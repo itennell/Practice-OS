@@ -91,7 +91,10 @@ function ApprovalItem({
             {approval.title}
           </h3>
           <p className="text-small text-[var(--fg-muted)]">
-            {KIND_LABEL[approval.kind] ?? approval.kind} · from {FROM_LABEL[approval.created_by] ?? approval.created_by} ·{" "}
+            {KIND_LABEL[approval.kind] ?? approval.kind} · from{" "}
+            {FROM_LABEL[approval.created_by] ??
+              (approval.created_by.startsWith("mcp:") ? `${approval.created_by.slice(4)} via MCP` : approval.created_by)}{" "}
+            ·{" "}
             {timeAgo(approval.created_at, now)}
           </p>
         </div>

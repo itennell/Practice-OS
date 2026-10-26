@@ -2,6 +2,7 @@ import { audit } from "./audit";
 import { db } from "./db";
 import { isDryRun } from "./env";
 import { editableField, executors } from "./executors";
+import type { ApprovalKind } from "./approval-kinds";
 import type { ApprovalRow } from "./executors/types";
 
 export type { ApprovalRow };
@@ -124,4 +125,30 @@ export async function decline(id: string, opts: { by: string }): Promise<Approve
   }
   await audit({ actor: "clinician", action: "approval_declined", approvalId: row.id, subjectType: row.kind, details: { by: opts.by } });
   return { ok: true, approval: toView(row) };
+}
+
+/**
+ * The only way agents and tools add work (AGENTS.md > Approvals): one INSERT
+ * with status 'pending' and an audit line. Never runs an executor.
+ */
+export async function queueApproval(input: {
+  kind: ApprovalKind;
+  title: string;
+  preview?: Record<string, unknown>;
+  payload?: Record<string, unknown>;
+  createdBy: string;
+}): Promise<string> {
+  const [row] = await db()<{ id: string }[]>`
+    insert into practice_os.approvals (kind, title, preview, payload, status, created_by)
+    values (${input.kind}, ${input.title}, ${db().json((input.preview ?? {}) as never)},
+            ${db().json((input.payload ?? {}) as never)}, 'pending', ${input.createdBy})
+    returning id`;
+  await audit({
+    actor: "aeon",
+    action: "approval_queued",
+    approvalId: row.id,
+    subjectType: input.kind,
+    details: { created_by: input.createdBy, title: input.title },
+  });
+  return row.id;
 }

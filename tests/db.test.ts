@@ -2,6 +2,7 @@
 // so CI stays green without a key. They leave no rows behind.
 import postgres from "postgres";
 import { afterAll, describe, expect, it } from "vitest";
+import { APPROVAL_KINDS } from "../lib/approval-kinds";
 import { loadEnv } from "../lib/env";
 
 loadEnv();
@@ -51,6 +52,14 @@ describe.skipIf(!sql)("practice_os database", () => {
     await expect(
       sql!`insert into practice_os.connections (provider, access_token_enc) values ('twilio', 'plain-token')`,
     ).rejects.toThrow(/connections_tokens_encrypted/);
+  });
+
+  it("accepts exactly the approval kinds in lib/approval-kinds.ts", async () => {
+    const [row] = await sql!`
+      select pg_get_constraintdef(oid) as def from pg_constraint
+      where conname = 'approvals_kind_check' and conrelid = 'practice_os.approvals'::regclass`;
+    const inDb = [...row.def.matchAll(/'([a-z_]+)'::text/g)].map((m) => m[1]).sort();
+    expect(inDb).toEqual([...APPROVAL_KINDS].sort());
   });
 
   it("rejects an unknown approval kind", async () => {
