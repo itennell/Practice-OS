@@ -31,8 +31,11 @@ describe.skipIf(!sql)("queue_approval", () => {
       arguments: { kind: "test_note", title: "[Sample] Queued over MCP", payload: { note: "[Sample] from vitest" } },
     });
     expect(result.isError).toBeFalsy();
-    expect(result.content).toEqual([{ type: "text", text: "queued for clinician approval" }]);
     const { approval_id: id, status } = result.structuredContent as { approval_id: string; status: string };
+    expect(result.content).toEqual([
+      { type: "text", text: "queued for clinician approval" },
+      { type: "text", text: `approval_id: ${id}` },
+    ]);
     created.push(id);
     expect(status).toBe("pending");
 

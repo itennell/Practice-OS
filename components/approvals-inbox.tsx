@@ -43,6 +43,22 @@ const FROM_LABEL: Record<string, string> = {
   "aeon:admin": "Admin",
 };
 
+// MCP clients announce themselves by their own internal names; Muse says "tbh".
+const MCP_CLIENT_LABEL: Record<string, string> = {
+  "claude-code": "Claude Code",
+  tbh: "Muse",
+  muse: "Muse",
+};
+
+function fromLabel(createdBy: string): string {
+  if (FROM_LABEL[createdBy]) return FROM_LABEL[createdBy];
+  if (createdBy.startsWith("mcp:")) {
+    const client = createdBy.slice(4);
+    return `${MCP_CLIENT_LABEL[client] ?? client} via MCP`;
+  }
+  return createdBy;
+}
+
 function previewLine(a: ApprovalView): string | null {
   const p = a.preview as Record<string, unknown>;
   for (const key of ["note", "excerpt", "caption_excerpt", "body"]) {
@@ -91,10 +107,7 @@ function ApprovalItem({
             {approval.title}
           </h3>
           <p className="text-small text-[var(--fg-muted)]">
-            {KIND_LABEL[approval.kind] ?? approval.kind} · from{" "}
-            {FROM_LABEL[approval.created_by] ??
-              (approval.created_by.startsWith("mcp:") ? `${approval.created_by.slice(4)} via MCP` : approval.created_by)}{" "}
-            ·{" "}
+            {KIND_LABEL[approval.kind] ?? approval.kind} · from {fromLabel(approval.created_by)} ·{" "}
             {timeAgo(approval.created_at, now)}
           </p>
         </div>

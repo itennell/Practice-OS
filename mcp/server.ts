@@ -67,7 +67,11 @@ server.registerTool(
   async ({ kind, title, preview, payload }) => {
     const id = await queueApproval({ kind, title, preview, payload, createdBy: createdBy() });
     return {
-      content: [{ type: "text", text: "queued for clinician approval" }],
+      // Second text block too: some clients (Muse) read only text, not structuredContent.
+      content: [
+        { type: "text", text: "queued for clinician approval" },
+        { type: "text", text: `approval_id: ${id}` },
+      ],
       structuredContent: { status: "pending" as const, approval_id: id },
     };
   },
