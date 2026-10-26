@@ -1,0 +1,10 @@
+#!/bin/sh
+# Blocks any commit that contains something that looks like a secret.
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "gitleaks not installed: brew install gitleaks"
+  exit 1
+fi
+gitleaks git --staged --redact --no-banner || {
+  echo "Commit blocked: possible secret found."
+  exit 1
+}

@@ -1,0 +1,101 @@
+@import "tailwindcss";
+
+/* Caseload design tokens (see AGENTS.md > Design system). */
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  --color-canvas: #f5f3fc;
+  --color-glow-lilac: #e2d8ff;
+  --color-glow-blue: #c9dbff;
+  --color-ink: #17142b;
+  --color-muted: #5d5878;
+  --color-accent: #5b47c9;
+  --color-accent-hover: #43349a;
+  --color-primary: #1e1a3a;
+  --color-border: #d4cdf0;
+  --color-success: #2f7a55;
+
+  --color-dark-surface: #100d24;
+  --color-dark-surface-2: #121022;
+  --color-dark-accent: #8e7cf8;
+
+  --radius-card: 24px;
+  --radius-card-sm: 20px;
+  --radius-card-lg: 28px;
+
+  --spacing-touch: 44px;
+  --spacing-btn-primary: 52px;
+  --spacing-btn-accent: 44px;
+  --spacing-chip: 40px;
+  --spacing-input: 48px;
+}
+
+:root {
+  --bg: var(--color-canvas);
+  --fg: var(--color-ink);
+  --fg-muted: var(--color-muted);
+  --link: var(--color-accent);
+  --glass: rgb(255 255 255 / 0.64);
+  --glass-line: rgb(255 255 255 / 0.9);
+  --glow-1: var(--color-glow-lilac);
+  --glow-2: var(--color-glow-blue);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: var(--color-dark-surface);
+    --fg: #f1eeff;
+    --fg-muted: #a9a3c8;
+    --link: var(--color-dark-accent);
+    --glass: rgb(18 16 34 / 0.64);
+    --glass-line: rgb(255 255 255 / 0.08);
+    --glow-1: rgb(142 124 248 / 0.18);
+    --glow-2: rgb(78 105 218 / 0.16);
+  }
+}
+
+body {
+  min-height: 100vh;
+  color: var(--fg);
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(60rem 40rem at 0% 0%, var(--glow-1), transparent 70%),
+    radial-gradient(60rem 40rem at 100% 100%, var(--glow-2), transparent 70%);
+  background-attachment: fixed;
+}
+
+@utility glass {
+  background: var(--glass);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid var(--glass-line);
+  border-radius: var(--radius-card);
+}
+
+/* Aeon's breathing orb and the helper orbs. */
+@utility orb {
+  border-radius: 9999px;
+  background: radial-gradient(circle at 35% 30%, #ffffff 0%, #e3d9ff 28%, #8e7cf8 62%, #4e69da 100%);
+  animation: breathe 4s ease-in-out infinite;
+}
+@utility orb-front-desk {
+  border-radius: 9999px;
+  background: radial-gradient(circle at 35% 30%, #5b9bf0, #2e5cc8);
+}
+@utility orb-referrals {
+  border-radius: 9999px;
+  background: radial-gradient(circle at 35% 30%, #a77bf0, #6a3fc8);
+}
+@utility orb-instagram {
+  border-radius: 9999px;
+  background: radial-gradient(circle at 35% 30%, #e07bc4, #8c44b8);
+}
+
+@keyframes breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .orb { animation: none; }
+}
