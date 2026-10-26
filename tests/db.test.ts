@@ -59,7 +59,7 @@ describe.skipIf(!sql)("practice_os database", () => {
     ).rejects.toThrow(/check constraint/);
   });
 
-  it("seeds the fictional Dana Reyes practice with 3 pending [Sample] approvals", async () => {
+  it("seeds the fictional Dana Reyes practice with 3 pending [Sample] helper approvals", async () => {
     const [profile] = await sql!`select full_name, credential, license_line, practice_stage from practice_os.clinician_profile`;
     expect(profile).toMatchObject({
       full_name: "Dana Reyes",
@@ -67,7 +67,7 @@ describe.skipIf(!sql)("practice_os database", () => {
       license_line: "Dana Reyes, LCPC (fictional demo practice)",
       practice_stage: "beginning",
     });
-    const pending = await sql!`select title from practice_os.approvals where status = 'pending' and is_sample`;
+    const pending = await sql!`select title from practice_os.approvals where status = 'pending' and is_sample and kind <> 'test_note'`;
     expect(pending).toHaveLength(3);
     for (const p of pending) expect(p.title).toMatch(/^\[Sample\]/);
   });

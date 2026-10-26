@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Caseload design tokens (see AGENTS.md > Design system). */
+/* Caseload design tokens (AGENTS.md > Design system; design board page 7). */
 @theme {
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 
@@ -19,9 +19,20 @@
   --color-dark-surface-2: #121022;
   --color-dark-accent: #8e7cf8;
 
+  /* Board type scale: title 27-34/600, body 15/400 at 1.5, label 12/600, small 12-13. */
+  --text-title: 2rem;
+  --text-title--line-height: 1.15;
+  --text-title--font-weight: 600;
+  --text-section: 1.25rem;
+  --text-section--line-height: 1.3;
+  --text-body: 0.9375rem;
+  --text-body--line-height: 1.5;
+  --text-label: 0.75rem;
+  --text-label--line-height: 1.3;
+  --text-small: 0.8125rem;
+  --text-small--line-height: 1.4;
+
   --radius-card: 24px;
-  --radius-card-sm: 20px;
-  --radius-card-lg: 28px;
 
   --spacing-touch: 44px;
   --spacing-btn-primary: 52px;
@@ -31,26 +42,71 @@
 }
 
 :root {
+  color-scheme: light;
   --bg: var(--color-canvas);
   --fg: var(--color-ink);
   --fg-muted: var(--color-muted);
   --link: var(--color-accent);
+  --accent-fg: var(--color-accent);
   --glass: rgb(255 255 255 / 0.64);
-  --glass-line: rgb(255 255 255 / 0.9);
+  --glass-strong: rgb(255 255 255 / 0.78);
+  --glass-line: rgb(255 255 255 / 0.85);
+  --hairline: rgb(23 20 43 / 0.08);
   --glow-1: var(--color-glow-lilac);
   --glow-2: var(--color-glow-blue);
+  --primary-bg: var(--color-primary);
+  --primary-fg: #ffffff;
+  --primary-hover: #2c2752;
+  --chip-off-bg: #ffffff;
+
+  /* Approval status pills (light text on tinted ground, all >= 4.5:1). */
+  --status-pending-fg: #7a4a00;
+  --status-pending-bg: #fdf0d5;
+  --status-running-fg: #4a37b5;
+  --status-running-bg: #ebe7fb;
+  --status-done-fg: #24603f;
+  --status-done-bg: #e2f2e9;
+  --status-failed-fg: #a1261b;
+  --status-failed-bg: #fce9e6;
+  --status-rejected-fg: #504b69;
+  --status-rejected-bg: #ecebf2;
+  --danger-fg: #a1261b;
+
+  --focus-ring: #5b47c9;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
+    color-scheme: dark;
     --bg: var(--color-dark-surface);
     --fg: #f1eeff;
-    --fg-muted: #a9a3c8;
+    --fg-muted: #b3adcf;
     --link: var(--color-dark-accent);
+    --accent-fg: #b0a3fb;
     --glass: rgb(18 16 34 / 0.64);
-    --glass-line: rgb(255 255 255 / 0.08);
+    --glass-strong: rgb(18 16 34 / 0.82);
+    --glass-line: rgb(255 255 255 / 0.1);
+    --hairline: rgb(255 255 255 / 0.08);
     --glow-1: rgb(142 124 248 / 0.18);
     --glow-2: rgb(78 105 218 / 0.16);
+    --primary-bg: #f1eeff;
+    --primary-fg: #17142b;
+    --primary-hover: #ffffff;
+    --chip-off-bg: transparent;
+
+    --status-pending-fg: #f6c56b;
+    --status-pending-bg: rgb(246 197 107 / 0.12);
+    --status-running-fg: #c4b9ff;
+    --status-running-bg: rgb(142 124 248 / 0.16);
+    --status-done-fg: #8fd8ae;
+    --status-done-bg: rgb(143 216 174 / 0.12);
+    --status-failed-fg: #ffaea3;
+    --status-failed-bg: rgb(255 174 163 / 0.12);
+    --status-rejected-fg: #c9c4de;
+    --status-rejected-bg: rgb(255 255 255 / 0.08);
+    --danger-fg: #ffaea3;
+
+    --focus-ring: #b0a3fb;
   }
 }
 
@@ -62,14 +118,45 @@ body {
     radial-gradient(60rem 40rem at 0% 0%, var(--glow-1), transparent 70%),
     radial-gradient(60rem 40rem at 100% 100%, var(--glow-2), transparent 70%);
   background-attachment: fixed;
+  font-size: var(--text-body);
+  line-height: 1.5;
 }
 
+p,
+h1,
+h2,
+h3 {
+  text-wrap: pretty;
+}
+
+/* Browser surfaces carry the palette too. */
+::selection {
+  background: rgb(91 71 201 / 0.22);
+}
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+textarea {
+  caret-color: var(--accent-fg);
+}
+
+/* Glass card: white at 64%, 18px blur, white hairline at 85%, radius 24. */
 @utility glass {
   background: var(--glass);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   border: 1px solid var(--glass-line);
   border-radius: var(--radius-card);
+}
+
+/* Label style from the board: 12 / 600 / uppercase, in accent. */
+@utility label-caps {
+  font-size: var(--text-label);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent-fg);
 }
 
 /* Aeon's breathing orb and the helper orbs. */
@@ -92,10 +179,22 @@ body {
 }
 
 @keyframes breathe {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.06); }
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .orb { animation: none; }
+  .orb {
+    animation: none;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
 }

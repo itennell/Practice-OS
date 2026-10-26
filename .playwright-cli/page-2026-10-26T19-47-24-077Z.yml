@@ -1,0 +1,31 @@
+- generic [active] [ref=f4e1]:
+  - generic [ref=f4e2]:
+    - navigation "Main" [ref=f4e3]:
+      - generic [ref=f4e6]:
+        - paragraph [ref=f4e7]: Aeon
+        - paragraph [ref=f4e8]: Practice co-owner
+      - list [ref=f4e9]:
+        - listitem [ref=f4e10]:
+          - link "Home" [ref=f4e11] [cursor=pointer]:
+            - /url: /
+        - listitem [ref=f4e15]:
+          - link "Approvals" [ref=f4e16] [cursor=pointer]:
+            - /url: /approvals
+        - listitem [ref=f4e20]:
+          - link "Deadlines" [ref=f4e21] [cursor=pointer]:
+            - /url: /deadlines
+        - listitem [ref=f4e26]:
+          - link "Referrals" [ref=f4e27] [cursor=pointer]:
+            - /url: /referrals
+        - listitem [ref=f4e33]:
+          - link "Instagram" [ref=f4e34] [cursor=pointer]:
+            - /url: /instagram
+        - listitem [ref=f4e38]:
+          - link "Front Desk" [ref=f4e39] [cursor=pointer]:
+            - /url: /front-desk
+      - link "Settings" [ref=f4e43] [cursor=pointer]:
+        - /url: /settings
+    - main [ref=f4e47]:
+      - region [ref=f4e51]:
+        - heading "Approvals" [level=2] [ref=f4e52]
+  - alert [ref=f4e57]

@@ -125,7 +125,17 @@ insert into practice_os.approvals (id, kind, title, preview, payload, created_by
    '[Sample] Text Riley Example open consult times',
    '{"to": "[Sample] Riley Example", "body": "[Sample] Hi Riley, this is the AI assistant for Reyes Counseling. Yes, superbills are available. Open consult times: Tue 6:00 PM, Thu 5:30 PM."}'::jsonb,
    '{"inquiry_id": "00000000-0000-4000-8000-000000000402", "delivery": "sms_to_verified_test_phone"}'::jsonb,
-   'aeon:front_desk', true);
+   'aeon:front_desk', true),
+  ('00000000-0000-4000-8000-000000000904', 'test_note',
+   '[Sample] Test note: hello from Aeon',
+   '{"note": "[Sample] Hello from Aeon. Approving this only writes one line to the audit log."}'::jsonb,
+   '{"note": "[Sample] Hello from Aeon. Approving this only writes one line to the audit log."}'::jsonb,
+   'aeon', true),
+  ('00000000-0000-4000-8000-000000000905', 'test_note',
+   '[Sample] Test note: this one fails on purpose',
+   '{"note": "[Sample] Approving this shows what a failed action looks like."}'::jsonb,
+   '{"note": "[Sample] Approving this shows what a failed action looks like.", "fail": true}'::jsonb,
+   'aeon', true);
 
 insert into practice_os.audit_log (actor, action, details)
 values ('system', 'demo_data_seeded', '{"practice": "Reyes Counseling PLLC (fictional demo practice)"}'::jsonb);

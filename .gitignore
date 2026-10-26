@@ -50,3 +50,7 @@ test/
 .claude/settings.local.json
 .agents/
 !.env.example
+
+# Playwright output
+/test-results/
+/playwright-report/
