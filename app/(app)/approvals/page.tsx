@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { Suspense } from "react";
 import { ApprovalsInbox } from "@/components/approvals-inbox";
 import { GlassCard } from "@/components/ui";
@@ -24,5 +25,6 @@ export default function ApprovalsPage() {
 }
 
 async function AllApprovals() {
+  await connection(); // read the database per request, never at build time
   return <ApprovalsInbox initial={await listApprovals({ includeDecided: true })} showAll />;
 }

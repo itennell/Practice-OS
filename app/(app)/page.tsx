@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { Suspense } from "react";
 import { ApprovalsInbox } from "@/components/approvals-inbox";
 import { GlassCard } from "@/components/ui";
@@ -24,6 +25,7 @@ export default function HomePage() {
 }
 
 async function Header() {
+  await connection(); // read the database per request, never at build time
   const profile = await getProfile();
   if (!profile) {
     return <h1 className="text-title">Welcome</h1>;
@@ -45,6 +47,7 @@ async function Header() {
 }
 
 async function Inbox() {
+  await connection();
   const approvals = await listApprovals();
   return <ApprovalsInbox initial={approvals} />;
 }
