@@ -47,6 +47,12 @@ describe.skipIf(!sql)("practice_os database", () => {
     }
   });
 
+  it("refuses a plain (unencrypted) token in connections", async () => {
+    await expect(
+      sql!`insert into practice_os.connections (provider, access_token_enc) values ('twilio', 'plain-token')`,
+    ).rejects.toThrow(/connections_tokens_encrypted/);
+  });
+
   it("rejects an unknown approval kind", async () => {
     await expect(
       sql!`insert into practice_os.approvals (kind, title, created_by) values ('wire_money', 'x', 'test')`,
