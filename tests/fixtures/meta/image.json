@@ -1,0 +1,56 @@
+{
+  "model": "muse-image-1.0",
+  "id": "redacted-id",
+  "object": "response",
+  "status": "completed",
+  "created_at": 1793040470,
+  "error": null,
+  "incomplete_details": null,
+  "output": [
+    {
+      "type": "reasoning",
+      "id": "redacted-id",
+      "summary": [
+        {
+          "type": "summary_text",
+          "text": "**Composing professional headshot**\nI'm planning a photorealistic portrait of Dana Reyes, a fictional counselor in her early 40s, with a warm smile, shoulders-up framing, soft natural window light, and a plain soft lilac background.\n**Composing portrait with styling**\nI'm setting up a photorealistic portrait with soft window light, a navy blazer over a cream blouse, gold hoops, and a warm smile against a soft lilac background."
+        }
+      ],
+      "status": "completed"
+    },
+    {
+      "type": "message",
+      "id": "redacted-id",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "",
+          "annotations": [],
+          "logprobs": []
+        }
+      ],
+      "status": "completed"
+    },
+    {
+      "type": "image_generation_call",
+      "id": "redacted-id",
+      "status": "completed",
+      "result": "UklGRr5PBQBXRUJQVlA4WAoAAAAEAAAAPwYAPwYAVlA4IBZOBQBwnhGdASpABkAG..."
+    }
+  ],
+  "instructions": null,
+  "usage": {
+    "input_tokens": 9877,
+    "input_tokens_details": {
+      "cached_tokens": 8000
+    },
+    "output_tokens": 727,
+    "output_tokens_details": {
+      "reasoning_tokens": 223
+    },
+    "total_tokens": 10604
+  },
+  "parallel_tool_calls": false,
+  "output_text": ""
+}

@@ -1,0 +1,70 @@
+{
+  "first": {
+    "id": "redacted-id",
+    "choices": [
+      {
+        "finish_reason": "tool_calls",
+        "index": 0,
+        "message": {
+          "content": "I'll check your license renewal deadline now.",
+          "refusal": null,
+          "tool_calls": [
+            {
+              "id": "redacted-id",
+              "type": "function",
+              "function": {
+                "name": "get_deadline",
+                "arguments": "{\"item\":\"license renewal\"}"
+              }
+            }
+          ],
+          "role": "assistant"
+        },
+        "logprobs": null
+      }
+    ],
+    "created": 1793040460,
+    "model": "muse-spark-1.3",
+    "object": "chat.completion",
+    "usage": {
+      "completion_tokens": 375,
+      "prompt_tokens": 572,
+      "total_tokens": 947,
+      "completion_tokens_details": {
+        "reasoning_tokens": 306
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 497
+      }
+    }
+  },
+  "final": {
+    "id": "redacted-id",
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "message": {
+          "content": "Your license renewal is due on **2026-12-31**.\n",
+          "refusal": null,
+          "role": "assistant"
+        },
+        "logprobs": null
+      }
+    ],
+    "created": 1793040463,
+    "model": "muse-spark-1.3",
+    "object": "chat.completion",
+    "usage": {
+      "completion_tokens": 233,
+      "prompt_tokens": 670,
+      "total_tokens": 903,
+      "completion_tokens_details": {
+        "reasoning_tokens": 210
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 113
+      }
+    }
+  }
+}

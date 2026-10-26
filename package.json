@@ -10,16 +10,21 @@
     "test": "vitest run",
     "mcp": "tsx mcp/server.ts",
     "db:migrate": "tsx scripts/migrate.ts",
-    "prepare": "git config core.hooksPath .githooks || true"
+    "prepare": "git config core.hooksPath .githooks || true",
+    "smoke": "tsx scripts/smoke.ts"
   },
   "dependencies": {
+    "@meta-sam/parser": "0.0.13",
     "@modelcontextprotocol/sdk": "1.32.2",
     "dotenv": "18.0.9",
     "next": "16.4.3",
+    "openai": "4.104.0",
+    "pdf-lib": "1.17.1",
     "postgres": "3.4.9",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "zod": "4.6.7"
+    "sharp": "0.35.5",
+    "zod": "3.25.76"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "4.3.3",
@@ -28,6 +33,7 @@
     "@types/react-dom": "19.3.0",
     "eslint": "9.39.5",
     "eslint-config-next": "16.4.3",
+    "mupdf": "1.28.1",
     "tailwindcss": "4.3.3",
     "tsx": "4.23.15",
     "typescript": "5.9.3",
@@ -35,7 +41,7 @@
   },
   "description": "Aeon: an open-source AI co-owner for independently licensed mental health clinicians in Illinois.",
   "engines": {
-    "node": ">=20"
+    "node": "^20.17.0 || >=22.9.0"
   },
   "type": "module"
 }
