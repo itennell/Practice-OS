@@ -33,6 +33,27 @@
   --text-small--line-height: 1.4;
 
   --radius-card: 24px;
+  --radius-card-sm: 20px;
+  --radius-card-lg: 28px;
+
+  --blur-glass: 18px;
+
+  /* Aeon and helper orb gradients (AGENTS.md > Design system). */
+  --color-aeon-1: #ffffff;
+  --color-aeon-2: #e3d9ff;
+  --color-aeon-3: #8e7cf8;
+  --color-aeon-4: #4e69da;
+  --color-front-desk-from: #5b9bf0;
+  --color-front-desk-to: #2e5cc8;
+  --color-referrals-from: #a77bf0;
+  --color-referrals-to: #6a3fc8;
+  --color-instagram-from: #e07bc4;
+  --color-instagram-to: #8c44b8;
+
+  /* Motion: calm for most UI, soft-out for things arriving, pop for small celebrations. */
+  --ease-calm: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-soft-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
 
   --spacing-touch: 44px;
   --spacing-btn-primary: 52px;
@@ -73,6 +94,12 @@
   --danger-fg: #a1261b;
 
   --focus-ring: #5b47c9;
+
+  /* Motion durations. The orb breathes over --dur-breathe. */
+  --dur-fast: 150ms;
+  --dur-base: 240ms;
+  --dur-slow: 400ms;
+  --dur-breathe: 4s;
 }
 
 @media (prefers-color-scheme: dark) {
