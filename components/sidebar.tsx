@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, CalendarClock, Camera, FileText, House, Inbox, Menu, Phone, Settings, Users, X } from "lucide-react";
+import { BookOpen, Brain, CalendarClock, Camera, FileText, LayoutDashboard, MessageCircle, Inbox, Menu, Phone, Settings, Users, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ComponentType } from "react";
@@ -9,7 +9,8 @@ import { Orb } from "./ui";
 type NavItem = { href: string; label: string; icon: ComponentType<{ size?: number; strokeWidth?: number; "aria-hidden"?: boolean }> };
 
 const NAV: NavItem[] = [
-  { href: "/", label: "Home", icon: House },
+  { href: "/", label: "Chat with Aeon", icon: MessageCircle },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/approvals", label: "Approvals", icon: Inbox },
   { href: "/deadlines", label: "Deadlines", icon: CalendarClock },
   { href: "/paperwork", label: "Paperwork", icon: FileText },
@@ -17,6 +18,7 @@ const NAV: NavItem[] = [
   { href: "/referrals", label: "Referrals", icon: Users },
   { href: "/instagram", label: "Instagram", icon: Camera },
   { href: "/front-desk", label: "Front Desk", icon: Phone },
+  { href: "/memory", label: "Memory", icon: Brain },
 ];
 
 function NavLink({ href, label, icon: Icon, onNavigate }: NavItem & { onNavigate?: () => void }) {

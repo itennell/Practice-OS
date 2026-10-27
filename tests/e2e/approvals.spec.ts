@@ -7,7 +7,7 @@ test.beforeEach(() => {
 });
 
 test("Approve a test note: Waiting for you, then Done", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   const card = page.getByRole("listitem", { name: "[Sample] Test note: hello from Aeon" });
   await expect(card.getByText("Waiting for you")).toBeVisible();
   await card.getByRole("button", { name: "Approve", exact: true }).click();
@@ -16,7 +16,7 @@ test("Approve a test note: Waiting for you, then Done", async ({ page }) => {
 });
 
 test("The failing note ends as Failed with its error", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   const card = page.getByRole("listitem", { name: "[Sample] Test note: this one fails on purpose" });
   await card.getByRole("button", { name: "Approve", exact: true }).click();
   const after = page.getByRole("listitem", { name: "[Sample] Test note: this one fails on purpose" });
@@ -25,7 +25,7 @@ test("The failing note ends as Failed with its error", async ({ page }) => {
 });
 
 test("Edit then approve runs the edited text", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   const card = page.getByRole("listitem", { name: "[Sample] Test note: hello from Aeon" });
   await card.getByRole("button", { name: "Edit then approve" }).click();
   await card.getByRole("textbox").fill("[Sample] Edited by Dana before approving.");
@@ -34,7 +34,7 @@ test("Edit then approve runs the edited text", async ({ page }) => {
 });
 
 test("Decline marks it Declined", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   const card = page.getByRole("listitem", { name: "[Sample] Test note: hello from Aeon" });
   await card.getByRole("button", { name: "Decline" }).click();
   await expect(page.getByRole("listitem", { name: "[Sample] Test note: hello from Aeon" }).getByText("Declined")).toBeVisible();
@@ -51,7 +51,7 @@ for (const path of ["/", "/approvals", "/deadlines", "/settings"]) {
 }
 
 test("Screenshots of Home and the failed state", async ({ page }, info) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   await page.getByRole("listitem", { name: "[Sample] Test note: this one fails on purpose" }).getByRole("button", { name: "Approve", exact: true }).click();
   await expect(page.getByText("Failed", { exact: true })).toBeVisible();
   await page.screenshot({ path: `test/screens/home-${info.project.name}.png`, fullPage: true });

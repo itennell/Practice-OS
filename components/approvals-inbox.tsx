@@ -49,6 +49,7 @@ const MCP_CLIENT_LABEL: Record<string, string> = {
 
 function fromLabel(createdBy: string): string {
   if (FROM_LABEL[createdBy]) return FROM_LABEL[createdBy];
+  if (createdBy.startsWith("chat:")) return "your chat with Aeon";
   if (createdBy.startsWith("mcp:")) {
     const client = createdBy.slice(4);
     return `${MCP_CLIENT_LABEL[client] ?? client} via MCP`;
@@ -201,7 +202,16 @@ function ApprovalItem({
   );
 }
 
-export function ApprovalsInbox({ initial, showAll = false }: { initial: ApprovalView[]; showAll?: boolean }) {
+export function ApprovalsInbox({
+  initial,
+  showAll = false,
+  ids,
+}: {
+  initial: ApprovalView[];
+  showAll?: boolean;
+  /** Only these approvals, without the summary line: the cards under one of Aeon's chat replies (UI-027). */
+  ids?: string[];
+}) {
   const [approvals, setApprovals] = useState(initial);
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [announcement, setAnnouncement] = useState("");
@@ -222,20 +232,26 @@ export function ApprovalsInbox({ initial, showAll = false }: { initial: Approval
   }, []);
 
   const refresh = useCallback(async () => {
-    const res = await fetch(`/api/approvals${showAll ? "?all=1" : ""}`, { cache: "no-store" });
+    const query = ids ? `?ids=${ids.join(",")}` : showAll ? "?all=1" : "";
+    const res = await fetch(`/api/approvals${query}`, { cache: "no-store" });
     if (!res.ok) return;
     const { approvals: next } = (await res.json()) as { approvals: ApprovalView[] };
     announceChanges(next);
     setApprovals(next);
     setNow(Date.now());
-  }, [announceChanges, showAll]);
+  }, [announceChanges, showAll, ids]);
 
   // Live status: every second while something is running, every 10 s otherwise.
   const anyRunning = busy.size > 0 || approvals.some((a) => a.status === "running");
+  // Chat cards (ids) start empty, so they load straight away too.
   useEffect(() => {
+    const first = ids ? setTimeout(refresh, 0) : undefined;
     const timer = setInterval(refresh, anyRunning ? 1000 : 10000);
-    return () => clearInterval(timer);
-  }, [refresh, anyRunning]);
+    return () => {
+      clearTimeout(first);
+      clearInterval(timer);
+    };
+  }, [refresh, anyRunning, ids]);
 
   async function decide(id: string, action: "approve" | "decline", edit?: string) {
     setProblem(null);
@@ -268,11 +284,13 @@ export function ApprovalsInbox({ initial, showAll = false }: { initial: Approval
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-[var(--fg-muted)]">
-        {pendingCount === 0
-          ? "Nothing is waiting for you. New drafts from Aeon show up here."
-          : `${pendingCount} waiting for you. Nothing is sent, posted or booked until you approve it.`}
-      </p>
+      {!ids && (
+        <p className="text-[var(--fg-muted)]">
+          {pendingCount === 0
+            ? "Nothing is waiting for you. New drafts from Aeon show up here."
+            : `${pendingCount} waiting for you. Nothing is sent, posted or booked until you approve it.`}
+        </p>
+      )}
       {problem && (
         <p role="alert" className="text-small font-medium" style={{ color: "var(--danger-fg)" }}>
           {problem}

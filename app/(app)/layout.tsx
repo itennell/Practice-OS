@@ -1,3 +1,4 @@
+import { Toaster } from "@/components/shared/toaster";
 import { Sidebar } from "@/components/sidebar";
 
 export default function AppLayout({ children }: LayoutProps<"/">) {
@@ -7,6 +8,7 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
       <main id="main" className="flex min-w-0 flex-1 flex-col gap-6 px-6 py-6 md:px-10 md:py-10">
         {children}
       </main>
+      <Toaster />
     </div>
   );
 }
