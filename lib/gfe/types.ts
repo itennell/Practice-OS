@@ -39,6 +39,10 @@ export type GfeLine = {
 export type GfeProviderEstimate = { provider: GfeProvider; lines: GfeLine[]; notes?: string };
 
 export type GoodFaithEstimate = {
+  /** Her reference number (GFE-2026-0001), so she can match the PDF to her records. */
+  reference?: string;
+  /** Not approved yet: every page says DRAFT. */
+  draft?: boolean;
   issuedOn: ISODate;
   convener: string;
   patient: GfePatient;

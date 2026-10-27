@@ -1,3 +1,4 @@
+import { gfeIssue } from "./gfe_issue";
 import { stateRules } from "./state_rules";
 import { testNote } from "./test_note";
 import type { Executor } from "./types";
@@ -6,6 +7,7 @@ import type { Executor } from "./types";
 export const executors: Partial<Record<string, Executor>> = {
   test_note: testNote,
   state_rules: stateRules,
+  gfe_issue: gfeIssue,
 };
 
 // The payload field the clinician may edit before approving, per kind.

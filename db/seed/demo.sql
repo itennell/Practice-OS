@@ -4,7 +4,7 @@
 
 insert into practice_os.clinician_profile
   (id, full_name, credential, practice_name, neighborhood, city, state, practice_stage, license_line,
-   onboarding_answers, onboarding_completed_at, is_sample)
+   onboarding_answers, onboarding_completed_at, office_hours, fee_schedule, is_sample)
 values (
   '00000000-0000-4000-8000-000000000001',
   'Dana Reyes', 'LCPC', 'Reyes Counseling PLLC', 'Lincoln Park', 'Chicago', 'IL', 'beginning',
@@ -17,7 +17,13 @@ values (
     "insurance": "[Sample] Not in network yet; credentialing planned",
     "stage": "beginning"
   }'::jsonb,
-  now(), true
+  now(),
+  -- [Sample] open Monday to Thursday, closed federal holidays: Good Faith Estimate due dates count these days.
+  '{"weekdays": [1, 2, 3, 4], "closed_on": [], "close_federal_holidays": true}'::jsonb,
+  '[{"code": "90791", "label": "First session (intake)", "cents": 20000},
+    {"code": "90834", "label": "Therapy, 38-52 minutes", "cents": 15000},
+    {"code": "90837", "label": "Therapy, 53 minutes or longer", "cents": 17500}]'::jsonb,
+  true
 );
 
 -- Settings are never reset: only created if missing.
@@ -125,6 +131,37 @@ insert into practice_os.approvals (id, kind, title, preview, payload, created_by
    '{"note": "[Sample] Approving this shows what a failed action looks like."}'::jsonb,
    '{"note": "[Sample] Approving this shows what a failed action looks like.", "fail": true}'::jsonb,
    'aeon', true);
+
+-- Two [Sample] Good Faith Estimates, with no client identity (migration 006): one
+-- already issued, one waiting for her approval. Dates are fixed, like the CMS example.
+insert into practice_os.approvals (id, kind, title, preview, payload, status, created_by, decided_at, decided_by, result, is_sample) values
+  ('00000000-0000-4000-8000-000000000906', 'gfe_issue', '[Sample] GFE-2026-0001: individual therapy, $8,950.00',
+   '{"body": "[Sample] 1 x 90791 $200.00 · 50 x 90837 $175.00. First visit 2026-11-12. Give it to the client by 2026-10-29.", "reference": "GFE-2026-0001"}'::jsonb,
+   '{"estimate_id": "00000000-0000-4000-8000-000000000a01"}'::jsonb,
+   'done', 'aeon:admin', '2026-10-28 15:00:00+00', 'clinician', '{"reference": "GFE-2026-0001", "issued_on": "2026-10-28", "on_time": true}'::jsonb, true),
+  ('00000000-0000-4000-8000-000000000907', 'gfe_issue', '[Sample] GFE-2026-0002: couples therapy, $3,950.00',
+   '{"body": "[Sample] 1 x 90791 $200.00 · 25 x 90834 $150.00, every 2 weeks. Client asked 2026-10-26. Give it to the client by 2026-10-29. Approving confirms these fees and marks it issued today. Aeon doesn''t send it; you give the PDF to the client.", "reference": "GFE-2026-0002"}'::jsonb,
+   '{"estimate_id": "00000000-0000-4000-8000-000000000a02"}'::jsonb,
+   'pending', 'aeon:admin', null, null, null, true);
+
+insert into practice_os.good_faith_estimates
+  (id, reference, basis, scheduled_on, service_on, requested_on, due_on, rule, service_kind, lines, recurring,
+   total_cents, issued_on, approval_id, is_sample) values
+  ('00000000-0000-4000-8000-000000000a01', 'GFE-2026-0001', 'scheduled', '2026-10-26', '2026-11-12', null, '2026-10-29',
+   '45 CFR 149.610(b)(1)(vi)(B)', 'individual',
+   '[{"code": "90791", "label": "First session (intake)", "quantity": 1, "cents": 20000, "location": "office"},
+     {"code": "90837", "label": "Therapy, 53 minutes or longer", "quantity": 50, "cents": 17500, "location": "either"}]'::jsonb,
+   '{"frequency": "weekly", "visits": 51, "from": "2026-11-12", "through": "2027-10-26"}'::jsonb,
+   895000, '2026-10-28', '00000000-0000-4000-8000-000000000906', true),
+  ('00000000-0000-4000-8000-000000000a02', 'GFE-2026-0002', 'requested', null, null, '2026-10-26', '2026-10-29',
+   '45 CFR 149.610(b)(1)(vi)(C)', 'couples',
+   '[{"code": "90791", "label": "First session (intake)", "quantity": 1, "cents": 20000, "location": "office"},
+     {"code": "90834", "label": "Therapy, 38-52 minutes", "quantity": 25, "cents": 15000, "location": "either"}]'::jsonb,
+   '{"frequency": "every_2_weeks", "visits": 26, "from": "2026-10-26", "through": "2027-10-26"}'::jsonb,
+   395000, null, '00000000-0000-4000-8000-000000000907', true);
+
+-- Real estimates continue after the sample numbers.
+select setval('practice_os.gfe_number_seq', greatest((select last_value from practice_os.gfe_number_seq), 2));
 
 insert into practice_os.audit_log (actor, action, details)
 values ('system', 'demo_data_seeded', '{"practice": "Reyes Counseling PLLC (fictional demo practice)"}'::jsonb);

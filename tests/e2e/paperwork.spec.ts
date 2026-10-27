@@ -6,16 +6,14 @@ test.beforeAll(() => {
   execSync("npm run db:reset", { stdio: "ignore" });
 });
 
-test("Good Faith Estimates: sample client, due date, timing check and the PDF", async ({ page, request }) => {
+test("Good Faith Estimates tab: timing check uses her hours, and the sample PDF still works", async ({ page, request }) => {
   const errors: string[] = [];
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
   await page.goto("/paperwork");
   await expect(page.getByRole("link", { name: "Good Faith Estimates" })).toHaveAttribute("aria-current", "page");
-  await expect(page.getByRole("heading", { name: "Jordan Example [Sample]" })).toBeVisible();
-  await expect(page.getByText("Thu, Oct 29, 2026")).toBeVisible();
-  await expect(page.getByRole("cell", { name: "$8,950.00" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "New Good Faith Estimate" })).toBeVisible();
 
-  // Thanksgiving week, Dana open Mon-Thu: 10 open days out, due Wed Dec 2.
+  // Thanksgiving week, Dana open Mon-Thu [Sample]: 10 open days out, due Wed Dec 2.
   await expect(page.getByText(/Give it by Wed, Dec 2, 2026/)).toBeVisible();
   await page.getByLabel("Or: client asked on").fill("2026-11-10");
   await expect(page.getByText(/Give it by Tue, Nov 17, 2026/)).toBeVisible();

@@ -27,7 +27,7 @@ describe("MCP server", () => {
     await client.connect(transport);
     try {
       const { tools } = await client.listTools();
-      expect(tools.map((t) => t.name).sort()).toEqual(["answer_setup", "log_event", "morning_brief", "queue_approval", "recheck_rules", "research_state_rules", "status", "update_facts"]);
+      expect(tools.map((t) => t.name).sort()).toEqual(["answer_setup", "draft_gfe", "log_event", "morning_brief", "queue_approval", "recheck_rules", "research_state_rules", "status", "update_facts"]);
 
       const result = await client.callTool({ name: "status" });
       const [first] = result.content as Array<{ type: string; text: string }>;
