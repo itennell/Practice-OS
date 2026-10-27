@@ -77,4 +77,43 @@ server.registerTool(
   },
 );
 
+const { morningBrief } = await import("../lib/compliance/brief");
+
+const briefItem = z.object({
+  title: z.string(),
+  due_on: z.string().nullable(),
+  days_left: z.number().nullable(),
+  urgency: z.string().nullable(),
+  what_to_do: z.string().nullable(),
+  you_must: z.string().nullable(),
+  source: z.string().nullable(),
+  needs_confirming: z.boolean(),
+});
+
+// Read-only: what the clinician needs to do this week, from the compliance calendar.
+server.registerTool(
+  "morning_brief",
+  {
+    title: "Morning brief: what needs you this week",
+    description:
+      "Answers 'What needs me this week?' for the clinician's practice: compliance deadlines due in the next 7 days " +
+      "(license, CE, CAQH, taxes, filings), anything urgent just after, setup questions waiting, and dates Aeon still needs. " +
+      "Each item says what to do and the part only she can do. Read-only; changes nothing.",
+    outputSchema: {
+      today: z.string(),
+      this_week: z.array(briefItem),
+      urgent_soon: z.array(briefItem),
+      setup_questions: z.array(z.object({ title: z.string(), what_to_do: z.string().nullable() })),
+      needs_dates: z.array(z.object({ title: z.string(), question: z.string() })),
+      is_sample: z.boolean(),
+      summary: z.string(),
+    },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  async () => {
+    const brief = await morningBrief();
+    return { content: [{ type: "text", text: brief.summary }], structuredContent: brief };
+  },
+);
+
 await server.connect(new StdioServerTransport());

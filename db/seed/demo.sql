@@ -23,19 +23,8 @@ values (
 -- Settings are never reset: only created if missing.
 insert into practice_os.settings (id) values (true) on conflict (id) do nothing;
 
-insert into practice_os.obligations (id, title, category, due_on, recurrence, notes, is_sample) values
-  ('00000000-0000-4000-8000-000000000101', '[Sample] Illinois LCPC license renewal', 'license_renewal',
-   date '2027-03-31', 'biennial', '[Sample] Demo date. Check your own expiration date with IDFPR.', true),
-  ('00000000-0000-4000-8000-000000000102', '[Sample] Continuing education hours for renewal', 'ce_hours',
-   date '2027-03-31', 'biennial', '[Sample] Demo item. Check IDFPR for the hours your license needs.', true),
-  ('00000000-0000-4000-8000-000000000103', '[Sample] CAQH re-attestation', 'caqh_reattestation',
-   current_date + 21, 'every_120_days', '[Sample] Demo date.', true),
-  ('00000000-0000-4000-8000-000000000104', '[Sample] Medicare revalidation', 'medicare_revalidation',
-   current_date + 400, 'every_5_years', '[Sample] Demo date.', true),
-  ('00000000-0000-4000-8000-000000000105', '[Sample] PLLC annual report', 'pllc_annual_report',
-   current_date + 60, 'annual', '[Sample] Demo date. Check the Illinois Secretary of State for yours.', true),
-  ('00000000-0000-4000-8000-000000000106', '[Sample] Quarterly estimated tax payment', 'quarterly_taxes',
-   current_date + 45, 'quarterly', '[Sample] Demo date. Confirm with your tax preparer.', true);
+-- Obligations come from the compliance rules: scripts/db-reset.ts writes Dana's
+-- compliance_facts (lib/compliance/demo.ts) and builds her calendar after this file.
 
 -- Made-up referral sources (never real NPPES providers).
 insert into practice_os.referral_sources

@@ -1,6 +1,8 @@
 import { readFile } from "node:fs/promises";
 import postgres from "postgres";
 import { loadEnv, requireEnv } from "../lib/env";
+import { danaFacts } from "../lib/compliance/demo";
+import { practiceToday, syncCalendar } from "../lib/compliance/store";
 
 // npm run db:reset: empties the demo-data tables and reseeds the fictional
 // Dana Reyes practice. Never touches settings, connections, audit_log,
@@ -11,6 +13,7 @@ export const DEMO_TABLES = [
   "clinician_profile",
   "approvals",
   "obligations",
+  "compliance_facts",
   "referral_sources",
   "posts",
   "inquiries",
@@ -49,6 +52,16 @@ try {
     await tx.unsafe(`truncate ${DEMO_TABLES.map((t) => `practice_os.${t}`).join(", ")}`);
     await tx.unsafe(seed);
   });
+
+  // Dana's practice facts, then her calendar built from the rules.
+  const today = await practiceToday(sql);
+  // State and credential live on clinician_profile; city goes in as city_code.
+  const facts: Record<string, unknown> = { ...danaFacts(today) };
+  facts.city_code = facts.city;
+  for (const key of ["practice_state", "credential", "city"]) delete facts[key];
+  await sql`insert into practice_os.compliance_facts ${sql(facts as never)}`;
+  const cal = await syncCalendar(sql, { today });
+  console.log(`Calendar for ${today}: ${cal.written} obligations from the rules.`);
 
   console.log("Reset done. Row counts:");
   for (const table of ALL_TABLES) {

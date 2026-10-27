@@ -73,3 +73,38 @@ describe.skipIf(!sql)("queue_approval", () => {
     expect(result.isError).toBe(true);
   });
 });
+
+describe.skipIf(!sql)("morning_brief", () => {
+  it("is listed as read-only", async () => {
+    const { tools } = await client.listTools();
+    const tool = tools.find((t) => t.name === "morning_brief");
+    expect(tool?.annotations?.readOnlyHint).toBe(true);
+  });
+
+  it("returns this week's items, urgent ones just after, and a plain-text summary", async () => {
+    const before = await sql!`select count(*)::int as n, max(updated_at) as at from practice_os.obligations`;
+    const result = await client.callTool({ name: "morning_brief", arguments: {} });
+    expect(result.isError).toBeFalsy();
+    const brief = result.structuredContent as {
+      today: string;
+      this_week: { title: string; days_left: number }[];
+      urgent_soon: { title: string; urgency: string; days_left: number }[];
+      setup_questions: { title: string }[];
+      is_sample: boolean;
+      summary: string;
+    };
+    for (const i of brief.this_week) expect(i.days_left).toBeLessThanOrEqual(7);
+    for (const i of brief.urgent_soon) expect(i).toMatchObject({ urgency: "red" });
+    // Dana's demo: CAQH is red (9 days out) so it shows as urgent soon.
+    expect([...brief.this_week, ...brief.urgent_soon].map((i) => i.title)).toContain(
+      "CAQH re-attestation (Illinois: every 180 days)",
+    );
+    expect(brief.setup_questions.length).toBeGreaterThan(0);
+    expect(brief.is_sample).toBe(true);
+    expect(result.content).toEqual([{ type: "text", text: brief.summary }]);
+    expect(brief.summary).toMatch(/\[Sample\]/);
+    // Read-only: nothing changed.
+    const after = await sql!`select count(*)::int as n, max(updated_at) as at from practice_os.obligations`;
+    expect(after).toEqual(before);
+  });
+});

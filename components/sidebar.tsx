@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarClock, Camera, House, Inbox, Menu, Phone, Settings, Users, X } from "lucide-react";
+import { BookOpen, CalendarClock, Camera, House, Inbox, Menu, Phone, Settings, Users, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ComponentType } from "react";
@@ -12,6 +12,7 @@ const NAV: NavItem[] = [
   { href: "/", label: "Home", icon: House },
   { href: "/approvals", label: "Approvals", icon: Inbox },
   { href: "/deadlines", label: "Deadlines", icon: CalendarClock },
+  { href: "/how-do-i", label: "How do I", icon: BookOpen },
   { href: "/referrals", label: "Referrals", icon: Users },
   { href: "/instagram", label: "Instagram", icon: Camera },
   { href: "/front-desk", label: "Front Desk", icon: Phone },
