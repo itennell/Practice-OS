@@ -57,7 +57,7 @@ Every UI piece Isaiah picked for Practice-OS, where it goes, and how to build it
 | UI-011 | Prompt Bar ("Ask anything" with dictation) | CHT | Message input | must | built | React Bits (app exception) | `components/shared/prompt-bar.tsx` (`PromptBar`) |
 | UI-012 | Slide to Commit | TBD | Anywhere it fits | nice | collected | React Bits (app exception) |  |
 | UI-013 | Spring Check (check off and cross out) | GLB | Checklists and check-offs | must | built | React Bits (app exception) | `components/shared/spring-check.tsx` (`SpringCheck`) |
-| UI-014 | Thought Line (Aeon is working) | CHT | Aeon thinking | must | approved | React Bits (app exception) | to build in Stage 1 |
+| UI-014 | Thought Line (Aeon is working) | CHT | Aeon thinking | must | built | React Bits (app exception) | `components/shared/thought-line.tsx` (`ThoughtLine`) |
 | UI-015 | Voice Pill (dictation capture) | CHT | Message input | must | built | React Bits (app exception) | `components/shared/voice-pill.tsx` (`VoicePill`), `app/api/transcribe` |
 | UI-016 | Animated Content (fade and slide in) | TBD | Anywhere it fits | nice | parked | React Bits (reference; marketing fit) |  |
 | UI-017 | Liquid Aeon (liquid metal blob for Aeon and the agents) | SHL | Aeon orb | must | approved | React Bits (app exception, adapted) | `components/agent-blob/` (test page built) |
