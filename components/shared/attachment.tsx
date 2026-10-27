@@ -55,8 +55,9 @@ export function Attachment({
     <div
       data-state={state}
       className={cn(
-        "group relative flex min-w-0 shrink-0 rounded-[var(--radius-card-sm)] border bg-[var(--glass)] p-2 text-[var(--fg)] backdrop-blur-[var(--blur-glass)]",
-        state === "error" ? "border-[var(--danger-fg)]" : "border-border",
+        "group relative flex min-w-0 shrink-0 rounded-[var(--radius-card-sm)] border bg-[var(--tile-bg)] p-2 text-[var(--fg)] shadow-[var(--tile-shadow)] backdrop-blur-[var(--blur-glass)]",
+        "transition-[box-shadow,transform] duration-200 ease-[var(--ease-soft-out)] hover:shadow-[var(--tile-shadow-hover)] motion-safe:hover:-translate-y-px",
+        state === "error" ? "border-[var(--danger-fg)]/60" : "border-[var(--tile-line)]",
         vertical ? "w-36 flex-col gap-2" : "w-80 max-w-full items-center gap-3",
         className,
       )}
@@ -126,7 +127,8 @@ const ACTION =
 /** A scrolling row of attachments, read as a list. */
 export function AttachmentList({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
   return (
-    <ul aria-label={label} className={cn("flex min-w-0 snap-x gap-3 overflow-x-auto overscroll-x-contain py-1", className)}>
+    // Padding leaves room for the cards' shadows, which the scrolling row would otherwise clip.
+    <ul aria-label={label} className={cn("-mx-2 -mt-1 -mb-6 flex min-w-0 snap-x gap-3 overflow-x-auto overscroll-x-contain px-2 pt-2 pb-8 [scrollbar-color:var(--fg-muted)_transparent] [scrollbar-width:thin]", className)}>
       {Array.isArray(children) ? children.map((c, i) => <li key={i} className="flex-none snap-start">{c}</li>) : <li className="flex-none">{children}</li>}
     </ul>
   );
