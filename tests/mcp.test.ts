@@ -87,7 +87,7 @@ describe.skipIf(!sql)("morning_brief", () => {
     expect(result.isError).toBeFalsy();
     const brief = result.structuredContent as {
       today: string;
-      this_week: { days_left: number }[];
+      this_week: { title: string; days_left: number }[];
       urgent_soon: { title: string; urgency: string; days_left: number }[];
       setup_questions: { title: string }[];
       is_sample: boolean;
@@ -96,7 +96,7 @@ describe.skipIf(!sql)("morning_brief", () => {
     for (const i of brief.this_week) expect(i.days_left).toBeLessThanOrEqual(7);
     for (const i of brief.urgent_soon) expect(i).toMatchObject({ urgency: "red" });
     // Dana's demo: CAQH is red (9 days out) so it shows as urgent soon.
-    expect([...brief.this_week, ...brief.urgent_soon].map((i) => (i as { title: string }).title)).toContain(
+    expect([...brief.this_week, ...brief.urgent_soon].map((i) => i.title)).toContain(
       "CAQH re-attestation (Illinois: every 180 days)",
     );
     expect(brief.setup_questions.length).toBeGreaterThan(0);
