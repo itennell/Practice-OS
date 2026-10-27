@@ -1,0 +1,122 @@
+{
+  "scenario": "status",
+  "recordedAt": "2026-10-27T19:51:50.775Z",
+  "calls": [
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "remember",
+        "forget"
+      ],
+      "lastRole": "user",
+      "response": {
+        "id": "chatcmpl-01a17eeb-4b3d-75d0-8886-66d8744a208c",
+        "choices": [
+          {
+            "finish_reason": "tool_calls",
+            "index": 0,
+            "message": {
+              "content": "Checking Practice-OS status now.",
+              "refusal": null,
+              "tool_calls": [
+                {
+                  "id": "call_a400f8cc-235f-4c42-8a19-175c1eb48b5d",
+                  "type": "function",
+                  "function": {
+                    "name": "status",
+                    "arguments": "{}"
+                  }
+                }
+              ],
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793130711,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 148,
+          "prompt_tokens": 4361,
+          "total_tokens": 4509,
+          "completion_tokens_details": {
+            "reasoning_tokens": 99
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        }
+      }
+    },
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "remember",
+        "forget"
+      ],
+      "lastRole": "tool",
+      "response": {
+        "id": "chatcmpl-01a17eeb-4e7f-706e-9897-9f3844475516",
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "index": 0,
+            "message": {
+              "content": "Yes. I checked Practice-OS status and dry-run is on.",
+              "refusal": null,
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793130712,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 196,
+          "prompt_tokens": 4435,
+          "total_tokens": 4631,
+          "completion_tokens_details": {
+            "reasoning_tokens": 173
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 4337
+          }
+        }
+      }
+    }
+  ],
+  "replies": [
+    {
+      "text": "Yes. I checked Practice-OS status and dry-run is on.",
+      "tools": [
+        "status"
+      ]
+    }
+  ]
+}

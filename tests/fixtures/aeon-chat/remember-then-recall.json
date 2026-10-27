@@ -1,0 +1,175 @@
+{
+  "scenario": "remember-then-recall",
+  "recordedAt": "2026-10-27T19:51:26.216Z",
+  "calls": [
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "remember",
+        "forget"
+      ],
+      "lastRole": "user",
+      "response": {
+        "id": "chatcmpl-01a17eea-eb75-7220-a430-9eb6f1288e03",
+        "choices": [
+          {
+            "finish_reason": "tool_calls",
+            "index": 0,
+            "message": {
+              "content": "Got it — I'll save that for your practice.",
+              "refusal": null,
+              "tool_calls": [
+                {
+                  "id": "call_6d7c186d-cdde-4eb6-95e7-51cc192d0763",
+                  "type": "function",
+                  "function": {
+                    "name": "remember",
+                    "arguments": "{\"kind\":\"decision\",\"text\":\"Does not take Medicaid\"}"
+                  }
+                }
+              ],
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793130687,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 202,
+          "prompt_tokens": 4358,
+          "total_tokens": 4560,
+          "completion_tokens_details": {
+            "reasoning_tokens": 117
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        }
+      }
+    },
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "remember",
+        "forget"
+      ],
+      "lastRole": "tool",
+      "response": {
+        "id": "chatcmpl-01a17eea-f4f0-77c5-b30c-02acb5a86b87",
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "index": 0,
+            "message": {
+              "content": "Saved: you don't take Medicaid.\n\nI'll remember that going forward.",
+              "refusal": null,
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793130689,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 247,
+          "prompt_tokens": 4519,
+          "total_tokens": 4766,
+          "completion_tokens_details": {
+            "reasoning_tokens": 225
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        }
+      }
+    },
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "remember",
+        "forget"
+      ],
+      "lastRole": "user",
+      "response": {
+        "id": "chatcmpl-01a17eea-fecb-72f5-afc8-240673884cf4",
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "index": 0,
+            "message": {
+              "content": "No. You do not take Medicaid.",
+              "refusal": null,
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793130692,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 407,
+          "prompt_tokens": 4402,
+          "total_tokens": 4809,
+          "completion_tokens_details": {
+            "reasoning_tokens": 390
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        }
+      }
+    }
+  ],
+  "replies": [
+    {
+      "text": "Saved: you don't take Medicaid.\n\nI'll remember that going forward.",
+      "tools": [
+        "remember"
+      ]
+    },
+    {
+      "text": "No. You do not take Medicaid.",
+      "tools": []
+    }
+  ]
+}

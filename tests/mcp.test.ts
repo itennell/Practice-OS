@@ -180,3 +180,45 @@ describe.skipIf(!sql)("admin tools", () => {
     }
   });
 });
+
+// One registry (lib/aeon/tools.ts) behind both MCP and Aeon's chat.
+describe.skipIf(!sql)("shared tool registry", () => {
+  it("lists every registry tool over MCP, plus the memory resource", async () => {
+    const { TOOLS } = await import("../lib/aeon/tools");
+    const { tools } = await client.listTools();
+    expect(tools.map((t) => t.name).sort()).toEqual(TOOLS.map((t) => t.name).sort());
+    const { resources } = await client.listResources();
+    expect(resources.map((r) => r.uri)).toContain("aeon://memory");
+  });
+
+  it("gives the same result over MCP and through the chat's runTool", async () => {
+    const { runTool } = await import("../lib/aeon/tools");
+    const { closeDb } = await import("../lib/db");
+    try {
+      for (const name of ["status", "morning_brief", "caqh_prep"]) {
+        const viaMcp = await client.callTool({ name, arguments: {} });
+        const viaChat = await runTool(name, {}, { by: "chat:test" });
+        expect({ content: viaChat.content, structuredContent: viaChat.structuredContent }).toEqual({
+          content: viaMcp.content,
+          structuredContent: viaMcp.structuredContent,
+        });
+      }
+    } finally {
+      await closeDb();
+    }
+  });
+
+  it("refuses a client detail in remember with the fixed line and saves nothing", async () => {
+    const marker = `Quillon${Date.now().toString(36).replace(/[0-9]/g, "")}x`;
+    const res = await client.callTool({ name: "remember", arguments: { kind: "fact", text: `My client ${marker} pays late` } });
+    expect(res.isError).toBe(true);
+    expect((res.content as { text: string }[])[0].text).toMatch(/^Not saved\. That looks like a person's name/);
+    const [{ n }] = await sql!`select count(*)::int as n from practice_os.memories where text like ${"%" + marker + "%"}`;
+    expect(n).toBe(0);
+  });
+
+  it("serves the memory resource as Markdown", async () => {
+    const res = await client.readResource({ uri: "aeon://memory" });
+    expect((res.contents[0] as { text: string }).text).toMatch(/^# What Aeon remembers/);
+  });
+});

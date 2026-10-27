@@ -1,0 +1,122 @@
+{
+  "scenario": "caqh",
+  "recordedAt": "2026-10-27T19:51:33.021Z",
+  "calls": [
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "remember",
+        "forget"
+      ],
+      "lastRole": "user",
+      "response": {
+        "id": "chatcmpl-01a17eeb-0f61-7255-b002-aae989a3b7e9",
+        "choices": [
+          {
+            "finish_reason": "tool_calls",
+            "index": 0,
+            "message": {
+              "content": "Pulling your CAQH checklist so you know what to fix before you attest.",
+              "refusal": null,
+              "tool_calls": [
+                {
+                  "id": "call_583c4573-d1da-453e-9cb4-17ebe2c44d7a",
+                  "type": "function",
+                  "function": {
+                    "name": "caqh_prep",
+                    "arguments": "{}"
+                  }
+                }
+              ],
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793130696,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 434,
+          "prompt_tokens": 4356,
+          "total_tokens": 4790,
+          "completion_tokens_details": {
+            "reasoning_tokens": 368
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        }
+      }
+    },
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "remember",
+        "forget"
+      ],
+      "lastRole": "tool",
+      "response": {
+        "id": "chatcmpl-01a17eeb-2585-734f-ad33-7a0eb6178dbb",
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "index": 0,
+            "message": {
+              "content": "You are due for CAQH re-attestation by Nov 5, 2026.\n\nI checked your CAQH prep list. Note: this is using the fictional demo practice data, not real records.\n\nYou are good on 3 items:\n- License listed as current through Mar 31, 2027.\n- Practice location matches.\n- Work history has no gaps.\n\nYou need to do 5 things in CAQH ProView before you attest:\n\n1. Check your NPI. NPPES shows no match for Type 1 NPI on file. Go to your CAQH profile, My Profile page, and confirm the number and taxonomy.\n2. Upload your renewed malpractice face sheet. The one on file expires Dec 1, 2026. Go to Documents in CAQH ProView and upload the new face sheet.\n3. Upload a signed W-9 for the PLLC. It is listed as missing. Go to Documents in CAQH ProView and upload it.\n4. Answer the Illinois disclosure questions. Only you can answer these.\n5. Click Review and Attest, then fix anything under View errors.\n\nLast step only you can do: log in to CAQH and click Attest.\n\nPayers will pull this data. If it lapses past Nov 5, it can hold up credentialing.",
+              "refusal": null,
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793130702,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 1296,
+          "prompt_tokens": 4985,
+          "total_tokens": 6281,
+          "completion_tokens_details": {
+            "reasoning_tokens": 1020
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 4337
+          }
+        }
+      }
+    }
+  ],
+  "replies": [
+    {
+      "text": "You are due for CAQH re-attestation by Nov 5, 2026.\n\nI checked your CAQH prep list. Note: this is using the fictional demo practice data, not real records.\n\nYou are good on 3 items:\n- License listed as current through Mar 31, 2027.\n- Practice location matches.\n- Work history has no gaps.\n\nYou need to do 5 things in CAQH ProView before you attest:\n\n1. Check your NPI. NPPES shows no match for Type 1 NPI on file. Go to your CAQH profile, My Profile page, and confirm the number and taxonomy.\n2. Upload your renewed malpractice face sheet. The one on file expires Dec 1, 2026. Go to Documents in CAQH ProView and upload the new face sheet.\n3. Upload a signed W-9 for the PLLC. It is listed as missing. Go to Documents in CAQH ProView and upload it.\n4. Answer the Illinois disclosure questions. Only you can answer these.\n5. Click Review and Attest, then fix anything under View errors.\n\nLast step only you can do: log in to CAQH and click Attest.\n\nPayers will pull this data. If it lapses past Nov 5, it can hold up credentialing.",
+      "tools": [
+        "caqh_prep"
+      ]
+    }
+  ]
+}
