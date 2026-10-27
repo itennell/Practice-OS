@@ -99,6 +99,11 @@ export const scheduleSchema = z.discriminatedUnion("type", [
       start_at_fact: z.boolean().default(false),
     })
     .strict(),
+  /**
+   * Due by the last day of the anniversary month of a date fact, every n years counted from that
+   * year (California Statement of Information: yearly for corporations, every 2 years for LLCs).
+   */
+  z.object({ type: z.literal("in_anniversary_month"), fact: z.enum(DATE_FACTS), every_years: z.number().int().min(1) }).strict(),
   /** Due before the first day of the anniversary month of a date fact (Illinois LLC annual report). */
   z.object({ type: z.literal("before_anniversary_month"), fact: z.enum(DATE_FACTS) }).strict(),
   /** n days after Dec 31 (HIPAA small-breach log: 60). */

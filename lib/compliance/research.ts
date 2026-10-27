@@ -61,17 +61,25 @@ export const TOPICS: Topic[] = [
       `which topics are required and how often (every renewal or one time), and is the first renewal exempt? ${HOW}`,
   },
   {
-    id: "entity_filing",
-    categories: ["pllc_annual_report", "pllc_registration", "business_setup"],
-    label: "Entity filing",
+    id: "entity_type",
+    categories: ["business_setup"],
+    label: "Business entity type",
+    context: "low",
+    licenseOnly: true,
+    question: (c) =>
+      `In ${c.stateName}, which business entity may a licensed ${c.credentialLabel} use for her own private practice? ` +
+      `May she use an ordinary LLC, a professional LLC, or must it be a professional corporation? ` +
+      `Look at the state's professional corporation or professional LLC law and her licensing board's rules. ${HOW}`,
+  },
+  {
+    id: "entity_filings",
+    categories: ["pllc_annual_report", "pllc_registration", "business_tax_return"],
+    label: "Entity filings and fees",
     context: "low",
     licenseOnly: false,
     question: (c) =>
-      `A ${c.credentialLabel} in ${c.stateName} runs her own private practice. Which business entity may she use for it ` +
-      `(may a licensed ${c.credentialLabel} use an LLC, or must it be a professional corporation or professional LLC)? ` +
-      `What recurring report must that entity file with the Secretary of State (or equivalent), when is it due, what is the fee, ` +
-      `and is there a yearly state franchise fee or minimum tax for it? Does her licensing board require the entity to register with it? ` +
-      `Only rules for her profession; ignore rules for other professions. ${HOW}`,
+      `In ${c.stateName}, what recurring report must a professional corporation, and an LLC, file with the Secretary of State ` +
+      `(or equivalent), how often, and what is the fee? Is there a yearly state franchise tax or minimum tax for each? ${HOW}`,
   },
   {
     id: "state_tax",
@@ -169,10 +177,11 @@ export const DRAFT_SCHEMA = {
           title: { type: "string" },
           schedule_type: {
             type: "string",
-            enum: ["every_n_years", "annual", "license_expiration", "clock", "setup", "none"],
+            enum: ["every_n_years", "annual", "license_expiration", "entity_anniversary", "clock", "setup", "none"],
             description:
               "every_n_years: a fixed month/day every n years (needs month, day, anchor_year = a year it falls on, every_years). " +
-              "annual: a fixed month/day each year. license_expiration: it falls on the licensee's own expiration date (birth month or issue date), repeating every_years. " +
+              "annual: a fixed month/day each year. license_expiration: it falls on the licensee's own license expiration date (birth month or issue date), repeating every_years; only for license renewal and CE. " +
+              "entity_anniversary: by the end of the month the business was formed or registered, every_years (1 = yearly). " +
               "clock: counts days from an event. setup: something to set up once and review. none: a note with no date.",
           },
           month: nullable("integer"),
@@ -213,7 +222,7 @@ export type DraftRule = {
   kind: "deadline" | "clock" | "setup" | "note";
   category: (typeof CATEGORIES)[number];
   title: string;
-  schedule_type: "every_n_years" | "annual" | "license_expiration" | "clock" | "setup" | "none";
+  schedule_type: "every_n_years" | "annual" | "license_expiration" | "entity_anniversary" | "clock" | "setup" | "none";
   month: number | null;
   day: number | null;
   anchor_year: number | null;
@@ -276,6 +285,8 @@ export function draftToRule(d: DraftRule, c: ResearchContext, topic: Topic, cita
       case "license_expiration":
         if (d.every_years === null) return null;
         return { type: "after_fact" as const, fact: "license_expires_on" as const, months: d.every_years * 12, repeat: true, start_at_fact: true };
+      case "entity_anniversary":
+        return { type: "in_anniversary_month" as const, fact: "pllc_formed_on" as const, every_years: d.every_years ?? 1 };
       case "clock":
         if (d.clock_event === null || d.clock_days === null) return null;
         return { type: "clock" as const, event: d.clock_event, days: d.clock_days };
@@ -286,6 +297,9 @@ export function draftToRule(d: DraftRule, c: ResearchContext, topic: Topic, cita
     }
   })();
   if (!schedule) return { error: `schedule ${d.schedule_type} is missing a value it needs` };
+  if (d.schedule_type === "license_expiration" && !["license_renewal", "license_window", "ce_hours"].includes(d.category)) {
+    return { error: `a ${d.category} rule can't follow her license expiration date` };
+  }
 
   const prefix = `${c.state.toLowerCase()}_${topic.licenseOnly ? `${c.credential.toLowerCase()}_` : ""}`;
   const kind = schedule.type === "clock" ? "clock" : schedule.type === "setup" ? "setup" : schedule.type === "none" ? "note" : "deadline";

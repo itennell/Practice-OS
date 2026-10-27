@@ -156,8 +156,8 @@ describe("which topics to research", () => {
   it("skips employer topics for a solo practice", async () => {
     const { topicsFor } = await import("../lib/compliance/research");
     const solo = topicsFor(0).map((t) => t.id);
-    expect(solo).toEqual(["license_renewal", "continuing_education", "entity_filing", "state_tax", "records_reporting", "telehealth_compacts"]);
-    expect(topicsFor(2)).toHaveLength(10);
+    expect(solo).toEqual(["license_renewal", "continuing_education", "entity_type", "entity_filings", "state_tax", "records_reporting", "telehealth_compacts"]);
+    expect(topicsFor(2)).toHaveLength(11);
   });
 });
 
@@ -176,5 +176,35 @@ describe("lessons from the Muse Code California demo", () => {
   it("doesn't repeat the state and license in a rule id", () => {
     const input = draftToRule(draft({ key: "ca_lcsw_ce_renewal", category: "license_renewal" }), caCtx, licenseTopic, "BBS");
     expect("error" in input ? input.error : input.id).toBe("ca_lcsw_ce_renewal");
+  });
+});
+
+describe("California entity filings (split topic)", () => {
+  const caCtx: ResearchContext = { state: "CA", stateName: "California", credential: "LCSW", credentialLabel: "LCSW (licensed clinical social worker)", today: "2026-10-27" };
+  const filings = TOPICS.find((t) => t.id === "entity_filings")!;
+
+  it("ties the Statement of Information to the month the business registered, yearly or every two years", async () => {
+    const saved = JSON.parse(await readFile("tests/fixtures/research/ca_lcsw_entity_filings.json", "utf8"));
+    const out = await vetDrafts(JSON.parse(saved.extraction.choices[0].message.content), readGrounded(saved.search), caCtx, filings, fakePage("on_page"));
+    const soi = out.rules.filter((r) => r.schedule.type === "in_anniversary_month");
+    expect(soi.map((r) => (r.schedule as { every_years: number }).every_years).sort()).toEqual([1, 2]);
+    for (const r of out.rules) expect(r.source.url).toMatch(/^https:\/\/www\.(sos|ftb)\.ca\.gov\//);
+    expect(out.rules.some((r) => r.schedule.type === "after_fact")).toBe(false);
+  });
+
+  it("in_anniversary_month: due the last day of the formation month, every n years", () => {
+    const rule = ruleSchema.parse({
+      ...ruleSchema.parse(draftToRule(draft({ key: "soi", category: "pllc_annual_report", schedule_type: "entity_anniversary", every_years: 2 }), caCtx, filings, "SOS") as never),
+    });
+    const facts = { ...danaFacts("2026-10-27"), practice_state: "CA", pllc_formed_on: "2025-12-10" };
+    expect(nextDue(rule, facts, "2026-10-27")).toEqual([{ due_on: "2027-12-31", title: rule.title }]);
+    const yearly = { ...rule, schedule: { type: "in_anniversary_month" as const, fact: "pllc_formed_on" as const, every_years: 1 } };
+    expect(nextDue(yearly, facts, "2026-10-27")).toEqual([{ due_on: "2026-12-31", title: rule.title }]);
+    expect(nextDue(yearly, { ...facts, pllc_formed_on: "2026-03-02" }, "2026-10-27")).toEqual([{ due_on: "2027-03-31", title: rule.title }]);
+  });
+
+  it("refuses a business filing tied to her license expiration date", () => {
+    const out = draftToRule(draft({ key: "soi", category: "pllc_annual_report", schedule_type: "license_expiration", every_years: 1 }), caCtx, filings, "SOS");
+    expect("error" in out && out.error).toMatch(/can't follow her license expiration/);
   });
 });
