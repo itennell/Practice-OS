@@ -117,6 +117,8 @@ export const PAIRS: Pair[] = [
     { fg: "--focus-ring", on: s.on, min: AA_NON_TEXT, label: `focus ring on ${s.name}` },
   ]),
   { fg: "--primary-fg", on: ["--bg", "--primary-bg"], min: AA_TEXT, label: "primary button label" },
+  { fg: "--primary-bg", on: ["--bg", "--glass"], min: AA_NON_TEXT, label: "checked box on glass card" },
+  { fg: "--accent-fg", on: ["--bg", "--glass"], min: AA_NON_TEXT, label: "hovered box outline on glass card" },
   ...["pending", "running", "done", "failed", "rejected"].map((k) => ({
     fg: `--status-${k}-fg`,
     on: ["--bg", "--glass", `--status-${k}-bg`],
