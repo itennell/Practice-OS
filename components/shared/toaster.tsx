@@ -34,25 +34,29 @@ export function Toaster() {
       toastOptions={{
         unstyled: true,
         classNames: {
+          // Sizes are fluid: the text, icon and padding grow a little on big screens and shrink on phones,
+          // and the icon is sized in em so it always matches the text next to it.
           toast:
-            "tile flex w-[min(24rem,calc(100vw-2rem))] items-start gap-3 bg-[var(--toast-bg)]! p-4 pr-3 font-sans text-[var(--fg)]",
-          icon: "mt-0.5 shrink-0",
+            "tile flex w-[calc(100vw-1.5rem)] items-start gap-[0.75em] bg-[var(--toast-bg)]! p-[clamp(0.75rem,0.6rem+0.6vw,1rem)] pr-2 font-sans text-[clamp(0.8125rem,0.77rem+0.2vw,0.9375rem)] text-[var(--fg)] sm:w-[clamp(20rem,26vw,26rem)]",
+          // Sonner positions its loading spinner in the middle of the toast; pin it back to the left of the text.
+          icon: "relative m-0! mt-[0.05em]! flex size-[1.25em]! shrink-0 items-center justify-center [&>div]:static! [&>div]:inset-auto! [&>div]:size-auto! [&>div]:transform-none! [&>div[data-visible=false]]:hidden!",
+          loader: "static! transform-none!",
           content: "flex min-w-0 flex-1 flex-col gap-0.5",
-          title: "text-small font-semibold leading-snug",
-          description: "text-small leading-snug text-[var(--fg-muted)]",
+          title: "font-semibold leading-snug",
+          description: "text-[0.93em] leading-snug text-[var(--fg-muted)]",
           actionButton:
-            "ml-1 inline-flex h-touch shrink-0 items-center rounded-full bg-[var(--primary-bg)] px-4 text-small font-semibold text-[var(--primary-fg)] hover:bg-[var(--primary-hover)]",
+            "ml-1 inline-flex h-touch shrink-0 items-center rounded-full bg-[var(--primary-bg)] px-4 font-semibold text-[var(--primary-fg)] hover:bg-[var(--primary-hover)]",
           closeButton:
-            "order-last -my-1 inline-flex size-11 shrink-0 items-center justify-center rounded-full border-0! bg-transparent! text-[var(--fg-muted)] hover:bg-[var(--hairline)]! hover:text-[var(--fg)] [&>svg]:size-4",
-          error: "border-[var(--danger-fg)]/60",
+            "order-last -my-2 inline-flex size-11 shrink-0 items-center justify-center rounded-full border-0! bg-transparent! text-[var(--fg-muted)] hover:bg-[var(--hairline)]! hover:text-[var(--fg)] [&>svg]:size-[1.1em]",
+          error: "border-[var(--tile-error-line)]! shadow-[var(--tile-error-shadow)]!",
         },
       }}
       icons={{
-        success: <StatusMark status="done" size={18} decorative />,
-        error: <StatusMark status="failed" size={18} decorative />,
-        loading: <StatusMark status="running" size={18} decorative />,
-        info: <StatusMark status="pending" size={18} decorative />,
-        warning: <StatusMark status="pending" size={18} decorative />,
+        success: <StatusMark status="done" size="1.25em" decorative />,
+        error: <StatusMark status="failed" size="1.25em" decorative />,
+        loading: <StatusMark status="running" size="1.25em" decorative />,
+        info: <StatusMark status="pending" size="1.25em" decorative />,
+        warning: <StatusMark status="pending" size="1.25em" decorative />,
       }}
     />
   );

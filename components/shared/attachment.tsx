@@ -57,8 +57,8 @@ export function Attachment({
       className={cn(
         "tile group relative flex min-w-0 shrink-0 p-2 text-[var(--fg)]",
         "transition-[box-shadow,transform] duration-200 ease-[var(--ease-soft-out)] hover:shadow-[var(--tile-shadow-hover)] motion-safe:hover:-translate-y-px",
-        state === "error" && "border-[var(--danger-fg)]/60",
-        vertical ? "w-36 flex-col gap-2" : "w-80 max-w-full items-center gap-3",
+        state === "error" && "border-[var(--tile-error-line)]! shadow-[var(--tile-error-shadow)]!",
+        vertical ? "w-[clamp(8rem,38vw,9.5rem)] flex-col gap-2" : "w-[clamp(15rem,78vw,21rem)] max-w-full items-center gap-3",
         className,
       )}
     >

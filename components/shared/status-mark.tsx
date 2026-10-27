@@ -46,8 +46,8 @@ export type StatusMarkProps = {
   status: Status;
   /** 0..1 while running, for a filling ring instead of a spinner. */
   progress?: number;
-  /** Icon size in px. */
-  size?: number;
+  /** Icon size: px as a number, or a CSS length like "1.25em" to scale with the text. */
+  size?: number | string;
   /** Accessible name when the mark stands alone; defaults to the status word. */
   label?: string;
   /** Hide from screen readers when visible text next to it already says the status. */

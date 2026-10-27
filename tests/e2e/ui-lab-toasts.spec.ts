@@ -6,7 +6,8 @@ import { expect, test } from "@playwright/test";
 test.describe("Toasts", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/ui-lab/toasts");
-    await page.waitForLoadState("networkidle");
+    // The toast region only exists once the page's scripts have started.
+    await page.locator("section[aria-label^=Notifications]").waitFor({ state: "attached" });
   });
 
   test("success shows and fades on its own", async ({ page }) => {
