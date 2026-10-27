@@ -75,12 +75,23 @@ export function caqhPrep(p: CredentialingProfile, facts: Facts, rules: Rule[], t
     you: licenseSoon,
   });
 
+  // Done only when the public NPPES registry has her NPI with the same taxonomy.
+  const npiLine = `Type ${p.npi.type} NPI ${p.npi.number}, taxonomy ${p.npi.taxonomy} (${p.npi.taxonomyLabel}).`;
+  const c = p.npiCheck;
   items.push({
     id: "npi",
-    label: "NPI and taxonomy match NPPES",
-    detail: `Type ${p.npi.type} NPI ${p.npi.number}, taxonomy ${p.npi.taxonomy} (${p.npi.taxonomyLabel}).`,
-    done: /^\d{10}$/.test(p.npi.number),
-    you: false,
+    label: !p.npi.number
+      ? "Add your NPI"
+      : !c
+        ? "Check your NPI against NPPES"
+        : c.matches
+          ? "NPI and taxonomy match NPPES"
+          : c.found
+            ? "Fix your taxonomy in NPPES or here so they match"
+            : "NPPES has no one with this NPI: check the number",
+    detail: c?.found ? `${npiLine} NPPES lists ${c.name ?? "a match"}, taxonomy ${c.taxonomy ?? "none"}.` : npiLine,
+    done: Boolean(c?.matches),
+    you: Boolean(c && !c.matches),
   });
 
   for (const doc of p.documents) {

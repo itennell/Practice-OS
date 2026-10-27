@@ -250,4 +250,71 @@ server.registerTool(
   },
 );
 
+const cred = await import("../lib/credentialing/store");
+const credActions = await import("../lib/credentialing/actions");
+
+server.registerTool(
+  "get_credentialing",
+  {
+    title: "Read her credentialing profile",
+    description:
+      "Her credentialing profile in CAQH ProView order: identity, education, license (type, state, board; never a number), NPI, " +
+      "tax ID, malpractice, practice location, work history and documents with expiry dates, plus the last NPPES check. Read-only.",
+    inputSchema: {},
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+  },
+  async () => {
+    const profile = await cred.loadCredentialingProfile();
+    return text(profile ? { profile, sections: cred.sectionValues(profile) } : { profile: null, next: "Ask her for her details and save them with update_credentialing." });
+  },
+);
+
+server.registerTool(
+  "update_credentialing",
+  {
+    title: "Update one section of her credentialing profile",
+    description:
+      "Saves one section of her credentialing profile, replacing that section. Read the current values with get_credentialing first and send the whole section back changed. " +
+      "Sections and shapes: identity {name, credential, practice_name, email, phone}; education [{degree, school, graduated}]; " +
+      "license {type, state, board} (never a license number); npi {npi, npi_type, taxonomy}; tin {tin: '12-3456789'}; " +
+      "malpractice {carrier, per_claim, aggregate, expires_on}; practice_location {name, street, city, state, zip, phone, telehealth}; " +
+      "work_history {jobs: [{employer, role, from, to}], gaps: [{from, to, reason}]}; documents [{id, label, upload, on_file, expires_on}]. " +
+      "Example: 'my malpractice renewed through Dec 1 2027' -> malpractice with expires_on 2027-12-01, and the malpractice document's expires_on too. Her own business details only.",
+    inputSchema: {
+      section: z.enum(["identity", "education", "license", "npi", "tin", "malpractice", "practice_location", "work_history", "documents"]),
+      value: z.any().describe("The whole section, in the shape above."),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+  },
+  async ({ section, value }) => {
+    const profile = await cred.updateCredentialingSection(section, value, createdBy());
+    const caqh = await credActions.currentCaqhPrep();
+    return text({ saved: section, sections: cred.sectionValues(profile), caqh_items_open: caqh?.prep.items.filter((i) => !i.done).map((i) => i.label) });
+  },
+);
+
+server.registerTool(
+  "caqh_prep",
+  {
+    title: "Get her ready to re-attest on CAQH",
+    description:
+      "What to fix before she re-attests on CAQH (DataSpring): the re-attest date from her state's rule (Illinois 180 days, else 120), " +
+      "missing or expiring documents, work-history gaps, disclosure questions. Ends with the step only she can do: log in and click Attest. Read-only.",
+    inputSchema: {},
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+  },
+  async () => text((await credActions.currentCaqhPrep()) ?? { prep: null, next: "Her credentialing profile isn't set up yet." }),
+);
+
+server.registerTool(
+  "check_npi",
+  {
+    title: "Check her NPI in NPPES",
+    description: "Looks up her own NPI in the public NPPES registry and saves whether it was found and whether the taxonomy matches her profile.",
+    inputSchema: {},
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: true },
+  },
+  async () => text(await cred.checkNpiInRegistry()),
+);
+
 await server.connect(new StdioServerTransport());

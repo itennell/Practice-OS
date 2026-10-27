@@ -24,6 +24,24 @@ export type WorkHistoryEntry = {
 
 export type GapExplanation = { from: ISODate; to: ISODate; reason: string };
 
+export type NpiCheck = {
+  checkedAt: string;
+  found: boolean;
+  name: string | null;
+  taxonomy: string | null;
+  /** Found, and the registry's taxonomy matches hers. */
+  matches: boolean;
+};
+
+/** Common NUCC taxonomy codes for licensed therapists. */
+export const TAXONOMY_LABEL: Record<string, string> = {
+  "101YP2500X": "Counselor, Professional",
+  "101YM0800X": "Counselor, Mental Health",
+  "1041C0700X": "Social Worker, Clinical",
+  "106H00000X": "Marriage & Family Therapist",
+  "103TC0700X": "Psychologist, Clinical",
+};
+
 export type CredentialingProfile = {
   identity: {
     name: string;
@@ -41,6 +59,10 @@ export type CredentialingProfile = {
     numberStored: false;
   };
   npi: { number: string; type: 1 | 2; taxonomy: string; taxonomyLabel: string };
+  /** The practice's federal tax ID (EIN), 12-3456789. Null until she adds it. */
+  tin: string | null;
+  /** Last check of her NPI against the public NPPES registry. */
+  npiCheck: NpiCheck | null;
   malpractice: { carrier: string; perClaim: number; aggregate: number; expiresOn: ISODate };
   practiceLocation: { name: string; address: Address; phone: string; telehealth: boolean };
   workHistory: WorkHistoryEntry[];
