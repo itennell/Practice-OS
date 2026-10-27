@@ -160,3 +160,21 @@ describe("which topics to research", () => {
     expect(topicsFor(2)).toHaveLength(10);
   });
 });
+
+describe("lessons from the Muse Code California demo", () => {
+  const caCtx: ResearchContext = { state: "CA", stateName: "California", credential: "LCSW", credentialLabel: "LCSW (licensed clinical social worker)", today: "2026-10-26" };
+
+  it("a topic keeps only its own kind of rule (CE found while researching renewal is dropped, not duplicated)", async () => {
+    const saved = JSON.parse(await readFile("tests/fixtures/research/ca_lcsw_license_renewal.json", "utf8"));
+    const answer = readGrounded(saved.search);
+    const drafts = JSON.parse(saved.extraction.choices[0].message.content);
+    const out = await vetDrafts(drafts, answer, caCtx, licenseTopic, fakePage("on_page"));
+    expect(out.rules.every((r) => r.category === "license_renewal" || r.category === "license_window")).toBe(true);
+    expect(out.dropped.some((d) => /belongs to another topic/.test(d.reasons[0]))).toBe(true);
+  });
+
+  it("doesn't repeat the state and license in a rule id", () => {
+    const input = draftToRule(draft({ key: "ca_lcsw_ce_renewal", category: "license_renewal" }), caCtx, licenseTopic, "BBS");
+    expect("error" in input ? input.error : input.id).toBe("ca_lcsw_ce_renewal");
+  });
+});
