@@ -161,7 +161,8 @@ export function PromptBar({
     <form
       onSubmit={submit}
       className={cn(
-        "tile flex w-full flex-col gap-1 rounded-[var(--radius-card-lg)] bg-[var(--toast-bg)]! p-2 focus-within:border-[var(--accent-fg)]",
+        // The focus ring goes round the whole bar, not a square inside it.
+        "tile flex w-full flex-col gap-1 rounded-[var(--radius-card-lg)] bg-[var(--toast-bg)]! p-2 has-[textarea:focus-visible]:outline-2 has-[textarea:focus-visible]:outline-offset-2 has-[textarea:focus-visible]:outline-[var(--focus-ring)] has-[textarea:focus-visible]:outline-solid",
         className,
       )}
     >
@@ -178,7 +179,7 @@ export function PromptBar({
         aria-label={label}
         aria-describedby={dict.kind !== "idle" ? statusId : undefined}
         disabled={disabled}
-        className="w-full resize-none bg-transparent px-3 pt-2.5 pb-1 text-body leading-[1.5] text-[var(--fg)] outline-none placeholder:text-[var(--fg-muted)] disabled:opacity-60"
+        className="w-full resize-none bg-transparent px-3 pt-2.5 pb-1 text-body leading-[1.5] text-[var(--fg)] outline-none! placeholder:text-[var(--fg-muted)] disabled:opacity-60"
       />
       <div className="flex items-center gap-1">
         {onAttach && (
@@ -203,7 +204,9 @@ export function PromptBar({
           {dict.kind === "working" && (
             <>
               <StatusMark status="running" size="1.1em" decorative />
-              <span className="shimmer-text">Turning your words into text…</span>
+              <span className="shimmer-text truncate">
+                Writing<span className="hidden min-[420px]:inline"> it down</span>…
+              </span>
             </>
           )}
           {dict.kind === "error" && dict.message}

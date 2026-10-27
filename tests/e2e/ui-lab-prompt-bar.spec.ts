@@ -82,6 +82,13 @@ test.describe("Prompt Bar", () => {
     await expect(page.getByRole("list", { name: "Files to send" }).getByRole("listitem")).toHaveCount(1);
   });
 
+  test("typing shows one focus ring round the whole bar", async ({ page }) => {
+    const box = page.getByRole("textbox", { name: "Message Aeon" });
+    await box.focus();
+    expect(await box.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe("none");
+    expect(await box.evaluate((el) => getComputedStyle(el.closest("form")!).outlineStyle)).toBe("solid");
+  });
+
   test("has no serious or critical accessibility issues", async ({ page }) => {
     await page.getByRole("textbox", { name: "Message Aeon" }).fill("What's due this month?");
     const { violations } = await new AxeBuilder({ page }).analyze();
