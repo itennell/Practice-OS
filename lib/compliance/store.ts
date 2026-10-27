@@ -29,6 +29,7 @@ export async function loadFacts(sql: postgres.Sql = db()): Promise<Facts | null>
     impact_revalidation_due_on: dateOrNull(row.impact_revalidation_due_on),
     caqh_last_attested_on: dateOrNull(row.caqh_last_attested_on),
     apit_granted_on: dateOrNull(row.apit_granted_on),
+    license_expires_on: dateOrNull(row.license_expires_on ?? null),
   } satisfies Record<string, unknown>);
 }
 

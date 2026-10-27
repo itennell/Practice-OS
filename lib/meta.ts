@@ -136,6 +136,8 @@ export type GroundedAnswer = {
 export type SearchOptions = {
   /** low: single facts; medium: the default; high: broad questions. */
   context?: "low" | "medium" | "high";
+  /** How hard Muse reasons (Responses API `reasoning.effort`); low keeps research cheaper. */
+  effort?: "low" | "medium" | "high";
   location?: { country?: string; region?: string; city?: string; timezone?: string };
 };
 
@@ -197,6 +199,7 @@ export async function searchGrounded(feature: string, input: string, opts: Searc
         input,
         tools: [tool],
         include: ["web_search_call.results"],
+        ...(opts.effort ? { reasoning: { effort: opts.effort } } : {}),
       } as never) as unknown as Promise<GroundedResponse>,
     (r) => r.usage?.total_tokens ?? null,
   );

@@ -1,0 +1,580 @@
+{
+  "ctx": {
+    "state": "CA",
+    "stateName": "California",
+    "credential": "LCSW",
+    "credentialLabel": "LCSW (licensed clinical social worker)",
+    "today": "2026-10-26"
+  },
+  "topic": "license_renewal",
+  "search": {
+    "top_logprobs": 0,
+    "temperature": 1,
+    "top_p": 1,
+    "service_tier": "auto",
+    "model": "muse-spark-1.3",
+    "reasoning": {
+      "effort": "low"
+    },
+    "background": false,
+    "tools": [
+      {
+        "type": "web_search",
+        "user_location": {
+          "type": "approximate",
+          "country": "US",
+          "region": "California"
+        },
+        "search_context_size": "low"
+      }
+    ],
+    "tool_choice": "auto",
+    "truncation": "disabled",
+    "id": "redacted-id",
+    "object": "response",
+    "status": "completed",
+    "created_at": 1793067865,
+    "completed_at": 1793067880,
+    "error": null,
+    "incomplete_details": null,
+    "output": [
+      {
+        "type": "reasoning",
+        "id": "redacted-id",
+        "summary": [],
+        "status": "completed"
+      },
+      {
+        "type": "message",
+        "id": "redacted-id",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "I'll look up the official California board rules on LCSW expiration and renewal.",
+            "annotations": [],
+            "logprobs": []
+          }
+        ],
+        "phase": "commentary",
+        "status": "completed"
+      },
+      {
+        "type": "web_search_call",
+        "id": "redacted-id",
+        "status": "completed",
+        "action": {
+          "type": "search",
+          "query": "California Board of Behavioral Sciences LCSW license expiration renewal birth month"
+        },
+        "results": [
+          {
+            "type": "text_result",
+            "title": "Social Work License Renewal Dates by State",
+            "url": "https://agentsofchangeprep.com/blog/social-work-license-renewal-dates-by-state/",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "California Business and Professions Code \u00a7 3774 (2019) :: 2019 California Code :: U.S. Codes and Statutes :: U.S. Law :: Justia",
+            "url": "https://law.justia.com/codes/california/2019/code-bpc/division-2/chapter-8-3/article-7/section-3774/",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "lcsw license verification near san francisco, ca",
+            "url": "https://einodmilvado1.com/z7r5j/n9zjd/article.php?page=lcsw-license-verification-near-san-francisco%2C-ca",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "LICENSE EXPIRATION ADVISORY AND REQUEST FOR BIRTH MONTH LICENSURE",
+            "url": "https://www.pmbc.ca.gov/forms_pubs/lic_expiration.pdf",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "\u00a7 32-2091.07 Active license; issuance; renewal; expiration; continuing education",
+            "url": "https://www.legalfix.com/statutes/state-codes/arizona/title-32/section-32-2091-07",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Section 5600 - [Effective 1/1/2025] Expiration; renewal of unexpired license, Cal. Bus. & Prof. Code \u00a7 5600",
+            "url": "https://Casetext.com/statute/california-codes/california-business-and-professions-code/division-3-professions-and-vocations-generally/chapter-3-architecture/article-6-revenue/section-5600-expiration-renewal-of-unexpired-license",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "LCSW Handbood Update",
+            "url": "https://bbs.ca.gov/pdf/publications/lcsw_handbook.pdf",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Become a Licensed Clinical Social Worker (LCSW) in California",
+            "url": "https://www.socialworkerlicense.com/social-work-license-guides/california-licensed-clinical-social-worker-lcsw/",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "California-2011-SB1575",
+            "url": "https://legiscan.com/CA/text/SB1575/id/656815/California-2011-SB1575-Amended.html",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Social Work State License Requirements",
+            "url": "https://www.rscourses.com/pages/social-work-state-license-requirements",
+            "snippet": ""
+          }
+        ]
+      },
+      {
+        "type": "reasoning",
+        "id": "redacted-id",
+        "summary": [],
+        "status": "completed"
+      },
+      {
+        "type": "message",
+        "id": "redacted-id",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "That first search didn't surface the board's own page, so I'll narrow the search to the official BBS site.",
+            "annotations": [],
+            "logprobs": []
+          }
+        ],
+        "phase": "commentary",
+        "status": "completed"
+      },
+      {
+        "type": "web_search_call",
+        "id": "redacted-id",
+        "status": "completed",
+        "action": {
+          "type": "search",
+          "query": "site:bbs.ca.gov license renewal expiration two years birth month"
+        },
+        "results": [
+          {
+            "type": "text_result",
+            "title": "Continuing Education and Additional Coursework Initial Statement Of Reasons",
+            "url": "https://bbs.ca.gov/pdf/regulation/pending/ce_add_coursework_isor.pdf",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Board of Behavioral Sciences",
+            "url": "https://bbs.ca.gov/pdf/agen_notice/2018/20181019_pa.pdf",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Policy & Advocacy Committee Approved Minutes April 2017",
+            "url": "https://bbs.ca.gov/pdf/board_minutes/2017/042017_pa_minutes.pdf",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Proposed Language Continuing Education; Law and Ethics Exam; Renewal",
+            "url": "https://www.bbs.ca.gov/pdf/forms/ceer_text.pdf",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Proposed Language - Continuing Education; Law and Ethics Exam; Renewal",
+            "url": "https://www.bbs.ca.gov/pdf/forms/ceer_prop_text_mod.pdf",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Overview and Discussion of Other States\u0090 Telehealth Allowances",
+            "url": "https://bbs.ca.gov/pdf/agen_notice/2021/20210625_telehealth_v.pdf",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Continuing Education - Board of Behavioral Sciences",
+            "url": "https://bbs.ca.gov/licensees/cont_ed.html",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Item 8 Update on Publications",
+            "url": "https://bbs.ca.gov/pdf/agen_notice/2026/20260623_oe_item8.pdf",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "February 27 - 28, 2025 Item 25",
+            "url": "https://www.bbs.ca.gov/pdf/agen_notice/2025/20250227-28_item25.pdf",
+            "snippet": ""
+          }
+        ]
+      },
+      {
+        "type": "reasoning",
+        "id": "redacted-id",
+        "summary": [],
+        "status": "completed"
+      },
+      {
+        "type": "message",
+        "id": "redacted-id",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "I'll run one more targeted search for the board's license renewal page.",
+            "annotations": [],
+            "logprobs": []
+          }
+        ],
+        "phase": "commentary",
+        "status": "completed"
+      },
+      {
+        "type": "web_search_call",
+        "id": "redacted-id",
+        "status": "completed",
+        "action": {
+          "type": "search",
+          "query": "California Board Behavioral Sciences licensee license renewal page expiration"
+        },
+        "results": [
+          {
+            "type": "text_result",
+            "title": "California-2011-SB1575",
+            "url": "https://legiscan.com/CA/text/SB1575/id/656815/California-2011-SB1575-Amended.html",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Article 3.  Renewal And Continuing Education :: Business and Professions Code :: 2010 California Code :: California Code :: U.S. Codes and Statutes :: U.S. Law :: Justia",
+            "url": "https://law.justia.com/codes/california/2010/bpc/4989.30-4989.45.html",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Licensee manual renewal application",
+            "url": "https://d2l2jhoszs7d12.cloudfront.net/state/CA/Board of Behavioral Sciences/www.bbs.ca.gov/Exam Candidate Related/man_renewal.pdf",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Bill Text: CA SB1575 | 2011-2012 | Regular Session | Amended | LegiScan",
+            "url": "https://legiscan.com/CA/text/SB1575/id/660313",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "California Board of Psychology Laws and Regulations",
+            "url": "https://www.psychology.ca.gov/laws_regs/2019lawsregs.pdf",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Continuing Education - Board of Behavioral Sciences",
+            "url": "https://bbs.ca.gov/licensees/cont_ed.html",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Faq for Display of License/Registration Requirements and Required Notice to Consumers",
+            "url": "https://bbs.ca.gov/pdf/display_of_lic_reg_reqs_and_req_notice_to_consumers.pdf",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "4984-4984.9 - California Statutes - USA Laws Searching",
+            "url": "http://www.laws9.com/statutes/california/bpc/4984-4984.9",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Section 4984.1 - Renewal after expiration, Cal. Bus. & Prof. Code \u00a7 4984.1",
+            "url": "https://casetext.com/statute/california-codes/california-business-and-professions-code/division-2-healing-arts/chapter-13-licensed-marriage-and-family-therapists/article-4-revenue/section-49841-renewal-after-expiration",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Bill Text: CA SB1575 | 2011-2012 | Regular Session | Amended | LegiScan",
+            "url": "https://legiscan.com/CA/text/SB1575/id/658129",
+            "snippet": ""
+          }
+        ]
+      },
+      {
+        "type": "reasoning",
+        "id": "redacted-id",
+        "summary": [],
+        "status": "completed"
+      },
+      {
+        "type": "message",
+        "id": "redacted-id",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "I've found some leads; now I'll open the official pages to verify the exact renewal language.",
+            "annotations": [],
+            "logprobs": []
+          }
+        ],
+        "phase": "commentary",
+        "status": "completed"
+      },
+      {
+        "type": "web_search_call",
+        "id": "redacted-id",
+        "status": "completed",
+        "action": {
+          "type": "open_page",
+          "url": "https://bbs.ca.gov/licensees/cont_ed.html"
+        },
+        "results": []
+      },
+      {
+        "type": "reasoning",
+        "id": "redacted-id",
+        "summary": [],
+        "status": "completed"
+      },
+      {
+        "type": "web_search_call",
+        "id": "redacted-id",
+        "status": "completed",
+        "action": {
+          "type": "open_page",
+          "url": "https://bbs.ca.gov/pdf/regulation/pending/ce_add_coursework_isor.pdf"
+        },
+        "results": []
+      },
+      {
+        "type": "reasoning",
+        "id": "redacted-id",
+        "summary": [],
+        "status": "completed"
+      },
+      {
+        "type": "web_search_call",
+        "id": "redacted-id",
+        "status": "completed",
+        "action": {
+          "type": "find_in_page",
+          "url": "https://bbs.ca.gov/pdf/regulation/pending/ce_add_coursework_isor.pdf",
+          "pattern": "birth month"
+        },
+        "results": []
+      },
+      {
+        "type": "reasoning",
+        "id": "redacted-id",
+        "summary": [],
+        "status": "completed"
+      },
+      {
+        "type": "message",
+        "id": "redacted-id",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "I found references to birth-month expiration; I'll pull the surrounding context to confirm the current rules.",
+            "annotations": [],
+            "logprobs": []
+          }
+        ],
+        "phase": "commentary",
+        "status": "completed"
+      },
+      {
+        "type": "web_search_call",
+        "id": "redacted-id",
+        "status": "completed",
+        "action": {
+          "type": "open_page",
+          "url": "https://bbs.ca.gov/pdf/regulation/pending/ce_add_coursework_isor.pdf"
+        },
+        "results": []
+      },
+      {
+        "type": "reasoning",
+        "id": "redacted-id",
+        "summary": [],
+        "status": "completed"
+      },
+      {
+        "type": "web_search_call",
+        "id": "redacted-id",
+        "status": "completed",
+        "action": {
+          "type": "open_page",
+          "url": "https://bbs.ca.gov/pdf/regulation/pending/ce_add_coursework_isor.pdf"
+        },
+        "results": []
+      },
+      {
+        "type": "reasoning",
+        "id": "redacted-id",
+        "summary": [],
+        "status": "completed"
+      },
+      {
+        "type": "message",
+        "id": "redacted-id",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "For a California LCSW \u2014 Licensed Clinical Social Worker \u2014 regulated by the California Board of Behavioral Sciences:\n\n### 1. How often renewed / when expires\n\nEvery **2 years / 24 months**.\n\nOfficial Board pages state:\n\n> \"Licensees must complete 36 hours of continuing education during each renewal period (the\"\n\n> \"two-year period that spans from the first day after the license's prior expiration date to\"\n\n> \"the current license expiration date), including 6 hours of Law and Ethics during each\"\n\nFor first-time renewal:\n\n> \"during their first license renewal period (the two-year period that spans from the first day\"\n\n> \"after the license's issue date to the license's expiration date).\"\n\nThe Board's Initial Statement of Reasons also describes:\n\n> \"since the initial renewal period was often shorter than the standard license renewal period of 24 months .\"\n\nAnd:\n\n> \"initial renewal periods are now two years long for all licensees  \u2013 previously the period could be as short as 13 months, as the expiration date was based on an\"\n\n> \"individual\u2019s birth month .\"\n\n### 2. Fixed date for everyone vs. birth month vs. issue date\n\n**Not a single fixed calendar date for everyone.**\n\n**Previously birth-month based, now standardized to issue-date / prior-expiration based:**\n\n> \"Previously, the board issued initial licenses that expired anywhere from  13 months to 24 months from the date of issuance, using the applicant\u2019s birth month to\"\n\n> \"determine the expiration date .\"\n\n> \"Once the board\u2019s new applicant tracking system came\"\n\n> \"online, it provided an opportunity to streamline that longstanding process and provide all new licensees with a standard 24-month initial renewal period .\"\n\nCurrent definition ties the period to issue date / prior expiration, not birth month:\n\n> \"during their first license renewal period (the two-year period that spans from the first day\"\n\n> \"after the license's issue date to the license's expiration date).\"\n\n> \"two-year period that spans from the first day after the license's prior expiration date to\"\n\n**What wasn't found on the opened official Board pages:** a sentence stating the exact time-of-day expiration, e.g. midnight on the last day, or a specific fixed month/day applicable to all LCSWs. That wasn't found instead of guessing.\n",
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://bbs.ca.gov/licensees/cont_ed.html",
+                "start_index": 409,
+                "end_index": 498,
+                "title": "Continuing Education - Board of Behavioral Sciences"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bbs.ca.gov/licensees/cont_ed.html",
+                "start_index": 525,
+                "end_index": 621,
+                "title": "Continuing Education - Board of Behavioral Sciences"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bbs.ca.gov/licensees/cont_ed.html",
+                "start_index": 623,
+                "end_index": 692,
+                "title": "Continuing Education - Board of Behavioral Sciences"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bbs.ca.gov/pdf/regulation/pending/ce_add_coursework_isor.pdf",
+                "start_index": 752,
+                "end_index": 862,
+                "title": "Continuing Education and Additional Coursework Initial Statement Of Reasons"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bbs.ca.gov/pdf/regulation/pending/ce_add_coursework_isor.pdf",
+                "start_index": 870,
+                "end_index": 1034,
+                "title": "Continuing Education and Additional Coursework Initial Statement Of Reasons"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bbs.ca.gov/pdf/regulation/pending/ce_add_coursework_isor.pdf",
+                "start_index": 1036,
+                "end_index": 1066,
+                "title": "Continuing Education and Additional Coursework Initial Statement Of Reasons"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bbs.ca.gov/pdf/regulation/pending/ce_add_coursework_isor.pdf",
+                "start_index": 1275,
+                "end_index": 1439,
+                "title": "Continuing Education and Additional Coursework Initial Statement Of Reasons"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bbs.ca.gov/pdf/regulation/pending/ce_add_coursework_isor.pdf",
+                "start_index": 1441,
+                "end_index": 1476,
+                "title": "Continuing Education and Additional Coursework Initial Statement Of Reasons"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bbs.ca.gov/pdf/regulation/pending/ce_add_coursework_isor.pdf",
+                "start_index": 1478,
+                "end_index": 1533,
+                "title": "Continuing Education and Additional Coursework Initial Statement Of Reasons"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bbs.ca.gov/pdf/regulation/pending/ce_add_coursework_isor.pdf",
+                "start_index": 1535,
+                "end_index": 1693,
+                "title": "Continuing Education and Additional Coursework Initial Statement Of Reasons"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bbs.ca.gov/licensees/cont_ed.html",
+                "start_index": 1782,
+                "end_index": 1878,
+                "title": "Continuing Education - Board of Behavioral Sciences"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bbs.ca.gov/licensees/cont_ed.html",
+                "start_index": 1880,
+                "end_index": 1949,
+                "title": "Continuing Education - Board of Behavioral Sciences"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bbs.ca.gov/licensees/cont_ed.html",
+                "start_index": 1951,
+                "end_index": 2045,
+                "title": "Continuing Education - Board of Behavioral Sciences"
+              }
+            ],
+            "logprobs": []
+          }
+        ],
+        "status": "completed"
+      }
+    ],
+    "instructions": null,
+    "usage": {
+      "input_tokens": 80564,
+      "input_tokens_details": {
+        "cached_tokens": 29716
+      },
+      "output_tokens": 2426,
+      "output_tokens_details": {
+        "reasoning_tokens": 1072
+      },
+      "total_tokens": 82990
+    },
+    "parallel_tool_calls": true,
+    "store": true,
+    "output_text": "I'll look up the official California board rules on LCSW expiration and renewal.That first search didn't surface the board's own page, so I'll narrow the search to the official BBS site.I'll run one more targeted search for the board's license renewal page.I've found some leads; now I'll open the official pages to verify the exact renewal language.I found references to birth-month expiration; I'll pull the surrounding context to confirm the current rules.For a California LCSW \u2014 Licensed Clinical Social Worker \u2014 regulated by the California Board of Behavioral Sciences:\n\n### 1. How often renewed / when expires\n\nEvery **2 years / 24 months**.\n\nOfficial Board pages state:\n\n> \"Licensees must complete 36 hours of continuing education during each renewal period (the\"\n\n> \"two-year period that spans from the first day after the license's prior expiration date to\"\n\n> \"the current license expiration date), including 6 hours of Law and Ethics during each\"\n\nFor first-time renewal:\n\n> \"during their first license renewal period (the two-year period that spans from the first day\"\n\n> \"after the license's issue date to the license's expiration date).\"\n\nThe Board's Initial Statement of Reasons also describes:\n\n> \"since the initial renewal period was often shorter than the standard license renewal period of 24 months .\"\n\nAnd:\n\n> \"initial renewal periods are now two years long for all licensees  \u2013 previously the period could be as short as 13 months, as the expiration date was based on an\"\n\n> \"individual\u2019s birth month .\"\n\n### 2. Fixed date for everyone vs. birth month vs. issue date\n\n**Not a single fixed calendar date for everyone.**\n\n**Previously birth-month based, now standardized to issue-date / prior-expiration based:**\n\n> \"Previously, the board issued initial licenses that expired anywhere from  13 months to 24 months from the date of issuance, using the applicant\u2019s birth month to\"\n\n> \"determine the expiration date .\"\n\n> \"Once the board\u2019s new applicant tracking system came\"\n\n> \"online, it provided an opportunity to streamline that longstanding process and provide all new licensees with a standard 24-month initial renewal period .\"\n\nCurrent definition ties the period to issue date / prior expiration, not birth month:\n\n> \"during their first license renewal period (the two-year period that spans from the first day\"\n\n> \"after the license's issue date to the license's expiration date).\"\n\n> \"two-year period that spans from the first day after the license's prior expiration date to\"\n\n**What wasn't found on the opened official Board pages:** a sentence stating the exact time-of-day expiration, e.g. midnight on the last day, or a specific fixed month/day applicable to all LCSWs. That wasn't found instead of guessing.\n"
+  },
+  "extraction": {
+    "id": "redacted-id",
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "message": {
+          "content": "{\"not_found\": [\"exact time-of-day expiration, e.g. midnight on the last day\", \"specific fixed month/day applicable to all LCSWs\"], \"rules\": [{\"anchor_year\": null, \"annual_label\": null, \"category\": \"license_renewal\", \"ce_hours\": null, \"ce_topics\": [], \"clock_days\": null, \"clock_event\": null, \"day\": null, \"every_years\": 2, \"key\": \"license_renewal\", \"kind\": \"deadline\", \"month\": null, \"quote\": \"two-year period that spans from the first day after the license's prior expiration date to\", \"reask_days\": null, \"schedule_type\": \"license_expiration\", \"source_url\": \"https://bbs.ca.gov/licensees/cont_ed.html\", \"title\": \"LCSW license renewal every two years\", \"what_to_do\": \"Renew the license for each two-year period ending on the current license expiration date.\", \"you_must\": null}, {\"anchor_year\": null, \"annual_label\": null, \"category\": \"ce_hours\", \"ce_hours\": null, \"ce_topics\": [{\"cadence\": \"every_renewal\", \"hours\": 6, \"label\": \"Law and Ethics\"}], \"clock_days\": null, \"clock_event\": null, \"day\": null, \"every_years\": 2, \"key\": \"ce_hours\", \"kind\": \"deadline\", \"month\": null, \"quote\": \"the current license expiration date), including 6 hours of Law and Ethics during each\", \"reask_days\": null, \"schedule_type\": \"license_expiration\", \"source_url\": \"https://bbs.ca.gov/licensees/cont_ed.html\", \"title\": \"Continuing education Law and Ethics each renewal\", \"what_to_do\": \"Complete 6 hours of Law and Ethics during each renewal period.\", \"you_must\": null}]}",
+          "refusal": null,
+          "role": "assistant"
+        },
+        "logprobs": null
+      }
+    ],
+    "created": 1793068344,
+    "model": "muse-spark-1.3",
+    "object": "chat.completion",
+    "usage": {
+      "completion_tokens": 4179,
+      "prompt_tokens": 1299,
+      "total_tokens": 5478,
+      "completion_tokens_details": {
+        "reasoning_tokens": 3773
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      }
+    }
+  }
+}

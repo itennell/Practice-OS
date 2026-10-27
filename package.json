@@ -12,7 +12,8 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "prepare": "git config core.hooksPath .githooks || true",
     "smoke": "tsx scripts/smoke.ts",
-    "db:reset": "tsx scripts/db-reset.ts"
+    "db:reset": "tsx scripts/db-reset.ts",
+    "research": "tsx scripts/research.ts"
   },
   "dependencies": {
     "@meta-sam/parser": "0.0.13",

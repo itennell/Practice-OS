@@ -59,6 +59,8 @@ try {
   const facts: Record<string, unknown> = { ...danaFacts(today) };
   facts.city_code = facts.city;
   for (const key of ["practice_state", "credential", "city"]) delete facts[key];
+  // Its column arrives with migration 005; Dana's Illinois license renews on a fixed date anyway.
+  if (facts.license_expires_on === null) delete facts.license_expires_on;
   await sql`insert into practice_os.compliance_facts ${sql(facts as never)}`;
   const cal = await syncCalendar(sql, { today });
   console.log(`Calendar for ${today}: ${cal.written} obligations from the rules.`);
