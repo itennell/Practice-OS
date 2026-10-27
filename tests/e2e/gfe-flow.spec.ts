@@ -11,8 +11,11 @@ test("Draft an estimate, approve it, then make the PDF with details that aren't 
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
 
   await page.goto("/paperwork");
+  // Wait for the form to be interactive, or a fill can land before hydration and be reset.
+  await page.waitForLoadState("networkidle");
   const form = page.getByRole("form").or(page.locator("form").first());
   await page.getByLabel("Booked on").first().fill("2026-11-25");
+  await expect(page.getByLabel("Booked on").first()).toHaveValue("2026-11-25");
   await page.getByLabel("First visit").fill("2026-12-15");
   await page.getByLabel("Service 1").selectOption("90791");
   await page.getByRole("button", { name: "Add a service" }).click();
