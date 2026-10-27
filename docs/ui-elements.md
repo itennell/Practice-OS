@@ -52,7 +52,7 @@ Every UI piece Isaiah picked for Practice-OS, where it goes, and how to build it
 | UI-007 | Plugins page for connections | SET | Connections | nice | collected | Design board p.8 |  |
 | UI-008 | Agent profile page | TBD | Anywhere it fits | nice | collected | Design board p.8 |  |
 | UI-009 | Primary button pinned to the bottom on phones | GLB | Buttons and chips | must | approved | Design board p.7 |  |
-| UI-010 | Status Mark (animated status icon) | GLB | Status pills | must | approved | React Bits (app exception) | to build in Stage 1 |
+| UI-010 | Status Mark (animated status icon) | GLB | Status pills | must | built | React Bits (app exception) | `components/shared/status-mark.tsx` (`StatusMark`, `StatusPill`) |
 | UI-011 | Prompt Bar ("Ask anything" with dictation) | CHT | Message input | must | approved | React Bits (app exception) | to build in Stage 1 |
 | UI-012 | Slide to Commit | TBD | Anywhere it fits | nice | collected | React Bits (app exception) |  |
 | UI-013 | Spring Check (check off and cross out) | GLB | Checklists and check-offs | must | approved | React Bits (app exception) | to build in Stage 1 |
