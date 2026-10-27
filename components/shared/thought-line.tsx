@@ -1,19 +1,20 @@
 "use client";
 
 // Thought Line (UI-014): shown while Aeon works through something the
-// clinician should see: a breathing, shimmering "Thinking…" line with a tiny
-// Aeon orb, a timer, and an expandable list of steps; it settles into a done
+// clinician should see: a shimmering "Thinking…" line with tiny chrome Aeon
+// droplets dancing beside it, a timer, and an expandable list of steps; it settles into a done
 // label ("Drafted 3 posts") and folds the steps away.
 // Steps must be plain-English summaries of real work from actual job
 // progress: never raw model reasoning, never invented progress.
 // Use Status Mark for item status and Thought Line for Aeon's own work.
 // Adapted from React Bits Thought Line (MIT, reactbits.dev/c/micro/thought-line):
-// Aeon orb glyph, lucide icons, Caseload colours, finished steps turn muted
+// chrome Aeon droplets as the glyph, lucide icons, Caseload colours, finished steps turn muted
 // instead of fading (so they keep 4.5:1), a 44px toggle with a focus ring.
 
 import { useEffect, useId, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AeonDroplets } from "./aeon-droplets";
 import { formatTenths, spokenTenths } from "./thought-line-time";
 
 export type ThoughtLineProps = {
@@ -84,7 +85,7 @@ export function ThoughtLine({
 
   const head = (
     <>
-      <span aria-hidden className={cn("orb size-[1.05em] shrink-0", !working && "animate-none! opacity-70")} />
+      <AeonDroplets working={working} />
       <span
         className={cn(
           "transition-colors duration-300",

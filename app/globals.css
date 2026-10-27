@@ -254,6 +254,66 @@ textarea {
   color: var(--accent-fg);
 }
 
+/* Aeon droplets (components/shared/aeon-droplets.tsx): chrome droplets that dance out,
+   splash and melt back into Aeon while working. Units are the SVG's 40x40 box. */
+.aeon-droplets .drop,
+.aeon-droplets .drop-core {
+  transform-origin: 20px 20px;
+  transition: transform 450ms var(--ease-soft-out);
+}
+.aeon-droplets .drop {
+  transition: transform 450ms var(--ease-soft-out), opacity 300ms ease 300ms;
+}
+.aeon-droplets:not(.is-working) .drop {
+  opacity: 0;
+}
+.aeon-droplets.is-working .drop-core {
+  animation: drop-core 1.8s ease-in-out infinite;
+}
+.aeon-droplets.is-working .drop-a {
+  animation: drop-a 1.8s var(--ease-calm) infinite;
+}
+.aeon-droplets.is-working .drop-b {
+  animation: drop-b 1.8s var(--ease-calm) infinite 0.22s;
+}
+.aeon-droplets.is-working .drop-c {
+  animation: drop-c 1.8s var(--ease-calm) infinite 0.45s;
+}
+.aeon-droplets.is-working .drop-d {
+  animation: drop-d 1.8s var(--ease-calm) infinite 0.67s;
+}
+@keyframes drop-core {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(0.88); }
+}
+@keyframes drop-a {
+  0%, 100% { transform: translate(0, 0); }
+  40% { transform: translate(-8.5px, -6.5px); }
+  55% { transform: translate(-9.5px, -7px) scale(0.85); }
+}
+@keyframes drop-b {
+  0%, 100% { transform: translate(0, 0); }
+  40% { transform: translate(8.5px, -6px); }
+  55% { transform: translate(9.5px, -6.5px) scale(0.85); }
+}
+@keyframes drop-c {
+  0%, 100% { transform: translate(0, 0); }
+  40% { transform: translate(7px, 8px); }
+  55% { transform: translate(7.5px, 9px) scale(0.85); }
+}
+@keyframes drop-d {
+  0%, 100% { transform: translate(0, 0); }
+  40% { transform: translate(-7px, 7.5px); }
+  55% { transform: translate(-7.5px, 8.5px) scale(0.85); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .aeon-droplets .drop,
+  .aeon-droplets .drop-core {
+    animation: none !important;
+    transition: none;
+  }
+}
+
 /* Shimmering text for work in progress (attachment titles, Thought Line). Still under reduced motion. */
 @utility shimmer-text {
   background: linear-gradient(90deg, var(--fg) 35%, var(--accent-fg) 50%, var(--fg) 65%) 0 0 / 300% 100%;
