@@ -99,6 +99,11 @@
   --scrim: rgb(23 20 43 / 0.32);
 
   /* Avatars: initials on soft tints. The clinician is lilac; callers and contacts get a tone from their name. */
+  /* Calendar event dots. */
+  --event-deadline: #a16207;
+  --event-consult: #5b47c9;
+  --event-post: #a3368c;
+  --event-done: #2f7a55;
   --avatar-ring: #ffffff;
   --avatar-lilac-bg: #e2d8ff;
   --avatar-lilac-fg: #4a37b5;
@@ -153,6 +158,10 @@
     --danger-hover: rgb(255 174 163 / 0.24);
     --scrim: rgb(0 0 0 / 0.55);
 
+    --event-deadline: #f6c56b;
+    --event-consult: #b0a3fb;
+    --event-post: #e88fd0;
+    --event-done: #8fd8ae;
     --avatar-ring: rgb(255 255 255 / 0.16);
     --avatar-lilac-bg: rgb(142 124 248 / 0.24);
     --avatar-lilac-fg: #e4ddff;

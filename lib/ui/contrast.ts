@@ -124,6 +124,12 @@ export const PAIRS: Pair[] = [
     min: AA_TEXT,
     label: `${tone} avatar initials`,
   })),
+  ...["deadline", "consult", "post", "done"].map((kind) => ({
+    fg: `--event-${kind}`,
+    on: ["--bg", "--glass"],
+    min: AA_NON_TEXT,
+    label: `${kind} dot on the calendar`,
+  })),
   { fg: "--danger-on", on: ["--bg", "--glass-strong", "--danger-bg"], min: AA_TEXT, label: "danger button label" },
   { fg: "--danger-on", on: ["--bg", "--glass-strong", "--danger-hover"], min: AA_TEXT, label: "danger button label, hovered" },
   { fg: "--fg", on: ["--bg", "--scrim", "--glass-strong"], min: AA_TEXT, label: "dialog text over the dimmed page" },
