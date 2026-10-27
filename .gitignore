@@ -58,3 +58,6 @@ test/
 
 # Public CA certificates the app ships (no private keys)
 !lib/certs/*.pem
+
+# Local model cache (the name-finder for the sensitive-info guard)
+/.cache/
