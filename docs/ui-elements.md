@@ -65,7 +65,7 @@ Every UI piece Isaiah picked for Practice-OS, where it goes, and how to build it
 | UI-020 | Card Nav (menu that opens into cards) | SHL | Phone top bar and menu | must | approved | React Bits (app exception) |  |
 | UI-021 | Dock (Mac-style magnifying dock) | TBD | Anywhere it fits | nice | parked | React Bits (reference) |  |
 | UI-022 | Stepper (onboarding steps) | ONB | Step list | must | approved | React Bits (app exception) |  |
-| UI-023 | Attachment (file and image cards) | IGM | Post composer | must | approved | shadcn/ui (MIT) | to build in Stage 1 |
+| UI-023 | Attachment (file and image cards) | IGM | Post composer | must | built | shadcn/ui (MIT) | `components/shared/attachment.tsx` (`Attachment`, `AttachmentList`) |
 | UI-024 | Library page (file manager layout) | LIB | Whole page | must | approved | Screenshot (React Bits Pro demo, layout reference only) (layout reference) |  |
 | UI-025 | Front Desk work queue (list plus schedule panel) | FDK | Inquiries list | must | approved | Screenshot (React Bits Pro demo, layout reference only) (layout reference) |  |
 | UI-026 | Chat-first home (the app opens on Aeon) | HOM | Opening view (whole page) | must | approved | Screenshot (layout reference only) (layout reference) |  |

@@ -225,6 +225,29 @@ textarea {
   color: var(--accent-fg);
 }
 
+/* Shimmering text for work in progress (attachment titles, Thought Line). Still under reduced motion. */
+@utility shimmer-text {
+  background: linear-gradient(90deg, var(--fg) 35%, var(--accent-fg) 50%, var(--fg) 65%) 0 0 / 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 1.6s linear infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    background: none;
+    color: inherit;
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
 /* Aeon's breathing orb and the helper orbs. */
 @utility orb {
   border-radius: 9999px;
