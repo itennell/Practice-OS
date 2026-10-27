@@ -12,6 +12,7 @@ loadEnv();
 export const DEMO_TABLES = [
   "clinician_profile",
   "approvals",
+  "good_faith_estimates",
   "obligations",
   "compliance_facts",
   "compliance_rules",

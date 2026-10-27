@@ -22,6 +22,7 @@ const KIND_LABEL: Record<string, string> = {
   consult_cancel: "Consult cancellation",
   web_chat_reply: "Web chat reply",
   state_rules: "State rules",
+  gfe_issue: "Good Faith Estimate",
 };
 
 function StatusPill({ status }: { status: ApprovalView["status"] }) {

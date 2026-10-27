@@ -6,7 +6,7 @@ import { formatDate } from "./deadline-card";
 
 // Try any booking: when would the Good Faith Estimate be due?
 
-const INPUT =
+export const INPUT =
   "h-input w-full rounded-full border border-border bg-[var(--chip-off-bg)] px-5 text-body text-[var(--fg)] focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]";
 
 export function GfeTimingCheck({ open, initial }: { open: OpenDays; initial: { bookedOn: string; visitOn: string } }) {

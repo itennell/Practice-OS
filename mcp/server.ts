@@ -213,4 +213,41 @@ server.registerTool(
     text(rule_id ? await actions.logEvent(rule_id, happened_on, createdBy()) : { clocks: await actions.listClocks() }),
 );
 
+const gfe = await import("../lib/gfe/store");
+
+server.registerTool(
+  "draft_gfe",
+  {
+    title: "Draft a Good Faith Estimate",
+    description:
+      "Drafts a Good Faith Estimate for a self-pay client (45 CFR 149.610) and queues it for her approval. " +
+      "Prices come from her fee list; the due date counts the days her practice is open. " +
+      "Takes no client details: never a name, birthday, contact detail or diagnosis. She adds those herself when she makes the PDF. " +
+      "Approving marks it issued; nothing is sent. Returns the reference number and due date.",
+    inputSchema: {
+      basis: z.enum(["scheduled", "requested"]).describe("scheduled: a visit was booked; requested: the client asked for an estimate."),
+      scheduled_on: isoDay.optional().describe("Booking date (scheduled)."),
+      service_on: isoDay.optional().describe("First visit date (scheduled)."),
+      requested_on: isoDay.optional().describe("Date the client asked (requested)."),
+      service_kind: z.enum(["individual", "couples", "family", "group"]),
+      lines: z
+        .array(
+          z.object({
+            code: z.string().regex(/^[A-Z0-9]{5}$/).describe("A CPT code on her fee list, e.g. 90837."),
+            quantity: z.number().int().min(1).max(366),
+            location: z.enum(["office", "telehealth", "either"]),
+          }),
+        )
+        .min(1)
+        .max(20),
+      frequency: z.enum(["weekly", "every_2_weeks", "monthly"]).optional().describe("For recurring care; scope is capped at 12 months."),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: false },
+  },
+  async (input) => {
+    const r = await gfe.draftEstimate(input, { createdBy: createdBy() });
+    return text({ reference: r.reference, due_on: r.dueOn, approval_id: r.approvalId, next: "She approves it in Approvals, then makes the PDF on the Paperwork page." });
+  },
+);
+
 await server.connect(new StdioServerTransport());
