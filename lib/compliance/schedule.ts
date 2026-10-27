@@ -120,6 +120,18 @@ export function nextDue(rule: Rule, facts: Facts, today: ISODate): Next {
       }
       return [];
     }
+    case "in_anniversary_month": {
+      const formed = facts[s.fact];
+      if (!formed) return { needs: s.fact };
+      const fy = year(formed);
+      const m = Number(formed.slice(5, 7));
+      for (let y = Math.max(fy + s.every_years, ty); y <= ty + s.every_years + 1; y++) {
+        if ((y - fy) % s.every_years !== 0) continue;
+        const d = fin(addDays(ymd(m === 12 ? y + 1 : y, m === 12 ? 1 : m + 1, 1), -1));
+        if (d >= today) return [{ due_on: d, title: rule.title }];
+      }
+      return [];
+    }
     case "days_after_year_end": {
       let d = addDays(ymd(ty - 1, 12, 31), s.days);
       if (d < today) d = addDays(ymd(ty, 12, 31), s.days);

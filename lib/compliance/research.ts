@@ -22,6 +22,8 @@ export type ResearchContext = {
 export type Topic = {
   id: string;
   label: string;
+  /** The rule categories this topic may produce; anything else belongs to another topic. */
+  categories: (typeof CATEGORIES)[number][];
   context: "low" | "medium" | "high";
   /** Rules from this topic apply only to her license (license renewal, CE). */
   licenseOnly: boolean;
@@ -40,6 +42,7 @@ const HOW =
 export const TOPICS: Topic[] = [
   {
     id: "license_renewal",
+    categories: ["license_renewal", "license_window"],
     label: "License renewal",
     context: "low",
     licenseOnly: true,
@@ -49,6 +52,7 @@ export const TOPICS: Topic[] = [
   },
   {
     id: "continuing_education",
+    categories: ["ce_hours"],
     label: "Continuing education",
     context: "medium",
     licenseOnly: true,
@@ -57,16 +61,29 @@ export const TOPICS: Topic[] = [
       `which topics are required and how often (every renewal or one time), and is the first renewal exempt? ${HOW}`,
   },
   {
-    id: "entity_filing",
-    label: "Entity filing",
+    id: "entity_type",
+    categories: ["business_setup"],
+    label: "Business entity type",
+    context: "low",
+    licenseOnly: true,
+    question: (c) =>
+      `In ${c.stateName}, which business entity may a licensed ${c.credentialLabel} use for her own private practice? ` +
+      `May she use an ordinary LLC, a professional LLC, or must it be a professional corporation? ` +
+      `Look at the state's professional corporation or professional LLC law and her licensing board's rules. ${HOW}`,
+  },
+  {
+    id: "entity_filings",
+    categories: ["pllc_annual_report", "pllc_registration", "business_tax_return"],
+    label: "Entity filings and fees",
     context: "low",
     licenseOnly: false,
     question: (c) =>
-      `In ${c.stateName}, what recurring report must an LLC or professional LLC file with the Secretary of State (or equivalent), ` +
-      `when is it due, and what is the fee? Does the licensing board require a separate registration for a professional entity? ${HOW}`,
+      `In ${c.stateName}, what recurring report must a professional corporation, and an LLC, file with the Secretary of State ` +
+      `(or equivalent), how often, and what is the fee? Is there a yearly state franchise tax or minimum tax for each? ${HOW}`,
   },
   {
     id: "state_tax",
+    categories: ["business_tax_return", "quarterly_taxes"],
     label: "State income and estimated tax",
     context: "low",
     licenseOnly: false,
@@ -75,6 +92,7 @@ export const TOPICS: Topic[] = [
   },
   {
     id: "payroll",
+    categories: ["payroll"],
     employerOnly: true,
     label: "Payroll withholding",
     context: "medium",
@@ -84,6 +102,7 @@ export const TOPICS: Topic[] = [
   },
   {
     id: "unemployment_new_hire",
+    categories: ["payroll"],
     employerOnly: true,
     label: "Unemployment insurance and new hires",
     context: "medium",
@@ -94,6 +113,7 @@ export const TOPICS: Topic[] = [
   },
   {
     id: "workers_comp_leave",
+    categories: ["insurance", "payroll"],
     employerOnly: true,
     label: "Workers' comp and paid leave",
     context: "medium",
@@ -103,6 +123,7 @@ export const TOPICS: Topic[] = [
   },
   {
     id: "harassment_training",
+    categories: ["payroll"],
     employerOnly: true,
     label: "Harassment training",
     context: "low",
@@ -111,6 +132,7 @@ export const TOPICS: Topic[] = [
   },
   {
     id: "records_reporting",
+    categories: ["hipaa", "reporting_duty"],
     label: "Records and reporting duties",
     context: "medium",
     licenseOnly: true,
@@ -119,6 +141,7 @@ export const TOPICS: Topic[] = [
   },
   {
     id: "telehealth_compacts",
+    categories: ["telehealth"],
     label: "Telehealth and compacts",
     context: "low",
     licenseOnly: true,
@@ -154,10 +177,11 @@ export const DRAFT_SCHEMA = {
           title: { type: "string" },
           schedule_type: {
             type: "string",
-            enum: ["every_n_years", "annual", "license_expiration", "clock", "setup", "none"],
+            enum: ["every_n_years", "annual", "license_expiration", "entity_anniversary", "clock", "setup", "none"],
             description:
               "every_n_years: a fixed month/day every n years (needs month, day, anchor_year = a year it falls on, every_years). " +
-              "annual: a fixed month/day each year. license_expiration: it falls on the licensee's own expiration date (birth month or issue date), repeating every_years. " +
+              "annual: a fixed month/day each year. license_expiration: it falls on the licensee's own license expiration date (birth month or issue date), repeating every_years; only for license renewal and CE. " +
+              "entity_anniversary: by the end of the month the business was formed or registered, every_years (1 = yearly). " +
               "clock: counts days from an event. setup: something to set up once and review. none: a note with no date.",
           },
           month: nullable("integer"),
@@ -198,7 +222,7 @@ export type DraftRule = {
   kind: "deadline" | "clock" | "setup" | "note";
   category: (typeof CATEGORIES)[number];
   title: string;
-  schedule_type: "every_n_years" | "annual" | "license_expiration" | "clock" | "setup" | "none";
+  schedule_type: "every_n_years" | "annual" | "license_expiration" | "entity_anniversary" | "clock" | "setup" | "none";
   month: number | null;
   day: number | null;
   anchor_year: number | null;
@@ -227,6 +251,8 @@ function extractionPrompt(c: ResearchContext, topic: Topic, answer: GroundedAnsw
     `- Only make rules about ${topic.label.toLowerCase()}; other topics are researched separately.`,
     "- Use kind 'deadline' for dates, 'clock' for 'within N days of an event', 'setup' for things to set up once, 'note' for facts with no date.",
     "- At most one note, and only if it changes what she must do. Skip definitions and history.",
+    "- If a payment on a date is 0% or not required, make it a note, not a deadline.",
+    `- Only rules that apply to a ${c.credentialLabel}; drop anything about other professions.`,
     "- Never use a proposed or pending regulation as a source.",
     "- For continuing education, make one rule of category ce_hours with schedule_type matching the license renewal, plus ce_hours and ce_topics.",
     "- Fill unused fields with null (ce_topics: empty list). Put anything the answer says wasn't found in not_found.",
@@ -259,6 +285,8 @@ export function draftToRule(d: DraftRule, c: ResearchContext, topic: Topic, cita
       case "license_expiration":
         if (d.every_years === null) return null;
         return { type: "after_fact" as const, fact: "license_expires_on" as const, months: d.every_years * 12, repeat: true, start_at_fact: true };
+      case "entity_anniversary":
+        return { type: "in_anniversary_month" as const, fact: "pllc_formed_on" as const, every_years: d.every_years ?? 1 };
       case "clock":
         if (d.clock_event === null || d.clock_days === null) return null;
         return { type: "clock" as const, event: d.clock_event, days: d.clock_days };
@@ -269,10 +297,14 @@ export function draftToRule(d: DraftRule, c: ResearchContext, topic: Topic, cita
     }
   })();
   if (!schedule) return { error: `schedule ${d.schedule_type} is missing a value it needs` };
+  if (d.schedule_type === "license_expiration" && !["license_renewal", "license_window", "ce_hours"].includes(d.category)) {
+    return { error: `a ${d.category} rule can't follow her license expiration date` };
+  }
 
+  const prefix = `${c.state.toLowerCase()}_${topic.licenseOnly ? `${c.credential.toLowerCase()}_` : ""}`;
   const kind = schedule.type === "clock" ? "clock" : schedule.type === "setup" ? "setup" : schedule.type === "none" ? "note" : "deadline";
   return {
-    id: `${c.state.toLowerCase()}_${topic.licenseOnly ? `${c.credential.toLowerCase()}_` : ""}${slug(d.key)}`,
+    id: `${prefix}${slug(d.key).replace(new RegExp(`^(${c.state.toLowerCase()}_)?(${c.credential.toLowerCase()}_)?`), "") || "rule"}`,
     kind,
     jurisdiction: c.state,
     category: d.category,
@@ -337,6 +369,10 @@ export async function vetDrafts(
   const page_checks: TopicResult["page_checks"] = [];
   const seen = new Set<string>();
   for (const d of drafts.rules) {
+    if (!topic.categories.includes(d.category)) {
+      dropped.push({ title: d.title, reasons: [`a ${d.category} rule belongs to another topic, not ${topic.label.toLowerCase()}`] });
+      continue;
+    }
     const title = answer.citations.find((x) => sameUrl(x.url, d.source_url))?.title ?? "";
     const input = draftToRule(d, c, topic, title);
     if ("error" in input) {

@@ -1,0 +1,531 @@
+{
+  "ctx": {
+    "state": "CA",
+    "stateName": "California",
+    "credential": "LCSW",
+    "credentialLabel": "LCSW (licensed clinical social worker)",
+    "today": "2026-10-27"
+  },
+  "topic": "entity_filings",
+  "search": {
+    "top_logprobs": 0,
+    "temperature": 1,
+    "top_p": 1,
+    "service_tier": "auto",
+    "model": "muse-spark-1.3",
+    "reasoning": {
+      "effort": "low"
+    },
+    "background": false,
+    "tools": [
+      {
+        "type": "web_search",
+        "user_location": {
+          "type": "approximate",
+          "country": "US",
+          "region": "California"
+        },
+        "search_context_size": "low"
+      }
+    ],
+    "tool_choice": "auto",
+    "truncation": "disabled",
+    "id": "redacted-id",
+    "object": "response",
+    "status": "completed",
+    "created_at": 1793107961,
+    "completed_at": 1793107975,
+    "error": null,
+    "incomplete_details": null,
+    "output": [
+      {
+        "type": "reasoning",
+        "id": "redacted-id",
+        "summary": [],
+        "status": "completed"
+      },
+      {
+        "type": "message",
+        "id": "redacted-id",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "I'll look up the official California requirements for your corporation and LLC, keeping strictly to state sources.",
+            "annotations": [],
+            "logprobs": []
+          }
+        ],
+        "phase": "commentary",
+        "status": "completed"
+      },
+      {
+        "type": "web_search_call",
+        "id": "redacted-id",
+        "status": "completed",
+        "action": {
+          "type": "search",
+          "query": "California Secretary of State Statement of Information corporation LLC filing fee frequency site:sos.ca.gov"
+        },
+        "results": [
+          {
+            "type": "text_result",
+            "title": "Limited Liability Companies (LLC) - California",
+            "url": "https://www.sos.ca.gov/business-programs/cannabizfile/cannabis-forms-and-fees/limited-liability-companies-llc-california",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Misleading Solicitations and Fraudulent Filings",
+            "url": "https://www.sos.ca.gov/business-programs/bizfile/misleading-solicitations-and-fraudulent-filings",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Business Programs :: California Secretary of State",
+            "url": "https://www.sos.ca.gov/administration/regulations/current-regulations/business/business-programs",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Frequently Asked Questions",
+            "url": "https://www.sos.ca.gov/business-programs/business-entities/faqs?origin=serp_auto",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Misleading Statement of Information Solicitations",
+            "url": "https://www.sos.ca.gov/business-programs/bizfile/misleading-statement-information-solicitations",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Misleading Statement of Information Solicitations",
+            "url": "https://www.sos.ca.gov/business-programs/customer-alerts/misleading-statement-information-solicitations",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Secretary of State Alex Padilla Announces Over 25,000 LLC Statements of Information Filed Online in First Month :: California Secretary of State",
+            "url": "https://www.sos.ca.gov/administration/news-releases-and-advisories/2017-news-releases-and-advisories/secretary-state-alex-padilla-announces-over-25000-llc-statements-information-filed-online-first-month",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Statutes of 2002 – Legislative Summary",
+            "url": "https://www.sos.ca.gov/business-programs/legislation/2002",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Statutes of 2012 – Legislative Summary :: California Secretary of State",
+            "url": "https://www.sos.ca.gov/business-programs/legislation/2012",
+            "snippet": ""
+          }
+        ]
+      },
+      {
+        "type": "web_search_call",
+        "id": "redacted-id",
+        "status": "completed",
+        "action": {
+          "type": "search",
+          "query": "California Franchise Tax Board minimum franchise tax corporation LLC $800 site:ftb.ca.gov"
+        },
+        "results": [
+          {
+            "type": "text_result",
+            "title": "Guide to Common Forms of Ownership | FTB Publication 1123 | FTB.ca.gov",
+            "url": "https://www.ftb.ca.gov/forms/misc/1123.html",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "S corporations | FTB.ca.gov",
+            "url": "http://www.ftb.ca.gov/file/business/types/corporations/s-corporations.html",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "FTB 927 Publication | FTB.ca.gov",
+            "url": "https://www.ftb.ca.gov/forms/misc/927.html",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Corporations | FTB.ca.gov",
+            "url": "https://www.ftb.ca.gov/file/business/types/corporations/index.html",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "FTB Publication 1060 | FTB.ca.gov",
+            "url": "https://www.ftb.ca.gov/forms/misc/1060.html/1000",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "2026 Instructions for Form 100-ES | FTB.ca.gov",
+            "url": "https://ftb.ca.gov/forms/2026/2026-100-es-instructions.html",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "C corporations | FTB.ca.gov",
+            "url": "https://www.ftb.ca.gov/file/business/types/corporations/c-corporations.html",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "FTB Publication 1060 | FTB.ca.gov",
+            "url": "https://www.ftb.ca.gov/forms/misc/1060.html",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Bill Analysis, SB 347; Annual Tax … Partnerships and Limited Liability Companies (LLCs)",
+            "url": "https://www.ftb.ca.gov/tax-pros/law/legislation/2025-2026/SB347-032625-050725-010526.pdf",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Bill Analysis, AB 91; Reduced Annual Tax and Minimum Franchise Tax for Small Businesses and Microbusinesses",
+            "url": "https://www.ftb.ca.gov/tax-pros/law/legislation/2021-2022/AB91-010322.pdf",
+            "snippet": ""
+          }
+        ]
+      },
+      {
+        "type": "reasoning",
+        "id": "redacted-id",
+        "summary": [],
+        "status": "completed"
+      },
+      {
+        "type": "message",
+        "id": "redacted-id",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "I've confirmed the filing details so far — now I'll pin down the exact tax rules to complete your answer.",
+            "annotations": [],
+            "logprobs": []
+          }
+        ],
+        "phase": "commentary",
+        "status": "completed"
+      },
+      {
+        "type": "web_search_call",
+        "id": "redacted-id",
+        "status": "completed",
+        "action": {
+          "type": "search",
+          "query": "FTB California LLC $800 annual tax limited liability company"
+        },
+        "results": [
+          {
+            "type": "text_result",
+            "title": "Limited liability company | FTB.ca.gov",
+            "url": "https://www.ftb.ca.gov/file/business/types/limited-liability-company/",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "LLC vs. Corporation in California: A Side-by-Side Comparison for Business Owners in 2026",
+            "url": "https://kmsdlawoffice.com/blog/llc-vs-corporation-california/",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "How to Start an LLC in California: $0 + $70 State Fee (2026)",
+            "url": "https://businessanywhere.io/how-to-start-an-llc-in-california/",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "LLC Tax California Requirements",
+            "url": "https://mycountsolutions.com/llc-tax-california/",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Victory for Out-of-State Members in LLCs \"Doing Business\" in California | Casetext",
+            "url": "https://casetext.com/analysis/victory-for-out-of-state-members-in-llcs-doing-business-in-california",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Single member limited liability company (SMLLC) | FTB.ca.gov",
+            "url": "https://www.ftb.ca.gov/about-ftb/newsroom/tax-news/april-2022/single-member-limited-liability-company-smllc.html",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Series LLC | FTB.ca.gov",
+            "url": "https://www.ftb.ca.gov/file/business/types/limited-liability-company/series-limited-liability-company.html",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "FTB Pub. 3556: Limited Liability Company Filing Information | Forms and Publications | FTB.ca.gov",
+            "url": "http://www.ftb.ca.gov/forms/misc/3556.html",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Where Do You Pay the $800 California LLC Tax?",
+            "url": "https://legalclarity.org/where-do-you-pay-the-800-california-llc-tax/",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Foreign LLC in California 2026 - How to Register (Form LLC-5, $70 Fee)",
+            "url": "https://www.youtube.com/watch?v=mwTrpZat9zM",
+            "snippet": ""
+          }
+        ]
+      },
+      {
+        "type": "reasoning",
+        "id": "redacted-id",
+        "summary": [],
+        "status": "completed"
+      },
+      {
+        "type": "message",
+        "id": "redacted-id",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "I've narrowed it to two official state pages — now I'll open them to verify the exact wording.",
+            "annotations": [],
+            "logprobs": []
+          }
+        ],
+        "phase": "commentary",
+        "status": "completed"
+      },
+      {
+        "type": "web_search_call",
+        "id": "redacted-id",
+        "status": "completed",
+        "action": {
+          "type": "open_page",
+          "url": "https://www.sos.ca.gov/business-programs/business-entities/faqs?origin=serp_auto"
+        },
+        "results": []
+      },
+      {
+        "type": "web_search_call",
+        "id": "redacted-id",
+        "status": "completed",
+        "action": {
+          "type": "open_page",
+          "url": "https://www.ftb.ca.gov/file/business/types/limited-liability-company/"
+        },
+        "results": []
+      },
+      {
+        "type": "reasoning",
+        "id": "redacted-id",
+        "summary": [],
+        "status": "completed"
+      },
+      {
+        "type": "message",
+        "id": "redacted-id",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "One state tax page is loaded — now I'll locate the recurring filing details on the other.",
+            "annotations": [],
+            "logprobs": []
+          }
+        ],
+        "phase": "commentary",
+        "status": "completed"
+      },
+      {
+        "type": "web_search_call",
+        "id": "redacted-id",
+        "status": "completed",
+        "action": {
+          "type": "find_in_page",
+          "url": "https://www.sos.ca.gov/business-programs/business-entities/faqs?origin=serp_auto",
+          "pattern": "Statement of Information"
+        },
+        "results": []
+      },
+      {
+        "type": "reasoning",
+        "id": "redacted-id",
+        "summary": [],
+        "status": "completed"
+      },
+      {
+        "type": "web_search_call",
+        "id": "redacted-id",
+        "status": "completed",
+        "action": {
+          "type": "find_in_page",
+          "url": "https://www.sos.ca.gov/business-programs/business-entities/faqs?origin=serp_auto",
+          "pattern": "$20"
+        },
+        "results": []
+      },
+      {
+        "type": "reasoning",
+        "id": "redacted-id",
+        "summary": [],
+        "status": "completed"
+      },
+      {
+        "type": "message",
+        "id": "redacted-id",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "In California:\n\n### 1. Professional corporation - recurring Secretary of State filing\n\n**Report:** Statement of Information\n\n> \"Generally, CA Stock Corporations and Qualified Out-of-State Corporations are required to file their Statement of Information yearly in the month of registration with the California Secretary of State.\"\n\n> \"A Statement of Information must be filed either every year for California stock, cooperative, credit union, and all qualified out-of-state corporations\"\n\nA professional corporation is a corporation for this filing rule. The opened Secretary of State FAQ page does not separately state a different frequency for professional / accountancy or law corporations.\n\n**Fee:**\n\nThe opened Secretary of State FAQ page states only:\n\n> \"The fee for filing a Statement of Information is $20 or $25.\"\n\nWhich entity pays $20 versus $25 was not stated with breakdown on the pages opened, so it wasn't found and is not stated here instead of guessing.\n\n### 2. LLC - recurring Secretary of State filing\n\n**Report:** Statement of Information\n\n> \"California Nonprofit Corporations and all Limited Liability Companies are required to file every two years in the month of registration in even or odd years based on the year of registration.\"\n\n> \"two years (only in odd years or only in even years based on year of initial registration) for California nonprofit corporations and all California and qualified out-of-state limited liability companies.\"\n\n> \"California and Out-of-State Limited Liability Company: File online at bizfileOnline.sos.ca.gov the Statement of Information – CA and Out-of-State LLC.\"\n\n**Fee:**\n\n> \"The fee for filing a Statement of Information is $20 or $25.\"\n\nWhich amount applies to LLCs was not stated with breakdown on the pages opened, so it wasn't found and is not stated here instead of guessing.\n\n### 3. Yearly state franchise / minimum / annual tax\n\n**LLC:**\n\n> \"Every LLC that is doing business or organized in California must pay an annual tax of $800.\"\n\n> \"This yearly tax will be due, even if you are not conducting business, until you cancel your LLC.\"\n\n> \"Pay the $800 annual tax\"\n\n> \"To keep your LLC active you must:\"\n\n> \"File and pay your state income taxes\"\n\n**Professional corporation:**\n\nWhether a yearly $800 minimum franchise tax or other franchise tax applies to a professional corporation was not stated on the official pages opened for this answer, so it wasn't found and is not stated here instead of guessing.\n",
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://www.sos.ca.gov/business-programs/business-entities/faqs?origin=serp_auto",
+                "start_index": 125,
+                "end_index": 329,
+                "title": "Frequently Asked Questions"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.sos.ca.gov/business-programs/business-entities/faqs?origin=serp_auto",
+                "start_index": 331,
+                "end_index": 486,
+                "title": "Frequently Asked Questions"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.sos.ca.gov/business-programs/business-entities/faqs?origin=serp_auto",
+                "start_index": 757,
+                "end_index": 821,
+                "title": "Frequently Asked Questions"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.sos.ca.gov/business-programs/business-entities/faqs?origin=serp_auto",
+                "start_index": 1059,
+                "end_index": 1254,
+                "title": "Frequently Asked Questions"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.sos.ca.gov/business-programs/business-entities/faqs?origin=serp_auto",
+                "start_index": 1256,
+                "end_index": 1462,
+                "title": "Frequently Asked Questions"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.sos.ca.gov/business-programs/business-entities/faqs?origin=serp_auto",
+                "start_index": 1464,
+                "end_index": 1618,
+                "title": "Frequently Asked Questions"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.sos.ca.gov/business-programs/business-entities/faqs?origin=serp_auto",
+                "start_index": 1630,
+                "end_index": 1694,
+                "title": "Frequently Asked Questions"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.ftb.ca.gov/file/business/types/limited-liability-company/",
+                "start_index": 1904,
+                "end_index": 1999,
+                "title": "Limited liability company | FTB.ca.gov"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.ftb.ca.gov/file/business/types/limited-liability-company/",
+                "start_index": 2001,
+                "end_index": 2101,
+                "title": "Limited liability company | FTB.ca.gov"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.ftb.ca.gov/file/business/types/limited-liability-company/",
+                "start_index": 2103,
+                "end_index": 2130,
+                "title": "Limited liability company | FTB.ca.gov"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.ftb.ca.gov/file/business/types/limited-liability-company/",
+                "start_index": 2132,
+                "end_index": 2169,
+                "title": "Limited liability company | FTB.ca.gov"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://www.ftb.ca.gov/file/business/types/limited-liability-company/",
+                "start_index": 2171,
+                "end_index": 2211,
+                "title": "Limited liability company | FTB.ca.gov"
+              }
+            ],
+            "logprobs": []
+          }
+        ],
+        "status": "completed"
+      }
+    ],
+    "instructions": null,
+    "usage": {
+      "input_tokens": 54271,
+      "input_tokens_details": {
+        "cached_tokens": 9016
+      },
+      "output_tokens": 3077,
+      "output_tokens_details": {
+        "reasoning_tokens": 1809
+      },
+      "total_tokens": 57348
+    },
+    "parallel_tool_calls": true,
+    "store": true,
+    "output_text": "I'll look up the official California requirements for your corporation and LLC, keeping strictly to state sources.I've confirmed the filing details so far — now I'll pin down the exact tax rules to complete your answer.I've narrowed it to two official state pages — now I'll open them to verify the exact wording.One state tax page is loaded — now I'll locate the recurring filing details on the other.In California:\n\n### 1. Professional corporation - recurring Secretary of State filing\n\n**Report:** Statement of Information\n\n> \"Generally, CA Stock Corporations and Qualified Out-of-State Corporations are required to file their Statement of Information yearly in the month of registration with the California Secretary of State.\"\n\n> \"A Statement of Information must be filed either every year for California stock, cooperative, credit union, and all qualified out-of-state corporations\"\n\nA professional corporation is a corporation for this filing rule. The opened Secretary of State FAQ page does not separately state a different frequency for professional / accountancy or law corporations.\n\n**Fee:**\n\nThe opened Secretary of State FAQ page states only:\n\n> \"The fee for filing a Statement of Information is $20 or $25.\"\n\nWhich entity pays $20 versus $25 was not stated with breakdown on the pages opened, so it wasn't found and is not stated here instead of guessing.\n\n### 2. LLC - recurring Secretary of State filing\n\n**Report:** Statement of Information\n\n> \"California Nonprofit Corporations and all Limited Liability Companies are required to file every two years in the month of registration in even or odd years based on the year of registration.\"\n\n> \"two years (only in odd years or only in even years based on year of initial registration) for California nonprofit corporations and all California and qualified out-of-state limited liability companies.\"\n\n> \"California and Out-of-State Limited Liability Company: File online at bizfileOnline.sos.ca.gov the Statement of Information – CA and Out-of-State LLC.\"\n\n**Fee:**\n\n> \"The fee for filing a Statement of Information is $20 or $25.\"\n\nWhich amount applies to LLCs was not stated with breakdown on the pages opened, so it wasn't found and is not stated here instead of guessing.\n\n### 3. Yearly state franchise / minimum / annual tax\n\n**LLC:**\n\n> \"Every LLC that is doing business or organized in California must pay an annual tax of $800.\"\n\n> \"This yearly tax will be due, even if you are not conducting business, until you cancel your LLC.\"\n\n> \"Pay the $800 annual tax\"\n\n> \"To keep your LLC active you must:\"\n\n> \"File and pay your state income taxes\"\n\n**Professional corporation:**\n\nWhether a yearly $800 minimum franchise tax or other franchise tax applies to a professional corporation was not stated on the official pages opened for this answer, so it wasn't found and is not stated here instead of guessing.\n"
+  },
+  "extraction": {
+    "id": "redacted-id",
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "message": {
+          "content": "{\"not_found\": [\"Statement of Information fee breakdown - whether $20 or $25 applies to a professional corporation or LLC\", \"Whether a yearly $800 minimum franchise tax or other franchise tax applies to a professional corporation\"], \"rules\": [{\"anchor_year\": null, \"annual_label\": null, \"category\": \"pllc_annual_report\", \"ce_hours\": null, \"ce_topics\": [], \"clock_days\": null, \"clock_event\": null, \"day\": null, \"every_years\": 1, \"key\": \"corp_statement_of_information\", \"kind\": \"deadline\", \"month\": null, \"quote\": \"CA Stock Corporations and Qualified Out-of-State Corporations are required to file their Statement of Information yearly in the month of registration\", \"reask_days\": null, \"schedule_type\": \"entity_anniversary\", \"source_url\": \"https://www.sos.ca.gov/business-programs/business-entities/faqs?origin=serp_auto\", \"title\": \"Professional corporation - Statement of Information\", \"what_to_do\": \"File the Statement of Information every year in the month of registration.\", \"you_must\": null}, {\"anchor_year\": null, \"annual_label\": null, \"category\": \"pllc_annual_report\", \"ce_hours\": null, \"ce_topics\": [], \"clock_days\": null, \"clock_event\": null, \"day\": null, \"every_years\": 2, \"key\": \"llc_statement_of_information\", \"kind\": \"deadline\", \"month\": null, \"quote\": \"all Limited Liability Companies are required to file every two years in the month of registration\", \"reask_days\": null, \"schedule_type\": \"entity_anniversary\", \"source_url\": \"https://www.sos.ca.gov/business-programs/business-entities/faqs?origin=serp_auto\", \"title\": \"LLC - Statement of Information\", \"what_to_do\": \"File the Statement of Information every two years in the month of registration, in the even or odd year matching the registration year.\", \"you_must\": null}, {\"anchor_year\": null, \"annual_label\": null, \"category\": \"business_tax_return\", \"ce_hours\": null, \"ce_topics\": [], \"clock_days\": null, \"clock_event\": null, \"day\": null, \"every_years\": null, \"key\": \"llc_annual_tax\", \"kind\": \"note\", \"month\": null, \"quote\": \"Every LLC that is doing business or organized in California must pay an annual tax of $800.\", \"reask_days\": null, \"schedule_type\": \"none\", \"source_url\": \"https://www.ftb.ca.gov/file/business/types/limited-liability-company/\", \"title\": \"LLC - $800 annual tax\", \"what_to_do\": \"Pay the $800 annual tax. It remains due even if you are not conducting business, until you cancel the LLC.\", \"you_must\": \"pay the $800 annual tax\"}]}",
+          "refusal": null,
+          "role": "assistant"
+        },
+        "logprobs": null
+      }
+    ],
+    "created": 1793108083,
+    "model": "muse-spark-1.3",
+    "object": "chat.completion",
+    "usage": {
+      "completion_tokens": 12892,
+      "prompt_tokens": 1404,
+      "total_tokens": 14296,
+      "completion_tokens_details": {
+        "reasoning_tokens": 12264
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      }
+    }
+  }
+}

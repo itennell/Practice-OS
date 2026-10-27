@@ -1,6 +1,6 @@
 ---
 name: state-research
-description: Research a clinician's state compliance rules (license renewal, CE, entity filing, state taxes, records, compacts, and employer rules once she has staff) with Practice-OS's research_state_rules tool, then walk her through approving and confirming them. Use when her practice is outside Illinois, when she moves states, or when she asks Aeon to look up her state's rules.
+description: Research a clinician's state compliance rules (license renewal, CE, business entity type and filings, state taxes, records, compacts, and employer rules once she has staff) with Practice-OS's research_state_rules tool, then walk her through approving and confirming them. Use when her practice is outside Illinois, when she moves states, or when she asks Aeon to look up her state's rules.
 ---
 
 # State research
@@ -19,7 +19,7 @@ Federal rules and Illinois ship verified by the Practice-OS maintainers. For any
 
 3. Call `research_state_rules` with 1 to 3 topics per call, in this order:
    - `license_renewal`, `continuing_education`
-   - `entity_filing`, `state_tax`
+   - `entity_type`, `entity_filings`, `state_tax`
    - `records_reporting`, `telehealth_compacts`
    - only if she has employees: `payroll`, `unemployment_new_hire`, `workers_comp_leave`, `harassment_training`
 4. After each call, tell her in one or two lines how many rules are waiting for review, and what was dropped or not found and why (from `dropped` and `not_found`). Don't restate the rules as if they were verified.
