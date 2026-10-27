@@ -26,6 +26,15 @@ test.describe("Thought Line", () => {
     await expect(page.getByText("[Sample] Checked the posting rules", { exact: false })).toBeVisible();
   });
 
+  test("hiding the steps leaves nothing showing", async ({ page }) => {
+    await page.getByRole("button", { name: "Start" }).click();
+    const settled = page.getByRole("button", { name: /Drafted 3 posts.*Show steps/ });
+    await expect(settled).toBeVisible({ timeout: 10_000 });
+    const box = page.locator(`#${await settled.getAttribute("aria-controls")}`);
+    await page.waitForTimeout(500);
+    expect(await box.evaluate((el) => [el.getBoundingClientRect().height, getComputedStyle(el).visibility])).toEqual([0, "hidden"]);
+  });
+
   test("a task that didn't work says so in words", async ({ page }) => {
     await expect(page.getByText("[Sample] Couldn't reach the fax list, didn't work")).toBeAttached();
   });

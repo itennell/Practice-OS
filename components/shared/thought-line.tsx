@@ -93,12 +93,7 @@ export function ThoughtLine({
     <>
       <AeonDroplets working={working} />
       <span
-        className={cn(
-          "transition-colors duration-300",
-          working
-            ? "thought-shimmer text-[var(--fg-muted)]"
-            : "text-[var(--fg)]",
-        )}
+        className={cn("transition-colors duration-300", working ? "thought-shimmer text-[var(--fg-muted)]" : "text-[var(--fg)]")}
       >
         {working ? label : done}
       </span>
@@ -108,7 +103,11 @@ export function ThoughtLine({
         </span>
       )}
       {hasSteps && (
-        <ChevronDown aria-hidden size="1em" className={cn("text-[var(--fg-muted)] transition-transform duration-200", open && "rotate-180")} />
+        <ChevronDown
+          aria-hidden
+          size="1em"
+          className={cn("text-[var(--fg-muted)] transition-transform duration-200", open && "rotate-180")}
+        />
       )}
     </>
   );
@@ -136,37 +135,41 @@ export function ThoughtLine({
         <div
           id={listId}
           className={cn(
-            "grid transition-[grid-template-rows] duration-300 ease-[var(--ease-soft-out)] motion-reduce:transition-none",
-            open ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+            // Folds to zero height, then turns invisible so no edge or shadow peeks through.
+            "grid transition-[grid-template-rows,visibility] duration-300 ease-[var(--ease-soft-out)] motion-reduce:transition-none",
+            open ? "visible grid-rows-[1fr]" : "invisible grid-rows-[0fr]",
           )}
           aria-hidden={!open}
         >
-          <div className="-mx-2 min-h-0 overflow-hidden px-2 pb-4">
-            {/* The task box: a raised card under the line, one row per task. */}
-            <ol className="tile mt-1 divide-y divide-[var(--hairline)] px-3.5 py-1 sm:px-4">
-              {normalizeSteps(steps, working).map((step, i) => (
-                <li
-                  key={`${i}-${step.label}`}
-                  className="flex items-center gap-3 py-2 font-normal motion-safe:animate-[pill-open_220ms_var(--ease-soft-out)]"
-                >
-                  <StatusMark status={step.status} size="1.1em" decorative />
-                  <span className="min-w-0">
-                    <span
-                      className={cn(
-                        "block text-small",
-                        step.status === "pending" && "text-[var(--fg-muted)]",
-                        step.status === "running" && "font-semibold text-[var(--fg)]",
-                        step.status === "done" && "text-[var(--fg)]",
-                        step.status === "failed" && "font-medium text-[var(--danger-fg)]",
-                      )}
-                    >
-                      {step.label}
-                      <span className="sr-only">, {STEP_WORDS[step.status]}</span>
+          {/* No padding on the folding part itself: padding would stay visible at zero height. */}
+          <div className="-mx-2 min-h-0 overflow-hidden">
+            <div className="px-2 pt-1 pb-4">
+              {/* The task box: a raised card under the line, one row per task. */}
+              <ol className="tile divide-y divide-[var(--hairline)] px-3.5 py-1 sm:px-4">
+                {normalizeSteps(steps, working).map((step, i) => (
+                  <li
+                    key={`${i}-${step.label}`}
+                    className="flex items-center gap-3 py-2 font-normal motion-safe:animate-[pill-open_220ms_var(--ease-soft-out)]"
+                  >
+                    <StatusMark status={step.status} size="1.1em" decorative />
+                    <span className="min-w-0">
+                      <span
+                        className={cn(
+                          "block text-small",
+                          step.status === "pending" && "text-[var(--fg-muted)]",
+                          step.status === "running" && "font-semibold text-[var(--fg)]",
+                          step.status === "done" && "text-[var(--fg)]",
+                          step.status === "failed" && "font-medium text-[var(--danger-fg)]",
+                        )}
+                      >
+                        {step.label}
+                        <span className="sr-only">, {STEP_WORDS[step.status]}</span>
+                      </span>
                     </span>
-                  </span>
-                </li>
-              ))}
-            </ol>
+                  </li>
+                ))}
+              </ol>
+            </div>
           </div>
         </div>
       )}
