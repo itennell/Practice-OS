@@ -4,11 +4,17 @@ import { expect, test } from "@playwright/test";
 // UI-029 Avatar: the shared profile picture.
 
 test.describe("Avatar", () => {
-  test("is named by the person, shows initials, and says what the dot means", async ({ page }) => {
+  test("shows Dana's headshot, named by her, and says what the dot means", async ({ page }) => {
     await page.goto("/ui-lab/avatar");
-    const dana = page.getByRole("img", { name: "Dana Reyes, LCPC", exact: true }).first();
-    await expect(dana).toHaveText("DR");
+    const photo = page.getByRole("img", { name: "Dana Reyes, LCPC", exact: true }).first().locator("img");
+    await expect(photo).toHaveAttribute("src", "/demo/dana-reyes-headshot.jpg");
+    await expect.poll(() => photo.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth)).toBe(256);
     await expect(page.getByRole("img", { name: "Dana Reyes, LCPC, connected" })).toBeVisible();
+  });
+
+  test("without a photo she gets her initials", async ({ page }) => {
+    await page.goto("/ui-lab/avatar");
+    await expect(page.getByRole("img", { name: "Dana Reyes, LCPC", exact: true }).last()).toHaveText("DR");
   });
 
   test("the three sizes are 32, 40 and 72 pixels", async ({ page }) => {
