@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import { PDFDocument, StandardFonts, degrees, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import { addMonths } from "../compliance/dates";
 import { assertComplete, grandTotal, lineTotal, money, providerTotal } from "./build";
 import { DISCLAIMERS, separateSchedulingDisclaimer } from "./disclaimers";
@@ -120,15 +120,19 @@ export async function renderGfePdf(g: GoodFaithEstimate): Promise<Uint8Array> {
     pdf,
     await pdf.embedFont(StandardFonts.Helvetica),
     await pdf.embedFont(StandardFonts.HelveticaBold),
-    g.isSample
-      ? "[Sample] Fictional demo practice. Not a real estimate."
-      : `Good Faith Estimate of ${usDate(g.issuedOn)} for ${g.patient.firstName} ${g.patient.lastName}`,
+    [
+      g.draft ? "DRAFT, not yet approved." : null,
+      g.isSample ? "[Sample] Fictional demo practice. Not a real estimate." : null,
+      g.reference ?? `Good Faith Estimate of ${usDate(g.issuedOn)}`,
+    ]
+      .filter(Boolean)
+      .join(" "),
   );
 
   // Header
   w.text(g.convener, { size: 16, bold: true, gap: 2 });
   w.text("Good Faith Estimate for Health Care Items and Services", { size: 13, gap: 2 });
-  w.text(`Date of Good Faith Estimate: ${usDate(g.issuedOn)}`, { color: MUTED, gap: 2 });
+  w.text(`Date of Good Faith Estimate: ${usDate(g.issuedOn)}${g.reference ? `   Reference: ${g.reference}` : ""}`, { color: MUTED, gap: 2 });
   if (g.isSample) w.text("[Sample] Every name, number and fee on this form is fake, for a fictional demo practice.", { size: 9, color: MUTED });
 
   // Patient, (c)(1)(i)
@@ -137,8 +141,8 @@ export async function renderGfePdf(g: GoodFaithEstimate): Promise<Uint8Array> {
   w.field("Patient name", [p.firstName, p.middleName, p.lastName].filter(Boolean).join(" "));
   w.field("Patient date of birth", usDate(p.dob));
   w.field("Mailing address", `${p.address.street}${p.address.apartment ? `, ${p.address.apartment}` : ""}, ${p.address.city}, ${p.address.state} ${p.address.zip}`);
-  w.field("Phone", p.phone);
-  w.field("Email address", p.email);
+  w.field("Phone", p.phone || "Not given");
+  w.field("Email address", p.email || "Not given");
   w.field("Contact preference", p.contactPreference === "email" ? "By email" : "By mail");
 
   // Primary service and diagnosis, (c)(1)(ii) and (iv)
@@ -222,11 +226,14 @@ export async function renderGfePdf(g: GoodFaithEstimate): Promise<Uint8Array> {
     for (const para of d.paragraphs) w.text(para);
   }
 
-  // Page numbers
+  // Page numbers, and a DRAFT mark across every page until she approves it
   const pages = pdf.getPages();
-  pages.forEach((pg, i) =>
-    pg.drawText(`Page ${i + 1} of ${pages.length}`, { x: W - M - 60, y: 30, size: 8, font: w.regular, color: MUTED }),
-  );
+  pages.forEach((pg, i) => {
+    pg.drawText(`Page ${i + 1} of ${pages.length}`, { x: W - M - 60, y: 30, size: 8, font: w.regular, color: MUTED });
+    if (g.draft) {
+      pg.drawText("DRAFT - NOT YET APPROVED", { x: 110, y: 250, size: 40, font: w.bold, color: rgb(0.85, 0.2, 0.15), opacity: 0.18, rotate: degrees(35) });
+    }
+  });
 
   return pdf.save();
 }
