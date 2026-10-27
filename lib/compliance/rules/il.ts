@@ -151,7 +151,7 @@ const licenseRules: RuleInput[] = LICENSES.flatMap((l): RuleInput[] => [
     applies_to: { credentials: [l.credential] },
     schedule: { type: "every_n_years", ...l.opens, n: 2 },
     lead: { red: 0, yellow: 0 },
-    what_to_do: "IDFPR opens online renewal today. Renewing early avoids the last-week rush.",
+    what_to_do: "IDFPR opens online renewal on this date. Renewing early avoids the last-week rush.",
     you_must: null,
     source: src("IDFPR license maintenance chart", LMU),
     verified_by: "maintainer",

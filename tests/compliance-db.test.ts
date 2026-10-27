@@ -34,7 +34,7 @@ describe.skipIf(!hasDb)("compliance calendar in the database", () => {
   });
 
   it("keeps her answer on a setup reminder across a rebuild", async () => {
-    const [row] = await db()`select id from practice_os.obligations where rule_id = 'us_professional_will'`;
+    const [row] = await db()`select id, status, answered_on, next_ask_on from practice_os.obligations where rule_id = 'us_professional_will'`;
     try {
       await db()`update practice_os.obligations set status = 'done', answered_on = current_date,
         next_ask_on = current_date + 365 where id = ${row.id}`;
@@ -43,8 +43,8 @@ describe.skipIf(!hasDb)("compliance calendar in the database", () => {
       expect(after.status).toBe("done");
       expect(after.answered_on).not.toBeNull();
     } finally {
-      await db()`update practice_os.obligations set status = 'upcoming', answered_on = null,
-        next_ask_on = current_date where id = ${row.id}`;
+      await db()`update practice_os.obligations set status = ${row.status}, answered_on = ${row.answered_on},
+        next_ask_on = ${row.next_ask_on} where id = ${row.id}`;
     }
   });
 
