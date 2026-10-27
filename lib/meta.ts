@@ -115,6 +115,94 @@ export function pdfPart(bytes: Buffer, filename: string) {
   };
 }
 
+// ---- Muse Spark: search grounding (Responses API) ---------------------------
+// Cookbook: 01_api_fundamentals/10_search_grounding.ipynb (cells 4, 6, 10, 12).
+// `include: ["web_search_call.results"]` and `user_location` come from Meta's
+// search grounding guide (dev.meta.ai/docs/search-grounding), not the notebook.
+
+export type SearchSource = { url: string; title: string; snippet: string };
+export type SearchCitation = { url: string; title: string; passage: string };
+export type GroundedAnswer = {
+  text: string;
+  /** False when the model answered without searching (the cookbook: never assume a search ran). */
+  searched: boolean;
+  /** Every page the search read, with the text the model saw. */
+  sources: SearchSource[];
+  /** The subset of sources the answer cites, with the passage each one backs. */
+  citations: SearchCitation[];
+  tokens: number | null;
+};
+
+export type SearchOptions = {
+  /** low: single facts; medium: the default; high: broad questions. */
+  context?: "low" | "medium" | "high";
+  location?: { country?: string; region?: string; city?: string; timezone?: string };
+};
+
+type GroundedResponse = {
+  output?: Array<{
+    type: string;
+    results?: Array<{ type?: string; url?: string; title?: string; snippet?: string }> | null;
+    content?: Array<{
+      type: string;
+      text?: string;
+      annotations?: Array<{ type: string; url?: string; title?: string; start_index?: number; end_index?: number }> | null;
+    }>;
+  }>;
+  usage?: { total_tokens?: number } | null;
+};
+
+/** Reads a search-grounded response by item type, never by position (cookbook cell 3). */
+export function readGrounded(response: GroundedResponse): GroundedAnswer {
+  const output = response.output ?? [];
+  const searches = output.filter((o) => o.type === "web_search_call");
+  const sources = searches.flatMap((s) =>
+    (s.results ?? [])
+      .filter((r) => r.url)
+      .map((r) => ({ url: r.url as string, title: r.title ?? "", snippet: r.snippet ?? "" })),
+  );
+  const blocks = output.filter((o) => o.type === "message").flatMap((m) => m.content ?? []).filter((b) => b.type === "output_text");
+  const citations = blocks.flatMap((b) =>
+    (b.annotations ?? [])
+      .filter((a) => a.type === "url_citation" && a.url)
+      .map((a) => ({
+        url: a.url as string,
+        title: a.title ?? "",
+        passage: (b.text ?? "").slice(a.start_index ?? 0, a.end_index ?? 0),
+      })),
+  );
+  return {
+    text: blocks.map((b) => b.text ?? "").join(""),
+    searched: searches.length > 0,
+    sources,
+    citations,
+    tokens: response.usage?.total_tokens ?? null,
+  };
+}
+
+/** One question answered from the live web, with every source's URL and snippet. */
+export async function searchGrounded(feature: string, input: string, opts: SearchOptions = {}) {
+  const tool = {
+    type: "web_search",
+    ...(opts.context ? { search_context_size: opts.context } : {}),
+    ...(opts.location ? { user_location: { type: "approximate", ...opts.location } } : {}),
+  };
+  const response = await tracked(
+    MODELS.chat,
+    feature,
+    () =>
+      // The SDK's types predate Meta's web_search tool and results include; the shape is Meta's.
+      metaClient().responses.create({
+        model: MODELS.chat,
+        input,
+        tools: [tool],
+        include: ["web_search_call.results"],
+      } as never) as unknown as Promise<GroundedResponse>,
+    (r) => r.usage?.total_tokens ?? null,
+  );
+  return { response, answer: readGrounded(response) };
+}
+
 // ---- Muse Image: Responses API ----------------------------------------------
 // Cookbook: 05_muse_image/01_image_api_fundamentals/README.md ("Generate", save_image).
 
