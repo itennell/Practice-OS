@@ -6,6 +6,7 @@ Every UI piece Isaiah picked for Practice-OS, where it goes, and how to build it
 - Priority: `must` or `nice`.
 - Colors always follow the Caseload palette in `AGENTS.md` and the tokens in `app/globals.css`, light and dark. Icons are lucide only (swap any Hugeicons). shadcn/ui pieces use Base UI primitives.
 - Rows marked *layout reference* came from screenshots of React Bits Pro demos. We do not have that code and do not copy it; we build our own from free parts. The screenshots stay private and are never committed.
+- Small cards that sit on a glass card (attachments, toasts, file tiles, and similar) use the raised `tile` style from `app/globals.css`: faint hairline, top highlight, soft shadow (Isaiah's pick, 2026-10-27).
 - Licenses: React Bits (free) and shadcn/ui are MIT. coss ui is AGPL-3.0, so it is a visual reference only; use the shadcn/ui equivalent.
 
 ## Decisions from the review (2026-10-26)
@@ -65,7 +66,7 @@ Every UI piece Isaiah picked for Practice-OS, where it goes, and how to build it
 | UI-020 | Card Nav (menu that opens into cards) | SHL | Phone top bar and menu | must | approved | React Bits (app exception) |  |
 | UI-021 | Dock (Mac-style magnifying dock) | TBD | Anywhere it fits | nice | parked | React Bits (reference) |  |
 | UI-022 | Stepper (onboarding steps) | ONB | Step list | must | approved | React Bits (app exception) |  |
-| UI-023 | Attachment (file and image cards) | IGM | Post composer | must | approved | shadcn/ui (MIT) | to build in Stage 1 |
+| UI-023 | Attachment (file and image cards) | IGM | Post composer | must | built | shadcn/ui (MIT) | `components/shared/attachment.tsx` (`Attachment`, `AttachmentList`) |
 | UI-024 | Library page (file manager layout) | LIB | Whole page | must | approved | Screenshot (React Bits Pro demo, layout reference only) (layout reference) |  |
 | UI-025 | Front Desk work queue (list plus schedule panel) | FDK | Inquiries list | must | approved | Screenshot (React Bits Pro demo, layout reference only) (layout reference) |  |
 | UI-026 | Chat-first home (the app opens on Aeon) | HOM | Opening view (whole page) | must | approved | Screenshot (layout reference only) (layout reference) |  |
@@ -73,8 +74,8 @@ Every UI piece Isaiah picked for Practice-OS, where it goes, and how to build it
 | UI-028 | Confirm dialog for permanent actions (Alert Dialog) | GLB | Confirm dialogs | must | built | shadcn/ui (MIT); coss ui reference only (AGPL) | `components/shared/confirm-dialog.tsx` (`ConfirmDialog`) |
 | UI-029 | Avatar (profile picture) | SHL | Profile (bottom of sidebar) | must | built | shadcn/ui (MIT); coss ui reference only (AGPL) | `components/shared/avatar.tsx` (`Avatar`) |
 | UI-030 | Calendar (shared month calendar) | DLN | Calendar | must | built | shadcn/ui (MIT); coss ui reference only (AGPL) | `components/shared/calendar.tsx` (`Calendar`) |
-| UI-031 | Toast notifications | GLB | Toasts | must | approved | shadcn/ui (MIT) | to build in Stage 1 |
-| UI-032 | Settings controls (switches and selects) | SET | Auto-approve kinds | must | approved | shadcn/ui (MIT) | to build in Stage 1 |
+| UI-031 | Toast notifications | GLB | Toasts | must | built | shadcn/ui (MIT) | `components/shared/toaster.tsx` (`Toaster`, `notify`) |
+| UI-032 | Settings controls (switches and selects) | SET | Auto-approve kinds | must | built | shadcn/ui (MIT) | `components/shared/settings-controls.tsx` (`SettingSwitch`, `SettingSelect`, `SettingRadio`, `TextField`) |
 
 ## Build notes
 
