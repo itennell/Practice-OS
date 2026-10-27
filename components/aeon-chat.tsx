@@ -4,16 +4,16 @@
 // POST /api/chat, which runs the crisis check and the sensitive-info guard
 // before any model call. A refused message is never shown or saved: her text
 // goes back into the box so she can take the detail out.
-// TODO(UI-014): swap the working line for the Thought Line once it is built.
 // TODO(UI-005): the conversation list becomes the dark chat menu.
 // TODO(UI-019): type the greeting in with Text Type.
 
-import { Check, MessageSquarePlus, ShieldAlert, X } from "lucide-react";
+import { MessageSquarePlus, ShieldAlert } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { PromptBar } from "@/components/shared/prompt-bar";
+import { ThoughtLine } from "@/components/shared/thought-line";
 import { notify } from "@/components/shared/toaster";
 import { ApprovalsInbox } from "./approvals-inbox";
 import { AeonText } from "./aeon-text";
@@ -47,24 +47,20 @@ function seconds(ms: number): string {
   return ms < 100 ? "<0.1s" : `${(ms / 1000).toFixed(1)}s`;
 }
 
+/** What Aeon checked for a reply (Thought Line UI-014, settled): real tool runs only, never invented steps. */
 function Steps({ steps }: { steps: ChatStep[] }) {
   if (steps.length === 0) return null;
+  const total = steps.reduce((n, s) => n + s.ms, 0);
+  const doneLabel = steps.length === 1 ? `${steps[0].label} · ${seconds(total)}` : `Checked ${steps.length} things · ${seconds(total)}`;
   return (
-    <ul aria-label="What Aeon checked" className="flex flex-col gap-1 text-small text-[var(--fg-muted)]">
-      {steps.map((s, i) => (
-        <li key={i} className="flex items-center gap-2">
-          {s.ok ? (
-            <Check aria-hidden size={14} strokeWidth={2.25} className="text-[var(--status-done-fg)]" />
-          ) : (
-            <X aria-hidden size={14} strokeWidth={2.25} className="text-[var(--danger-fg)]" />
-          )}
-          <span>
-            {s.label}
-            {s.ok ? "" : " (didn't work)"} · {seconds(s.ms)}
-          </span>
-        </li>
-      ))}
-    </ul>
+    <ThoughtLine
+      working={false}
+      doneLabel={doneLabel}
+      // One step that worked is said in full by the label; the task box is for several, or a failure.
+      steps={steps.length === 1 && steps[0].ok ? [] : steps.map((s) => ({ label: s.label, status: s.ok ? ("done" as const) : ("failed" as const) }))}
+      showTimer={false}
+      collapseOnSettle={steps.length > 1}
+    />
   );
 }
 
@@ -278,12 +274,7 @@ export function AeonChat({
           </div>
         )}
 
-        {busy && (
-          <p role="status" className="flex items-center gap-3 text-[var(--fg-muted)]">
-            <Orb size={20} />
-            <span className="shimmer-text">Aeon is working on it…</span>
-          </p>
-        )}
+        {busy && <ThoughtLine working label="Aeon is working on it…" />}
         {/* Scrolls the newest reply clear of the message box pinned below it. */}
         <div ref={end} className="scroll-mb-44" />
 
