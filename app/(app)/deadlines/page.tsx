@@ -5,6 +5,8 @@ import { DeadlineCard, ResearchedBadge, SourceLine, formatDate } from "@/compone
 import { SetupReminders } from "@/components/setup-reminders";
 import { Chip, GlassCard } from "@/components/ui";
 import { deadlinesView } from "@/lib/compliance/view";
+import { listPayerApplications, payerDates } from "@/lib/payers/store";
+import Link from "next/link";
 
 export const metadata: Metadata = { title: "Deadlines · Practice-OS" };
 
@@ -36,6 +38,7 @@ export default function DeadlinesPage() {
 async function Deadlines() {
   await connection(); // read the database per request, never at build time
   const view = await deadlinesView(90);
+  const insurance = payerDates(await listPayerApplications(), view.today, 90);
   const count = (u: string) => view.due.filter((d) => d.urgency === u).length;
   const urgent = count("overdue") + count("red");
 
@@ -63,6 +66,27 @@ async function Deadlines() {
           </ul>
         )}
       </GlassCard>
+
+      {insurance.length > 0 && (
+        <GlassCard aria-labelledby="insurance-heading" className="flex flex-col gap-3 p-6 md:p-8">
+          <h2 id="insurance-heading" className="text-section font-semibold">
+            Insurance follow-ups
+          </h2>
+          <ul className="flex flex-col gap-2">
+            {insurance.map((d) => (
+              <li key={`${d.id}-${d.kind}`}>
+                <span className="font-semibold">
+                  {d.days_left < 0 ? `${-d.days_left} days overdue` : d.days_left === 0 ? "Today" : formatDate(d.due_on)}:
+                </span>{" "}
+                {d.what}
+              </li>
+            ))}
+          </ul>
+          <Link href="/paperwork?tab=insurance" className="text-small text-[var(--link)] underline underline-offset-2">
+            Your insurance applications
+          </Link>
+        </GlassCard>
+      )}
 
       {view.needs_facts.length > 0 && (
         <GlassCard aria-labelledby="facts-heading" className="flex flex-col gap-3 p-6 md:p-8">

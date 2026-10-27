@@ -14,6 +14,7 @@ export const DEMO_TABLES = [
   "approvals",
   "good_faith_estimates",
   "credentialing_profile",
+  "payer_applications",
   "obligations",
   "compliance_facts",
   "compliance_rules",

@@ -106,6 +106,16 @@ server.registerTool(
       urgent_soon: z.array(briefItem),
       setup_questions: z.array(z.object({ rule_id: z.string().nullable(), title: z.string(), what_to_do: z.string().nullable() })),
       needs_dates: z.array(z.object({ title: z.string(), question: z.string() })),
+      payer_dates: z.array(
+        z.object({
+          id: z.string(),
+          payer: z.string(),
+          kind: z.enum(["follow_up", "recredential"]),
+          due_on: z.string(),
+          days_left: z.number(),
+          what: z.string(),
+        }),
+      ),
       is_sample: z.boolean(),
       summary: z.string(),
     },
@@ -315,6 +325,75 @@ server.registerTool(
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: true },
   },
   async () => text(await cred.checkNpiInRegistry()),
+);
+
+const payers = await import("../lib/payers/store");
+const cms855i = await import("../lib/payers/cms855i");
+
+server.registerTool(
+  "fill_payer_form",
+  {
+    title: "Prepare a payer enrollment form",
+    description:
+      "Prepares Medicare's CMS-855I (version 05/23) from her credentialing profile and returns what was filled and what only she can complete. " +
+      "Counselors and MFTs get 'Undefined Non-Physician Practitioner Specialty' with MHC or MFT written in, per CMS's May 2024 FAQ. " +
+      "It never fills her SSN, date of birth, license number, the legal questions, payment details or the signature, and it never submits. " +
+      "She downloads it on Paperwork > Insurance, or applies online in PECOS (faster, and it lists MFT and MHC). Also adds a Medicare row to her applications if missing.",
+    inputSchema: { form: z.enum(["cms855i"]) },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+  },
+  async () => {
+    const profile = await cred.loadCredentialingProfile();
+    if (!profile) return text({ error: "Her credentialing profile isn't set up yet. Fill it in first (update_credentialing)." });
+    const r = await cms855i.fillCms855i(profile);
+    const apps = await payers.listPayerApplications();
+    if (!apps.some((a) => a.form === "cms855i")) await payers.savePayerApplication({ payer: "Medicare", form: "cms855i", status: "preparing" }, createdBy());
+    return text({
+      form: `CMS-855I (${cms855i.CMS855I_VERSION})`,
+      filled: r.filled,
+      left_for_her: r.leftForYou,
+      download: "Paperwork > Insurance > Download the prepared CMS-855I",
+      faster_route: "PECOS (pecos.cms.hhs.gov) lists MFT and MHC as specialties and is usually faster than paper.",
+      is_sample: profile.isSample,
+    });
+  },
+);
+
+server.registerTool(
+  "list_payer_applications",
+  {
+    title: "List her insurance applications",
+    description: "Every payer she's applying to or enrolled with: status, applied, follow-up, approved and recredential dates. Read-only.",
+    inputSchema: {},
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+  },
+  async () => text({ applications: await payers.listPayerApplications() }),
+);
+
+server.registerTool(
+  "update_payer_application",
+  {
+    title: "Add or update an insurance application",
+    description:
+      "Adds a payer (no id) or updates one (with id from list_payer_applications). Status: preparing, applied, pending, approved, denied, withdrawn. " +
+      "Applied with no follow_up_on sets a follow-up 30 days out; approved with no recredential_on sets 36 months out. " +
+      "Example: 'I sent my BCBSIL application today' -> {payer: 'BCBSIL', status: 'applied'}. Never a license number or client detail.",
+    inputSchema: {
+      id: z.string().uuid().optional(),
+      payer: z.string().min(2).max(120),
+      form: z.enum(["cms855i"]).optional(),
+      status: z.enum(["preparing", "applied", "pending", "approved", "denied", "withdrawn"]),
+      applied_on: isoDay.optional(),
+      follow_up_on: isoDay.optional(),
+      approved_on: isoDay.optional(),
+      effective_on: isoDay.optional(),
+      recredential_on: isoDay.optional(),
+      reference: z.string().max(60).optional(),
+      notes: z.string().max(500).optional(),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: false },
+  },
+  async (input) => text(await payers.savePayerApplication(input, createdBy())),
 );
 
 await server.connect(new StdioServerTransport());
