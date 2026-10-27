@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
 import { Suspense } from "react";
-import { DeadlineCard, SourceLine, formatDate } from "@/components/deadline-card";
+import { DeadlineCard, ResearchedBadge, SourceLine, formatDate } from "@/components/deadline-card";
 import { SetupReminders } from "@/components/setup-reminders";
 import { Chip, GlassCard } from "@/components/ui";
 import { deadlinesView } from "@/lib/compliance/view";
@@ -106,6 +106,7 @@ async function Deadlines() {
                     {n.what_to_do && <p className="max-w-[65ch]">{n.what_to_do}</p>}
                     {n.caveat && <p className="text-small text-[var(--fg-muted)]">Note: {n.caveat}</p>}
                     <SourceLine o={n} />
+                    <ResearchedBadge o={n} />
                   </div>
                 </details>
               </li>

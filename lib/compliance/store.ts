@@ -1,6 +1,7 @@
 import type postgres from "postgres";
 import { db } from "../db";
 import { todayIn, type ISODate } from "./dates";
+import { loadSavedRules } from "./researched";
 import { SHIPPED_RULES } from "./rules";
 import { buildCalendar, type Calendar } from "./schedule";
 import { factsSchema, type Facts, type Rule } from "./types";
@@ -66,7 +67,9 @@ export async function syncCalendar(
   const today = opts.today ?? (await practiceToday(sql));
   if (!facts) return { today, written: 0, removed: 0, needs_facts: [] };
 
-  const cal = buildCalendar(opts.rules ?? SHIPPED_RULES, facts, today);
+  // Shipped rules plus the researched rules she approved.
+  const rules = opts.rules ?? [...SHIPPED_RULES, ...(await loadSavedRules(sql))];
+  const cal = buildCalendar(rules, facts, today);
   const rows = rowsFor(cal);
 
   return sql.begin(async (tx) => {
@@ -77,12 +80,13 @@ export async function syncCalendar(
         insert into practice_os.obligations (
           rule_id, kind, title, category, due_on, jurisdiction, verified_by,
           lead_red_days, lead_yellow_days, what_to_do, you_must, guide_slug,
-          citation, source_url, quote, last_verified_on, caveat,
+          citation, source_url, quote, last_verified_on, caveat, evidence,
           ce_required, ce_done, ce_topics_left, next_ask_on, is_sample
         ) values (
           ${rule.id}, ${rule.kind}, ${r.title}, ${rule.category}, ${r.due_on}, ${rule.jurisdiction}, ${rule.verified_by},
           ${rule.lead.red}, ${rule.lead.yellow}, ${rule.what_to_do}, ${rule.you_must}, ${rule.guide},
           ${rule.source.citation}, ${rule.source.url ?? null}, ${rule.source.quote ?? null}, ${rule.source.checked_on}, ${rule.caveat ?? null},
+          ${rule.verified_by === "maintainer" ? null : (rule.source.evidence ?? "cited")},
           ${r.ce?.required ?? null}, ${r.ce?.done ?? null}, ${r.ce ? tx.json(r.ce.topics_left as never) : null},
           ${rule.kind === "setup" ? today : null}, ${facts.is_sample}
         )
@@ -92,7 +96,7 @@ export async function syncCalendar(
           lead_red_days = excluded.lead_red_days, lead_yellow_days = excluded.lead_yellow_days,
           what_to_do = excluded.what_to_do, you_must = excluded.you_must, guide_slug = excluded.guide_slug,
           citation = excluded.citation, source_url = excluded.source_url, quote = excluded.quote,
-          last_verified_on = excluded.last_verified_on, caveat = excluded.caveat,
+          last_verified_on = excluded.last_verified_on, caveat = excluded.caveat, evidence = excluded.evidence,
           ce_required = excluded.ce_required, ce_done = excluded.ce_done, ce_topics_left = excluded.ce_topics_left,
           is_sample = excluded.is_sample
         returning id`;
