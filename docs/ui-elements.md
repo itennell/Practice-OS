@@ -75,7 +75,7 @@ Every UI piece Isaiah picked for Practice-OS, where it goes, and how to build it
 | UI-029 | Avatar (profile picture) | SHL | Profile (bottom of sidebar) | must | built | shadcn/ui (MIT); coss ui reference only (AGPL) | `components/shared/avatar.tsx` (`Avatar`) |
 | UI-030 | Calendar (shared month calendar) | DLN | Calendar | must | built | shadcn/ui (MIT); coss ui reference only (AGPL) | `components/shared/calendar.tsx` (`Calendar`) |
 | UI-031 | Toast notifications | GLB | Toasts | must | built | shadcn/ui (MIT) | `components/shared/toaster.tsx` (`Toaster`, `notify`) |
-| UI-032 | Settings controls (switches and selects) | SET | Auto-approve kinds | must | approved | shadcn/ui (MIT) | to build in Stage 1 |
+| UI-032 | Settings controls (switches and selects) | SET | Auto-approve kinds | must | built | shadcn/ui (MIT) | `components/shared/settings-controls.tsx` (`SettingSwitch`, `SettingSelect`, `SettingRadio`, `TextField`) |
 
 ## Build notes
 
