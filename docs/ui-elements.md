@@ -71,8 +71,8 @@ Every UI piece Isaiah picked for Practice-OS, where it goes, and how to build it
 | UI-026 | Chat-first home (the app opens on Aeon) | HOM | Opening view (whole page) | must | approved | Screenshot (layout reference only) (layout reference) |  |
 | UI-027 | Approval card in the chat | CHT | Approval card in chat | must | approved | Screenshot (layout reference only) (layout reference) |  |
 | UI-028 | Confirm dialog for permanent actions (Alert Dialog) | GLB | Confirm dialogs | must | built | shadcn/ui (MIT); coss ui reference only (AGPL) | `components/shared/confirm-dialog.tsx` (`ConfirmDialog`) |
-| UI-029 | Avatar (profile picture) | SHL | Profile (bottom of sidebar) | must | approved | shadcn/ui (MIT); coss ui reference only (AGPL) | to build in Stage 1 |
-| UI-030 | Calendar (shared month calendar) | DLN | Calendar | must | approved | shadcn/ui (MIT); coss ui reference only (AGPL) | to build in Stage 1 |
+| UI-029 | Avatar (profile picture) | SHL | Profile (bottom of sidebar) | must | built | shadcn/ui (MIT); coss ui reference only (AGPL) | `components/shared/avatar.tsx` (`Avatar`) |
+| UI-030 | Calendar (shared month calendar) | DLN | Calendar | must | built | shadcn/ui (MIT); coss ui reference only (AGPL) | `components/shared/calendar.tsx` (`Calendar`) |
 | UI-031 | Toast notifications | GLB | Toasts | must | approved | shadcn/ui (MIT) | to build in Stage 1 |
 | UI-032 | Settings controls (switches and selects) | SET | Auto-approve kinds | must | approved | shadcn/ui (MIT) | to build in Stage 1 |
 

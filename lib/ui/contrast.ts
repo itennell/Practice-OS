@@ -118,6 +118,18 @@ export const PAIRS: Pair[] = [
   ]),
   { fg: "--primary-fg", on: ["--bg", "--primary-bg"], min: AA_TEXT, label: "primary button label" },
   { fg: "--primary-bg", on: ["--bg", "--glass"], min: AA_NON_TEXT, label: "checked box on glass card" },
+  ...["lilac", "blue", "pink", "green"].map((tone) => ({
+    fg: `--avatar-${tone}-fg`,
+    on: ["--bg", "--glass", `--avatar-${tone}-bg`],
+    min: AA_TEXT,
+    label: `${tone} avatar initials`,
+  })),
+  ...["deadline", "consult", "post", "done"].map((kind) => ({
+    fg: `--event-${kind}`,
+    on: ["--bg", "--glass"],
+    min: AA_NON_TEXT,
+    label: `${kind} dot on the calendar`,
+  })),
   { fg: "--danger-on", on: ["--bg", "--glass-strong", "--danger-bg"], min: AA_TEXT, label: "danger button label" },
   { fg: "--danger-on", on: ["--bg", "--glass-strong", "--danger-hover"], min: AA_TEXT, label: "danger button label, hovered" },
   { fg: "--fg", on: ["--bg", "--scrim", "--glass-strong"], min: AA_TEXT, label: "dialog text over the dimmed page" },

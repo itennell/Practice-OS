@@ -98,6 +98,22 @@
   --danger-hover: #861d14;
   --scrim: rgb(23 20 43 / 0.32);
 
+  /* Avatars: initials on soft tints. The clinician is lilac; callers and contacts get a tone from their name. */
+  /* Calendar event dots. */
+  --event-deadline: #a16207;
+  --event-consult: #5b47c9;
+  --event-post: #a3368c;
+  --event-done: #2f7a55;
+  --avatar-ring: #ffffff;
+  --avatar-lilac-bg: #e2d8ff;
+  --avatar-lilac-fg: #4a37b5;
+  --avatar-blue-bg: #dce8fb;
+  --avatar-blue-fg: #234a9e;
+  --avatar-pink-bg: #f7ddef;
+  --avatar-pink-fg: #8a2f73;
+  --avatar-green-bg: #ddf0e5;
+  --avatar-green-fg: #24603f;
+
   --focus-ring: #5b47c9;
 
   /* Motion durations. The orb breathes over --dur-breathe. */
@@ -141,6 +157,20 @@
     --danger-on: #ffaea3;
     --danger-hover: rgb(255 174 163 / 0.24);
     --scrim: rgb(0 0 0 / 0.55);
+
+    --event-deadline: #f6c56b;
+    --event-consult: #b0a3fb;
+    --event-post: #e88fd0;
+    --event-done: #8fd8ae;
+    --avatar-ring: rgb(255 255 255 / 0.16);
+    --avatar-lilac-bg: rgb(142 124 248 / 0.24);
+    --avatar-lilac-fg: #e4ddff;
+    --avatar-blue-bg: rgb(91 155 240 / 0.22);
+    --avatar-blue-fg: #d3e3fc;
+    --avatar-pink-bg: rgb(224 123 196 / 0.22);
+    --avatar-pink-fg: #f7d6ee;
+    --avatar-green-bg: rgb(143 216 174 / 0.18);
+    --avatar-green-fg: #cbf0da;
 
     --focus-ring: #b0a3fb;
   }
