@@ -10,14 +10,13 @@ describe("Thought Line steps", () => {
   it("planned tasks keep their own status while working", () => {
     const steps = normalizeSteps(
       [
-        { label: "a", status: "done", detail: "found 2" },
+        { label: "a", status: "done" },
         { label: "b", status: "running" },
         { label: "c", status: "pending" },
       ],
       true,
     );
     expect(steps.map((s) => s.status)).toEqual(["done", "running", "pending"]);
-    expect(steps[0].detail).toBe("found 2");
   });
 
   it("when work ends nothing is left running or waiting, but failures stay failed", () => {

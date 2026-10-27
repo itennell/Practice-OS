@@ -4,14 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { Button, GlassCard } from "@/components/ui";
 import { ThoughtLine } from "../thought-line";
 
-// A sample job reported the way real jobs will: a plan of tasks up front, each
-// ticked off with a short note of what Aeon found or did.
-const PLAN: { label: string; detail: string }[] = [
-  { label: "[Sample] Read your practice details", detail: "Dana Reyes, LCPC · Lincoln Park · new clients welcome" },
-  { label: "[Sample] Checked what you posted last month", detail: "2 posts: fees, a look at the office" },
-  { label: "[Sample] Drafted 3 posts", detail: "Your first session · Fees and superbills · How to book" },
-  { label: "[Sample] Checked each draft against the posting rules", detail: "Logistics only, no advice or client stories: all 3 pass" },
-];
+// A sample job reported the way real jobs will: a short plan of tasks up front,
+// each ticked off as it finishes. One short line per task.
+const PLAN = ["[Sample] Read your practice details", "[Sample] Checked last month's posts", "[Sample] Drafted 3 posts", "[Sample] Checked the posting rules"];
 
 export default function ThoughtLineLab() {
   const [at, setAt] = useState(-1); // index of the task in progress; -1 not started; PLAN.length finished
@@ -33,10 +28,9 @@ export default function ThoughtLineLab() {
     if (timer.current) clearInterval(timer.current);
   }, []);
 
-  const steps = PLAN.map((task, i) => ({
-    label: task.label,
+  const steps = PLAN.map((label, i) => ({
+    label,
     status: i < at ? ("done" as const) : i === at ? ("running" as const) : ("pending" as const),
-    detail: i < at ? task.detail : undefined,
   }));
 
   return (
@@ -63,9 +57,9 @@ export default function ThoughtLineLab() {
           showTimer={false}
           collapseOnSettle={false}
           steps={[
-            { label: "[Sample] Searched the NPI Registry near Lincoln Park", detail: "12 primary care offices within 3 miles", status: "done" },
-            { label: "[Sample] Picked the 4 closest that see adults", detail: "Lakeview Family Medicine and 3 more", status: "done" },
-            { label: "[Sample] Looked up their fax numbers", detail: "Couldn't reach the registry. Try again later.", status: "failed" },
+            { label: "[Sample] Searched near Lincoln Park", status: "done" },
+            { label: "[Sample] Picked the 4 closest", status: "done" },
+            { label: "[Sample] Couldn't reach the fax list", status: "failed" },
           ]}
         />
       </GlassCard>

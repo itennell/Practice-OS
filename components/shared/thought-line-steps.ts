@@ -2,11 +2,11 @@
 
 export type StepStatus = "pending" | "running" | "done" | "failed";
 
-/** One task in Aeon's task box. `detail` is a short line of what it found or did. */
-export type ThoughtStep = { label: string; detail?: string; status?: StepStatus };
+/** One task in Aeon's task box: one short line, five to seven words at most. */
+export type ThoughtStep = { label: string; status?: StepStatus };
 
 /** A task with its status worked out. */
-export type NormalStep = { label: string; detail?: string; status: StepStatus };
+export type NormalStep = { label: string; status: StepStatus };
 
 /**
  * Plain strings are past work plus the current step: all done except the
@@ -20,7 +20,7 @@ export function normalizeSteps(steps: (string | ThoughtStep)[], working: boolean
     const implied: StepStatus = working && i === steps.length - 1 ? "running" : "done";
     let status = step.status ?? implied;
     if (!working && (status === "running" || status === "pending")) status = "done";
-    return { label: step.label, detail: step.detail, status };
+    return { label: step.label, status };
   });
 }
 

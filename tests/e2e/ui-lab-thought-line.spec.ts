@@ -16,20 +16,18 @@ test.describe("Thought Line", () => {
     // The plan shows up front: the first task in progress, the rest coming up.
     await expect(page.getByText("[Sample] Read your practice details, in progress")).toBeAttached();
     await expect(page.getByText("[Sample] Drafted 3 posts, coming up")).toBeAttached();
-    // Tasks tick off with a short note of what Aeon found.
+    // Tasks tick off as they finish.
     await expect(page.getByText("[Sample] Read your practice details, done")).toBeAttached({ timeout: 4_000 });
-    await expect(page.getByText("Dana Reyes, LCPC · Lincoln Park · new clients welcome")).toBeVisible();
     const settled = page.getByRole("button", { name: /Drafted 3 posts.*Show steps/ });
     await expect(settled).toBeVisible({ timeout: 10_000 });
     await expect(settled).toHaveAttribute("aria-expanded", "false");
     await settled.click();
     await expect(page.getByRole("button", { name: /Drafted 3 posts.*Hide steps/ })).toHaveAttribute("aria-expanded", "true");
-    await expect(page.getByText("[Sample] Checked each draft against the posting rules")).toBeVisible();
+    await expect(page.getByText("[Sample] Checked the posting rules", { exact: false })).toBeVisible();
   });
 
   test("a task that didn't work says so in words", async ({ page }) => {
-    await expect(page.getByText("[Sample] Looked up their fax numbers, didn't work")).toBeAttached();
-    await expect(page.getByText("Couldn't reach the registry. Try again later.")).toBeVisible();
+    await expect(page.getByText("[Sample] Couldn't reach the fax list, didn't work")).toBeAttached();
   });
 
   test("announces work and the result to screen readers", async ({ page }) => {

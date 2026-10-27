@@ -27,9 +27,9 @@ export type ThoughtLineProps = {
   /** When done, what happened: "Drafted 3 posts". Defaults to "Done in 4.2s". */
   doneLabel?: string;
   /**
-   * Real progress, in plain words, oldest first. Plain strings: all done except
-   * the last, which is in progress. Or tasks with their own status (planned
-   * ones as "pending") and a short detail line of what Aeon found or did.
+   * Real progress, oldest first, one short line each (five to seven words at
+   * most: "Drafted 3 posts"). Plain strings: all done except the last, which
+   * is in progress. Or tasks with their own status (planned ones as "pending").
    */
   steps?: (string | ThoughtStep)[];
   showTimer?: boolean;
@@ -147,13 +147,13 @@ export function ThoughtLine({
               {normalizeSteps(steps, working).map((step, i) => (
                 <li
                   key={`${i}-${step.label}`}
-                  className="flex items-start gap-3 py-2.5 font-normal motion-safe:animate-[pill-open_220ms_var(--ease-soft-out)]"
+                  className="flex items-center gap-3 py-2 font-normal motion-safe:animate-[pill-open_220ms_var(--ease-soft-out)]"
                 >
-                  <StatusMark status={step.status} size="1.15em" decorative className="mt-[0.15em]" />
-                  <span className="flex min-w-0 flex-col gap-0.5">
+                  <StatusMark status={step.status} size="1.1em" decorative />
+                  <span className="min-w-0">
                     <span
                       className={cn(
-                        "text-small",
+                        "block text-small",
                         step.status === "pending" && "text-[var(--fg-muted)]",
                         step.status === "running" && "font-semibold text-[var(--fg)]",
                         step.status === "done" && "text-[var(--fg)]",
@@ -163,7 +163,6 @@ export function ThoughtLine({
                       {step.label}
                       <span className="sr-only">, {STEP_WORDS[step.status]}</span>
                     </span>
-                    {step.detail && <span className="text-label text-[var(--fg-muted)]">{step.detail}</span>}
                   </span>
                 </li>
               ))}
