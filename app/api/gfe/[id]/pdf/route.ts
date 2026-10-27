@@ -2,7 +2,8 @@ import { canDecide } from "@/lib/admin-guard";
 import { practiceToday } from "@/lib/compliance/store";
 import { clientIdentitySchema } from "@/lib/gfe/identity";
 import { renderGfePdf } from "@/lib/gfe/pdf";
-import { getEstimate, toGoodFaithEstimate } from "@/lib/gfe/store";
+import { loadCredentialingProfile } from "@/lib/credentialing/store";
+import { MissingProviderDetails, getEstimate, toGoodFaithEstimate } from "@/lib/gfe/store";
 import { isUuid } from "../../../approvals/responses";
 
 // Makes the PDF for a saved estimate with the client details she types. Those
@@ -22,9 +23,11 @@ export async function POST(request: Request, ctx: RouteContext<"/api/gfe/[id]/pd
     return Response.json({ error: `Check these fields: ${fields.join(", ")}.` }, { status: 400 });
   }
 
+  const profile = await loadCredentialingProfile();
   try {
+    if (!profile) throw new MissingProviderDetails();
     const issuedOn = estimate.issued_on ?? (await practiceToday());
-    const bytes = await renderGfePdf(toGoodFaithEstimate(estimate, parsed.data, issuedOn));
+    const bytes = await renderGfePdf(toGoodFaithEstimate(estimate, parsed.data, issuedOn, profile));
     return new Response(Buffer.from(bytes), {
       headers: {
         "Content-Type": "application/pdf",
@@ -32,7 +35,8 @@ export async function POST(request: Request, ctx: RouteContext<"/api/gfe/[id]/pd
         "Cache-Control": "no-store",
       },
     });
-  } catch {
+  } catch (err) {
+    if (err instanceof MissingProviderDetails) return Response.json({ error: err.message }, { status: 409 });
     return Response.json({ error: "Couldn't make the PDF. Check the details and try again." }, { status: 400 });
   }
 }

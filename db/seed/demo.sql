@@ -132,6 +132,29 @@ insert into practice_os.approvals (id, kind, title, preview, payload, created_by
    '{"note": "[Sample] Approving this shows what a failed action looks like.", "fail": true}'::jsonb,
    'aeon', true);
 
+-- [Sample] credentialing profile (migration 007): CAQH ProView order, no license number.
+-- The NPI passes the check digit but NPPES has no one with it; the TIN starts with 00.
+insert into practice_os.credentialing_profile
+  (identity, education, license, npi, npi_type, taxonomy, tin, malpractice, practice_location,
+   work_history, gap_explanations, documents, is_sample)
+values (
+  '{"name": "Dana Reyes", "credential": "LCPC", "practice_name": "Reyes Counseling PLLC", "email": "dana@example.com", "phone": "312-555-0142"}'::jsonb,
+  '[{"degree": "MA, Clinical Mental Health Counseling", "school": "Example University [Sample]", "graduated": 2019}]'::jsonb,
+  '{"type": "Licensed Clinical Professional Counselor (LCPC)", "state": "IL", "board": "Illinois Department of Financial and Professional Regulation (IDFPR)"}'::jsonb,
+  '1999999901', 1, '101YP2500X', '00-1234567',
+  '{"carrier": "Example Mutual [Sample]", "per_claim": 1000000, "aggregate": 3000000, "expires_on": "2026-12-01"}'::jsonb,
+  '{"name": "Reyes Counseling PLLC", "street": "2400 N Example Ave, Suite 2", "city": "Chicago", "state": "IL", "zip": "60614", "phone": "312-555-0142", "telehealth": true}'::jsonb,
+  '[{"employer": "Example Community Counseling Center [Sample]", "role": "Staff counselor", "from": "2019-08-01", "to": "2025-11-30"},
+    {"employer": "Reyes Counseling PLLC", "role": "Owner, LCPC", "from": "2025-12-10", "to": null}]'::jsonb,
+  '[]'::jsonb,
+  '[{"id": "license", "label": "License verification", "upload": "a current IDFPR license lookup", "on_file": true, "expires_on": null},
+    {"id": "malpractice", "label": "Malpractice face sheet", "upload": "your renewed malpractice face sheet", "on_file": true, "expires_on": "2026-12-01"},
+    {"id": "diploma", "label": "Diploma or transcript", "upload": "your diploma or final transcript", "on_file": true, "expires_on": null},
+    {"id": "cv", "label": "CV with month/year dates", "upload": "a CV with month and year for every job", "on_file": true, "expires_on": null},
+    {"id": "w9", "label": "W-9 for the PLLC", "upload": "a signed W-9 for the PLLC", "on_file": false, "expires_on": null}]'::jsonb,
+  true
+);
+
 -- Two [Sample] Good Faith Estimates, with no client identity (migration 006): one
 -- already issued, one waiting for her approval. Dates are fixed, like the CMS example.
 insert into practice_os.approvals (id, kind, title, preview, payload, status, created_by, decided_at, decided_by, result, is_sample) values

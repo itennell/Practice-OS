@@ -66,6 +66,18 @@ describe("other states", () => {
 });
 
 describe("work history and NPI", () => {
+  it("the NPI item is done only when NPPES found it with the same taxonomy", () => {
+    const at = "2026-10-27T12:00:00.000Z";
+    const item = (npiCheck: typeof DANA_PROFILE.npiCheck) =>
+      caqhPrep({ ...DANA_PROFILE, npiCheck }, facts, SHIPPED_RULES, TODAY).items.find((i) => i.id === "npi")!;
+    expect(item(null)).toMatchObject({ label: "Check your NPI against NPPES", done: false });
+    expect(item({ checkedAt: at, found: false, name: null, taxonomy: null, matches: false })).toMatchObject({ done: false, you: true });
+    expect(item({ checkedAt: at, found: true, name: "DANA REYES", taxonomy: "101YP2500X", matches: true })).toMatchObject({
+      label: "NPI and taxonomy match NPPES",
+      done: true,
+    });
+  });
+
   it("finds a gap over 6 months and clears it once explained", () => {
     const p = {
       ...DANA_PROFILE,

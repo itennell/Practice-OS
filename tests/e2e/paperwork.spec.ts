@@ -29,7 +29,7 @@ test("Credentialing: profile, CAQH date that matches Deadlines, and the attest l
   await page.getByRole("link", { name: "Credentialing" }).click();
   await expect(page).toHaveURL(/tab=credentialing/);
   await expect(page.getByRole("heading", { name: "Credentialing profile" })).toBeVisible();
-  await expect(page.getByText("License number: [Sample] not shown. Practice-OS doesn’t store it.")).toBeVisible();
+  await expect(page.getByRole("listitem", { name: "License" }).getByText(/License number: not stored here/)).toBeVisible();
   await expect(page.getByText("Upload your renewed malpractice face sheet")).toBeVisible();
   await expect(page.getByText("You must log in and click Attest yourself.")).toBeVisible();
 
