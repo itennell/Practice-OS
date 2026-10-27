@@ -98,6 +98,12 @@ export function legalHolidays(y: number): Set<ISODate> {
   return days;
 }
 
+/** Observed federal holidays under 5 USC 6103 only (no DC Emancipation Day, which is an IRS rule). */
+export function federalHolidays(y: number): Set<ISODate> {
+  const dc = observed(ymd(y, 4, 16));
+  return new Set([...legalHolidays(y)].filter((d) => d !== dc));
+}
+
 export function isBusinessDay(date: ISODate): boolean {
   return !isWeekend(date) && !legalHolidays(year(date)).has(date);
 }
