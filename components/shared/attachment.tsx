@@ -55,9 +55,9 @@ export function Attachment({
     <div
       data-state={state}
       className={cn(
-        "group relative flex min-w-0 shrink-0 rounded-[var(--radius-card-sm)] border bg-[var(--tile-bg)] p-2 text-[var(--fg)] shadow-[var(--tile-shadow)] backdrop-blur-[var(--blur-glass)]",
+        "tile group relative flex min-w-0 shrink-0 p-2 text-[var(--fg)]",
         "transition-[box-shadow,transform] duration-200 ease-[var(--ease-soft-out)] hover:shadow-[var(--tile-shadow-hover)] motion-safe:hover:-translate-y-px",
-        state === "error" ? "border-[var(--danger-fg)]/60" : "border-[var(--tile-line)]",
+        state === "error" && "border-[var(--danger-fg)]/60",
         vertical ? "w-36 flex-col gap-2" : "w-80 max-w-full items-center gap-3",
         className,
       )}

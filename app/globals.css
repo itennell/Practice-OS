@@ -104,6 +104,8 @@
   --tile-line: rgb(23 20 43 / 0.06);
   --tile-shadow: inset 0 1px 0 rgb(255 255 255 / 0.9), 0 1px 2px rgb(23 20 43 / 0.06), 0 6px 18px -4px rgb(43 33 110 / 0.14);
   --tile-shadow-hover: inset 0 1px 0 rgb(255 255 255 / 0.9), 0 2px 4px rgb(23 20 43 / 0.06), 0 12px 28px -6px rgb(43 33 110 / 0.2);
+  /* Toasts float over anything, so they are nearly solid. */
+  --toast-bg: rgb(255 255 255 / 0.97);
 
   /* Calendar event dots. */
   --event-deadline: #a16207;
@@ -168,6 +170,7 @@
     --tile-line: rgb(255 255 255 / 0.07);
     --tile-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 22px -6px rgb(0 0 0 / 0.5);
     --tile-shadow-hover: inset 0 1px 0 rgb(255 255 255 / 0.08), 0 2px 4px rgb(0 0 0 / 0.3), 0 14px 32px -8px rgb(0 0 0 / 0.6);
+    --toast-bg: rgb(29 25 56 / 0.97);
     --event-deadline: #f6c56b;
     --event-consult: #b0a3fb;
     --event-post: #e88fd0;
@@ -224,6 +227,17 @@ textarea {
   -webkit-backdrop-filter: blur(18px);
   border: 1px solid var(--glass-line);
   border-radius: var(--radius-card);
+}
+
+/* Raised card for small things that sit on a glass card: attachments, toasts, file tiles.
+   Faint hairline, top highlight, soft two-layer shadow (tokens --tile-*). */
+@utility tile {
+  background: var(--tile-bg);
+  border: 1px solid var(--tile-line);
+  border-radius: var(--radius-card-sm);
+  box-shadow: var(--tile-shadow);
+  backdrop-filter: blur(var(--blur-glass));
+  -webkit-backdrop-filter: blur(var(--blur-glass));
 }
 
 /* Label style from the board: 12 / 600 / uppercase, in accent. */
