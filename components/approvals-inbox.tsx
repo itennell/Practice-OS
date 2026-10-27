@@ -2,14 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ApprovalView } from "@/lib/approvals";
+import { StatusPill } from "./shared/status-mark";
 import { Button } from "./ui";
 
 const STATUS = {
-  pending: { label: "Waiting for you", tone: "pending" },
-  running: { label: "Running…", tone: "running" },
-  done: { label: "Done", tone: "done" },
-  failed: { label: "Failed", tone: "failed" },
-  rejected: { label: "Declined", tone: "rejected" },
+  pending: { label: "Waiting for you", mark: "pending" },
+  running: { label: "Running…", mark: "running" },
+  done: { label: "Done", mark: "done" },
+  failed: { label: "Failed", mark: "failed" },
+  rejected: { label: "Declined", mark: "declined" },
 } as const;
 
 const KIND_LABEL: Record<string, string> = {
@@ -24,16 +25,9 @@ const KIND_LABEL: Record<string, string> = {
   state_rules: "State rules",
 };
 
-function StatusPill({ status }: { status: ApprovalView["status"] }) {
+function ApprovalStatus({ status }: { status: ApprovalView["status"] }) {
   const s = STATUS[status];
-  return (
-    <span
-      className="inline-flex h-7 shrink-0 items-center rounded-full px-3 text-small font-semibold"
-      style={{ color: `var(--status-${s.tone}-fg)`, background: `var(--status-${s.tone}-bg)` }}
-    >
-      {s.label}
-    </span>
-  );
+  return <StatusPill status={s.mark}>{s.label}</StatusPill>;
 }
 
 const FROM_LABEL: Record<string, string> = {
@@ -136,7 +130,7 @@ function ApprovalItem({
             {timeAgo(approval.created_at, now)}
           </p>
         </div>
-        <StatusPill status={busy && approval.status === "pending" ? "running" : approval.status} />
+        <ApprovalStatus status={busy && approval.status === "pending" ? "running" : approval.status} />
       </div>
 
       {line && !editing && <p className="max-w-[65ch] text-[var(--fg)]">{line}</p>}
