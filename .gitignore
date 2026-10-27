@@ -55,3 +55,6 @@ test/
 /test-results/
 /playwright-report/
 /.playwright-cli/
+
+# Public CA certificates the app ships (no private keys)
+!lib/certs/*.pem
