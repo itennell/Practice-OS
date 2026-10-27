@@ -24,6 +24,9 @@ export const DEMO_TABLES = [
   "consult_bookings",
   "faqs",
   "alerts",
+  "memories",
+  "chat_messages",
+  "conversations",
 ] as const;
 
 export const ALL_TABLES = [
