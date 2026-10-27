@@ -20,7 +20,8 @@ const by = { actor: "aeon" as const, source: "test:vitest" };
 
 afterAll(async () => {
   if (!ready) return;
-  if (made.length) await db()`delete from practice_os.memories where id in ${db()(made)}`;
+  // Everything this file saved, including anything the guard should have refused.
+  await db()`delete from practice_os.memories where source = ${by.source} or id in ${db()(made.length ? made : ["00000000-0000-0000-0000-000000000000"])}`;
   await mem.renderMemoryFile();
   await closeDb();
 });

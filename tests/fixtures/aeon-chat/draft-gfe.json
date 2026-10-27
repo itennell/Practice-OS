@@ -1,0 +1,122 @@
+{
+  "scenario": "draft-gfe",
+  "recordedAt": "2026-10-27T19:51:42.857Z",
+  "calls": [
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "remember",
+        "forget"
+      ],
+      "lastRole": "user",
+      "response": {
+        "id": "chatcmpl-01a17eeb-321e-770f-b76f-77220924ff6b",
+        "choices": [
+          {
+            "finish_reason": "tool_calls",
+            "index": 0,
+            "message": {
+              "content": "I'll draft that Good Faith Estimate for weekly office visits starting November 10th.",
+              "refusal": null,
+              "tool_calls": [
+                {
+                  "id": "call_4417d284-941a-4409-8ca4-8faeb6570fe3",
+                  "type": "function",
+                  "function": {
+                    "name": "draft_gfe",
+                    "arguments": "{\"basis\":\"scheduled\",\"frequency\":\"weekly\",\"lines\":[{\"code\":\"90837\",\"location\":\"office\",\"quantity\":52}],\"scheduled_on\":\"2026-10-27\",\"service_kind\":\"individual\",\"service_on\":\"2026-11-10\"}"
+                  }
+                }
+              ],
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793130705,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 669,
+          "prompt_tokens": 4385,
+          "total_tokens": 5054,
+          "completion_tokens_details": {
+            "reasoning_tokens": 490
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        }
+      }
+    },
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "remember",
+        "forget"
+      ],
+      "lastRole": "tool",
+      "response": {
+        "id": "chatcmpl-01a17eeb-4368-742f-85cf-4dcfdc3c3ee5",
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "index": 0,
+            "message": {
+              "content": "Done. Your Good Faith Estimate draft is ready.\n\nWhat I used: your fee list for 90837, for weekly office visits starting November 10 for 12 months.\n\nWhat you need to do:\n1. Go to the Approvals page and approve reference GFE-2026-0081 by October 28.\n2. Then go to the Paperwork page to make the PDF.\n\nIt is waiting for your approval. Nothing has been sent.",
+              "refusal": null,
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793130709,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 897,
+          "prompt_tokens": 4665,
+          "total_tokens": 5562,
+          "completion_tokens_details": {
+            "reasoning_tokens": 797
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        }
+      }
+    }
+  ],
+  "replies": [
+    {
+      "text": "Done. Your Good Faith Estimate draft is ready.\n\nWhat I used: your fee list for 90837, for weekly office visits starting November 10 for 12 months.\n\nWhat you need to do:\n1. Go to the Approvals page and approve reference GFE-2026-0081 by October 28.\n2. Then go to the Paperwork page to make the PDF.\n\nIt is waiting for your approval. Nothing has been sent.",
+      "tools": [
+        "draft_gfe"
+      ]
+    }
+  ]
+}

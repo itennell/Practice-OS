@@ -6,6 +6,7 @@
 
 export type PhiKind = "birth_date" | "client_name" | "diagnosis" | "identifier" | "contact" | "address";
 export type PhiCheck = { ok: true } | { ok: false; kind: PhiKind };
+export const ALL_KINDS: readonly PhiKind[] = ["birth_date", "client_name", "diagnosis", "identifier", "contact", "address"];
 
 /** Names and contact details that belong to the practice: her profile and her Referrals list. */
 export type Allowlist = { names: string[]; contacts: string[] };
@@ -130,12 +131,19 @@ function hasClientAddress(text: string, allow: Allowlist): boolean {
 
 // ---- the check ---------------------------------------------------------------
 
-export function checkIdentity(text: string, allow: Allowlist = { names: [], contacts: [] }): PhiCheck {
-  if (hasBirthDate(text)) return { ok: false, kind: "birth_date" };
-  if (SSN.test(text) || SSN_WORDS.test(text) || RECORD_ID.test(text)) return { ok: false, kind: "identifier" };
-  if (hasDiagnosis(text)) return { ok: false, kind: "diagnosis" };
-  if (hasForeignContact(text, allow)) return { ok: false, kind: "contact" };
-  if (hasClientAddress(text, allow)) return { ok: false, kind: "address" };
-  if (hasClientName(text, allow)) return { ok: false, kind: "client_name" };
+export function checkIdentity(
+  text: string,
+  allow: Allowlist = { names: [], contacts: [] },
+  only: readonly PhiKind[] = ALL_KINDS,
+): PhiCheck {
+  const checks: [PhiKind, () => boolean][] = [
+    ["birth_date", () => hasBirthDate(text)],
+    ["identifier", () => SSN.test(text) || SSN_WORDS.test(text) || RECORD_ID.test(text)],
+    ["diagnosis", () => hasDiagnosis(text)],
+    ["contact", () => hasForeignContact(text, allow)],
+    ["address", () => hasClientAddress(text, allow)],
+    ["client_name", () => hasClientName(text, allow)],
+  ];
+  for (const [kind, found] of checks) if (only.includes(kind) && found()) return { ok: false, kind };
   return { ok: true };
 }

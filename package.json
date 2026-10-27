@@ -14,7 +14,8 @@
     "smoke": "tsx scripts/smoke.ts",
     "db:reset": "tsx scripts/db-reset.ts",
     "research": "tsx scripts/research.ts",
-    "models:download": "tsx scripts/download-models.ts"
+    "models:download": "tsx scripts/download-models.ts",
+    "aeon:record": "tsx scripts/record-aeon-fixture.ts"
   },
   "dependencies": {
     "@base-ui/react": "1.9.0",
@@ -36,7 +37,8 @@
     "sharp": "0.35.5",
     "tailwind-merge": "3.7.0",
     "three": "0.180.0",
-    "zod": "3.25.76"
+    "zod": "3.25.76",
+    "zod-to-json-schema": "3.25.2"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",

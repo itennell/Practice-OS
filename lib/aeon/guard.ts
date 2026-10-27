@@ -44,9 +44,14 @@ export function isAllowedPerson(name: string, text: string, allow: Allowlist): b
   return PROVIDER_BEFORE.test(text.slice(Math.max(0, at - 8), at)) || PROVIDER_AFTER.test(text.slice(at + name.length));
 }
 
+// Tool results are the practice's own records and official sources: board phone
+// numbers, renewal dates from years ago, rule text that names a disorder. Only
+// ID numbers and "client <name>" withhold one; other names are blanked below.
+const TOOL_RESULT_RULES: readonly PhiKind[] = ["identifier", "client_name"];
+
 export async function guard(text: string, at: GuardPoint, allow?: Allowlist): Promise<GuardResult> {
   const list = allow ?? (await practiceAllowlist());
-  const rules = checkIdentity(text, list);
+  const rules = at === "tool_result" ? checkIdentity(text, list, TOOL_RESULT_RULES) : checkIdentity(text, list);
   if (!rules.ok) return { ok: false, kind: rules.kind };
 
   let names: string[];
