@@ -32,7 +32,7 @@ function Toggle({ on, onClick, children }: { on: boolean; onClick: () => void; c
 
 export default function BlobLab() {
   const [state, setState] = useState<Steady>("rest");
-  const [material, setMaterial] = useState<BlobMaterial>("liquid");
+  const [material, setMaterial] = useState<BlobMaterial>("chrome");
   const [splash, setSplash] = useState(0);
   const [eyes, setEyes] = useState(true);
 

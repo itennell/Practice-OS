@@ -23,9 +23,10 @@ export type AgentBlobProps = {
   splashOnMount?: boolean;
   /** Orb diameter in pixels. */
   size?: number;
+  /** Surface. Chrome is Isaiah's pick (2026-10-27); the others stay for comparison. */
   material?: BlobMaterial;
   /**
-   * Give the blob eyes. Clinician-facing Aeon only: never on the public Front
+   * Give the blob eyes (Isaiah's pick for Aeon, 2026-10-27). Clinician-facing Aeon only: never on the public Front
    * Desk or web chat, where HB 1806 rules out anything that reads as a mood.
    */
   eyes?: boolean;
@@ -68,7 +69,7 @@ export default function AgentBlob({
   splashKey = 0,
   splashOnMount = true,
   size = 160,
-  material = "liquid",
+  material = "chrome",
   eyes = false,
   label,
   still = false,
