@@ -1,6 +1,4 @@
 import { readFileSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { PDFCheckBox, PDFDocument, PDFTextField, StandardFonts, degrees, rgb } from "pdf-lib";
 import type { CredentialingProfile } from "../credentialing/profile";
 
@@ -17,18 +15,12 @@ export const CMS855I_SOURCE = "https://www.cms.gov/medicare/cms-forms/cms-forms/
 export const MFT_MHC_FAQ = "https://www.cms.gov/files/document/marriage-and-family-therapists-and-mental-health-counselors-faq.pdf";
 
 function formBytes(): Uint8Array {
-  const candidates = [
-    path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "forms", "cms855i-05-23.pdf"),
-    path.join(process.cwd(), "lib", "forms", "cms855i-05-23.pdf"),
-  ];
-  for (const file of candidates) {
-    try {
-      return readFileSync(file);
-    } catch {
-      // try the next place
-    }
+  // A static URL next to this file, so the bundler traces just this PDF (not the whole project).
+  try {
+    return readFileSync(new URL("../forms/cms855i-05-23.pdf", import.meta.url));
+  } catch {
+    throw new Error("The CMS-855I form file is missing (lib/forms/cms855i-05-23.pdf).");
   }
-  throw new Error("The CMS-855I form file is missing (lib/forms/cms855i-05-23.pdf).");
 }
 
 /** Section 2H specialty: LCSW has its own box; counselors and MFTs use the write-in (CMS FAQ, May 2024). */

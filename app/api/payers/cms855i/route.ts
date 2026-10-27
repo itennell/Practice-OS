@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { canDecide } from "@/lib/admin-guard";
 import { audit } from "@/lib/audit";
 import { loadCredentialingProfile } from "@/lib/credentialing/store";
@@ -6,6 +7,7 @@ import { fillCms855i } from "@/lib/payers/cms855i";
 // Medicare's CMS-855I, prepared from her credentialing profile. She finishes,
 // signs and submits it (or uses PECOS); Aeon never does.
 export async function GET(request: Request) {
+  await connection(); // read the profile per request, never at build time
   if (!canDecide(request)) return Response.json({ error: "Not allowed here." }, { status: 403 });
   const profile = await loadCredentialingProfile();
   if (!profile) return Response.json({ error: "Set up your credentialing profile first." }, { status: 409 });
