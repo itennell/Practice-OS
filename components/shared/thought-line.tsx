@@ -12,9 +12,11 @@
 // instead of fading (so they keep 4.5:1), a 44px toggle with a focus ring.
 
 import { useEffect, useId, useRef, useState } from "react";
-import { Check, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AeonDroplets } from "./aeon-droplets";
+import { StatusMark } from "./status-mark";
+import { STEP_WORDS, normalizeSteps, type ThoughtStep } from "./thought-line-steps";
 import { formatTenths, spokenTenths } from "./thought-line-time";
 
 export type ThoughtLineProps = {
@@ -24,8 +26,12 @@ export type ThoughtLineProps = {
   label?: string;
   /** When done, what happened: "Drafted 3 posts". Defaults to "Done in 4.2s". */
   doneLabel?: string;
-  /** Real progress, in plain words, oldest first. The last one is the step in progress. */
-  steps?: string[];
+  /**
+   * Real progress, in plain words, oldest first. Plain strings: all done except
+   * the last, which is in progress. Or tasks with their own status (planned
+   * ones as "pending") and a short detail line of what Aeon found or did.
+   */
+  steps?: (string | ThoughtStep)[];
   showTimer?: boolean;
   /** Fold the steps away when done (they can be opened again). */
   collapseOnSettle?: boolean;
@@ -108,7 +114,7 @@ export function ThoughtLine({
   );
 
   return (
-    <div className={cn("inline-flex flex-col items-start text-body font-medium", className)}>
+    <div className={cn("flex w-full max-w-xl flex-col items-start text-body font-medium [&>div[id]]:self-stretch", className)}>
       {hasSteps ? (
         <button
           type="button"
@@ -135,25 +141,34 @@ export function ThoughtLine({
           )}
           aria-hidden={!open}
         >
-          <ol className="min-h-0 overflow-hidden">
-            {steps.map((text, i) => {
-              const finished = !working || i < steps.length - 1;
-              return (
+          <div className="-mx-2 min-h-0 overflow-hidden px-2 pb-4">
+            {/* The task box: a raised card under the line, one row per task. */}
+            <ol className="tile mt-1 divide-y divide-[var(--hairline)] px-3.5 py-1 sm:px-4">
+              {normalizeSteps(steps, working).map((step, i) => (
                 <li
-                  key={`${i}-${text}`}
-                  className="flex items-center gap-2 py-1 pl-[1.45em] text-small font-normal motion-safe:animate-[pill-open_200ms_var(--ease-soft-out)]"
+                  key={`${i}-${step.label}`}
+                  className="flex items-start gap-3 py-2.5 font-normal motion-safe:animate-[pill-open_220ms_var(--ease-soft-out)]"
                 >
-                  <span aria-hidden className="grid size-[1em] shrink-0 place-items-center text-[var(--fg-muted)]">
-                    {finished ? <Check size="1em" strokeWidth={2.5} /> : <i className="block size-[0.45em] rounded-full bg-[var(--accent-fg)] motion-safe:animate-pulse" />}
-                  </span>
-                  <span className={finished ? "text-[var(--fg-muted)]" : "text-[var(--fg)]"}>
-                    {text}
-                    <span className="sr-only">{finished ? ", done" : ", in progress"}</span>
+                  <StatusMark status={step.status} size="1.15em" decorative className="mt-[0.15em]" />
+                  <span className="flex min-w-0 flex-col gap-0.5">
+                    <span
+                      className={cn(
+                        "text-small",
+                        step.status === "pending" && "text-[var(--fg-muted)]",
+                        step.status === "running" && "font-semibold text-[var(--fg)]",
+                        step.status === "done" && "text-[var(--fg)]",
+                        step.status === "failed" && "font-medium text-[var(--danger-fg)]",
+                      )}
+                    >
+                      {step.label}
+                      <span className="sr-only">, {STEP_WORDS[step.status]}</span>
+                    </span>
+                    {step.detail && <span className="text-label text-[var(--fg-muted)]">{step.detail}</span>}
                   </span>
                 </li>
-              );
-            })}
-          </ol>
+              ))}
+            </ol>
+          </div>
         </div>
       )}
     </div>
