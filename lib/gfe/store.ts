@@ -4,7 +4,7 @@ import { queueApproval } from "../approvals";
 import { audit } from "../audit";
 import { addMonths, toDate, type ISODate } from "../compliance/dates";
 import { practiceToday } from "../compliance/store";
-import { DANA_PROFILE, SAMPLE_NPI, SAMPLE_TIN } from "../credentialing/demo";
+import type { CredentialingProfile } from "../credentialing/profile";
 import { db } from "../db";
 import { money } from "./build";
 import { gfeDueDate, WEEKDAYS, type OpenDays } from "./timing";
@@ -250,9 +250,24 @@ export function estimateStatus(e: Pick<EstimateRow, "approval_status" | "issued_
   return "Waiting for you";
 }
 
-/** Builds the PDF model: the saved estimate plus the identity she typed, which is used here and dropped. */
-export function toGoodFaithEstimate(e: EstimateRow, client: ClientIdentity, issuedOn: ISODate): GoodFaithEstimate {
-  const p = DANA_PROFILE;
+/** The estimate needs her NPI and tax ID (45 CFR 149.610(c)(1)(v)); they come from Credentialing. */
+export class MissingProviderDetails extends Error {
+  constructor() {
+    super("Add your NPI and tax ID on Paperwork > Credentialing first. The estimate must show both.");
+  }
+}
+
+/**
+ * Builds the PDF model: the saved estimate, her credentialing profile (NPI, TIN,
+ * office), and the identity she typed, which is used here and dropped.
+ */
+export function toGoodFaithEstimate(
+  e: EstimateRow,
+  client: ClientIdentity,
+  issuedOn: ISODate,
+  p: CredentialingProfile,
+): GoodFaithEstimate {
+  if (!p.npi.number || !p.tin) throw new MissingProviderDetails();
   const office = `${p.practiceLocation.address.street}, ${p.practiceLocation.address.city}, ${p.practiceLocation.address.state} ${p.practiceLocation.address.zip}`;
   const where = { office, telehealth: `Telehealth from ${p.practiceLocation.address.state}`, either: `${office}, or telehealth` };
   const kind = SERVICE_KINDS[e.service_kind];
@@ -283,8 +298,8 @@ export function toGoodFaithEstimate(e: EstimateRow, client: ClientIdentity, issu
         provider: {
           name: `${p.identity.name}, ${p.identity.credential}${e.is_sample ? " (fictional demo practice)" : ""}`,
           type: p.license.type,
-          npi: SAMPLE_NPI,
-          tin: SAMPLE_TIN,
+          npi: p.npi.number,
+          tin: p.tin,
           address: p.practiceLocation.address,
           contact: { person: p.identity.name, phone: p.identity.phone, email: p.identity.email },
         },

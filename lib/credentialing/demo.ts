@@ -23,6 +23,8 @@ export const DANA_PROFILE: CredentialingProfile = {
     numberStored: false,
   },
   npi: { number: SAMPLE_NPI, type: 1, taxonomy: "101YP2500X", taxonomyLabel: "Counselor, Professional" },
+  tin: SAMPLE_TIN,
+  npiCheck: null,
   malpractice: { carrier: "Example Mutual [Sample]", perClaim: 1_000_000, aggregate: 3_000_000, expiresOn: "2026-12-01" },
   practiceLocation: {
     name: "Reyes Counseling PLLC",

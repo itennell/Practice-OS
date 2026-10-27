@@ -13,7 +13,8 @@ import { SHIPPED_RULES } from "@/lib/compliance/rules";
 import { STATES } from "@/lib/compliance/states";
 import { loadFacts, practiceToday } from "@/lib/compliance/store";
 import { CAQH_URL, caqhPrep } from "@/lib/credentialing/checklist";
-import { DANA_PROFILE } from "@/lib/credentialing/demo";
+import { emptyCredentialingProfile, loadCredentialingProfile, sectionValues } from "@/lib/credentialing/store";
+import { CredentialingEditor } from "@/components/credentialing-editor";
 import { money } from "@/lib/gfe/build";
 import { SERVICE_KINDS, estimateStatus, listEstimates, loadPracticeSettings, toOpenDays } from "@/lib/gfe/store";
 
@@ -187,41 +188,9 @@ async function Credentialing() {
   const today = await practiceToday();
   const facts = (await loadFacts()) ?? danaFacts(today);
   const rules = [...SHIPPED_RULES, ...(await loadSavedRules())];
-  const p = DANA_PROFILE;
+  const p = (await loadCredentialingProfile()) ?? emptyCredentialingProfile();
   const prep = caqhPrep(p, facts, rules, today);
   const state = STATES[facts.practice_state] ?? facts.practice_state;
-
-  const sections: { title: string; lines: string[]; flag?: string }[] = [
-    { title: "Identity", lines: [`${p.identity.name}, ${p.identity.credential}`, p.identity.practiceName, `${p.identity.phone} · ${p.identity.email}`] },
-    { title: "Education", lines: p.education.map((e) => `${e.degree}, ${e.school}, ${e.graduated}`) },
-    {
-      title: "License",
-      lines: [
-        `${p.license.type}, ${state}`,
-        p.license.board,
-        prep.licenseExpiresOn ? `Expires ${formatDate(prep.licenseExpiresOn, false)}` : "Expiration not known yet",
-        "License number: [Sample] not shown. Practice-OS doesn’t store it.",
-      ],
-    },
-    { title: "NPI", lines: [`Type ${p.npi.type}: ${p.npi.number} [Sample]`, `Taxonomy ${p.npi.taxonomy} (${p.npi.taxonomyLabel})`, "Not a real NPI: NPPES has no one with this number."] },
-    {
-      title: "Malpractice",
-      lines: [`${p.malpractice.carrier}`, `$${p.malpractice.perClaim / 1e6}M per claim / $${p.malpractice.aggregate / 1e6}M aggregate`],
-      flag: `Expires ${formatDate(p.malpractice.expiresOn, false)}`,
-    },
-    {
-      title: "Practice location",
-      lines: [
-        p.practiceLocation.name,
-        `${p.practiceLocation.address.street}, ${p.practiceLocation.address.city}, ${p.practiceLocation.address.state} ${p.practiceLocation.address.zip} [Sample]`,
-        p.practiceLocation.telehealth ? "Also sees clients by telehealth" : "In person only",
-      ],
-    },
-    {
-      title: "Work history",
-      lines: p.workHistory.map((w) => `${w.role}, ${w.employer}: ${w.from.slice(0, 7)} to ${w.to ? w.to.slice(0, 7) : "now"}`),
-    },
-  ];
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
@@ -231,31 +200,19 @@ async function Credentialing() {
             Credentialing profile
           </h2>
           <p className="text-[var(--fg-muted)]">
-            {p.identity.name}, {p.identity.credential} (fictional demo practice). In CAQH ProView’s order, so you can copy it section by section.
+            {p.identity.name || "Your profile"}
+            {p.identity.credential && `, ${p.identity.credential}`}
+            {p.isSample && " (fictional demo practice)"}. In CAQH ProView’s order, so you can copy it section by section. Payer
+            forms and Good Faith Estimates fill in from here. You can also tell Aeon what changed, like “my malpractice renewed
+            through Dec 2027”.
           </p>
+          {prep.licenseExpiresOn && (
+            <p className="text-small text-[var(--fg-muted)]">
+              License expires {formatDate(prep.licenseExpiresOn, false)} ({state} renewal rule, same as Deadlines).
+            </p>
+          )}
         </div>
-        <ul className="flex flex-col gap-3">
-          {sections.map((s) => (
-            <li key={s.title} className="rounded-[20px] border border-[var(--hairline)] bg-[var(--glass-strong)] p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="font-semibold">{s.title}</h3>
-                {s.flag && (
-                  <span
-                    className="inline-flex h-7 items-center rounded-full px-3 text-small font-semibold"
-                    style={{ color: "var(--status-pending-fg)", background: "var(--status-pending-bg)" }}
-                  >
-                    {s.flag}
-                  </span>
-                )}
-              </div>
-              {s.lines.map((l) => (
-                <p key={l} className="text-[var(--fg-muted)]">
-                  {l}
-                </p>
-              ))}
-            </li>
-          ))}
-        </ul>
+        <CredentialingEditor values={sectionValues(p)} npiCheck={p.npiCheck} />
       </GlassCard>
 
       <GlassCard aria-labelledby="caqh-heading" className="flex h-fit flex-col gap-4 p-6 md:p-8">
