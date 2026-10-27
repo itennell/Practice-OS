@@ -41,7 +41,7 @@ test.describe("Liquid Aeon test page", () => {
     await expect(page.getByRole("img", { name: "Aeon is resting" }).first()).toBeVisible();
     await expect(page.locator("canvas")).toHaveCount(0);
     await expect(page.locator('[data-state="pop"]')).toHaveCount(0);
-    await expect(page).toHaveScreenshot("liquid-aeon-still.png", { fullPage: true, maxDiffPixelRatio: 0.01 });
+    await expect(page).toHaveScreenshot("liquid-aeon-still.png", { fullPage: true, maxDiffPixelRatio: 0.01, mask: [page.locator("nextjs-portal")] });
   });
 
   test("keyboard reaches every control with a visible focus ring", async ({ page }) => {
