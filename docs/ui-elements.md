@@ -55,7 +55,7 @@ Every UI piece Isaiah picked for Practice-OS, where it goes, and how to build it
 | UI-010 | Status Mark (animated status icon) | GLB | Status pills | must | built | React Bits (app exception) | `components/shared/status-mark.tsx` (`StatusMark`, `StatusPill`) |
 | UI-011 | Prompt Bar ("Ask anything" with dictation) | CHT | Message input | must | approved | React Bits (app exception) | to build in Stage 1 |
 | UI-012 | Slide to Commit | TBD | Anywhere it fits | nice | collected | React Bits (app exception) |  |
-| UI-013 | Spring Check (check off and cross out) | GLB | Checklists and check-offs | must | approved | React Bits (app exception) | to build in Stage 1 |
+| UI-013 | Spring Check (check off and cross out) | GLB | Checklists and check-offs | must | built | React Bits (app exception) | `components/shared/spring-check.tsx` (`SpringCheck`) |
 | UI-014 | Thought Line (Aeon is working) | CHT | Aeon thinking | must | approved | React Bits (app exception) | to build in Stage 1 |
 | UI-015 | Voice Pill (dictation capture) | CHT | Message input | must | approved | React Bits (app exception) | to build in Stage 1 |
 | UI-016 | Animated Content (fade and slide in) | TBD | Anywhere it fits | nice | parked | React Bits (reference; marketing fit) |  |
@@ -70,7 +70,7 @@ Every UI piece Isaiah picked for Practice-OS, where it goes, and how to build it
 | UI-025 | Front Desk work queue (list plus schedule panel) | FDK | Inquiries list | must | approved | Screenshot (React Bits Pro demo, layout reference only) (layout reference) |  |
 | UI-026 | Chat-first home (the app opens on Aeon) | HOM | Opening view (whole page) | must | approved | Screenshot (layout reference only) (layout reference) |  |
 | UI-027 | Approval card in the chat | CHT | Approval card in chat | must | approved | Screenshot (layout reference only) (layout reference) |  |
-| UI-028 | Confirm dialog for permanent actions (Alert Dialog) | GLB | Confirm dialogs | must | approved | shadcn/ui (MIT); coss ui reference only (AGPL) | to build in Stage 1 |
+| UI-028 | Confirm dialog for permanent actions (Alert Dialog) | GLB | Confirm dialogs | must | built | shadcn/ui (MIT); coss ui reference only (AGPL) | `components/shared/confirm-dialog.tsx` (`ConfirmDialog`) |
 | UI-029 | Avatar (profile picture) | SHL | Profile (bottom of sidebar) | must | approved | shadcn/ui (MIT); coss ui reference only (AGPL) | to build in Stage 1 |
 | UI-030 | Calendar (shared month calendar) | DLN | Calendar | must | approved | shadcn/ui (MIT); coss ui reference only (AGPL) | to build in Stage 1 |
 | UI-031 | Toast notifications | GLB | Toasts | must | approved | shadcn/ui (MIT) | to build in Stage 1 |

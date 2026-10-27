@@ -92,6 +92,11 @@
   --status-rejected-fg: #504b69;
   --status-rejected-bg: #ecebf2;
   --danger-fg: #a1261b;
+  /* Danger pill (Confirm dialog): solid red with white text in light. */
+  --danger-bg: #a1261b;
+  --danger-on: #ffffff;
+  --danger-hover: #861d14;
+  --scrim: rgb(23 20 43 / 0.32);
 
   --focus-ring: #5b47c9;
 
@@ -132,6 +137,10 @@
     --status-rejected-fg: #c9c4de;
     --status-rejected-bg: rgb(255 255 255 / 0.08);
     --danger-fg: #ffaea3;
+    --danger-bg: rgb(255 174 163 / 0.16);
+    --danger-on: #ffaea3;
+    --danger-hover: rgb(255 174 163 / 0.24);
+    --scrim: rgb(0 0 0 / 0.55);
 
     --focus-ring: #b0a3fb;
   }

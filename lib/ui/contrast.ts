@@ -117,6 +117,12 @@ export const PAIRS: Pair[] = [
     { fg: "--focus-ring", on: s.on, min: AA_NON_TEXT, label: `focus ring on ${s.name}` },
   ]),
   { fg: "--primary-fg", on: ["--bg", "--primary-bg"], min: AA_TEXT, label: "primary button label" },
+  { fg: "--primary-bg", on: ["--bg", "--glass"], min: AA_NON_TEXT, label: "checked box on glass card" },
+  { fg: "--danger-on", on: ["--bg", "--glass-strong", "--danger-bg"], min: AA_TEXT, label: "danger button label" },
+  { fg: "--danger-on", on: ["--bg", "--glass-strong", "--danger-hover"], min: AA_TEXT, label: "danger button label, hovered" },
+  { fg: "--fg", on: ["--bg", "--scrim", "--glass-strong"], min: AA_TEXT, label: "dialog text over the dimmed page" },
+  { fg: "--fg-muted", on: ["--bg", "--scrim", "--glass-strong"], min: AA_TEXT, label: "dialog muted text over the dimmed page" },
+  { fg: "--accent-fg", on: ["--bg", "--glass"], min: AA_NON_TEXT, label: "hovered box outline on glass card" },
   ...["pending", "running", "done", "failed", "rejected"].map((k) => ({
     fg: `--status-${k}-fg`,
     on: ["--bg", "--glass", `--status-${k}-bg`],
