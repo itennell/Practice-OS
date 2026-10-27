@@ -70,7 +70,7 @@ Every UI piece Isaiah picked for Practice-OS, where it goes, and how to build it
 | UI-025 | Front Desk work queue (list plus schedule panel) | FDK | Inquiries list | must | approved | Screenshot (React Bits Pro demo, layout reference only) (layout reference) |  |
 | UI-026 | Chat-first home (the app opens on Aeon) | HOM | Opening view (whole page) | must | approved | Screenshot (layout reference only) (layout reference) |  |
 | UI-027 | Approval card in the chat | CHT | Approval card in chat | must | approved | Screenshot (layout reference only) (layout reference) |  |
-| UI-028 | Confirm dialog for permanent actions (Alert Dialog) | GLB | Confirm dialogs | must | approved | shadcn/ui (MIT); coss ui reference only (AGPL) | to build in Stage 1 |
+| UI-028 | Confirm dialog for permanent actions (Alert Dialog) | GLB | Confirm dialogs | must | built | shadcn/ui (MIT); coss ui reference only (AGPL) | `components/shared/confirm-dialog.tsx` (`ConfirmDialog`) |
 | UI-029 | Avatar (profile picture) | SHL | Profile (bottom of sidebar) | must | approved | shadcn/ui (MIT); coss ui reference only (AGPL) | to build in Stage 1 |
 | UI-030 | Calendar (shared month calendar) | DLN | Calendar | must | approved | shadcn/ui (MIT); coss ui reference only (AGPL) | to build in Stage 1 |
 | UI-031 | Toast notifications | GLB | Toasts | must | approved | shadcn/ui (MIT) | to build in Stage 1 |
