@@ -4,6 +4,8 @@ Compliance calendar (license renewal, CE hours, CAQH re-attestation, Medicare re
 
 Aeon prepares forms; the clinician signs and submits them. Aeon never signs, attests or submits a government, payer or CAQH form.
 
+Agent skills: `SKILL.md` (practice admin through the MCP tools) and `state-research/SKILL.md` (researching a state outside Illinois).
+
 ## How-do-i guides (references/)
 
 Short numbered checklists, each with the official page and its sources. Steps that start with `[You]` are ones only the clinician can do. The app renders them at /how-do-i, and any agent can read the files directly.

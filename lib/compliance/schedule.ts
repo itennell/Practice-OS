@@ -105,7 +105,7 @@ export function nextDue(rule: Rule, facts: Facts, today: ISODate): Next {
       const base = facts[s.fact];
       if (!base) return { needs: s.fact };
       const step = (d: ISODate) => addDays(addMonths(d, s.months), s.days);
-      let d = step(base);
+      let d = s.start_at_fact ? base : step(base);
       if (s.repeat && (s.months > 0 || s.days > 0)) while (d < today) d = step(d);
       return [{ due_on: fin(d), title: rule.title }];
     }
@@ -116,6 +116,18 @@ export function nextDue(rule: Rule, facts: Facts, today: ISODate): Next {
       // The first report is due the year after formation; due the day before the anniversary month starts.
       for (let y = Math.max(ty, year(formed) + 1); y <= ty + 2; y++) {
         const d = fin(addDays(ymd(y, m, 1), -1));
+        if (d >= today) return [{ due_on: d, title: rule.title }];
+      }
+      return [];
+    }
+    case "in_anniversary_month": {
+      const formed = facts[s.fact];
+      if (!formed) return { needs: s.fact };
+      const fy = year(formed);
+      const m = Number(formed.slice(5, 7));
+      for (let y = Math.max(fy + s.every_years, ty); y <= ty + s.every_years + 1; y++) {
+        if ((y - fy) % s.every_years !== 0) continue;
+        const d = fin(addDays(ymd(m === 12 ? y + 1 : y, m === 12 ? 1 : m + 1, 1), -1));
         if (d >= today) return [{ due_on: d, title: rule.title }];
       }
       return [];

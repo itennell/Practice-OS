@@ -1,0 +1,464 @@
+{
+  "ctx": {
+    "state": "CA",
+    "stateName": "California",
+    "credential": "LCSW",
+    "credentialLabel": "LCSW (licensed clinical social worker)",
+    "today": "2026-10-27"
+  },
+  "topic": "entity_type",
+  "search": {
+    "top_logprobs": 0,
+    "temperature": 1,
+    "top_p": 1,
+    "service_tier": "auto",
+    "model": "muse-spark-1.3",
+    "reasoning": {
+      "effort": "low"
+    },
+    "background": false,
+    "tools": [
+      {
+        "type": "web_search",
+        "user_location": {
+          "type": "approximate",
+          "country": "US",
+          "region": "California"
+        },
+        "search_context_size": "low"
+      }
+    ],
+    "tool_choice": "auto",
+    "truncation": "disabled",
+    "id": "redacted-id",
+    "object": "response",
+    "status": "completed",
+    "created_at": 1793107921,
+    "completed_at": 1793107931,
+    "error": null,
+    "incomplete_details": null,
+    "output": [
+      {
+        "type": "reasoning",
+        "id": "redacted-id",
+        "summary": [],
+        "status": "completed"
+      },
+      {
+        "type": "message",
+        "id": "redacted-id",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "I'll check the Board's official rules on which business entity your private practice may use.",
+            "annotations": [],
+            "logprobs": []
+          }
+        ],
+        "phase": "commentary",
+        "status": "completed"
+      },
+      {
+        "type": "web_search_call",
+        "id": "redacted-id",
+        "status": "completed",
+        "action": {
+          "type": "search",
+          "query": "site:bbs.ca.gov LCSW professional corporation LLC private practice"
+        },
+        "results": [
+          {
+            "type": "text_result",
+            "title": "Board of Behavioral Sciences",
+            "url": "https://bbs.ca.gov/pdf/agen_notice/2018/20180608_exempt.pdf",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Board of Behavioral Sciences Exempt Setting Committee Meeting Materials February 23, 2018",
+            "url": "https://bbs.ca.gov/pdf/agen_notice/2018/20180223_exempt.pdf",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Committee Meeting Notice",
+            "url": "https://bbs.ca.gov/pdf/agen_notice/2017/01202017_notice.pdf",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Supplemental Board Meeting Materials November 2018",
+            "url": "https://bbs.ca.gov/pdf/agen_notice/2018/20181128_bdmtg_item_xxvii_c.pdf",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "CALIFORNIA STATE BOARD OF BEHAVIORAL SCIENCES",
+            "url": "https://bbs.ca.gov/pdf/agen_notice/2019/20190607_exempt.pdf",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "XV b - Board Meeting Minutes",
+            "url": "https://bbs.ca.gov/pdf/agen_notice/2021/20210506_07_xvb.pdf",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Discussion of Supervision of Associates Within Kaiser Health System",
+            "url": "https://bbs.ca.gov/pdf/agen_notice/2020/20201105_21.pdf",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Board of Behavioral Sciences",
+            "url": "https://bbs.ca.gov/pdf/agen_notice/2018/20180912_exempt.pdf",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "POLICY AND ADVOCACY COMMITTEE MINUTES 1",
+            "url": "https://bbs.ca.gov/pdf/agen_notice/2021/20210416_pa_item_iii.pdf",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Board of Behavioral Sciences - March 4-5, 2021 Board Meeting materials",
+            "url": "https://bbs.ca.gov/pdf/agen_notice/2021/20210304_5_xvi_a.pdf",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Licensed Clinical Social Worker",
+            "url": "https://bbs.ca.gov/applicants/lcsw.html",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Associate Clinical Social Worker Registration",
+            "url": "https://bbs.ca.gov/pdf/forms/lcs/aswapp_oos.pdf",
+            "snippet": ""
+          }
+        ]
+      },
+      {
+        "type": "reasoning",
+        "id": "redacted-id",
+        "summary": [],
+        "status": "completed"
+      },
+      {
+        "type": "message",
+        "id": "redacted-id",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "I found the Board's page on private practices. I'll open it to pull the exact requirements.",
+            "annotations": [],
+            "logprobs": []
+          }
+        ],
+        "phase": "commentary",
+        "status": "completed"
+      },
+      {
+        "type": "web_search_call",
+        "id": "redacted-id",
+        "status": "completed",
+        "action": {
+          "type": "open_page",
+          "url": "https://bbs.ca.gov/pdf/agen_notice/2018/20180608_exempt.pdf"
+        },
+        "results": []
+      },
+      {
+        "type": "reasoning",
+        "id": "redacted-id",
+        "summary": [],
+        "status": "completed"
+      },
+      {
+        "type": "message",
+        "id": "redacted-id",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "That source was from 2018, so I'll search for current rules on LLC restrictions.",
+            "annotations": [],
+            "logprobs": []
+          }
+        ],
+        "phase": "commentary",
+        "status": "completed"
+      },
+      {
+        "type": "web_search_call",
+        "id": "redacted-id",
+        "status": "completed",
+        "action": {
+          "type": "search",
+          "query": "site:bbs.ca.gov LCSW LLC cannot limited liability company professional corporation"
+        },
+        "results": [
+          {
+            "type": "text_result",
+            "title": "September 19-20, 2024 Material Item 16",
+            "url": "https://bbs.ca.gov/pdf/agen_notice/2024/20240919-20_item_16.pdf",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Board Meeting Minutes Feb 2015",
+            "url": "https://bbs.ca.gov/pdf/board_minutes/2015/022015_bd_minutes.pdf",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "February 2015 Board Meeting Draft Minutes",
+            "url": "https://bbs.ca.gov/pdf/agen_notice/2015/0515_bdmtg_suppl_material.pdf",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Board Meeting Minutes",
+            "url": "https://bbs.ca.gov/pdf/agen_notice//2024/20240228_materials_item_12a.pdf",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Board Meeting Minutes",
+            "url": "https://bbs.ca.gov/pdf/board_minutes/2023/20231116-17_minutes.pdf",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Board Meeting Notice and Agenda - November 16-17, 2023",
+            "url": "https://bbs.ca.gov/pdf/agen_notice/2023/20231116_17.pdf",
+            "snippet": ""
+          }
+        ]
+      },
+      {
+        "type": "web_search_call",
+        "id": "redacted-id",
+        "status": "completed",
+        "action": {
+          "type": "search",
+          "query": "site:sos.ca.gov licensed clinical social worker professional corporation LLC"
+        },
+        "results": [
+          {
+            "type": "text_result",
+            "title": "Statutes of 2003 – Legislative Summary",
+            "url": "https://www.sos.ca.gov/business-programs/legislation/2003",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Statutes of 2011 – Legislative Summary :: California Secretary of State",
+            "url": "https://www.sos.ca.gov/business-programs/legislation/2011",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Business Entity Names :: California Secretary of State",
+            "url": "https://www.sos.ca.gov/administration/regulations/current-regulations/business/business-entity-names/",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Private Service Companies",
+            "url": "https://www.sos.ca.gov/business-programs/private-service-companies",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "bizfile :: California Secretary of State",
+            "url": "https://www.sos.ca.gov/business-programs/bizfile?daksldlkdsadas=1",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Limited Liability Companies – Foreign (Out-of-State or Out-of-Country)",
+            "url": "https://www.sos.ca.gov/business-programs/business-entities/forms/limited-liability-companies-foreign-out-state-or-out-country",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Secretary of State Alex Padilla Announces LLCs Can Now Be Formed Online, Launches New Business Chatbot",
+            "url": "https://www.sos.ca.gov/administration/news-releases-and-advisories/2018-news-releases-and-advisories/secretary-state-alex-padilla-announces-llcs-can-now-be-formed-online-launches-new-business-chatbot",
+            "snippet": ""
+          },
+          {
+            "type": "text_result",
+            "title": "Frequently Asked Questions",
+            "url": "https://www.sos.ca.gov/business-programs/business-entities/faqs?origin=serp_auto",
+            "snippet": ""
+          }
+        ]
+      },
+      {
+        "type": "reasoning",
+        "id": "redacted-id",
+        "summary": [],
+        "status": "completed"
+      },
+      {
+        "type": "message",
+        "id": "redacted-id",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "I've hit my search limit, so I'll open the Board's LCSW page to verify the entity rules.",
+            "annotations": [],
+            "logprobs": []
+          }
+        ],
+        "phase": "commentary",
+        "status": "completed"
+      },
+      {
+        "type": "web_search_call",
+        "id": "redacted-id",
+        "status": "completed",
+        "action": {
+          "type": "open_page",
+          "url": "https://bbs.ca.gov/applicants/lcsw.html"
+        },
+        "results": []
+      },
+      {
+        "type": "reasoning",
+        "id": "redacted-id",
+        "summary": [],
+        "status": "completed"
+      },
+      {
+        "type": "message",
+        "id": "redacted-id",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "In California, a licensed LCSW in her own private practice:\n\n### 1. Professional corporation - YES, permitted\n\nThe Board of Behavioral Sciences states the LCSW private-practice definition as:\n\n> “A “private practice” is a setting owned by a licensed clinical social worker, a licensed marriage and family therapist, a licensed psychologist, a licensed professional clinical counselor, or a licensed physician and surgeon, or a professional corporation of any of those licensed professions, as defined in section 13401(b) of the Corporations Code.”\n\nThe Board adds:\n\n> “Note that professional corporations are included in the above definition .”\n\n> “A professional corporation must register with the California Secretary of State and meet the requirements of the Corporations Code.”\n\n> “It may be appropriate to include professional corporations in the definition of private practice, as a single licensee can form a professional corporation .”\n\nOther sole-owner / multi-owner forms noted by the Board:\n\n> “When owned by one licensee, it would be considered a sole proprietorship.”\n\n> “However, when a practice is owned by two or more licensees, the company could be either a professional corporation or a partnership.”\n\nThe Board's current LCSW applicant page also lists as a setting category:\n\n> “Private Practice and Professional Corporation Settings”\n\n> “Registrants with a subsequent registration number cannot work in a private practice or a”\n\n> “professional corporation setting. There are no exceptions.”\n\n### 2. Ordinary LLC - NOT FOUND on the official pages reviewed\n\n> It wasn't found - no sentence on the official Board pages opened for this answer expressly states whether a licensed LCSW may or may not use an ordinary LLC for private practice.\n\n### 3. Professional LLC - NOT FOUND on the official pages reviewed\n\n> It wasn't found - no sentence on the official Board pages opened for this answer expressly states whether California offers / permits a professional LLC for LCSW private practice, or whether she must use a professional corporation instead.\n\n**Bottom line from official sources reviewed:** A professional corporation is expressly included as a permitted LCSW private-practice owner-entity. Whether an ordinary LLC or a professional LLC is permitted or prohibited was not stated on those official pages.\n",
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://bbs.ca.gov/pdf/agen_notice/2018/20180608_exempt.pdf",
+                "start_index": 193,
+                "end_index": 547,
+                "title": "Board of Behavioral Sciences"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bbs.ca.gov/pdf/agen_notice/2018/20180608_exempt.pdf",
+                "start_index": 566,
+                "end_index": 644,
+                "title": "Board of Behavioral Sciences"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bbs.ca.gov/pdf/agen_notice/2018/20180608_exempt.pdf",
+                "start_index": 646,
+                "end_index": 781,
+                "title": "Board of Behavioral Sciences"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bbs.ca.gov/pdf/agen_notice/2018/20180608_exempt.pdf",
+                "start_index": 783,
+                "end_index": 943,
+                "title": "Board of Behavioral Sciences"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bbs.ca.gov/pdf/agen_notice/2018/20180608_exempt.pdf",
+                "start_index": 1003,
+                "end_index": 1080,
+                "title": "Board of Behavioral Sciences"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bbs.ca.gov/pdf/agen_notice/2018/20180608_exempt.pdf",
+                "start_index": 1082,
+                "end_index": 1218,
+                "title": "Board of Behavioral Sciences"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bbs.ca.gov/applicants/lcsw.html",
+                "start_index": 1295,
+                "end_index": 1353,
+                "title": "Licensed Clinical Social Worker"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bbs.ca.gov/applicants/lcsw.html",
+                "start_index": 1355,
+                "end_index": 1447,
+                "title": "Licensed Clinical Social Worker"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://bbs.ca.gov/applicants/lcsw.html",
+                "start_index": 1486,
+                "end_index": 1511,
+                "title": "Licensed Clinical Social Worker"
+              }
+            ],
+            "logprobs": []
+          }
+        ],
+        "status": "completed"
+      }
+    ],
+    "instructions": null,
+    "usage": {
+      "input_tokens": 25791,
+      "input_tokens_details": {
+        "cached_tokens": 9668
+      },
+      "output_tokens": 1991,
+      "output_tokens_details": {
+        "reasoning_tokens": 959
+      },
+      "total_tokens": 27782
+    },
+    "parallel_tool_calls": true,
+    "store": true,
+    "output_text": "I'll check the Board's official rules on which business entity your private practice may use.I found the Board's page on private practices. I'll open it to pull the exact requirements.That source was from 2018, so I'll search for current rules on LLC restrictions.I've hit my search limit, so I'll open the Board's LCSW page to verify the entity rules.In California, a licensed LCSW in her own private practice:\n\n### 1. Professional corporation - YES, permitted\n\nThe Board of Behavioral Sciences states the LCSW private-practice definition as:\n\n> “A “private practice” is a setting owned by a licensed clinical social worker, a licensed marriage and family therapist, a licensed psychologist, a licensed professional clinical counselor, or a licensed physician and surgeon, or a professional corporation of any of those licensed professions, as defined in section 13401(b) of the Corporations Code.”\n\nThe Board adds:\n\n> “Note that professional corporations are included in the above definition .”\n\n> “A professional corporation must register with the California Secretary of State and meet the requirements of the Corporations Code.”\n\n> “It may be appropriate to include professional corporations in the definition of private practice, as a single licensee can form a professional corporation .”\n\nOther sole-owner / multi-owner forms noted by the Board:\n\n> “When owned by one licensee, it would be considered a sole proprietorship.”\n\n> “However, when a practice is owned by two or more licensees, the company could be either a professional corporation or a partnership.”\n\nThe Board's current LCSW applicant page also lists as a setting category:\n\n> “Private Practice and Professional Corporation Settings”\n\n> “Registrants with a subsequent registration number cannot work in a private practice or a”\n\n> “professional corporation setting. There are no exceptions.”\n\n### 2. Ordinary LLC - NOT FOUND on the official pages reviewed\n\n> It wasn't found - no sentence on the official Board pages opened for this answer expressly states whether a licensed LCSW may or may not use an ordinary LLC for private practice.\n\n### 3. Professional LLC - NOT FOUND on the official pages reviewed\n\n> It wasn't found - no sentence on the official Board pages opened for this answer expressly states whether California offers / permits a professional LLC for LCSW private practice, or whether she must use a professional corporation instead.\n\n**Bottom line from official sources reviewed:** A professional corporation is expressly included as a permitted LCSW private-practice owner-entity. Whether an ordinary LLC or a professional LLC is permitted or prohibited was not stated on those official pages.\n"
+  },
+  "extraction": {
+    "id": "redacted-id",
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "message": {
+          "content": "{\"not_found\": [\"Whether a licensed LCSW may or may not use an ordinary LLC for private practice\", \"Whether California offers or permits a professional LLC for LCSW private practice\"], \"rules\": [{\"anchor_year\": null, \"annual_label\": null, \"category\": \"business_setup\", \"ce_hours\": null, \"ce_topics\": [], \"clock_days\": null, \"clock_event\": null, \"day\": null, \"every_years\": null, \"key\": \"professional_corporation_permitted\", \"kind\": \"note\", \"month\": null, \"quote\": \"\\u201cNote that professional corporations are included in the above definition .\\u201d\", \"reask_days\": null, \"schedule_type\": \"none\", \"source_url\": \"https://bbs.ca.gov/pdf/agen_notice/2018/20180608_exempt.pdf\", \"title\": \"Professional corporation permitted for LCSW private practice\", \"what_to_do\": \"You may own your LCSW private practice through a professional corporation; it is included as a permitted private-practice entity.\", \"you_must\": null}, {\"anchor_year\": null, \"annual_label\": null, \"category\": \"business_setup\", \"ce_hours\": null, \"ce_topics\": [], \"clock_days\": null, \"clock_event\": null, \"day\": null, \"every_years\": null, \"key\": \"professional_corporation_registration\", \"kind\": \"setup\", \"month\": null, \"quote\": \"\\u201cA professional corporation must register with the California Secretary of State and meet the requirements of the Corporations Code.\\u201d\", \"reask_days\": null, \"schedule_type\": \"setup\", \"source_url\": \"https://bbs.ca.gov/pdf/agen_notice/2018/20180608_exempt.pdf\", \"title\": \"Register professional corporation with Secretary of State\", \"what_to_do\": \"Register your professional corporation with the California Secretary of State and meet the requirements of the Corporations Code.\", \"you_must\": null}]}",
+          "refusal": null,
+          "role": "assistant"
+        },
+        "logprobs": null
+      }
+    ],
+    "created": 1793107960,
+    "model": "muse-spark-1.3",
+    "object": "chat.completion",
+    "usage": {
+      "completion_tokens": 9250,
+      "prompt_tokens": 1210,
+      "total_tokens": 10460,
+      "completion_tokens_details": {
+        "reasoning_tokens": 8823
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      }
+    }
+  }
+}

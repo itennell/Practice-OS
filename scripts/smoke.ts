@@ -15,6 +15,7 @@ import {
   segmentImage,
   transcribe,
   transcriptText,
+  searchGrounded,
 } from "../lib/meta";
 import { cutoutPng } from "../lib/cutout";
 import { wordErrorRate } from "../lib/wer";
@@ -214,6 +215,30 @@ await step("6b. muse-spark-1.3 PDF page as PNG", async () => {
   const reply = res.choices[0]?.message.content ?? "";
   check(readsName(reply), `Did not read the client name: ${reply}`, res);
   return `reply "${reply.trim()}" | tokens ${res.usage?.total_tokens}`;
+});
+
+// 7. Search grounding (cookbook 10_search_grounding.ipynb, cells 4 and 10; results and
+// user_location from Meta's search grounding guide). Asks a question we verified by hand
+// (68 IAC 1375: LCPC licenses expire March 31 of odd years) and checks Muse found it on an
+// official page. It also reports whether our saved quote appears in a cited passage.
+await step("7. muse-spark-1.3 web search", async () => {
+  const { response, answer } = await searchGrounded(
+    "smoke.web_search",
+    "When does an Illinois LCPC (licensed clinical professional counselor) license expire? Use the official IDFPR or Illinois Administrative Code pages and cite them.",
+    { context: "low", location: { country: "US", region: "Illinois" } },
+  );
+  await saveFixture("web_search", response);
+  check(answer.searched, "The model answered without searching.", response);
+  check(answer.sources.length > 0 && answer.sources.every((s) => s.url && s.snippet !== undefined), "No search results came back.", response);
+  const official = answer.sources.filter((s) => /\.gov\b|\.us\b/.test(new URL(s.url).hostname));
+  check(official.length > 0, `No official (.gov) source among ${answer.sources.length} results.`, answer.sources);
+  check(/march 31/i.test(answer.text), `The answer doesn't say March 31: ${answer.text}`, response);
+  // Results carry empty snippets in practice; the evidence is the cited passage of the answer.
+  const quote = "shall expire on march 31 of odd numbered years";
+  const norm = (t: string) => t.toLowerCase().replace(/\s+/g, " ");
+  const quoted = answer.citations.some((c) => norm(c.passage).includes(quote));
+  const snippets = answer.sources.filter((s) => s.snippet).length;
+  return `${answer.sources.length} sources (${official.length} official, ${snippets} with snippets), ${answer.citations.length} citations | our quote in a cited passage: ${quoted ? "yes" : "no"} | tokens ${answer.tokens}`;
 });
 
 console.log("\n=== Summary");

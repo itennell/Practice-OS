@@ -51,7 +51,7 @@ describe.skipIf(!hasDb)("compliance calendar in the database", () => {
   it("every obligation row has its rule's source", async () => {
     const rows = await db()`select rule_id, citation, last_verified_on, verified_by from practice_os.obligations where rule_id is not null`;
     expect(rows.length).toBeGreaterThan(20);
-    for (const r of rows) expect(r, r.rule_id).toMatchObject({ verified_by: "maintainer" });
+    for (const r of rows) expect(["maintainer", "agent", "clinician"], r.rule_id).toContain(r.verified_by);
     for (const r of rows) expect(r.citation && r.last_verified_on, r.rule_id).toBeTruthy();
   });
 

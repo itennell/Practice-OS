@@ -8,6 +8,8 @@ import { deadlinesView, type ObligationView } from "./view";
 export const BRIEF_DAYS = 7;
 
 export type BriefItem = {
+  /** Use with answer_setup / log_event. */
+  rule_id: string | null;
   title: string;
   due_on: string | null;
   days_left: number | null;
@@ -22,7 +24,7 @@ export type MorningBrief = {
   today: string;
   this_week: BriefItem[];
   urgent_soon: BriefItem[];
-  setup_questions: { title: string; what_to_do: string | null }[];
+  setup_questions: { rule_id: string | null; title: string; what_to_do: string | null }[];
   needs_dates: { title: string; question: string }[];
   is_sample: boolean;
   summary: string;
@@ -30,6 +32,7 @@ export type MorningBrief = {
 
 function item(o: ObligationView): BriefItem {
   return {
+    rule_id: o.rule_id,
     title: o.title,
     due_on: o.due_on,
     days_left: o.days_left,
@@ -87,7 +90,7 @@ export async function morningBrief(): Promise<MorningBrief> {
     today: view.today,
     this_week: thisWeek.map(item),
     urgent_soon: urgentSoon.map(item),
-    setup_questions: view.setups.map((s) => ({ title: s.title, what_to_do: s.what_to_do })),
+    setup_questions: view.setups.map((s) => ({ rule_id: s.rule_id, title: s.title, what_to_do: s.what_to_do })),
     needs_dates: view.needs_facts.map((n) => ({ title: n.title, question: DATE_QUESTION[n.fact] ?? n.fact })),
     is_sample: view.is_sample,
   };

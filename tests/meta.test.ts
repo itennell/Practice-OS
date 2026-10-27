@@ -9,6 +9,7 @@ import {
   assertAllowedModel,
   extractImage,
   pdfPart,
+  readGrounded,
   readToolCalls,
   transcriptText,
   validateSegmentation,
@@ -109,5 +110,28 @@ describe("transcription", () => {
 
   it("treats spoken and written digits the same", () => {
     expect(normalizeWords("555-0100")).toEqual(normalizeWords("five five five oh one zero zero"));
+  });
+});
+
+describe("search grounding", () => {
+  it("reads sources, citations and the answer by item type", async () => {
+    const a = readGrounded(await fixture("web_search"));
+    expect(a.searched).toBe(true);
+    expect(a.sources.length).toBeGreaterThan(0);
+    for (const s of a.sources) expect(s.url).toMatch(/^https?:\/\//);
+    expect(a.sources.some((s) => /\.gov$/.test(new URL(s.url).hostname))).toBe(true);
+    expect(a.text).toMatch(/March 31/);
+    expect(a.tokens).toBeGreaterThan(0);
+  });
+
+  it("ties each citation to the passage it backs (Illinois LCPC rule, 68 IAC 1375.200)", async () => {
+    const a = readGrounded(await fixture("web_search"));
+    const cited = a.citations.find((c) => /shall expire on march 31 of odd numbered years/i.test(c.passage));
+    expect(cited?.url).toMatch(/ilga\.gov.*0137/i);
+  });
+
+  it("reports no search when the model answered from memory", () => {
+    const a = readGrounded({ output: [{ type: "message", content: [{ type: "output_text", text: "Paris", annotations: [] }] }] });
+    expect(a).toMatchObject({ searched: false, sources: [], citations: [], text: "Paris" });
   });
 });
