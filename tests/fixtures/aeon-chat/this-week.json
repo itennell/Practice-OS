@@ -1,0 +1,122 @@
+{
+  "scenario": "this-week",
+  "recordedAt": "2026-10-27T19:51:17.638Z",
+  "calls": [
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "remember",
+        "forget"
+      ],
+      "lastRole": "user",
+      "response": {
+        "id": "chatcmpl-01a17eea-d112-70cb-b624-89203225cc22",
+        "choices": [
+          {
+            "finish_reason": "tool_calls",
+            "index": 0,
+            "message": {
+              "content": "Checking what needs you this week.",
+              "refusal": null,
+              "tool_calls": [
+                {
+                  "id": "call_5c66d00c-f75a-4484-8ffe-044560e27479",
+                  "type": "function",
+                  "function": {
+                    "name": "morning_brief",
+                    "arguments": "{}"
+                  }
+                }
+              ],
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793130680,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 140,
+          "prompt_tokens": 4356,
+          "total_tokens": 4496,
+          "completion_tokens_details": {
+            "reasoning_tokens": 83
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        }
+      }
+    },
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "remember",
+        "forget"
+      ],
+      "lastRole": "tool",
+      "response": {
+        "id": "chatcmpl-01a17eea-e27e-70cb-91d8-fcb2e7539f4e",
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "index": 0,
+            "message": {
+              "content": "Nothing needs you this week. I checked your deadlines calendar.\n\nNext up: CAQH re-attestation is due Thu, Nov 5. That is in 9 days.\n\nWhat you need to do: log in to CAQH yourself and click Attest. I cannot do that part for you.\n\nAlso waiting on your Deadlines page: 7 setup questions. They are general liability, cyber insurance and lease, CE certificates, malpractice insurance, professional will, records disposal, registering your number for texting, and retirement plan.\n\nIf you want, I can run a CAQH check to show what to fix before you attest.",
+              "refusal": null,
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793130685,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 836,
+          "prompt_tokens": 4559,
+          "total_tokens": 5395,
+          "completion_tokens_details": {
+            "reasoning_tokens": 701
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        }
+      }
+    }
+  ],
+  "replies": [
+    {
+      "text": "Nothing needs you this week. I checked your deadlines calendar.\n\nNext up: CAQH re-attestation is due Thu, Nov 5. That is in 9 days.\n\nWhat you need to do: log in to CAQH yourself and click Attest. I cannot do that part for you.\n\nAlso waiting on your Deadlines page: 7 setup questions. They are general liability, cyber insurance and lease, CE certificates, malpractice insurance, professional will, records disposal, registering your number for texting, and retirement plan.\n\nIf you want, I can run a CAQH check to show what to fix before you attest.",
+      "tools": [
+        "morning_brief"
+      ]
+    }
+  ]
+}
