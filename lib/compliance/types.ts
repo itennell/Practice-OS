@@ -35,6 +35,8 @@ export const factsSchema = z.object({
   medicaid_enrolled: z.boolean(),
   impact_revalidation_due_on: isoDate.nullable(),
   caqh_last_attested_on: isoDate.nullable(),
+  /** Her current license expiration, for states that renew on her own date (birth month, issue date). */
+  license_expires_on: isoDate.nullable(),
   has_psypact_apit: z.boolean(),
   apit_granted_on: isoDate.nullable(),
   /** Qualified examiner under 405 ILCS 5/1-122 (Illinois FOID reporting). */
@@ -56,6 +58,7 @@ export const DATE_FACTS = [
   "impact_revalidation_due_on",
   "caqh_last_attested_on",
   "apit_granted_on",
+  "license_expires_on",
 ] as const satisfies readonly FactKey[];
 export type DateFact = (typeof DATE_FACTS)[number];
 
@@ -92,6 +95,8 @@ export const scheduleSchema = z.discriminatedUnion("type", [
       days: z.number().int().default(0),
       months: z.number().int().min(0).default(0),
       repeat: z.boolean().default(false),
+      /** The fact itself is the first due date (her license expiration), then every offset after. */
+      start_at_fact: z.boolean().default(false),
     })
     .strict(),
   /** Due before the first day of the anniversary month of a date fact (Illinois LLC annual report). */
@@ -182,6 +187,8 @@ export const ruleSchema = z
         /** A short line from the source page (under 15 words). Required for agent-researched rules. */
         quote: z.string().max(200).optional(),
         checked_on: isoDate,
+        /** Agent-researched rules: cited (Muse quoted a cited official page) or page (our own fetch found the quote). */
+        evidence: z.enum(["cited", "page"]).optional(),
       })
       .strict(),
     verified_by: z.enum(["maintainer", "agent", "clinician"]),

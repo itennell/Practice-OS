@@ -105,7 +105,7 @@ export function nextDue(rule: Rule, facts: Facts, today: ISODate): Next {
       const base = facts[s.fact];
       if (!base) return { needs: s.fact };
       const step = (d: ISODate) => addDays(addMonths(d, s.months), s.days);
-      let d = step(base);
+      let d = s.start_at_fact ? base : step(base);
       if (s.repeat && (s.months > 0 || s.days > 0)) while (d < today) d = step(d);
       return [{ due_on: fin(d), title: rule.title }];
     }

@@ -1,5 +1,6 @@
 import { db } from "../db";
 import { addDays, daysBetween, type ISODate } from "./dates";
+import { loadSavedRules } from "./researched";
 import { SHIPPED_RULES } from "./rules";
 import { buildCalendar, urgency, type Urgency } from "./schedule";
 import { loadFacts, practiceToday } from "./store";
@@ -24,6 +25,8 @@ export type ObligationView = {
   source_url: string | null;
   last_verified_on: ISODate | null;
   caveat: string | null;
+  /** Researched rules only: cited (Muse quoted an official page) or page (we found the quote on it). */
+  evidence: "cited" | "page" | null;
   ce: { required: number; done: number; topics_left: { id: string; label: string; hours: number; optional: string | null }[] } | null;
   status: string;
   answered_on: ISODate | null;
@@ -54,6 +57,7 @@ function toView(row: Record<string, unknown>, today: ISODate): ObligationView {
     source_url: (row.source_url as string | null) ?? null,
     last_verified_on: asDate(row.last_verified_on),
     caveat: (row.caveat as string | null) ?? null,
+    evidence: (row.evidence as ObligationView["evidence"]) ?? null,
     ce:
       row.ce_required === null || row.ce_required === undefined
         ? null
@@ -104,7 +108,7 @@ export async function deadlinesView(days = 90): Promise<DeadlinesView> {
     setups: setups.filter((v) => v.status !== "done" && (!v.next_ask_on || v.next_ask_on <= today)),
     setups_done: setups.filter((v) => v.status === "done").length,
     notes: views.filter((v) => v.kind === "note"),
-    needs_facts: facts ? buildCalendar(SHIPPED_RULES, facts, today).needs_facts : [],
+    needs_facts: facts ? buildCalendar([...SHIPPED_RULES, ...(await loadSavedRules(sql))], facts, today).needs_facts : [],
     is_sample: facts?.is_sample ?? views.some((v) => v.is_sample),
   };
 }

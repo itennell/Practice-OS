@@ -21,6 +21,7 @@ const KIND_LABEL: Record<string, string> = {
   consult_reschedule: "Consult reschedule",
   consult_cancel: "Consult cancellation",
   web_chat_reply: "Web chat reply",
+  state_rules: "State rules",
 };
 
 function StatusPill({ status }: { status: ApprovalView["status"] }) {
@@ -41,6 +42,7 @@ const FROM_LABEL: Record<string, string> = {
   "aeon:instagram": "Instagram",
   "aeon:front_desk": "Front Desk",
   "aeon:admin": "Admin",
+  "aeon:research": "Aeon research",
 };
 
 // MCP clients announce themselves by their own internal names; Muse says "tbh".
@@ -65,6 +67,29 @@ function previewLine(a: ApprovalView): string | null {
     if (typeof p[key] === "string") return p[key] as string;
   }
   return null;
+}
+
+type PreviewRule = { title: string; when: string; source: string; evidence: "cited" | "page" | null };
+
+/** state_rules approvals: what she is about to add, with where each rule came from. */
+function RuleList({ preview }: { preview: unknown }) {
+  const rules = (preview as { rules?: PreviewRule[] }).rules;
+  if (!Array.isArray(rules) || rules.length === 0) return null;
+  return (
+    <ul className="flex flex-col gap-2 text-small">
+      {rules.map((r) => (
+        <li key={`${r.title}-${r.source}`} className="flex flex-col">
+          <span className="font-semibold">{r.title}</span>
+          <span className="text-[var(--fg-muted)]">
+            {r.when} · {r.evidence === "page" ? "quote found on the page" : "quoted from a cited page"} ·{" "}
+            <a href={r.source} target="_blank" rel="noreferrer" className="text-[var(--link)] underline underline-offset-2">
+              {new URL(r.source).hostname}
+            </a>
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 function timeAgo(iso: string, now: number): string {
@@ -115,6 +140,8 @@ function ApprovalItem({
       </div>
 
       {line && !editing && <p className="max-w-[65ch] text-[var(--fg)]">{line}</p>}
+
+      {!editing && <RuleList preview={approval.preview} />}
 
       {approval.status === "failed" && approval.error && (
         <p className="text-small font-medium" style={{ color: "var(--danger-fg)" }}>

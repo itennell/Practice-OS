@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ObligationView } from "@/lib/compliance/view";
+import { ConfirmRule } from "./confirm-rule";
 
 // One item on the Deadlines page: when it's due, what to do, the part only she
 // can do, and where the rule comes from.
@@ -54,16 +55,11 @@ export function SourceLine({ o }: { o: ObligationView }) {
   );
 }
 
+/** Researched rules: the confirm badge until she confirms, then a quiet note. Maintainer rules: nothing. */
 export function ResearchedBadge({ o }: { o: ObligationView }) {
-  if (o.verified_by !== "agent") return null;
-  return (
-    <p
-      className="rounded-[14px] px-3 py-2 text-small font-medium"
-      style={{ color: "var(--status-pending-fg)", background: "var(--status-pending-bg)" }}
-    >
-      Aeon researched this. Please confirm it with your board.
-    </p>
-  );
+  if (o.verified_by === "agent") return <ConfirmRule obligationId={o.id} evidence={o.evidence} title={o.title} />;
+  if (o.verified_by === "clinician") return <p className="text-small text-[var(--fg-muted)]">Researched by Aeon, confirmed by you.</p>;
+  return null;
 }
 
 function CeProgress({ ce }: { ce: NonNullable<ObligationView["ce"]> }) {

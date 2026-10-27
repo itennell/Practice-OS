@@ -24,6 +24,7 @@ export function danaFacts(today: ISODate): Facts {
     medicaid_enrolled: false,
     impact_revalidation_due_on: null,
     caqh_last_attested_on: addDays(today, -171),
+    license_expires_on: null,
     has_psypact_apit: false,
     apit_granted_on: null,
     qualified_examiner: false,

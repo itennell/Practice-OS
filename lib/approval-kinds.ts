@@ -9,6 +9,7 @@ export const APPROVAL_KINDS = [
   "consult_cancel",
   "web_chat_reply",
   "test_note",
+  "state_rules",
 ] as const;
 
 export type ApprovalKind = (typeof APPROVAL_KINDS)[number];

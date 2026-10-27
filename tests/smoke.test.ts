@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 
 describe("design tokens", () => {
@@ -13,17 +14,20 @@ describe("design tokens", () => {
 });
 
 describe("MCP server", () => {
-  it("starts over stdio and lists its tools", async () => {
+  it("starts over stdio from any folder and lists its tools", async () => {
+    // MCP clients launch the server from wherever they run, not the repo root.
+    const root = process.cwd();
     const transport = new StdioClientTransport({
       command: "npx",
-      args: ["tsx", "mcp/server.ts"],
+      args: ["--no-install", "--prefix", root, "tsx", `${root}/mcp/server.ts`],
+      cwd: tmpdir(),
       stderr: "pipe",
     });
     const client = new Client({ name: "smoke-test", version: "0.0.0" });
     await client.connect(transport);
     try {
       const { tools } = await client.listTools();
-      expect(tools.map((t) => t.name).sort()).toEqual(["morning_brief", "queue_approval", "status"]);
+      expect(tools.map((t) => t.name).sort()).toEqual(["answer_setup", "log_event", "morning_brief", "queue_approval", "recheck_rules", "research_state_rules", "status", "update_facts"]);
 
       const result = await client.callTool({ name: "status" });
       const [first] = result.content as Array<{ type: string; text: string }>;

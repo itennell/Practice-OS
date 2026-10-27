@@ -14,6 +14,7 @@ export const DEMO_TABLES = [
   "approvals",
   "obligations",
   "compliance_facts",
+  "compliance_rules",
   "referral_sources",
   "posts",
   "inquiries",

@@ -80,6 +80,7 @@ server.registerTool(
 const { morningBrief } = await import("../lib/compliance/brief");
 
 const briefItem = z.object({
+  rule_id: z.string().nullable(),
   title: z.string(),
   due_on: z.string().nullable(),
   days_left: z.number().nullable(),
@@ -103,7 +104,7 @@ server.registerTool(
       today: z.string(),
       this_week: z.array(briefItem),
       urgent_soon: z.array(briefItem),
-      setup_questions: z.array(z.object({ title: z.string(), what_to_do: z.string().nullable() })),
+      setup_questions: z.array(z.object({ rule_id: z.string().nullable(), title: z.string(), what_to_do: z.string().nullable() })),
       needs_dates: z.array(z.object({ title: z.string(), question: z.string() })),
       is_sample: z.boolean(),
       summary: z.string(),
@@ -114,6 +115,102 @@ server.registerTool(
     const brief = await morningBrief();
     return { content: [{ type: "text", text: brief.summary }], structuredContent: brief };
   },
+);
+
+const actions = await import("../lib/compliance/actions");
+const { recheckRules } = await import("../lib/compliance/recheck");
+const { TOPICS } = await import("../lib/compliance/research");
+const { ANSWERS } = await import("../lib/compliance/answers");
+
+const text = (value: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] });
+const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD");
+
+// Long: a few minutes per topic. Queues one approval; saves nothing until she approves.
+server.registerTool(
+  "research_state_rules",
+  {
+    title: "Research this practice's state rules",
+    description:
+      "Muse researches the clinician's state rules (license renewal, CE, entity filing, state taxes, records, compacts; payroll and " +
+      "employer rules once she has employees) on official sites with web search. Every rule must quote an official page it cites; " +
+      "code drops anything it can't verify. The result waits in her approvals inbox as one item; nothing is saved until she approves. " +
+      "Slow (about 1-2 minutes per topic): pass 1-3 topics per call. Refuses states whose rules already ship verified (Illinois).",
+    inputSchema: {
+      topics: z
+        .array(z.enum(TOPICS.map((t) => t.id) as [string, ...string[]]))
+        .max(4)
+        .optional()
+        .describe("Which topics to research this call. Omit for all relevant topics (slow)."),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: false },
+  },
+  async ({ topics }) => text(await actions.runResearch(topics, createdBy())),
+);
+
+server.registerTool(
+  "recheck_rules",
+  {
+    title: "Re-check researched rules",
+    description:
+      "Re-checks the state rules Muse researched that are due (quarterly), or all with force. Reads each source page first; " +
+      "asks Muse only when a page can't be read. A rule whose quote is gone is flagged on her Deadlines page. " +
+      "Never touches the rules that ship verified (federal, Illinois).",
+    inputSchema: {
+      force: z.boolean().optional().describe("Re-check every researched rule now, not just the ones due."),
+      limit: z.number().int().min(1).max(50).optional(),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: true },
+  },
+  async ({ force, limit }) => text(await recheckRules({ force, limit, by: createdBy() })),
+);
+
+server.registerTool(
+  "update_facts",
+  {
+    title: "Update practice facts",
+    description:
+      "Saves a fact about the practice that changes which deadlines apply or when, then rebuilds the calendar. Examples: " +
+      "'I attested on CAQH today' -> caqh_last_attested_on; 'I hired my first employee' -> employee_count; " +
+      "'my license expires June 30 2027' -> license_expires_on; '24 CE hours done' -> ce_hours_done. " +
+      "Business facts only: never a client's name or any clinical detail.",
+    inputSchema: actions.updatableFacts.shape,
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+  },
+  async (facts) => text(await actions.updateFacts(facts, createdBy())),
+);
+
+server.registerTool(
+  "answer_setup",
+  {
+    title: "Answer a setup reminder",
+    description:
+      "Records her answer to a 'Did you set this up?' reminder (rule_id from morning_brief's setup_questions): " +
+      "done (asked again when due), not_yet (asked again in 30 days) or not_applicable (hidden for a year).",
+    inputSchema: {
+      rule_id: z.string().regex(/^[a-z0-9_]+$/),
+      answer: z.enum(ANSWERS),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+  },
+  async ({ rule_id, answer }) => text(await actions.answerSetupByRule(rule_id, answer, createdBy())),
+);
+
+server.registerTool(
+  "log_event",
+  {
+    title: "Start a deadline clock",
+    description:
+      "Starts a clock when something happens: a records request, a move, a new hire, a contractor, a text opt-out. " +
+      "The deadline appears on her Deadlines page. Call without rule_id to list the clocks that apply to her. " +
+      "Takes only a date: never a client's name or any detail about a client.",
+    inputSchema: {
+      rule_id: z.string().regex(/^[a-z0-9_]+$/).optional(),
+      happened_on: isoDay.optional().describe("When it happened (default today)."),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+  },
+  async ({ rule_id, happened_on }) =>
+    text(rule_id ? await actions.logEvent(rule_id, happened_on, createdBy()) : { clocks: await actions.listClocks() }),
 );
 
 await server.connect(new StdioServerTransport());

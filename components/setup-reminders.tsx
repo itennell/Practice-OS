@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { ObligationView } from "@/lib/compliance/view";
-import { SourceLine } from "./deadline-card";
+import { ResearchedBadge, SourceLine } from "./deadline-card";
 import { Button } from "./ui";
 
 // "Did you set this up?" Three answers; Aeon saves each one and asks again later.
@@ -76,6 +76,7 @@ export function SetupReminders({ initial, doneCount }: { initial: ObligationView
               {item.what_to_do && <p className="max-w-[65ch]">{item.what_to_do}</p>}
               {item.caveat && <p className="max-w-[65ch] text-small text-[var(--fg-muted)]">Note: {item.caveat}</p>}
               <SourceLine o={item} />
+              <ResearchedBadge o={item} />
               <div className="flex flex-wrap gap-2" role="group" aria-label={`Answer: ${item.title}`}>
                 {(Object.keys(ANSWER_LABEL) as Answer[]).map((a) => (
                   <Button

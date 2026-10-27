@@ -1,0 +1,588 @@
+{
+  "top_logprobs": 0,
+  "temperature": 1,
+  "top_p": 1,
+  "service_tier": "auto",
+  "model": "muse-spark-1.3",
+  "reasoning": {
+    "effort": "high"
+  },
+  "background": false,
+  "tools": [
+    {
+      "type": "web_search",
+      "user_location": {
+        "type": "approximate",
+        "country": "US",
+        "region": "Illinois"
+      },
+      "search_context_size": "low"
+    }
+  ],
+  "tool_choice": "auto",
+  "truncation": "disabled",
+  "id": "redacted-id",
+  "object": "response",
+  "status": "completed",
+  "created_at": 1793065447,
+  "completed_at": 1793065456,
+  "error": null,
+  "incomplete_details": null,
+  "output": [
+    {
+      "type": "reasoning",
+      "id": "redacted-id",
+      "summary": [],
+      "status": "completed"
+    },
+    {
+      "type": "message",
+      "id": "redacted-id",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "I'll look up the official IDFPR and Administrative Code sources for the LCPC expiration date.",
+          "annotations": [],
+          "logprobs": []
+        }
+      ],
+      "phase": "commentary",
+      "status": "completed"
+    },
+    {
+      "type": "web_search_call",
+      "id": "redacted-id",
+      "status": "completed",
+      "action": {
+        "type": "search",
+        "query": "site:idfpr.illinois.gov LCPC license expiration Illinois"
+      },
+      "results": [
+        {
+          "type": "text_result",
+          "title": "Licensure:",
+          "url": "https://idfpr.illinois.gov/content/dam/soi/en/web/idfpr/core/dpr/012-qualifications-for-licensure.pdf",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "Professional Boxing Promoter 2",
+          "url": "https://idfpr.illinois.gov/content/dam/soi/en/web/idfpr/core/dpr/002-prof-boxing-promoter-qualifications-for-licensure.pdf",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "Microsoft Word - Guidance Social Work_Clinical Social Work CE (2020-October).docx",
+          "url": "https://idfpr.illinois.gov/content/dam/soi/en/web/idfpr/forms/covid19/2020-10-13-final-guidance-social-work-ce-october-2020.pdf",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "Boxing or full contact martial arts",
+          "url": "https://idfpr.illinois.gov/content/dam/soi/en/web/idfpr/core/dpr/002-prof-second-qualifications-for-licensure.pdf",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "IDFPR | Professional Counselor",
+          "url": "https://idfpr.illinois.gov/profs/profcounselor.html",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "IMPORTANT NOTICE: RETURN APPLICATION TO: FOR OFFICIAL USE ONLY Completion of this form is necessary for consideration for STATE OF ILLINOIS Approved licensure under 225 of the Illinois DEPARTMENT OF FINANCIAL AND PROFESSIONAL REGULATION",
+          "url": "https://idfpr.illinois.gov/content/dam/soi/en/web/idfpr/renewals/apply/forms/f1797pcc.pdf",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "IDFPR - Design Times Quarterly Newsletter",
+          "url": "https://idfpr.illinois.gov/content/dam/soi/en/web/idfpr/forms/dpr/design-newsletter-issue-34-summer-26.pdf",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "Qualifications for licensure 002",
+          "url": "https://idfpr.illinois.gov/content/dam/soi/en/web/idfpr/core/dpr/002-manager-qualifications-for-licensure.pdf",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "www.idfpr.com",
+          "url": "https://idfpr.illinois.gov/content/dam/soi/en/web/idfpr/forms/covid19/final-nursing-reinstatement-fee-and-ce-variance-for-non-renewed-until-may-22.pdf",
+          "snippet": ""
+        }
+      ]
+    },
+    {
+      "type": "web_search_call",
+      "id": "redacted-id",
+      "status": "completed",
+      "action": {
+        "type": "search",
+        "query": "Illinois Administrative Code licensed clinical professional counselor license expiration renewal"
+      },
+      "results": [
+        {
+          "type": "text_result",
+          "title": "Illinois Administrative Code, Subpart B, Section 1375.170 - Restoration of a License as a Clinical Professional Counselor | Illinois Administrative Code | Justia",
+          "url": "https://regulations.justia.com/states/illinois/title-68/part-1375/subpart-b/section-1375-170/",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "How to Become a Licensed Professional Counselor in Illinois",
+          "url": "https://legalclarity.org/illinois-professional-counselor-licensing-guide/",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "Section 1375.205 - Fees, Ill. Admin. Code tit. 68 § 1375.205 | Casetext Search + Citator",
+          "url": "https://CaseText.com/regulation/illinois-administrative-code/title-68-professions-and-occupations/part-1375-professional-counselor-and-clinical-professional-counselor-licensing-and-practice-act/subpart-c-general/section-1375205-fees",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "ADMINISTRATIVE CODE",
+          "url": "https://ilga.gov/agencies/JCAR/EntirePart?titlepart=06801375",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "Licensed Professional Counselor License in Illinois",
+          "url": "https://www.stateregstoday.com/business/licensed-professional-counselor-license-in-illinois",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "225 ILCS 107/ Professional Counselor and Clinical Professional Counselor Licensing Act. - Illinois Statutes",
+          "url": "http://statutes.laws-info.com/illinois/chapter225/1324",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "Section 1315.140 - Renewal, Ill. Admin. Code tit. 68 § 1315.140 | Casetext Search + Citator",
+          "url": "https://casetext.com/regulation/illinois-administrative-code/title-68-professions-and-occupations/part-1315-illinois-occupational-therapy-practice-act/section-1315140-renewal",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "225 ILCS 107/ Professional Counselor and Clinical Professional Counselor Licensing Act. - Illinois Statutes - USA Laws Searching",
+          "url": "http://www.laws9.com/statutes/illinois/chapter225/1324",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "Bill Text: IL HB5457 | 2023-2024 | 103rd General Assembly | Engrossed | LegiScan",
+          "url": "https://legiscan.com/IL/text/HB5457/id/2979814",
+          "snippet": ""
+        }
+      ]
+    },
+    {
+      "type": "reasoning",
+      "id": "redacted-id",
+      "summary": [],
+      "status": "completed"
+    },
+    {
+      "type": "message",
+      "id": "redacted-id",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "The initial search surfaced the IDFPR counselor page, so I'll open it to find the renewal details.",
+          "annotations": [],
+          "logprobs": []
+        }
+      ],
+      "phase": "commentary",
+      "status": "completed"
+    },
+    {
+      "type": "web_search_call",
+      "id": "redacted-id",
+      "status": "completed",
+      "action": {
+        "type": "open_page",
+        "url": "https://idfpr.illinois.gov/profs/profcounselor.html"
+      },
+      "results": []
+    },
+    {
+      "type": "reasoning",
+      "id": "redacted-id",
+      "summary": [],
+      "status": "completed"
+    },
+    {
+      "type": "message",
+      "id": "redacted-id",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "That page didn't list an expiration date, so I'll search the Administrative Code and IDFPR renewal notices next.",
+          "annotations": [],
+          "logprobs": []
+        }
+      ],
+      "phase": "commentary",
+      "status": "completed"
+    },
+    {
+      "type": "web_search_call",
+      "id": "redacted-id",
+      "status": "completed",
+      "action": {
+        "type": "search",
+        "query": "Illinois Administrative Code 68 1375.160 renewal clinical professional counselor March 31"
+      },
+      "results": [
+        {
+          "type": "text_result",
+          "title": "197 PROFESSIONAL COUNSELOR",
+          "url": "https://idfpr.illinois.gov/content/dam/soi/en/web/idfpr/core/dpr/197-qualifications-for-licensure.pdf",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "Illinois Behavioral Health : Counselor CE Requirements - Elite Learning",
+          "url": "https://www.elitelearning.com/counselor/illinois/requirements/",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "PART 1375\nPROFESSIONAL COUNSELOR AND CLINICAL PROFESSIONAL\nCOUNSELOR LICENSING AND PRACTICE ACT\n\n : Sections Listing",
+          "url": "https://www.ilga.gov/ftp/JCAR/AdminCode/068/06801375sections.html",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "Illinois Administrative Code, Subpart B, Section 1375.160 - Licensure by Endorsement as a Clinical Professional Counselor | Illinois Administrative Code | Justia",
+          "url": "https://regulations.justia.com/states/illinois/title-68/part-1375/subpart-b/section-1375-160/",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "Title:68  Part:1400",
+          "url": "https://witnessslips.ilga.gov/Commission/jcar/admincode/JCARTitlePart.asp?Title=068&Part=1400",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "Letter_Bill 1..4",
+          "url": "https://ilga.gov/legislation/96/HB/PDF/09600HB4864eng.pdf",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "Section 1375.205 - Fees, Ill. Admin. Code tit. 68 § 1375.205 | Casetext Search + Citator",
+          "url": "https://CaseText.com/regulation/illinois-administrative-code/title-68-professions-and-occupations/part-1375-professional-counselor-and-clinical-professional-counselor-licensing-and-practice-act/subpart-c-general/section-1375205-fees",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "Section 1375.80 - Restoration of License as a Professional Counselor, Ill. Admin. Code tit. 68 § 1375.80 | Casetext Search + Citator",
+          "url": "https://casetext.com/regulation/illinois-administrative-code/title-68-professions-and-occupations/part-1375-professional-counselor-and-clinical-professional-counselor-licensing-act/subpart-a-licensed-professional-counselor/section-137580-restoration-professional-counselor",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "pc.indd",
+          "url": "https://kamoeko.ch/convert-to-pdf-online-website-3de7/",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "Letter_Bill 1..4",
+          "url": "https://ilga.gov/legislation/publicacts/96/PDF/096-1139.pdf",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "Bill Text: IL HB5457 | 2023-2024 | 103rd General Assembly | Engrossed | LegiScan",
+          "url": "https://legiscan.com/IL/text/HB5457/id/2979814",
+          "snippet": ""
+        }
+      ]
+    },
+    {
+      "type": "web_search_call",
+      "id": "redacted-id",
+      "status": "completed",
+      "action": {
+        "type": "search",
+        "query": "site:ilga.gov 1375.160 professional counselor renewal expiration"
+      },
+      "results": [
+        {
+          "type": "text_result",
+          "title": "Section 1375",
+          "url": "http://www.ilga.gov/commission/jcar/admincode/068/068013750B01700R.html",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "Section 1375",
+          "url": "https://witnessslips.ilga.gov/commission/jcar/admincode/068/068013750A00800R.html",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "Title:68  Part:1375",
+          "url": "https://witnessslips.ilga.gov/Commission/jcar/admincode/JCARTitlePart.asp?Title=068&Part=1375",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "Section 1375",
+          "url": "https://my.ilga.gov/ftp/JCAR/AdminCode/068/068013750A00800R.html",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "Microsoft Word - Issue 25",
+          "url": "https://ilga.gov/documents\\commission\\jcar\\flinn\\20250620_June 20, 2025 - Issue 25.pdf",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "Public Act 0706 97TH GENERAL ASSEMBLY",
+          "url": "https://www.ilga.gov/ftp/Public%20Acts/97/097-0706.htm",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "Section 1375",
+          "url": "https://www.ilga.gov/ftp/JCAR/AdminCode/068/068013750A00800R.html",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "050045150000600R",
+          "url": "https://www.ilga.gov/commission/jcar/admincode/050/050045150000600R.html",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "ADMINISTRATIVE CODE",
+          "url": "https://ilga.gov/agencies/JCAR/EntirePart?titlepart=06801375",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "Section 1375",
+          "url": "http://www.ilga.gov/commission/jcar/admincode/068/068013750C02200R.html",
+          "snippet": ""
+        }
+      ]
+    },
+    {
+      "type": "web_search_call",
+      "id": "redacted-id",
+      "status": "completed",
+      "action": {
+        "type": "search",
+        "query": "IDFPR LCPC renewal March 31 2025 2027 expiration"
+      },
+      "results": [
+        {
+          "type": "text_result",
+          "title": "Illinois LPC License Requirements: LPC & LCPC Guide 2026",
+          "url": "https://www.humanservicesedu.org/illinois-counseling-lpc/",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "How to Become a Counselor in Illinois: From Student to Licensed Professional (LPC & LCPC) - Counseling Degree",
+          "url": "https://counselingdegree.org/become-a-counselor/illinois/",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "24 CACREP-Accredited Counseling Programs in Illinois",
+          "url": "https://onlinemftprograms.com/cacrep-accredited-counseling-programs/illinois/",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "Illinois Counseling License Requirements",
+          "url": "https://www.counselingdegreeguide.org/licensure/illinois/",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "Illinois Pharmacy Technician License: 2026 Guide",
+          "url": "https://pharmacytechscholar.com/illinois-pharmacy-technician-license/",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "197 PROFESSIONAL COUNSELOR",
+          "url": "https://idfpr.illinois.gov/content/dam/soi/en/web/idfpr/core/dpr/197-qualifications-for-licensure.pdf",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "CEU's and Professional Development - Counseling & Therapy Services - The Juniper Center",
+          "url": "https://www.thejunipercenter.com/university/",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "2025 Counselor Renewal is Now OPEN Online - Illinois Counseling Association",
+          "url": "https://www.ilcounseling.org/news/690415/2025-Counselor-Renewal-is-Now-OPEN-Online.htm",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "Continuing Education for Illinois Inspectors - CCPIA",
+          "url": "https://ccpia.org/continuing-education-for-illinois-inspectors",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "2025 CEU Tracker",
+          "url": "https://cdn.ymaws.com/www.ilcounseling.org/resource/resmgr/forms/2025_renewal_ica_ce_tracker-.pdf",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "Illinois Respiratory Therapy CE Requirements 2026",
+          "url": "https://atrespiratorylectures.com/state-requirement/illinois",
+          "snippet": ""
+        }
+      ]
+    },
+    {
+      "type": "reasoning",
+      "id": "redacted-id",
+      "summary": [],
+      "status": "completed"
+    },
+    {
+      "type": "message",
+      "id": "redacted-id",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "I found an IDFPR document noting the March 31 odd-year expiration. I'll open it and the Administrative Code renewal section to confirm.",
+          "annotations": [],
+          "logprobs": []
+        }
+      ],
+      "phase": "commentary",
+      "status": "completed"
+    },
+    {
+      "type": "web_search_call",
+      "id": "redacted-id",
+      "status": "completed",
+      "action": {
+        "type": "open_page",
+        "url": "https://idfpr.illinois.gov/content/dam/soi/en/web/idfpr/core/dpr/197-qualifications-for-licensure.pdf"
+      },
+      "results": []
+    },
+    {
+      "type": "web_search_call",
+      "id": "redacted-id",
+      "status": "completed",
+      "action": {
+        "type": "search",
+        "query": "\"Section 1375.200\" Renewals site:ilga.gov"
+      },
+      "results": [
+        {
+          "type": "text_result",
+          "title": "Section 1375",
+          "url": "https://www.ilga.gov/commission/Jcar/admincode/068/068013750C02000R.html",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "PART 1375\nPROFESSIONAL COUNSELOR AND CLINICAL PROFESSIONAL\nCOUNSELOR LICENSING AND PRACTICE ACT\n\n : Sections Listing",
+          "url": "https://www.ilga.gov/ftp/JCAR/AdminCode/068/06801375sections.html",
+          "snippet": ""
+        },
+        {
+          "type": "text_result",
+          "title": "Title:2  Part:1375",
+          "url": "https://www.ilga.gov/Commission/jcar/admincode/JCARTitlePart.asp?Title=002&Part=1375",
+          "snippet": ""
+        }
+      ]
+    },
+    {
+      "type": "web_search_call",
+      "id": "redacted-id",
+      "status": "completed",
+      "action": {
+        "type": "open_page",
+        "url": "https://www.ilga.gov/commission/Jcar/admincode/068/068013750C02000R.html"
+      },
+      "results": []
+    },
+    {
+      "type": "reasoning",
+      "id": "redacted-id",
+      "summary": [],
+      "status": "completed"
+    },
+    {
+      "type": "message",
+      "id": "redacted-id",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "An Illinois **LCPC** license expires **March 31 of odd-numbered years**.\n\n* Illinois Administrative Code, Title 68, Part 1375 — **PROFESSIONAL COUNSELOR AND CLINICAL PROFESSIONAL COUNSELOR LICENSING ACT** — provides in Section 1375.200 Renewals:\n\n> Every license issued under the Act shall expire on March 31 of odd numbered years.\n\n* IDFPR states the same rule:\n\n> All Professional Counselor licenses expire March 31 of odd years.\n\nThe first licensure period may be less than 2 years. After the first renewal, the licensure cycle is 2 years.\n\nThe holder may renew the license preceding the expiration date at a time determined by the Division by paying the fee set forth in Section 1375.205 and completing 30 hours of continuing education in accordance with Section 1375.220.",
+          "annotations": [
+            {
+              "type": "url_citation",
+              "url": "https://www.ilga.gov/commission/Jcar/admincode/068/068013750C02000R.html",
+              "start_index": 74,
+              "end_index": 204,
+              "title": "Section 1375"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://www.ilga.gov/commission/Jcar/admincode/068/068013750C02000R.html",
+              "start_index": 247,
+              "end_index": 331,
+              "title": "Section 1375"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://www.ilga.gov/commission/Jcar/admincode/068/068013750C02000R.html",
+              "start_index": 544,
+              "end_index": 776,
+              "title": "Section 1375"
+            }
+          ],
+          "logprobs": []
+        }
+      ],
+      "status": "completed"
+    }
+  ],
+  "instructions": null,
+  "usage": {
+    "input_tokens": 37747,
+    "input_tokens_details": {
+      "cached_tokens": 11576
+    },
+    "output_tokens": 2076,
+    "output_tokens_details": {
+      "reasoning_tokens": 1086
+    },
+    "total_tokens": 39823
+  },
+  "parallel_tool_calls": true,
+  "store": true,
+  "output_text": "I'll look up the official IDFPR and Administrative Code sources for the LCPC expiration date.The initial search surfaced the IDFPR counselor page, so I'll open it to find the renewal details.That page didn't list an expiration date, so I'll search the Administrative Code and IDFPR renewal notices next.I found an IDFPR document noting the March 31 odd-year expiration. I'll open it and the Administrative Code renewal section to confirm.An Illinois **LCPC** license expires **March 31 of odd-numbered years**.\n\n* Illinois Administrative Code, Title 68, Part 1375 — **PROFESSIONAL COUNSELOR AND CLINICAL PROFESSIONAL COUNSELOR LICENSING ACT** — provides in Section 1375.200 Renewals:\n\n> Every license issued under the Act shall expire on March 31 of odd numbered years.\n\n* IDFPR states the same rule:\n\n> All Professional Counselor licenses expire March 31 of odd years.\n\nThe first licensure period may be less than 2 years. After the first renewal, the licensure cycle is 2 years.\n\nThe holder may renew the license preceding the expiration date at a time determined by the Division by paying the fee set forth in Section 1375.205 and completing 30 hours of continuing education in accordance with Section 1375.220."
+}
