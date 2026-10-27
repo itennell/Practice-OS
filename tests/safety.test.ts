@@ -13,7 +13,7 @@ describe("checkCrisis", () => {
 
   it("names what matched without echoing the message", () => {
     const result = checkCrisis("I want to kill myself");
-    expect(result.category).toBe("self_harm");
+    expect(result).toEqual({ crisis: true, category: "self_harm" });
     expect(JSON.stringify(result)).not.toContain("kill myself");
   });
 
