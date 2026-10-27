@@ -276,6 +276,20 @@ textarea {
   }
 }
 
+/* Thought Line's working label: muted text with an accent sheen passing through. Still under reduced motion. */
+@utility thought-shimmer {
+  background: linear-gradient(100deg, var(--fg-muted) 35%, var(--accent-fg) 50%, var(--fg-muted) 65%) 0 0 / 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 1.8s linear infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    background: none;
+    -webkit-text-fill-color: currentColor;
+  }
+}
+
 @keyframes shimmer {
   from {
     background-position: 100% 0;
