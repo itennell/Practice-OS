@@ -8,7 +8,21 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
-import { AGENT_STOPS, PARAMS, POP_MS, breathe, type Agent, type Shown } from "./motion";
+import {
+  AGENT_STOPS,
+  DOUBLE_BLINK_CHANCE,
+  DOUBLE_BLINK_GAP_S,
+  EYE_INK,
+  PARAMS,
+  POP_MS,
+  blinkOpenness,
+  breathe,
+  nextBlinkIn,
+  popOpenness,
+  readingGaze,
+  type Agent,
+  type Shown,
+} from "./motion";
 
 export type BlobMaterial = "liquid" | "chrome" | "jelly";
 
@@ -18,6 +32,8 @@ export type BlobCanvasProps = {
   /** Increments each time a splash starts. */
   popId: number;
   material: BlobMaterial;
+  /** Draw eyes (clinician-facing Aeon only). */
+  eyes: boolean;
   /** Orb diameter in CSS pixels; the canvas is larger so splashes have room. */
   size: number;
   onSettled: (popId: number) => void;
@@ -50,7 +66,14 @@ uniform vec3 tint1;
 uniform vec3 tint2;
 uniform vec3 tint3;
 uniform vec2 tintStops;
+uniform float eyeOn;
+uniform vec2 eyeCenter;
+uniform vec2 eyeLook;
+uniform float eyeOpen;
+uniform vec3 eyeInk;
 varying vec2 vBlobSpot;
+float eyeMask = 0.0;
+float eyeCatch = 0.0;
 
 vec4 blobPart(vec2 p, int i, float z) {
   vec2 d = p - blobSeg[i].xy;
@@ -81,12 +104,32 @@ vec3 blobTint() {
   c = mix(c, tint2, smoothstep(tintStops.x, tintStops.y, t));
   return mix(c, tint3, smoothstep(tintStops.y, 1.0, t));
 }
+
+// Two plain ovals that sit on the dome: they follow the blob's centre as it
+// wobbles, narrow as the gaze turns towards the edge, and flatten to a line
+// when the lids close. A small highlight sits top-left in each.
+void blobEyes(vec2 p) {
+  if (eyeOn < 0.5) return;
+  for (int s = 0; s < 2; s++) {
+    float side = s == 0 ? -1.0 : 1.0;
+    vec2 base = vec2(0.3 * side, 0.1) + eyeLook;
+    float fore = sqrt(max(0.25, 1.0 - dot(base, base)));
+    vec2 c = eyeCenter + base * blobRef;
+    vec2 rad = vec2(0.105 * fore, 0.15 * max(eyeOpen, 0.05)) * blobRef;
+    float d = (length((p - c) / rad) - 1.0) * min(rad.x, rad.y);
+    float m = clamp(0.5 - d / max(fwidth(d), 0.0001), 0.0, 1.0);
+    eyeMask = max(eyeMask, m);
+    float cd = length(p - c - vec2(-0.035, 0.05) * blobRef) - 0.032 * blobRef * clamp(eyeOpen * 1.6 - 0.4, 0.0, 1.0);
+    eyeCatch = max(eyeCatch, clamp(0.5 - cd / max(fwidth(cd), 0.0001), 0.0, 1.0) * m);
+  }
+}
 `;
 
 const SURFACE = `
   vec4 blobBase = blobShape(vBlobSpot, 0.0);
   float blobAlpha = clamp(0.5 - blobBase.x / max(fwidth(blobBase.x), 0.0001), 0.0, 1.0);
   if (blobAlpha <= 0.0) discard;
+  blobEyes(vBlobSpot);
   float blobLow = 0.0;
   float blobHigh = blobTop;
   float blobZ = min(sqrt(max(-blobBase.x, 0.0) * max(2.0 * blobRef + blobBase.x, 0.0)), blobTop);
@@ -136,12 +179,12 @@ function finish(m: THREE.MeshPhysicalMaterial, kind: BlobMaterial) {
   m.needsUpdate = true;
 }
 
-export default function BlobCanvas({ agent, state, popId, material, size, onSettled }: BlobCanvasProps) {
+export default function BlobCanvas({ agent, state, popId, material, eyes, size, onSettled }: BlobCanvasProps) {
   const rootRef = useRef<HTMLDivElement>(null);
-  const live = useRef({ agent, state, popId, material, size, onSettled });
+  const live = useRef({ agent, state, popId, material, eyes, size, onSettled });
   // Layout effect runs before the effects below, so they always see fresh props.
   useLayoutEffect(() => {
-    live.current = { agent, state, popId, material, size, onSettled };
+    live.current = { agent, state, popId, material, eyes, size, onSettled };
   });
   const poke = useRef<{ restyle: () => void; splash: () => void } | null>(null);
 
@@ -189,6 +232,11 @@ export default function BlobCanvas({ agent, state, popId, material, size, onSett
       tint2: { value: new THREE.Color() },
       tint3: { value: new THREE.Color() },
       tintStops: { value: new THREE.Vector2(0.3, 0.65) },
+      eyeOn: { value: 0 },
+      eyeCenter: { value: new THREE.Vector2() },
+      eyeLook: { value: new THREE.Vector2() },
+      eyeOpen: { value: 1 },
+      eyeInk: { value: new THREE.Color(EYE_INK) },
     };
 
     const skin = new THREE.MeshPhysicalMaterial({ transparent: true });
@@ -199,8 +247,15 @@ export default function BlobCanvas({ agent, state, popId, material, size, onSett
         .replace("#include <project_vertex>", "#include <project_vertex>\n\tvBlobSpot = (modelMatrix * vec4(transformed, 1.0)).xy;");
       shader.fragmentShader = shader.fragmentShader
         .replace("void main() {", `${FIELD}\nvoid main() {\n${SURFACE}`)
-        .replace("vec4 diffuseColor = vec4( diffuse, opacity );", "vec4 diffuseColor = vec4( diffuse * blobTint(), opacity * blobAlpha );")
-        .replace("#include <normal_fragment_begin>", SURFACE_NORMAL);
+        .replace(
+          "vec4 diffuseColor = vec4( diffuse, opacity );",
+          "vec4 diffuseColor = vec4( mix( diffuse * blobTint(), eyeInk, eyeMask ), opacity * blobAlpha );"
+        )
+        .replace("#include <normal_fragment_begin>", SURFACE_NORMAL)
+        // Eyes are glossy but not metal, so they stay dark instead of mirroring the room.
+        .replace("#include <metalnessmap_fragment>", "#include <metalnessmap_fragment>\n\tmetalnessFactor = mix( metalnessFactor, 0.0, eyeMask );")
+        .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\n\troughnessFactor = mix( roughnessFactor, 0.3, eyeMask );")
+        .replace("#include <opaque_fragment>", "#include <opaque_fragment>\n\tgl_FragColor.rgb = mix( gl_FragColor.rgb, vec3( 1.4 ), eyeCatch );");
     };
     const blob = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), skin);
     blob.frustumCulled = false;
@@ -217,6 +272,8 @@ export default function BlobCanvas({ agent, state, popId, material, size, onSett
     let breath = 0;
     let nextSplit = 0.6;
     let settleTimer = 0;
+    let popStart = -Infinity;
+    const eye = { open: 1, lookX: 0, lookY: 0, toX: 0, toY: 0, nextGlance: 2, blinkAt: 2, doubleAt: -1 };
     let raf = 0;
     let last = 0;
     let onScreen = true;
@@ -260,6 +317,7 @@ export default function BlobCanvas({ agent, state, popId, material, size, onSett
       const R = radius();
       swell.value = 0.05;
       swell.velocity = 0;
+      popStart = performance.now();
       // A timer, not the frame loop: blobs scrolled out of view stop drawing
       // but must still settle.
       window.clearTimeout(settleTimer);
@@ -272,6 +330,18 @@ export default function BlobCanvas({ agent, state, popId, material, size, onSett
         ball.vy += Math.sin(a) * push;
       }
       spawn(6, [3.2, 4.6], [0.1, 0.2], [0.22, 0.34]);
+    };
+
+    const calmDown = () => {
+      drops.length = 0;
+      swell.value = Math.max(swell.value, 1);
+      swell.velocity = 0;
+      for (const ball of core) {
+        ball.x = ball.tx;
+        ball.y = ball.ty;
+        ball.vx = 0;
+        ball.vy = 0;
+      }
     };
 
     const resize = () => {
@@ -324,7 +394,7 @@ export default function BlobCanvas({ agent, state, popId, material, size, onSett
       if (p.splitEvery) {
         nextSplit -= dt;
         if (nextSplit <= 0) {
-          spawn(Math.random() < 0.5 ? 1 : 2, [1.4, 2.2], [0.12, 0.2], [0.18, 0.3]);
+          spawn(Math.random() < 0.5 ? 1 : 2, [1.1, 1.7], [0.12, 0.2], [0.18, 0.3]);
           nextSplit = between(p.splitEvery);
         }
       }
@@ -365,6 +435,41 @@ export default function BlobCanvas({ agent, state, popId, material, size, onSett
 
     };
 
+    // Lids and gaze. Resting: blinks every 3-6s (sometimes twice) and small
+    // glances. Splash: squint, then wide open. Working: reads left to right.
+    const look = (dt: number, now: number) => {
+      const { state } = live.current;
+      const t = now / 1000;
+      let base = 1;
+      if (state === "pop") {
+        base = popOpenness((now - popStart) / POP_MS);
+        eye.toX = 0;
+        eye.toY = 0;
+        eye.blinkAt = t + nextBlinkIn("rest");
+      } else if (state === "work") {
+        eye.toX = readingGaze(t) * 0.07;
+        eye.toY = -0.035;
+      } else if (t >= eye.nextGlance) {
+        eye.toX = (Math.random() - 0.5) * 0.1;
+        eye.toY = (Math.random() - 0.5) * 0.06;
+        eye.nextGlance = t + mix(2, 4, Math.random());
+      }
+      if (state !== "pop" && t >= eye.blinkAt + 0.2) {
+        eye.blinkAt = t + nextBlinkIn(state);
+        if (state === "rest" && Math.random() < DOUBLE_BLINK_CHANCE) eye.doubleAt = eye.blinkAt + DOUBLE_BLINK_GAP_S;
+      }
+      if (eye.doubleAt > 0 && t >= eye.doubleAt + 0.2) eye.doubleAt = -1;
+      const lid = Math.min(blinkOpenness(t - eye.blinkAt), eye.doubleAt > 0 ? blinkOpenness(t - eye.doubleAt) : 1);
+      // Fast follow for gaze (a jump back to the line start must look quick).
+      const k = 1 - Math.exp(-dt * (state === "work" ? 30 : 12));
+      eye.lookX += (eye.toX - eye.lookX) * k;
+      eye.lookY += (eye.toY - eye.lookY) * k;
+      eye.open = state === "pop" ? base : eye.open + (base - eye.open) * (1 - Math.exp(-dt * 10));
+      field.eyeOn.value = live.current.eyes ? 1 : 0;
+      field.eyeLook.value.set(eye.lookX, eye.lookY);
+      field.eyeOpen.value = eye.open * lid;
+    };
+
     const build = () => {
       const R = radius();
       const out = drops.filter((d) => d.sink < 0).reduce((sum, d) => sum + Math.pow(d.r / R, 3), 0);
@@ -391,6 +496,14 @@ export default function BlobCanvas({ agent, state, popId, material, size, onSett
       field.blobRef.value = Math.max(r, 1);
       field.blobLift.value = 1;
       field.blobCenter.value.set(0, 0);
+      // Eyes ride the middle of the wobbling core, not the fixed box centre.
+      let cx = 0;
+      let cy = 0;
+      for (const ball of core) {
+        cx += ball.x / CORE;
+        cy += ball.y / CORE;
+      }
+      field.eyeCenter.value.set(cx * swell.value, -cy * swell.value);
       const box = Math.min(reach + 4, Math.max(view.width, view.height));
       blob.scale.set(box * 2, box * 2, 1);
       blob.visible = r >= 0.5;
@@ -402,6 +515,7 @@ export default function BlobCanvas({ agent, state, popId, material, size, onSett
       const dt = Math.min(1 / 30, Math.max(1 / 240, (now - last) / 1000));
       last = now;
       step(dt);
+      look(dt, now);
       build();
       renderer.render(scene, camera);
       raf = requestAnimationFrame(tick);
@@ -418,6 +532,8 @@ export default function BlobCanvas({ agent, state, popId, material, size, onSett
     // Stop drawing while the blob is scrolled out of view.
     const io = new IntersectionObserver(([entry]) => {
       onScreen = entry.isIntersecting;
+      // A splash that finished while out of view should not replay late.
+      if (onScreen && performance.now() - popStart > POP_MS) calmDown();
       if (onScreen) start();
     });
     io.observe(root);

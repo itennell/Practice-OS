@@ -9,7 +9,7 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useReducer, useRef, useSyncExternalStore } from "react";
 import type { BlobMaterial } from "./blob-canvas";
-import { AGENT_STOPS, describe, initialMachine, reduce, shown, type Agent, type Steady } from "./motion";
+import { AGENT_STOPS, EYE_INK, describe, initialMachine, reduce, shown, type Agent, type Steady } from "./motion";
 
 const BlobCanvas = dynamic(() => import("./blob-canvas"), { ssr: false });
 
@@ -24,6 +24,11 @@ export type AgentBlobProps = {
   /** Orb diameter in pixels. */
   size?: number;
   material?: BlobMaterial;
+  /**
+   * Give the blob eyes. Clinician-facing Aeon only: never on the public Front
+   * Desk or web chat, where HB 1806 rules out anything that reads as a mood.
+   */
+  eyes?: boolean;
   /** Accessible name; defaults to e.g. "Aeon is working". */
   label?: string;
   /** Force the still CSS orb (used by the lab to preview the fallback). */
@@ -64,6 +69,7 @@ export default function AgentBlob({
   splashOnMount = true,
   size = 160,
   material = "liquid",
+  eyes = false,
   label,
   still = false,
   className = "",
@@ -98,10 +104,41 @@ export default function AgentBlob({
       style={{ width: size, height: size }}
     >
       {live ? (
-        <BlobCanvas agent={agent} state={now} popId={machine.popId} material={material} size={size} onSettled={onSettled} />
+        <BlobCanvas
+          agent={agent}
+          state={now}
+          popId={machine.popId}
+          material={material}
+          eyes={eyes}
+          size={size}
+          onSettled={onSettled}
+        />
       ) : (
-        <div className="h-full w-full rounded-full" style={{ background: stillGradient(agent) }} />
+        <div className="relative h-full w-full rounded-full" style={{ background: stillGradient(agent) }}>
+          {eyes && <StillEyes />}
+        </div>
       )}
     </div>
+  );
+}
+
+/** The same eyes as the shader draws, as still CSS ovals (open, no blinking). */
+function StillEyes() {
+  return (
+    <>
+      {[-1, 1].map((side) => (
+        <span
+          key={side}
+          className="absolute rounded-full"
+          style={{
+            width: "10%",
+            height: "15%",
+            left: `${50 + side * 15 - 5}%`,
+            top: `${50 - 5 - 7.5}%`,
+            background: `radial-gradient(circle at 32% 26%, #ffffff 0 22%, ${EYE_INK} 26%)`,
+          }}
+        />
+      ))}
+    </>
   );
 }

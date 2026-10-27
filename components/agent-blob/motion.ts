@@ -52,7 +52,7 @@ export type Params = {
 export const PARAMS: Record<Shown, Params> = {
   rest: { morph: 0.16, morphSpeed: 0.22, wobble: 0.45, splitEvery: null },
   pop: { morph: 0.35, morphSpeed: 0.5, wobble: 0.95, splitEvery: null },
-  work: { morph: 0.7, morphSpeed: 0.75, wobble: 0.85, splitEvery: [0.8, 1.6] },
+  work: { morph: 0.42, morphSpeed: 0.7, wobble: 0.8, splitEvery: [0.9, 1.7] },
 };
 
 /** Gradient stops for the blob tint, matching the CSS orbs: [colour, position] from highlight to rim. */
@@ -95,3 +95,57 @@ export const AGENT_NAMES: Record<Agent, string> = {
 /** Plain-words status used as the blob's accessible name. */
 export const describe = (agent: Agent, state: Shown) =>
   `${AGENT_NAMES[agent]} is ${state === "work" ? "working" : state === "pop" ? "here" : "resting"}`;
+
+/*
+ * Eyes (optional, clinician-facing Aeon only; never on the public Front Desk
+ * or web chat, HB 1806). Two plain ovals: no brows, no mouth, nothing that
+ * reads as a feeling. They blink, squint through a splash, and scan like
+ * reading while the agent works.
+ */
+
+/** Eye colour: Caseload ink. The blob is light in both themes, so the eyes stay dark. */
+export const EYE_INK = "#17142b";
+
+/** One blink: lids close and reopen in 130ms. */
+export const BLINK_S = 0.13;
+
+/** Seconds until the next blink. Working blinks less, like someone concentrating. */
+export function nextBlinkIn(state: Shown, random: () => number = Math.random): number {
+  const [lo, hi] = state === "work" ? [5, 9] : [3, 6];
+  return lo + (hi - lo) * random();
+}
+
+/** Chance that a resting blink is a quick double blink. */
+export const DOUBLE_BLINK_CHANCE = 0.2;
+/** Gap between the two blinks of a double blink. */
+export const DOUBLE_BLINK_GAP_S = 0.22;
+
+/** How open the lids are `since` seconds after a blink started: 1 open, 0 shut. */
+export function blinkOpenness(since: number): number {
+  if (since <= 0 || since >= BLINK_S) return 1;
+  return 1 - Math.sin((Math.PI * since) / BLINK_S);
+}
+
+/**
+ * Lids through a splash, by progress 0..1: squinting while the droplets fly,
+ * opening wide as the blob lands, then easing back to normal.
+ */
+export function popOpenness(progress: number): number {
+  const p = Math.min(1, Math.max(0, progress));
+  if (p < 0.45) return 0.3;
+  if (p < 0.7) return 0.3 + (1.15 - 0.3) * ((p - 0.45) / 0.25);
+  return 1.15 - 0.15 * ((p - 0.7) / 0.3);
+}
+
+/** Seconds per line when "reading" while working. */
+export const READ_LINE_S = 1.1;
+
+/**
+ * Horizontal gaze while working, -1 (left) to 1 (right): a steady sweep along
+ * a line, then a quick jump back to the start of the next one.
+ */
+export function readingGaze(seconds: number): number {
+  const t = (((seconds % READ_LINE_S) + READ_LINE_S) % READ_LINE_S) / READ_LINE_S;
+  const sweep = 0.88;
+  return t < sweep ? -1 + 2 * (t / sweep) : 1 - 2 * ((t - sweep) / (1 - sweep));
+}

@@ -34,6 +34,7 @@ export default function BlobLab() {
   const [state, setState] = useState<Steady>("rest");
   const [material, setMaterial] = useState<BlobMaterial>("liquid");
   const [splash, setSplash] = useState(0);
+  const [eyes, setEyes] = useState(true);
 
   return (
     <div className="space-y-6">
@@ -60,13 +61,33 @@ export default function BlobLab() {
             </Toggle>
           ))}
         </div>
+        <div role="group" aria-label="Eyes" className="flex flex-wrap gap-2">
+          <Toggle on={eyes} onClick={() => setEyes(true)}>
+            Eyes on
+          </Toggle>
+          <Toggle on={!eyes} onClick={() => setEyes(false)}>
+            Eyes off
+          </Toggle>
+        </div>
       </GlassCard>
 
-      <GlassCard className="flex flex-col items-center gap-4 px-6 py-12">
-        <AgentBlob agent="aeon" state={state} splashKey={splash} size={220} material={material} />
+      <GlassCard className="flex flex-col items-center gap-14 px-6 py-14">
+        <AgentBlob agent="aeon" state={state} splashKey={splash} size={220} material={material} eyes={eyes} />
         <p className="text-small text-[var(--fg-muted)]" aria-live="polite">
           Aeon, {state === "work" ? "working" : "resting"}
         </p>
+      </GlassCard>
+
+      <GlassCard className="p-6">
+        <h2 className="label-caps">Side by side</h2>
+        <ul className="mt-6 grid grid-cols-2 gap-8">
+          {[false, true].map((withEyes) => (
+            <li key={String(withEyes)} className="flex flex-col items-center gap-12">
+              <AgentBlob agent="aeon" state={state} splashKey={splash} size={140} material={material} eyes={withEyes} />
+              <span className="text-small font-medium">{withEyes ? "With eyes" : "Without eyes"}</span>
+            </li>
+          ))}
+        </ul>
       </GlassCard>
 
       <GlassCard className="p-6">
@@ -74,7 +95,7 @@ export default function BlobLab() {
         <ul className="mt-6 grid grid-cols-2 gap-8 sm:grid-cols-4">
           {AGENTS.map((a) => (
             <li key={a} className="flex flex-col items-center gap-3">
-              <AgentBlob agent={a} state={state} splashKey={splash} size={104} material={material} />
+              <AgentBlob agent={a} state={state} splashKey={splash} size={104} material={material} eyes={eyes} />
               <span className="text-small font-medium">{AGENT_NAMES[a]}</span>
             </li>
           ))}
@@ -85,12 +106,16 @@ export default function BlobLab() {
         <h2 className="label-caps">Reduced motion and small sizes</h2>
         <p className="mt-2 text-small text-[var(--fg-muted)]">
           When someone turns on reduced motion, or the browser has no WebGL, each blob becomes this still orb. Sidebar and list
-          orbs always use it.
+          orbs always use it. With eyes on, they are open and still.
+        </p>
+        <p className="mt-2 text-small text-[var(--fg-muted)]">
+          Eyes are for Aeon where the clinician sees it. The public Front Desk and web chat never get them (HB 1806). Helpers
+          show them here only so you can compare.
         </p>
         <ul className="mt-6 flex flex-wrap gap-8">
           {AGENTS.map((a) => (
             <li key={a} className="flex flex-col items-center gap-3">
-              <AgentBlob agent={a} still size={56} />
+              <AgentBlob agent={a} still size={56} eyes={eyes} />
               <span className="text-small font-medium">{AGENT_NAMES[a]}</span>
             </li>
           ))}
