@@ -117,6 +117,10 @@ export const PAIRS: Pair[] = [
     { fg: "--focus-ring", on: s.on, min: AA_NON_TEXT, label: `focus ring on ${s.name}` },
   ]),
   { fg: "--primary-fg", on: ["--bg", "--primary-bg"], min: AA_TEXT, label: "primary button label" },
+  { fg: "--fg", on: ["--bg", "--glass", "--tile-bg"], min: AA_TEXT, label: "text on a raised card" },
+  { fg: "--fg-muted", on: ["--bg", "--glass", "--tile-bg"], min: AA_TEXT, label: "muted text on a raised card" },
+  { fg: "--danger-fg", on: ["--bg", "--glass", "--tile-bg"], min: AA_TEXT, label: "error text on a raised card" },
+  { fg: "--fg-muted", on: ["--bg", "--toast-bg"], min: AA_TEXT, label: "toast description" },
   { fg: "--primary-bg", on: ["--bg", "--glass"], min: AA_NON_TEXT, label: "checked box on glass card" },
   ...["lilac", "blue", "pink", "green"].map((tone) => ({
     fg: `--avatar-${tone}-fg`,
