@@ -9,6 +9,7 @@ What she gets: the Practice-OS web app at http://localhost:3000, and Aeon's tool
 1. Check Node is 20 or newer: `node --version`. If it's older or missing, help her install Node 20+ from nodejs.org.
 2. Clone the repo and install: `git clone https://github.com/itennell/Practice-OS && cd Practice-OS && npm install`.
 3. Copy the settings template: `cp .env.example .env`. You fill in `.env` from her answers; each line in `.env.example` says where the value comes from.
+4. Download Aeon's privacy checker: `npm run models:download` (about 108 MB, once; a few minutes on a slow connection). It is a small name-finder that runs on her computer and stops client names from reaching Aeon's model or the database. Tell her: "I'm downloading the privacy checker that keeps client names out of Aeon's chat. It stays on your computer." Chat refuses messages until it is in place.
 
 ## 2. Accounts (ask for these one at a time)
 

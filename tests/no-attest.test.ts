@@ -5,18 +5,25 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { APPROVAL_KINDS } from "../lib/approval-kinds";
+import { TOOLS } from "../lib/aeon/tools";
 import { editableField, executors } from "../lib/executors";
 
 const FORBIDDEN = /attest|submit|(^|_)e?_?sign(_|$)|signature|certif/i;
 
+// Every MCP and chat tool comes from one list, lib/aeon/tools.ts.
 const server = readFileSync(new URL("../mcp/server.ts", import.meta.url), "utf8");
-const mcpTools = [...server.matchAll(/registerTool\(\s*"([^"]+)"/g)].map((m) => m[1]);
+const mcpTools = TOOLS.map((t) => t.name);
 
 describe("nothing can attest, sign or submit", () => {
-  it("finds the MCP tools (guards against the regex silently matching nothing)", () => {
+  it("finds the MCP tools (guards against the list silently being empty)", () => {
     expect(mcpTools).toEqual(
-      expect.arrayContaining(["status", "queue_approval", "morning_brief", "research_state_rules", "recheck_rules", "update_facts", "answer_setup", "log_event"]),
+      expect.arrayContaining(["status", "queue_approval", "morning_brief", "research_state_rules", "recheck_rules", "update_facts", "answer_setup", "log_event", "remember", "forget"]),
     );
+  });
+
+  it("the MCP server registers no tool outside that list", () => {
+    expect(server).not.toMatch(/registerTool\(\s*["'`]/);
+    expect(server).toMatch(/for \(const tool of TOOLS\)/);
   });
 
   it.each(mcpTools)("MCP tool %s", (name) => expect(name).not.toMatch(FORBIDDEN));
