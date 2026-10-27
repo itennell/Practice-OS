@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import https from "node:https";
 import path from "node:path";
 import { rootCertificates } from "node:tls";
+import { fileURLToPath } from "node:url";
 
 // Reads an official page ourselves to confirm a quoted rule is really on it,
 // with no third-party scraper. Read-only, public pages, no credentials sent.
@@ -10,8 +11,28 @@ import { rootCertificates } from "node:tls";
 // sends only its leaf certificate). The chain must still reach a trusted root;
 // nothing here turns certificate checks off.
 
-const EXTRA_INTERMEDIATES = [readFileSync(path.join(process.cwd(), "lib", "certs", "sectigo-ov-r40.pem"), "utf8")];
-const agent = new https.Agent({ ca: [...rootCertificates, ...EXTRA_INTERMEDIATES], keepAlive: false });
+// Found next to this file, so it works whatever folder the app or the MCP server starts in
+// (MCP clients launch the server from anywhere); the repo root is the fallback for bundlers.
+function loadIntermediates(): string[] {
+  const candidates = [
+    path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "certs", "sectigo-ov-r40.pem"),
+    path.join(process.cwd(), "lib", "certs", "sectigo-ov-r40.pem"),
+  ];
+  for (const file of candidates) {
+    try {
+      return [readFileSync(file, "utf8")];
+    } catch {
+      // try the next place
+    }
+  }
+  return []; // ilga.gov pages then read as unreadable, never as wrong
+}
+
+let agent: https.Agent | null = null;
+function trustAgent(): https.Agent {
+  agent ??= new https.Agent({ ca: [...rootCertificates, ...loadIntermediates()], keepAlive: false });
+  return agent;
+}
 
 const MAX_BYTES = 3_000_000;
 const TIMEOUT_MS = 20_000;
@@ -62,7 +83,7 @@ function get(url: string, redirectsLeft: number): Promise<PageRead> {
 
     const req = https.get(
       parsed,
-      { agent, timeout: TIMEOUT_MS, headers: { "User-Agent": "Practice-OS rule check (+https://github.com/itennell/Practice-OS)", Accept: "text/html" } },
+      { agent: trustAgent(), timeout: TIMEOUT_MS, headers: { "User-Agent": "Practice-OS rule check (+https://github.com/itennell/Practice-OS)", Accept: "text/html" } },
       (res) => {
         const status = res.statusCode ?? 0;
         if (status >= 300 && status < 400 && res.headers.location && redirectsLeft > 0) {

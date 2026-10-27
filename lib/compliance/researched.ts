@@ -127,11 +127,14 @@ export async function saveStateRules(approvalId: string, payload: StateRulesPayl
 /** Saved researched rules, ready to join the shipped ones in the calendar. */
 export async function loadSavedRules(sql: postgres.Sql = db()): Promise<Rule[]> {
   const rows = await sql`
-    select rule, verified_by, evidence_level from practice_os.compliance_rules where status <> 'retired' order by id`;
+    select rule, verified_by, evidence_level, status from practice_os.compliance_rules where status <> 'retired' order by id`;
   return rows.map((r) => {
     const rule = ruleSchema.parse(r.rule);
     rule.verified_by = r.verified_by;
     rule.source.evidence = r.evidence_level;
+    if (r.status === "needs_recheck") {
+      rule.caveat = "At its last re-check, Aeon couldn't find this rule's quote on its source page. Check it with your board before relying on it.";
+    }
     return rule;
   });
 }

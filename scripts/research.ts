@@ -14,23 +14,7 @@ const { readGrounded } = await import("../lib/meta");
 const { readFile } = await import("node:fs/promises");
 const { todayIn } = await import("../lib/compliance/dates");
 const { closeDb } = await import("../lib/db");
-
-const STATES: Record<string, string> = {
-  AL: "Alabama", AK: "Alaska", AZ: "Arizona", AR: "Arkansas", CA: "California", CO: "Colorado", CT: "Connecticut",
-  DE: "Delaware", DC: "District of Columbia", FL: "Florida", GA: "Georgia", HI: "Hawaii", ID: "Idaho", IL: "Illinois",
-  IN: "Indiana", IA: "Iowa", KS: "Kansas", KY: "Kentucky", LA: "Louisiana", ME: "Maine", MD: "Maryland",
-  MA: "Massachusetts", MI: "Michigan", MN: "Minnesota", MS: "Mississippi", MO: "Missouri", MT: "Montana",
-  NE: "Nebraska", NV: "Nevada", NH: "New Hampshire", NJ: "New Jersey", NM: "New Mexico", NY: "New York",
-  NC: "North Carolina", ND: "North Dakota", OH: "Ohio", OK: "Oklahoma", OR: "Oregon", PA: "Pennsylvania",
-  RI: "Rhode Island", SC: "South Carolina", SD: "South Dakota", TN: "Tennessee", TX: "Texas", UT: "Utah",
-  VT: "Vermont", VA: "Virginia", WA: "Washington", WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming",
-};
-const LABEL: Record<Credential, string> = {
-  LCSW: "LCSW (licensed clinical social worker)",
-  LCPC: "licensed professional counselor (LPC/LCPC/LPCC)",
-  LMFT: "LMFT (licensed marriage and family therapist)",
-  Psychologist: "licensed clinical psychologist",
-};
+const { CREDENTIAL_LABEL: LABEL, STATES } = await import("../lib/compliance/states");
 
 const args = process.argv.slice(2);
 const save = args.includes("--save");
