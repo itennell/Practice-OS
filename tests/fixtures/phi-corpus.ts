@@ -140,5 +140,7 @@ export const PHI_CASES: PhiCase[] = [
   { text: "The insurance panel opens in January", expect: "pass" },
   { text: "I want to add couples therapy at $200", expect: "pass" },
   { text: "Group sessions run Thursday evenings", expect: "pass" },
+  { text: "[Sample] Does not take Medicaid", expect: "pass", note: "demo label" },
+  { text: "[Sample] Prefers Tuesday consults", expect: "pass", note: "demo label" },
   { text: "My anxiety about taxes is real, what's due?", expect: "pass", note: "her own feeling, no person ref" },
 ];

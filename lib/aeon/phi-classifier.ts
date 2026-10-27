@@ -76,13 +76,22 @@ function slices(text: string): string[] {
   return out;
 }
 
-/** Every person's name the model finds, as written. */
+const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Every person's name the model finds, as written in the text. A name must start
+ * at the start of a word, and is stretched to the end of its last word (the model
+ * sometimes returns "Okaf" for "Okafor"). The demo label "[Sample]" is blanked
+ * first so its "Sam" isn't read as a name.
+ */
 export async function findNames(text: string): Promise<string[]> {
   const ner = await loadNameFinder();
   const names: string[] = [];
-  for (const slice of slices(text)) {
+  for (const slice of slices(text.replace(/\[Sample\]/g, "        "))) {
     for (const e of mergeEntities(await ner(slice))) {
-      if (e.label === "PER" && e.score >= MIN_SCORE && e.text.length > 1) names.push(e.text);
+      if (e.label !== "PER" || e.score < MIN_SCORE || e.text.length < 2) continue;
+      const found = new RegExp(`(?<![\\p{L}\\p{N}])${escape(e.text)}[\\p{L}'’-]*`, "u").exec(slice);
+      if (found) names.push(found[0]);
     }
   }
   return names;

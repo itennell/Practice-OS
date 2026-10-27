@@ -61,3 +61,6 @@ test/
 
 # Local model cache (the name-finder for the sensitive-info guard)
 /.cache/
+
+# Aeon's memory, rendered from practice_os.memories
+aeon/MEMORY.md
