@@ -1,9 +1,9 @@
 // The built-in database (lib/local-db.ts) and its backups, each test in its own
 // throwaway data folder. Needs the Postgres build for this computer, which
 // `npm install` brings in through embedded-postgres.
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import postgres from "postgres";
@@ -119,6 +119,19 @@ describe("built-in database", () => {
     expect(manifest.migrations).toEqual(files.slice(0, -1));
     expect(await auditCount(url)).toBe(1);
     expect(await migrateWithBackup(url, dir)).toBeNull(); // nothing pending, no backup
+  });
+
+  it("npm run db:migrate backs up the built-in database first", async () => {
+    const dir = await freshDir();
+    const url = await startLocalDatabase(dir);
+    const files = await migrationFiles();
+    await runMigrations(url, { upTo: files[files.length - 2] });
+    await query(url, (sql) => sql`insert into practice_os.audit_log (actor, action) values ('system', 'before-upgrade')`);
+
+    // DATABASE_URL set but empty, so a .env file can't fill it in and point the script at a shared database.
+    execFileSync("npx", ["tsx", "scripts/migrate.ts"], { env: { ...process.env, DATABASE_URL: "", PRACTICE_OS_DATA_DIR: dir }, stdio: "ignore" });
+    expect(await readdir(path.join(dir, "backups"))).toHaveLength(1);
+    expect(await auditCount(url)).toBe(1);
   });
 
   it("restores a backup into a new database (a new computer) with every row", async () => {

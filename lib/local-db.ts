@@ -242,7 +242,7 @@ async function hasPracticeData(url: string): Promise<boolean> {
  * a migration is pending, it backs up first (into <dir>/backups, newest 14 kept).
  * Returns the backup folder, or null when none was needed.
  */
-export async function migrateWithBackup(url: string, dir: string = dataDir()): Promise<string | null> {
+export async function migrateWithBackup(url: string, dir: string = dataDir(), log?: (line: string) => void): Promise<string | null> {
   const pending = await pendingMigrations(url);
   if (pending.length === 0) return null;
   let backup: string | null = null;
@@ -253,7 +253,7 @@ export async function migrateWithBackup(url: string, dir: string = dataDir()): P
     await backupDatabase(url, backup, "before migrations");
     await pruneBackups(root, BACKUPS_KEPT);
   }
-  await runMigrations(url);
+  await runMigrations(url, { log });
   return backup;
 }
 
