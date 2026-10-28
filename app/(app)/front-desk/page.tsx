@@ -28,9 +28,7 @@ const when = (iso: string) =>
   new Date(iso).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 const who = (s: string) => (s.startsWith("+1") ? prettyPhone(s) : s);
 
-export default async function FrontDeskPage({ searchParams }: PageProps<"/front-desk">) {
-  const q = (await searchParams).filter;
-  const filter: Filter = (FILTERS as readonly string[]).includes(String(q)) ? (q as Filter) : "all";
+export default function FrontDeskPage({ searchParams }: PageProps<"/front-desk">) {
   return (
     <>
       <header className="flex flex-wrap items-start justify-between gap-4">
@@ -46,14 +44,16 @@ export default async function FrontDeskPage({ searchParams }: PageProps<"/front-
         <CheckNow />
       </header>
       <Suspense fallback={<p className="text-[var(--fg-muted)]">Loading Front Desk…</p>}>
-        <FrontDesk filter={filter} />
+        <FrontDesk searchParams={searchParams} />
       </Suspense>
     </>
   );
 }
 
-async function FrontDesk({ filter }: { filter: Filter }) {
+async function FrontDesk({ searchParams }: { searchParams: PageProps<"/front-desk">["searchParams"] }) {
   await connection(); // read the database per request, never at build time
+  const q = (await searchParams).filter;
+  const filter: Filter = (FILTERS as readonly string[]).includes(String(q)) ? (q as Filter) : "all";
   const [view, phone, calendar, settings] = await Promise.all([frontDeskView(filter), phoneStatus(), calendarStatus(), loadApprovalSettings()]);
   const calcom = calendar.provider === "calcom" && calendar.connected;
   return (

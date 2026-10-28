@@ -79,7 +79,7 @@ export function PhoneCard({ initial }: { initial: PhoneCardStatus }) {
             </p>
           )}
           {status.devLine ? (
-            <p className="text-small text-[var(--fg-muted)]">This is the developer test line from .env, not a clinician's account.</p>
+            <p className="text-small text-[var(--fg-muted)]">This is the developer test line from .env, not a clinician&apos;s account.</p>
           ) : (
             <ConfirmDialog
               trigger={<Button variant="quiet" className="self-start">Disconnect</Button>}
