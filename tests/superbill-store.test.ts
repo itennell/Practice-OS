@@ -1,5 +1,5 @@
 // Saved superbills against the live database. Runs only when DATABASE_URL is
-// set and migration 010 has run; every superbill made here is deleted after.
+// set and migration 011 has run; every superbill made here is deleted after.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadEnv } from "../lib/env";
 
@@ -18,7 +18,7 @@ beforeAll(async () => {
   if (!hasDb) return;
   const [r] = await db()`select to_regclass('practice_os.superbills') is not null as ok`;
   ready = Boolean(r?.ok);
-  if (!ready) console.warn("[superbill-store] migration 010 hasn't run yet; skipping database checks.");
+  if (!ready) console.warn("[superbill-store] migration 011 hasn't run yet; skipping database checks.");
 });
 
 afterAll(async () => {

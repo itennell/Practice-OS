@@ -1,4 +1,4 @@
--- 010: superbills she gives a self-pay or out-of-network client, saved by reference.
+-- 011: superbills she gives a self-pay or out-of-network client, saved by reference.
 --
 -- A row holds only the practice side of a superbill: dates of service, CPT codes,
 -- modifiers, units, fees, place of service, diagnosis POINTER letters (A-D) and
