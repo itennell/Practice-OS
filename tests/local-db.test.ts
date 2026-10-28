@@ -2,6 +2,7 @@
 // throwaway data folder. Needs the Postgres build for this computer, which
 // `npm install` brings in through embedded-postgres.
 import { execFileSync, spawnSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -9,7 +10,7 @@ import path from "node:path";
 import postgres from "postgres";
 import { afterAll, describe, expect, it, vi } from "vitest";
 import { backupDatabase, restoreDatabase } from "../lib/local-backup";
-import { ensureLocalSecrets, migrateWithBackup, startLocalDatabase, stopLocalDatabase } from "../lib/local-db";
+import { backupKey, ensureLocalSecrets, migrateWithBackup, startLocalDatabase, stopLocalDatabase } from "../lib/local-db";
 import { migrationFiles, runMigrations } from "../lib/migrations";
 
 vi.setConfig({ testTimeout: 120_000 });
@@ -22,11 +23,13 @@ async function freshDir(): Promise<string> {
 }
 
 afterAll(async () => {
-  for (const dir of dirs) {
-    await stopLocalDatabase(dir).catch(() => {});
-    await rm(dir, { recursive: true, force: true });
-  }
-});
+  await Promise.all(
+    dirs.map(async (dir) => {
+      await stopLocalDatabase(dir).catch(() => {});
+      await rm(dir, { recursive: true, force: true });
+    }),
+  );
+}, 120_000);
 
 async function query<T>(url: string, run: (sql: postgres.Sql) => Promise<T>): Promise<T> {
   const sql = postgres(url, { max: 1, onnotice: () => {} });
@@ -124,6 +127,12 @@ describe("built-in database", () => {
       delete process.env.CONNECTIONS_ENCRYPTION_KEY;
       await ensureLocalSecrets(dir);
       expect(process.env.CONNECTIONS_ENCRYPTION_KEY).toBe(first);
+
+      // A separate key for backups, kept the same way.
+      const backup = await backupKey(dir);
+      expect(backup).toHaveLength(32);
+      expect(backup.equals(Buffer.from(first, "base64"))).toBe(false);
+      expect((await backupKey(dir)).equals(backup)).toBe(true);
     } finally {
       if (saved) process.env.CONNECTIONS_ENCRYPTION_KEY = saved;
       else delete process.env.CONNECTIONS_ENCRYPTION_KEY;
@@ -143,6 +152,12 @@ describe("built-in database", () => {
     expect(manifest.migrations).toEqual(files.slice(0, -1));
     expect(await auditCount(url)).toBe(1);
     expect(await migrateWithBackup(url, dir)).toBeNull(); // nothing pending, no backup
+
+    // The backup opens with this data folder's backup key.
+    const target = await startLocalDatabase(await freshDir());
+    await runMigrations(target, { upTo: files[files.length - 2] });
+    await restoreDatabase(target, backup!, await backupKey(dir));
+    expect(await auditCount(target)).toBe(1);
   });
 
   it("npm run db:migrate backs up the built-in database first", async () => {
@@ -162,14 +177,27 @@ describe("built-in database", () => {
     const source = await startLocalDatabase(await freshDir());
     await runMigrations(source);
     await query(source, async (sql) => {
-      for (let i = 0; i < 50; i++) await sql`insert into practice_os.audit_log (actor, action, details) values ('system', 'drill', ${sql.json({ i })})`;
+      for (let i = 0; i < 50; i++) {
+        await sql`insert into practice_os.audit_log (actor, action, details) values ('system', 'drill', ${sql.json({ note: "drill-row", i })})`;
+      }
     });
     const backupDir = path.join(await freshDir(), "backup");
-    const made = await backupDatabase(source, backupDir, "drill");
+    const key = randomBytes(32);
+    const made = await backupDatabase(source, backupDir, "drill", key);
+
+    // Every table file is encrypted; the manifest holds counts, not rows.
+    for (const name of await readdir(backupDir)) {
+      const text = (await readFile(path.join(backupDir, name))).toString("latin1");
+      expect(text, name).not.toContain("drill-row");
+      if (name !== "manifest.json") expect(name).toMatch(/\.copy\.enc$/);
+    }
 
     const target = await startLocalDatabase(await freshDir());
     await runMigrations(target);
-    const restored = await restoreDatabase(target, backupDir);
+    // The wrong key, or a damaged file, is refused and leaves the database empty.
+    await expect(restoreDatabase(target, backupDir, randomBytes(32))).rejects.toThrow(/can't be opened with this key/);
+    expect(await auditCount(target)).toBe(0);
+    const restored = await restoreDatabase(target, backupDir, key);
     expect(restored.rows).toEqual(made.rows);
     expect(await auditCount(target)).toBe(50);
 
@@ -179,7 +207,7 @@ describe("built-in database", () => {
     expect(Number(id)).toBeGreaterThan(max);
 
     // A second restore on top of real data is refused.
-    await expect(restoreDatabase(target, backupDir)).rejects.toThrow(/empty/);
+    await expect(restoreDatabase(target, backupDir, key)).rejects.toThrow(/empty/);
   });
 
   it.skipIf(process.platform === "win32")("waits for its own slow Postgres instead of moving the port", async () => {

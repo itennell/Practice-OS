@@ -17,8 +17,8 @@ import { pendingMigrations, runMigrations } from "./migrations";
 // Layout of the data folder (PRACTICE_OS_DATA_DIR, default ./.data):
 //   postgres/        the database files
 //   local-db.json    port, user and a random password (owner-only file)
-//   secrets.json     the generated CONNECTIONS_ENCRYPTION_KEY (owner-only file)
-//   backups/         copies taken before every migration
+//   secrets.json     the generated CONNECTIONS_ENCRYPTION_KEY and BACKUP_ENCRYPTION_KEY (owner-only file)
+//   backups/         encrypted copies taken before every migration
 //   postgres.log
 //
 // Postgres runs as its own process (pg_ctl), so `next dev`, the MCP server and
@@ -221,19 +221,42 @@ export async function stopLocalDatabase(dir: string = dataDir()): Promise<void> 
   await run(binary("pg_ctl"), ["stop", "-w", "-m", "fast", "-D", pgdata]);
 }
 
-/** Generates CONNECTIONS_ENCRYPTION_KEY once for this data folder when .env doesn't set one. */
-export async function ensureLocalSecrets(dir: string = dataDir()): Promise<void> {
-  if (process.env.CONNECTIONS_ENCRYPTION_KEY) return;
+type Secrets = { CONNECTIONS_ENCRYPTION_KEY?: string; BACKUP_ENCRYPTION_KEY?: string };
+
+/** Reads secrets.json, generating any key it doesn't have yet (one writer at a time, never a half-written file). */
+async function localSecrets(dir: string): Promise<Required<Secrets>> {
   const file = path.join(dir, "secrets.json");
-  let secrets = await readJson<{ CONNECTIONS_ENCRYPTION_KEY: string }>(file);
-  if (!secrets) {
-    secrets = { CONNECTIONS_ENCRYPTION_KEY: randomBytes(32).toString("base64") };
-    await writeFile(file, JSON.stringify(secrets, null, 2), { mode: 0o600, flag: "wx" }).catch(async (err) => {
-      if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
-      secrets = await readJson(file); // another process wrote it first
-    });
-  }
-  process.env.CONNECTIONS_ENCRYPTION_KEY = secrets!.CONNECTIONS_ENCRYPTION_KEY;
+  const complete = (s: Secrets | null): s is Required<Secrets> => !!s?.CONNECTIONS_ENCRYPTION_KEY && !!s.BACKUP_ENCRYPTION_KEY;
+  const found = await readJson<Secrets>(file);
+  if (complete(found)) return found;
+  return withLock(path.join(dir, "secrets.lock"), async () => {
+    const secrets = await readJson<Secrets>(file);
+    if (complete(secrets)) return secrets; // another process wrote it first
+    // Overwriting a file we can't read would lose its keys for good.
+    if (!secrets && existsSync(file)) throw new Error(`${file} can't be read. Fix or restore it; it holds this practice's encryption keys.`);
+    const next = {
+      CONNECTIONS_ENCRYPTION_KEY: secrets?.CONNECTIONS_ENCRYPTION_KEY || randomBytes(32).toString("base64"),
+      BACKUP_ENCRYPTION_KEY: secrets?.BACKUP_ENCRYPTION_KEY || randomBytes(32).toString("base64"),
+    };
+    await writeFile(`${file}.tmp`, JSON.stringify(next, null, 2), { mode: 0o600 });
+    await rename(`${file}.tmp`, file);
+    return next;
+  });
+}
+
+/**
+ * Generates this data folder's keys once: CONNECTIONS_ENCRYPTION_KEY (used when
+ * .env doesn't set one) and BACKUP_ENCRYPTION_KEY, which encrypts the backups.
+ * Both live in secrets.json for now; phase 2 moves them to the OS keychain.
+ */
+export async function ensureLocalSecrets(dir: string = dataDir()): Promise<void> {
+  const secrets = await localSecrets(dir);
+  process.env.CONNECTIONS_ENCRYPTION_KEY ||= secrets.CONNECTIONS_ENCRYPTION_KEY;
+}
+
+/** The key this data folder's backups are encrypted with. */
+export async function backupKey(dir: string = dataDir()): Promise<Buffer> {
+  return Buffer.from((await localSecrets(dir)).BACKUP_ENCRYPTION_KEY, "base64");
 }
 
 async function hasPracticeData(url: string): Promise<boolean> {
@@ -259,7 +282,7 @@ export async function migrateWithBackup(url: string, dir: string = dataDir(), lo
     const root = path.join(dir, "backups");
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
     backup = path.join(root, `${stamp}-before-${pending[0].replace(/\.sql$/, "")}`);
-    await backupDatabase(url, backup, "before migrations");
+    await backupDatabase(url, backup, "before migrations", await backupKey(dir));
     await pruneBackups(root, BACKUPS_KEPT);
   }
   await runMigrations(url, { log });
