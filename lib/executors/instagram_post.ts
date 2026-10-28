@@ -26,10 +26,12 @@ type PostRow = {
 export const instagramPost: Executor = async (approval, { dryRun }) => {
   const postId = (approval.payload as { post_id?: unknown }).post_id;
   if (typeof postId !== "string") throw new Error("This approval has no post.");
+  // Claims the post for this approval (it may run before saveDraft fills approval_id).
   const [post] = await db()<PostRow[]>`
-    select id, caption, alt_text, image_jpeg, status, approval_id, ig_container_id, ig_media_id, ig_permalink
-    from practice_os.posts where id = ${postId}`;
-  if (!post || post.approval_id !== approval.id) throw new Error("That post no longer matches this approval.");
+    update practice_os.posts set approval_id = ${approval.id}
+     where id = ${postId} and (approval_id is null or approval_id = ${approval.id})
+    returning id, caption, alt_text, image_jpeg, status, approval_id, ig_container_id, ig_media_id, ig_permalink`;
+  if (!post) throw new Error("That post no longer matches this approval.");
   if (post.status === "blocked") throw new Error("The safety check blocked this post, so it cannot be published.");
   if (!post.image_jpeg || !post.alt_text) throw new Error("This post has no finished image yet.");
 

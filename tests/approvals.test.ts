@@ -51,10 +51,10 @@ describe.skipIf(!hasDb)("approve flow", () => {
   });
 
   it("fails a kind with no executor yet", async () => {
-    const id = await makeApproval("instagram_post", {});
+    const id = await makeApproval("web_chat_reply", {});
     const res = await approve(id, { by: "test" });
     expect(res.ok && res.approval.status).toBe("failed");
-    expect(res.ok && res.approval.error).toBe("No executor for instagram_post yet.");
+    expect(res.ok && res.approval.error).toBe("No executor for web_chat_reply yet.");
   });
 
   it("edit then approve runs the edited text and logs before and after", async () => {

@@ -107,7 +107,7 @@ describe("publishing", async () => {
   const input = { jpeg, caption: "How to book a first session. Dana Reyes, LCPC (fictional demo practice)", altText: "Dana smiling in her office", aiGenerated: true };
 
   it("hosts the JPEG, makes a container, waits, publishes and reads the link", async () => {
-    const { d, calls, saved, relay } = await deps([
+    const { d, calls, saved } = await deps([
       [200, fx("publishing_limit")],
       [200, fx("container_create")],
       [200, fx("container_in_progress")],
