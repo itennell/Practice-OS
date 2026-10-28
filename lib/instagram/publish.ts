@@ -1,5 +1,5 @@
 import { captionProblems, InstagramApiError, LIMITS, type ContainerStatus, type InstagramGraph } from "./graph";
-import { checkInstagramJpeg } from "./image";
+import { checkInstagramJpeg, toInstagramJpeg } from "./image";
 import type { HostedImage } from "./relay";
 
 // Publishing one image post: host the JPEG on the relay for an hour, make a
@@ -58,28 +58,39 @@ export async function publishImagePost(input: PublishInput, prior: PublishProgre
     }
   }
   const resumed = progress.containerId !== null;
+
+  // The picture is public on the relay only until Meta has fetched it: it comes
+  // off as soon as the container is FINISHED, and on every way out that fails.
+  // (A resumed run never re-uploads; the relay deletes any leftover within the hour.)
   let hostedUrl: string | null = null;
+  const takeDown = async () => {
+    if (!hostedUrl) return;
+    const url = hostedUrl;
+    hostedUrl = null;
+    await deps.deleteImage(url).catch(() => undefined);
+  };
 
-  if (!progress.containerId) {
-    const problems = await publishProblems(input);
-    if (problems.length) throw new Error(problems.join(" "));
-    const quota = await deps.graph.publishingLimit(deps.igUserId);
-    if (quota.used >= quota.total) {
-      throw new Error(`Instagram's limit of ${quota.total} posts a day is used up. Try again tomorrow.`);
+  try {
+    if (!progress.containerId) {
+      const problems = await publishProblems(input);
+      if (problems.length) throw new Error(problems.join(" "));
+      const quota = await deps.graph.publishingLimit(deps.igUserId);
+      if (quota.used >= quota.total) {
+        throw new Error(`Instagram's limit of ${quota.total} posts a day is used up. Try again tomorrow.`);
+      }
+      // Re-encode right before upload, so the relay only ever gets a fresh sharp JPEG with no metadata.
+      const image = await deps.uploadImage(await toInstagramJpeg(input.jpeg));
+      hostedUrl = image.url;
+      const container = await deps.graph.createImageContainer(deps.igUserId, {
+        imageUrl: image.url,
+        caption: input.caption,
+        altText: input.altText,
+        aiGenerated: input.aiGenerated,
+      });
+      progress.containerId = container.id;
+      await deps.save(progress);
     }
-    const image = await deps.uploadImage(input.jpeg);
-    hostedUrl = image.url;
-    const container = await deps.graph.createImageContainer(deps.igUserId, {
-      imageUrl: image.url,
-      caption: input.caption,
-      altText: input.altText,
-      aiGenerated: input.aiGenerated,
-    });
-    progress.containerId = container.id;
-    await deps.save(progress);
-  }
 
-  {
     // First look after 2 s (images are usually ready), then back off to Meta's once a minute.
     let delay = 2_000;
     let waited = 0;
@@ -94,22 +105,22 @@ export async function publishImagePost(input: PublishInput, prior: PublishProgre
       if (status === "EXPIRED") throw new Error("The prepared post expired before it was published. Try again.");
       if (status === "PUBLISHED") break;
     }
+  } finally {
+    await takeDown();
+  }
 
-    // Meta has fetched the picture; take it off the relay now (best effort: it expires within the hour anyway).
-    if (hostedUrl) await deps.deleteImage(hostedUrl).catch(() => undefined);
-    if (status !== "PUBLISHED") {
-      const media = await deps.graph.publish(deps.igUserId, progress.containerId!);
-      progress.mediaId = media.id;
+  if (status !== "PUBLISHED") {
+    const media = await deps.graph.publish(deps.igUserId, progress.containerId!);
+    progress.mediaId = media.id;
+    await deps.save(progress);
+  }
+  if (progress.mediaId) {
+    try {
+      progress.permalink = (await deps.graph.permalink(progress.mediaId)).permalink;
       await deps.save(progress);
-    }
-    if (progress.mediaId) {
-      try {
-        progress.permalink = (await deps.graph.permalink(progress.mediaId)).permalink;
-        await deps.save(progress);
-      } catch (err) {
-        // The post is live; a missing link is not a failure.
-        if (err instanceof InstagramApiError && err.tokenInvalid) throw err;
-      }
+    } catch (err) {
+      // The post is live; a missing link is not a failure.
+      if (err instanceof InstagramApiError && err.tokenInvalid) throw err;
     }
   }
   return { ...progress, resumed, checks };

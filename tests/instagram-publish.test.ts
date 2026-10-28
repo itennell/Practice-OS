@@ -156,6 +156,55 @@ describe("publishing", async () => {
     await expect(publishImagePost(input, fresh, d)).rejects.toThrow(/more than 5 minutes/);
   });
 
+  it("uploads a freshly re-encoded JPEG, with no metadata", async () => {
+    const { d, relay } = await deps([
+      [200, fx("publishing_limit")],
+      [200, fx("container_create")],
+      [200, fx("container_finished")],
+      [200, fx("media_publish")],
+      [200, fx("permalink")],
+    ]);
+    const tagged = await sharp(input.jpeg).withMetadata({ exif: { IFD0: { Copyright: "x" } } }).jpeg().toBuffer();
+    await publishImagePost({ ...input, jpeg: tagged }, fresh, d);
+    const sent = (relay.uploadJpeg.mock.calls as unknown as Buffer[][])[0][0];
+    const meta = await sharp(sent).metadata();
+    expect(meta).toMatchObject({ format: "jpeg", width: 1080, height: 1350, space: "srgb" });
+    expect(meta.exif).toBeUndefined();
+  });
+
+  it("takes the picture off the relay right after FINISHED, before publishing", async () => {
+    const { d, calls, relay } = await deps([
+      [200, fx("publishing_limit")],
+      [200, fx("container_create")],
+      [200, fx("container_finished")],
+      [200, fx("media_publish")],
+      [200, fx("permalink")],
+    ]);
+    const order: string[] = [];
+    relay.deleteImage.mockImplementation(async () => void order.push(`delete after ${calls.length} calls`));
+    await publishImagePost(input, fresh, d);
+    // calls: limit, create, status FINISHED → delete → publish, permalink
+    expect(order).toEqual(["delete after 3 calls"]);
+    expect(relay.deleteImage).toHaveBeenCalledTimes(1);
+  });
+
+  for (const [label, replies, error] of [
+    ["the container fails", [[200, fx("container_error")]], /could not use the image/],
+    ["the container expires", [[200, { status_code: "EXPIRED", id: "c" }]], /expired/],
+    ["Instagram refuses the container", null, /failed \(HTTP 400\)/],
+    ["Instagram takes too long", Array.from({ length: 20 }, () => [200, fx("container_in_progress")]), /more than 5 minutes/],
+  ] as const) {
+    it(`still takes the picture off the relay when ${label}`, async () => {
+      const { d, relay } = await deps([
+        [200, fx("publishing_limit")],
+        ...(replies ? [[200, fx("container_create")] as [number, unknown], ...(replies as [number, unknown][])] : [[400, fx("error_token_expired")] as [number, unknown]]),
+      ]);
+      await expect(publishImagePost(input, fresh, d)).rejects.toThrow(error);
+      expect(relay.deleteImage).toHaveBeenCalledWith("https://relay.example/m/img1.jpg");
+      expect(relay.deleteImage).toHaveBeenCalledTimes(1);
+    });
+  }
+
   it("checks the caption and image before anything leaves the computer", async () => {
     const { d, calls } = await deps([]);
     await expect(publishImagePost({ ...input, caption: "x".repeat(2300) }, fresh, d)).rejects.toThrow(/2,?200/);
