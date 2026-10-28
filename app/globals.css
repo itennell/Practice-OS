@@ -407,3 +407,8 @@ textarea {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* "Larger text" (onboarding, Session A): every size is in rem, so this scales the whole app. */
+:root[data-text-size="large"] {
+  font-size: 125%;
+}

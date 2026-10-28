@@ -1,0 +1,185 @@
+import AxeBuilder from "@axe-core/playwright";
+import { expect, test, type Page } from "@playwright/test";
+import { execSync } from "node:child_process";
+import { pick, typeDate } from "../helpers/controls";
+
+// Aeon's onboarding interview on a fresh install: every screen checked with axe, a full
+// run as a new clinician (answers, Skip and Set up later), the crisis reply, resuming,
+// and the 200% / 320px reflow checks. No model call: without a Muse key the follow-up
+// questions are the three fixed ones.
+
+const FRESH = ["clinician_profile", "compliance_facts", "settings", "credentialing_profile", "payer_applications", "obligations", "memories"];
+
+function freshInstall() {
+  execSync("npm run db:reset", { stdio: "ignore" });
+  execSync(
+    `node -e "const p=require('postgres')(process.env.DATABASE_URL);p.unsafe('truncate ${FRESH.map((t) => `practice_os.${t}`).join(", ")} cascade').then(()=>process.exit(0))"`,
+    { stdio: "ignore" },
+  );
+}
+
+async function seriousViolations(page: Page) {
+  const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
+  return results.violations
+    .filter((v) => v.impact === "serious" || v.impact === "critical")
+    .map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`);
+}
+
+const heading = (page: Page) => page.getByRole("heading", { level: 1 });
+const next = (page: Page) => page.getByRole("button", { name: /^(Next|Finish setup)$/ });
+
+/** Answer the current screen with `fill`, check it with axe, then press Next (or Skip / Set up later). */
+async function step(page: Page, ask: RegExp, fill: () => Promise<void>, how: "next" | "skip" | "later" = "next") {
+  await expect(heading(page)).toHaveText(ask);
+  await fill();
+  expect(await seriousViolations(page), `axe on "${ask}"`).toEqual([]);
+  const button = how === "next" ? next(page) : page.getByRole("button", { name: how === "skip" ? "Skip" : "Set up later" });
+  await button.click();
+  await expect(heading(page)).not.toHaveText(ask);
+}
+
+const radio = (page: Page, name: string | RegExp) => page.getByRole("radio", { name }).click();
+const none = async () => {};
+
+
+
+test("A new clinician sets up the whole practice, and the home page lists what she put off", async ({ page }) => {
+  test.setTimeout(240_000);
+  freshInstall();
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/onboarding$/);
+  await expect(page.getByText("You and your practice · question 1 of 8")).toBeVisible();
+
+  await step(page, /What's your name\?/, () => page.getByLabel("Your name").fill("Dana Reyes"));
+  await step(page, /What's your practice called\?/, () => page.getByLabel("Practice name").fill("Reyes Counseling PLLC"));
+  await step(page, /Which state/, () => pick(page, page, "State", "Illinois"));
+  await step(page, /What kind of license/, () => radio(page, /LCPC/));
+  await step(page, /How do clients reach/, async () => {
+    await page.getByLabel("Practice email").fill("dana@example.com");
+    await page.getByLabel("Phone number clients call").fill("(312) 555-0100");
+  });
+  await step(page, /Where do you see clients\?/, () => radio(page, "Both"));
+  await step(page, /office address/, async () => {
+    await page.getByLabel("Street address").fill("100 W Example St");
+    await page.getByLabel("City").fill("Chicago");
+    await page.getByLabel("ZIP code").fill("60614");
+  });
+  await step(page, /your own cell phone/, () => page.getByLabel("Phone number").fill("312 555 0199"));
+
+  // 2 · License and rules
+  await expect(page.getByText(/License and rules · question 1 of/)).toBeVisible();
+  await step(page, /When does your LCPC license expire\?/, () => typeDate(page, "Date", "2027-11-30"));
+  await step(page, /first time renewing/, async () => {
+    await radio(page, "No");
+    await page.getByLabel(/Hours of continuing education/).fill("12");
+  });
+  await step(page, /26 or older/, () => radio(page, "Yes"));
+  await step(page, /NPI/, none, "later");
+  await step(page, /PLLC or LLC/, async () => {
+    await radio(page, "Yes");
+    await typeDate(page, "When was it formed?", "2026-01-15");
+  });
+  await step(page, /file taxes/, () => radio(page, /Just me/));
+  await step(page, /tax ID/, none, "later");
+  await step(page, /Does anyone work for you\?/, () => radio(page, "No"));
+  await step(page, /malpractice/, none, "skip");
+  await step(page, /Which of these do you already have\?/, async () => {
+    await page.getByRole("radiogroup").first().getByRole("radio", { name: "I have this" }).click();
+  });
+
+  // 3 · Fees, insurance and hours
+  await step(page, /Which days is your practice open\?/, none);
+  await step(page, /What do you charge/, () => page.getByLabel(/Fee for Session, 53 minutes or more/).fill("175"));
+  await step(page, /Do you take insurance\?/, () => radio(page, /clients pay me themselves/));
+  await step(page, /set up with Medicare/, () => radio(page, "No"));
+
+  // 4 · Who you help (the crisis check runs on what she types)
+  await expect(heading(page)).toHaveText(/Who do you help/);
+  await page.getByRole("button", { name: "Adults", exact: true, pressed: false }).click();
+  await page.getByLabel("In your own words (optional)").fill("I want to kill myself");
+  await next(page).click();
+  await expect(page.getByRole("alert").filter({ hasText: "988" })).toBeVisible();
+  await expect(heading(page)).toHaveText(/Who do you help/); // nothing saved, still here
+  await page.getByLabel("In your own words (optional)").fill("Adults with work stress");
+  await step(page, /Who do you help/, () => page.getByRole("button", { name: "Evenings", pressed: false }).click());
+
+  // Three fixed follow-up questions (no Muse key here), one per screen.
+  await step(page, /off your plate/, () => page.getByLabel("Your answer").fill("Insurance paperwork"));
+  await step(page, /find you now/, () => page.getByLabel("Your answer").fill("Word of mouth"));
+  await step(page, /never want consults booked/, () => page.getByLabel("Your answer").fill("Fridays"));
+
+  // 5 · Stage, 6 · Connect your tools, 7 · How Aeon asks
+  await step(page, /Where is your practice right now\?/, () => radio(page, /Beginning/));
+  await step(page, /Connect your tools/, none);
+  await step(page, /text clients/, () => radio(page, "Yes"));
+  await step(page, /How should I ask/, () => radio(page, /Ask me first/));
+  await step(page, /miss a call/, () => radio(page, "No"));
+
+  // 8 · Your team, then home.
+  await expect(heading(page)).toHaveText("Meet your team");
+  await expect(page.getByText(/You're just opening/)).toBeVisible();
+  expect(await seriousViolations(page)).toEqual([]);
+  await page.getByRole("button", { name: "Finish setup" }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("heading", { level: 1, name: /How can I help\?/ })).toBeVisible();
+
+  const todo = page.getByRole("region", { name: "Still to set up" });
+  await expect(todo).toContainText("What's your NPI number?");
+  await expect(todo).toContainText("What's your practice's tax ID (EIN)?");
+  await expect(todo).not.toContainText("malpractice"); // Skip means "not for me"; only Set up later, or a skip that a form needs, is listed
+  expect(await seriousViolations(page)).toEqual([]);
+
+  // "Answer" opens that one question again.
+  await todo.getByRole("link", { name: "Answer" }).first().click();
+  await expect(heading(page)).toHaveText("What's your NPI number?");
+});
+
+test("She can stop and pick up where she left off", async ({ page }) => {
+  freshInstall();
+  await page.goto("/onboarding");
+  await step(page, /What's your name\?/, () => page.getByLabel("Your name").fill("Dana Reyes"));
+  await step(page, /What's your practice called\?/, none, "skip");
+  await step(page, /Which state/, () => pick(page, page, "State", "Illinois"));
+  await step(page, /What kind of license/, () => radio(page, /LCPC/));
+  await page.reload();
+  await expect(heading(page)).toHaveText(/How do clients reach/);
+  await page.getByRole("button", { name: "Back" }).click();
+  await expect(page.getByRole("radio", { name: /LCPC/ })).toBeChecked();
+});
+
+test("Keyboard only: Next is reachable and works with Enter", async ({ page }) => {
+  freshInstall();
+  await page.goto("/onboarding");
+  await expect(heading(page)).toBeFocused(); // a screen reader starts on the question
+  await page.keyboard.press("Tab");
+  await page.keyboard.type("Dana Reyes");
+  for (let i = 0; i < 12 && !(await next(page).evaluate((el) => el === document.activeElement)); i++) await page.keyboard.press("Tab");
+  await expect(next(page)).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(heading(page)).toHaveText(/What's your practice called\?/);
+});
+
+test("Larger text at a narrow window: nothing scrolls sideways and axe stays clean", async ({ page }) => {
+  freshInstall();
+  for (const width of [640, 320]) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto("/onboarding");
+    await page.getByRole("switch", { name: /Larger text/ }).click();
+    await expect(page.locator("html")).toHaveAttribute("data-text-size", "large");
+    const sideways = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(sideways, `horizontal scroll at ${width}px`).toBeLessThanOrEqual(0);
+    expect(await seriousViolations(page)).toEqual([]);
+    // The setting follows her to every page.
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("data-text-size", "large");
+    await page.getByRole("switch", { name: /Larger text/ }).click();
+  }
+});
+
+test("Dana's demo practice is already set up, so the app opens on the chat", async ({ page }) => {
+  execSync("npm run db:reset", { stdio: "ignore" });
+  await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1, name: /How can I help\?/ })).toBeVisible();
+  await page.goto("/onboarding?q=fees");
+  await expect(heading(page)).toHaveText(/What do you charge/);
+});

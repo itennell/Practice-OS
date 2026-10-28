@@ -46,7 +46,7 @@ Every UI piece Isaiah picked for Practice-OS, where it goes, and how to build it
 |---|---|---|---|---|---|---|---|
 | UI-001 | Soft blue and purple glass gradients | GLB | Cards and surfaces | must | built | Design board p.8 | `app/globals.css` (`glass`) |
 | UI-002 | Animated orb agent | SHL | Aeon orb | must | built | Design board p.8 | `components/ui.tsx` (`Orb`) |
-| UI-003 | Chip selectors | ONB | Who you help | must | approved | Design board p.8 |  |
+| UI-003 | Chip selectors | ONB | Who you help | must | built | Design board p.8 | `app/onboarding/fields.tsx` (`ChipToggle`: `chipClass` on a button with `aria-pressed`) |
 | UI-004 | Pill buttons | GLB | Buttons and chips | must | built | Design board p.8 | `components/ui.tsx` (`Button`, `ButtonLink`, `Chip`, `ChipLink`) |
 | UI-005 | Dark chat menu (ChatGPT style) | CHT | Conversation list | must | built | Design board p.8 | `components/sidebar.tsx` (`Sidebar`) |
 | UI-006 | Chat bubbles with cut corners | CHT | Aeon bubble | must | approved | Design board p.7 |  |
@@ -61,11 +61,11 @@ Every UI piece Isaiah picked for Practice-OS, where it goes, and how to build it
 | UI-015 | Voice Pill (dictation capture) | CHT | Message input | must | built | React Bits (app exception) | `components/shared/voice-pill.tsx` (`VoicePill`), `app/api/transcribe` |
 | UI-016 | Animated Content (fade and slide in) | TBD | Anywhere it fits | nice | parked | React Bits (reference; marketing fit) |  |
 | UI-017 | Liquid Aeon (liquid metal blob for Aeon and the agents) | SHL | Aeon orb | must | approved | React Bits (app exception, adapted) | `components/agent-blob/` (test page built) |
-| UI-018 | Liquid Ether (living background) | GLB | App background | must | approved | React Bits (app exception) |  |
+| UI-018 | Liquid Ether (living background) | GLB | App background | must | built | React Bits idea (MIT), own WebGL shader | `components/shared/liquid-ether.tsx` (`LiquidEther`); test page `/ui-lab/liquid-ether` |
 | UI-019 | Text Type (welcome greeting) | HOM | Greeting and practice chips | must | approved | React Bits (app exception) |  |
 | UI-020 | Card Nav (menu that opens into cards) | SHL | Phone top bar and menu | must | approved | React Bits (app exception) |  |
 | UI-021 | Dock (Mac-style magnifying dock) | TBD | Anywhere it fits | nice | parked | React Bits (reference) |  |
-| UI-022 | Stepper (onboarding steps) | ONB | Step list | must | approved | React Bits (app exception) |  |
+| UI-022 | Stepper (onboarding steps) | ONB | Step list | must | built (own) | React Bits (reference) | `app/onboarding/onboarding-flow.tsx` (chapter list in the glass panel; compact line on phones) |
 | UI-023 | Attachment (file and image cards) | IGM | Post composer | must | built | shadcn/ui (MIT) | `components/shared/attachment.tsx` (`Attachment`, `AttachmentList`) |
 | UI-024 | Library page (file manager layout) | LIB | Whole page | must | approved | Screenshot (React Bits Pro demo, layout reference only) (layout reference) |  |
 | UI-025 | Front Desk work queue (list plus schedule panel) | FDK | Inquiries list | must | approved | Screenshot (React Bits Pro demo, layout reference only) (layout reference) |  |
@@ -185,7 +185,7 @@ Isaiah loves this look: turn the Blob Cursor's liquid metal blob into how Aeon a
 
 **GLB · App background** · must · approved · React Bits (app exception) · DECIDED 2026-10-26: live background for the opening moments only; everyday screens keep the still glows. · [link](https://reactbits.dev/c/backgrounds/liquid-ether)
 
-A slow, living fluid background that drifts on its own (autoDemo on, cursor force 0, click bursts off), so the app feels alive the moment it opens. DECIDED (2026-10-26): live version for the opening moments only (app opening, onboarding interview, and the password page of the online demo copy; the local app has no sign-in); the everyday screens (Home, approvals, deadlines) keep the current still glows. Colors from the Caseload palette in light mode: lilac #E2D8FF, blue #C9DBFF, soft violet #8E7CF8 at low intensity over #F5F3FC; dark mode: #100D24 base with #8E7CF8 and #4E69DA. Glass cards (64% white, 18px blur) sit on top, which keeps text readable. Plain WebGL with no extra libraries; pauses itself when off screen or the tab is hidden; respects reduced motion (still gradient instead). Keep resolution at 0.5 and cap pixel ratio for speed. Works alongside Liquid Aeon (UI-017): onboarding would run two WebGL canvases, which is fine. Install: npx shadcn@latest add @react-bits/LiquidEther-TS-TW.
+A slow, living fluid background that drifts on its own (autoDemo on, cursor force 0, click bursts off), so the app feels alive the moment it opens. DECIDED (2026-10-26): live version for the opening moments only (app opening, onboarding interview, and the password page of the online demo copy; the local app has no sign-in); the everyday screens (Home, approvals, deadlines) keep the current still glows. Colors from the Caseload palette in light mode: lilac #E2D8FF, blue #C9DBFF, soft violet #8E7CF8 at low intensity over #F5F3FC; dark mode: #100D24 base with #8E7CF8 and #4E69DA. Glass cards (64% white, 18px blur) sit on top, which keeps text readable. BUILT 2026-10-28 (`components/shared/liquid-ether.tsx`) with the calm palette instead of the lilac list above: light #FAF9F5 with warm sand, #E3D9FF and a little #8E7CF8; dark #262624 with #8E7CF8 and #4E69DA at low alpha. Plain WebGL with no extra libraries; pauses itself when off screen or the tab is hidden; respects reduced motion (still gradient instead). Keep resolution at 0.5 and cap pixel ratio for speed. Works alongside Liquid Aeon (UI-017): onboarding would run two WebGL canvases, which is fine. Install: npx shadcn@latest add @react-bits/LiquidEther-TS-TW.
 
 ### UI-019 Text Type (welcome greeting)
 
