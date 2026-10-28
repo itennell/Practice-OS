@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { AeonChat, type ChatEntry } from "@/components/aeon-chat";
@@ -8,6 +9,7 @@ import { listApprovals } from "@/lib/approvals";
 import { loadApprovalSettings } from "@/lib/approval-settings";
 import { morningBrief, type BriefItem } from "@/lib/compliance/brief";
 import { getProfile } from "@/lib/profile";
+import { StillToSetUp } from "../onboarding/still-to-set-up";
 
 // The app opens on a conversation with Aeon (AGENTS.md, UI-026). The full approvals
 // inbox is /approvals; what the practice needs next is at the top of /admin.
@@ -28,6 +30,8 @@ async function Chat({ searchParams }: { searchParams: PageProps<"/">["searchPara
     id ? getConversation(id) : null,
     loadApprovalSettings(),
   ]);
+  // The first run opens on Aeon's onboarding interview until she finishes it.
+  if (!profile?.onboarding_completed_at) redirect("/onboarding");
   const messages: ChatEntry[] = (found?.messages ?? []).map((m) => ({
     key: String(m.id),
     role: m.role,
@@ -63,6 +67,8 @@ async function StartCards() {
   const soon = [...brief.this_week, ...brief.urgent_soon].slice(0, 4);
   const waiting = approvals.filter((a) => a.status === "pending");
   return (
+    <>
+    <StillToSetUp />
     <div className="grid gap-4 md:grid-cols-2">
       <GlassCard aria-labelledby="brief-heading" className="flex flex-col gap-3 p-5">
         <h2 id="brief-heading" className="label-caps">
@@ -104,6 +110,7 @@ async function StartCards() {
         </Link>
       </GlassCard>
     </div>
+    </>
   );
 }
 
