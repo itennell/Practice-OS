@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
   // Aeon reads aeon/SOUL.md at run time; the tracer can't see a file read, so name it.
   outputFileTracingIncludes: {
     "/api/chat": ["./aeon/SOUL.md"],
+    "/api/conversations": ["./aeon/SOUL.md"],
+    "/api/cron/reflect": ["./aeon/SOUL.md"],
+    "/settings": ["./aeon/SOUL.md"],
   },
   // The Vercel copy runs on Linux: leave out other platforms' onnxruntime builds,
   // the browser build, and the local model cache (Vercel downloads it to /tmp).
