@@ -57,6 +57,15 @@ describe("built-in database", () => {
     expect(applied).toEqual(await migrationFiles());
   });
 
+  it("applies each migration once when two runners start together", async () => {
+    const url = await startLocalDatabase(await freshDir());
+    const [a, b] = await Promise.all([runMigrations(url), runMigrations(url)]);
+    const files = await migrationFiles();
+    expect([...a, ...b].sort()).toEqual(files);
+    const applied = await query(url, async (sql) => (await sql`select name from practice_os.schema_migrations order by name`).map((r) => r.name));
+    expect(applied).toEqual(files);
+  });
+
   it("generates the encryption key once and keeps it", async () => {
     const dir = await freshDir();
     const saved = process.env.CONNECTIONS_ENCRYPTION_KEY;
