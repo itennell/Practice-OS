@@ -148,16 +148,16 @@ describe.skipIf(!url)("Instagram Connect through the relay", () => {
     // Post images go up with the relay's own upload key, and come down once Instagram has them.
     const stored: string[] = [];
     const blobs: Blobs = { put: async (p) => (stored.push(p), { url: `https://blob.example/${p}` }), list: async () => [], del: async (urls) => void stored.splice(0, stored.length, ...stored.filter((p) => !urls.includes(`https://blob.example/${p}`))) };
-    const relayOutside = { blobs, now: Date.now, inspectImage: async () => ({ format: "jpeg", width: 1080, height: 1080 }) };
+    const relayOutside = { blobs, now: Date.now, reencodeImage: async (b: Uint8Array) => ({ format: "jpeg", width: 1080, height: 1080, jpeg: b }) };
     vi.stubGlobal("fetch", async (input: string | URL, init?: RequestInit) => {
       const r = new Request(String(input), { ...init, headers: { ...(init?.headers as Record<string, string>), "content-length": String((init?.body as Uint8Array | string)?.length ?? 0) } });
       return init?.method === "DELETE" ? deleteImage(r, relayEnv, relayOutside) : uploadImage(r, relayEnv, relayOutside);
     });
     const { uploadPostImage, deletePostImage } = await import("../lib/connect");
     const image = await uploadPostImage(Buffer.from([0xff, 0xd8, 0xff, 0xe0]));
-    expect(stored).toHaveLength(1);
+    expect(stored.filter((p) => p.endsWith(".jpg"))).toHaveLength(1);
     await deletePostImage(image.url);
-    expect(stored).toHaveLength(0);
+    expect(stored.filter((p) => p.endsWith(".jpg"))).toHaveLength(0);
   });
 
   it("won't upload a post image for a sign-in that didn't allow publishing", async () => {
