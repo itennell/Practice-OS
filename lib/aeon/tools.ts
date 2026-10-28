@@ -17,6 +17,8 @@ import * as credActions from "../credentialing/actions";
 import * as cred from "../credentialing/store";
 import { isDryRun } from "../env";
 import * as gfe from "../gfe/store";
+import * as cms855i from "../payers/cms855i";
+import * as payers from "../payers/store";
 import { guard, WITHHELD } from "./guard";
 import { forget, MEMORY_KINDS, MemoryRefused, remember } from "./memory";
 
@@ -134,6 +136,16 @@ export const TOOLS: AeonTool[] = [
       urgent_soon: z.array(briefItem),
       setup_questions: z.array(z.object({ rule_id: z.string().nullable(), title: z.string(), what_to_do: z.string().nullable() })),
       needs_dates: z.array(z.object({ title: z.string(), question: z.string() })),
+      payer_dates: z.array(
+        z.object({
+          id: z.string(),
+          payer: z.string(),
+          kind: z.enum(["follow_up", "recredential"]),
+          due_on: z.string(),
+          days_left: z.number(),
+          what: z.string(),
+        }),
+      ),
       is_sample: z.boolean(),
       summary: z.string(),
     },
@@ -331,6 +343,73 @@ export const TOOLS: AeonTool[] = [
     label: "Checked your NPI in the national registry",
     changesData: true,
     run: async () => text(await cred.checkNpiInRegistry()),
+  }),
+
+  // Insurance: prepare a payer's enrollment form and track each application. She signs and submits.
+  tool({
+    name: "fill_payer_form",
+    title: "Prepare a payer enrollment form",
+    description:
+      "Prepares Medicare's CMS-855I (version 05/23) from her credentialing profile and returns what was filled and what only she can complete. " +
+      "Counselors and MFTs get 'Undefined Non-Physician Practitioner Specialty' with MHC or MFT written in, per CMS's May 2024 FAQ. " +
+      "It never fills her SSN, date of birth, license number, the legal questions, payment details or the signature, and it never submits. " +
+      "She downloads it on Paperwork > Insurance, or applies online in PECOS (faster, and it lists MFT and MHC). Also adds a Medicare row to her applications if missing.",
+    input: { form: z.enum(["cms855i"]) },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+    label: "Prepared your Medicare enrollment form",
+    changesData: true,
+    run: async (_input, ctx) => {
+      const profile = await cred.loadCredentialingProfile();
+      if (!profile) return text({ error: "Her credentialing profile isn't set up yet. Fill it in first (update_credentialing)." });
+      const r = await cms855i.fillCms855i(profile);
+      const apps = await payers.listPayerApplications();
+      if (!apps.some((a) => a.form === "cms855i")) await payers.savePayerApplication({ payer: "Medicare", form: "cms855i", status: "preparing" }, ctx.by);
+      return text({
+        form: `CMS-855I (${cms855i.CMS855I_VERSION})`,
+        filled: r.filled,
+        left_for_her: r.leftForYou,
+        download: "Paperwork > Insurance > Download the prepared CMS-855I",
+        faster_route: "PECOS (pecos.cms.hhs.gov) lists MFT and MHC as specialties and is usually faster than paper.",
+        is_sample: profile.isSample,
+      });
+    },
+  }),
+
+  tool({
+    name: "list_payer_applications",
+    title: "List her insurance applications",
+    description: "Every payer she's applying to or enrolled with: status, applied, follow-up, approved and recredential dates. Read-only.",
+    input: {},
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+    label: "Checked your insurance applications",
+    changesData: false,
+    run: async () => text({ applications: await payers.listPayerApplications() }),
+  }),
+
+  tool({
+    name: "update_payer_application",
+    title: "Add or update an insurance application",
+    description:
+      "Adds a payer (no id) or updates one (with id from list_payer_applications). Status: preparing, applied, pending, approved, denied, withdrawn. " +
+      "Applied with no follow_up_on sets a follow-up 30 days out; approved with no recredential_on sets 36 months out. " +
+      "Example: 'I sent my BCBSIL application today' -> {payer: 'BCBSIL', status: 'applied'}. Never a license number or client detail.",
+    input: {
+      id: z.string().uuid().optional(),
+      payer: z.string().min(2).max(120),
+      form: z.enum(["cms855i"]).optional(),
+      status: z.enum(["preparing", "applied", "pending", "approved", "denied", "withdrawn"]),
+      applied_on: isoDay.optional(),
+      follow_up_on: isoDay.optional(),
+      approved_on: isoDay.optional(),
+      effective_on: isoDay.optional(),
+      recredential_on: isoDay.optional(),
+      reference: z.string().max(60).optional(),
+      notes: z.string().max(500).optional(),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: false },
+    label: "Updated your insurance applications",
+    changesData: true,
+    run: async (input, ctx) => text(await payers.savePayerApplication(input, ctx.by)),
   }),
 
   // AGENTS.md > Aeon's memory: Aeon saves what it learns through remember, each one audited.

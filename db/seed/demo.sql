@@ -155,6 +155,14 @@ values (
   true
 );
 
+-- [Sample] insurance applications (migration 009): Medicare being prepared,
+-- BCBSIL waiting (follow up 30 days after applying), Aetna approved (recredential in 36 months).
+insert into practice_os.payer_applications
+  (payer, form, status, applied_on, follow_up_on, approved_on, effective_on, recredential_on, reference, notes, is_sample) values
+  ('Medicare', 'cms855i', 'preparing', null, null, null, null, null, null, '[Sample] Prepare the CMS-855I or apply in PECOS.', true),
+  ('BCBSIL', null, 'applied', '2026-10-05', '2026-11-04', null, null, null, '[Sample] APP-1042', null, true),
+  ('Aetna', null, 'approved', '2026-01-12', null, '2026-03-16', '2026-04-01', '2029-03-16', null, null, true);
+
 -- Two [Sample] Good Faith Estimates, with no client identity (migration 006): one
 -- already issued, one waiting for her approval. Dates are fixed, like the CMS example.
 insert into practice_os.approvals (id, kind, title, preview, payload, status, created_by, decided_at, decided_by, result, is_sample) values
