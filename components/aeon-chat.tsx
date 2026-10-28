@@ -15,7 +15,10 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { PromptBar } from "@/components/shared/prompt-bar";
 import { ThoughtLine } from "@/components/shared/thought-line";
 import { notify } from "@/components/shared/toaster";
+import { ApprovalAskBar } from "./approval-ask-bar";
 import { ApprovalsInbox } from "./approvals-inbox";
+import { ModePicker, nextMode } from "./mode-picker";
+import type { ApprovalMode } from "@/lib/approval-modes";
 import { AeonText } from "./aeon-text";
 import { Orb } from "./ui";
 
@@ -106,7 +109,13 @@ export function AeonChat({
   conversations: initialConversations,
   firstName,
   start,
+  mode: initialMode,
+  modeReadOnly = false,
 }: {
+  /** This chat's mode, or the default from Settings for a new chat. */
+  mode: ApprovalMode;
+  /** The Vercel demo copy: the pill shows but can't change. */
+  modeReadOnly?: boolean;
   conversationId: string | null;
   initialMessages: ChatEntry[];
   conversations: ConversationSummary[];
@@ -120,6 +129,9 @@ export function AeonChat({
   const [conversations, setConversations] = useState(initialConversations);
   const [busy, setBusy] = useState(false);
   const [listOpen, setListOpen] = useState(false);
+  const [mode, setMode] = useState<ApprovalMode>(initialMode);
+  const [asked, setAsked] = useState(0);
+  const [modeNote, setModeNote] = useState("");
   const abort = useRef<AbortController | null>(null);
   const end = useRef<HTMLDivElement>(null);
 
@@ -143,7 +155,7 @@ export function AeonChat({
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ conversationId, text }),
+        body: JSON.stringify({ conversationId, text, ...(modeReadOnly ? {} : { mode }) }),
         signal: abort.current.signal,
       });
       const data = (await res.json().catch(() => ({}))) as { conversationId?: string | null; reply?: Reply; error?: string };
@@ -159,6 +171,7 @@ export function AeonChat({
           window.history.replaceState(null, "", `/?c=${data.conversationId}`);
         }
         void refreshList();
+        setAsked((n) => n + 1);
         return;
       }
       // Crisis or privacy refusal: her message was not accepted, so it leaves the chat.
@@ -174,6 +187,22 @@ export function AeonChat({
     } finally {
       setBusy(false);
       abort.current = null;
+    }
+  }
+
+  async function changeMode(next: ApprovalMode) {
+    const before = mode;
+    setMode(next);
+    setModeNote(`Mode: ${next === "manual" ? "Manual" : next === "auto" ? "Auto" : "Bypass"}`);
+    if (!conversationId) return; // a new chat saves its mode with the first message
+    const res = await fetch(`/api/conversations/${conversationId}/mode`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ mode: next }),
+    }).catch(() => null);
+    if (!res?.ok) {
+      setMode(before);
+      notify.error("Couldn't change the mode.", { description: "This chat is still on its old mode." });
     }
   }
 
@@ -279,13 +308,32 @@ export function AeonChat({
         <div ref={end} className="scroll-mb-44" />
 
         <div className={`${empty ? "" : "sticky bottom-0 -mx-2 mt-auto bg-gradient-to-t from-[var(--bg)] from-70% to-transparent px-2 pb-4 pt-6"}`}>
-          <PromptBar
-            onSend={send}
-            busy={busy}
-            onStop={() => abort.current?.abort()}
-            dictation
-            placeholder="Ask Aeon anything about your practice"
-          />
+          <ApprovalAskBar refreshKey={asked} />
+          <div
+            onKeyDownCapture={(e) => {
+              // Shift+Tab in the message box switches the mode, as in a coding agent.
+              if (e.key === "Tab" && e.shiftKey && !modeReadOnly && (e.target as HTMLElement).tagName === "TEXTAREA") {
+                e.preventDefault();
+                const next = nextMode(mode);
+                // Bypass always goes through the picker, which asks first.
+                void changeMode(next === "bypass" ? nextMode(next) : next);
+              }
+            }}
+          >
+            <PromptBar
+              onSend={send}
+              busy={busy}
+              onStop={() => abort.current?.abort()}
+              dictation
+              placeholder="Ask Aeon anything about your practice"
+            />
+          </div>
+          <div className="mt-2 flex items-center gap-3">
+            <ModePicker mode={mode} onChange={changeMode} readOnly={modeReadOnly} />
+            <span aria-live="polite" className="sr-only">
+              {modeNote}
+            </span>
+          </div>
           <p className="mt-3 text-center text-small text-[var(--fg-muted)]">
             Aeon handles practice logistics, not clinical advice. Please don&apos;t type client names or details. Check anything important.
           </p>

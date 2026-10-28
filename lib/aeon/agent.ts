@@ -13,6 +13,7 @@ import { CRISIS_REPLY, checkCrisis } from "../safety";
 import { guard, REFUSAL, type GuardKind } from "./guard";
 import { relevantMemories, type Memory } from "./memory";
 import { soul } from "./soul";
+import type { ApprovalMode } from "../approval-policy";
 import { TOOLS_BY_NAME, chatTools, runTool, type ToolResult } from "./tools";
 
 export const FEATURE = "aeon_chat";
@@ -35,6 +36,8 @@ export type RespondOptions = {
   /** For created_by and audit rows: "chat:<conversation id>". */
   by: string;
   viewOnly?: boolean;
+  /** The mode under the chat box (lib/approval-policy.ts). */
+  mode?: ApprovalMode;
   /** Today in the practice's time zone, YYYY-MM-DD. */
   today?: string;
   /** Swapped in by tests to replay recorded model replies. */
@@ -115,7 +118,7 @@ export async function respond(message: string, opts: RespondOptions): Promise<Re
     for (const call of calls) {
       const started = Date.now();
       const result: ToolResult = call.argsValid
-        ? await runTool(call.name, call.args, { by: opts.by, viewOnly: opts.viewOnly }).catch(
+        ? await runTool(call.name, call.args, { by: opts.by, viewOnly: opts.viewOnly, mode: opts.mode }).catch(
             (err): ToolResult => ({ content: [{ type: "text", text: `Error: ${err instanceof Error ? err.message : String(err)}` }], isError: true }),
           )
         : { content: [{ type: "text", text: "Error: the arguments were not valid JSON." }], isError: true };

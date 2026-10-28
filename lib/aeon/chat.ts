@@ -2,10 +2,20 @@
 // A crisis or refused message is answered and stored nowhere: no conversation
 // row, no message row (her text was never accepted). Only an answered exchange
 // is saved, and both sides of it have passed the sensitive-info guard.
+import type { ApprovalMode } from "../approval-policy";
+import { loadApprovalSettings } from "../approval-settings";
 import { db } from "../db";
 import { respond, type RespondOptions, type Reply, type Step, type Turn } from "./agent";
 
-export type Conversation = { id: string; title: string; is_sample: boolean; created_at: Date; updated_at: Date };
+export type Conversation = {
+  id: string;
+  title: string;
+  is_sample: boolean;
+  /** Its own mode from the picker under the chat box; null = the default in Settings. */
+  approval_mode: ApprovalMode | null;
+  created_at: Date;
+  updated_at: Date;
+};
 export type ChatMessage = {
   id: number;
   conversation_id: string;
@@ -50,17 +60,25 @@ export async function sendMessage(input: {
   conversationId?: string | null;
   text: string;
   viewOnly?: boolean;
+  /** The mode showing under the chat box when she sent it. */
+  mode?: ApprovalMode;
   chat?: RespondOptions["chat"];
 }): Promise<{ conversationId: string | null; reply: Reply }> {
   const existing = input.conversationId ? await getConversation(input.conversationId) : null;
   if (input.conversationId && !existing) throw new Error("No conversation with that id.");
   const history: Turn[] = existing?.messages.map((m) => ({ role: m.role, content: m.content })) ?? [];
 
+  // The mode she picked, else this chat's own, else the default. The view-only demo never acts.
+  const mode: ApprovalMode = input.viewOnly
+    ? "manual"
+    : (input.mode ?? existing?.conversation.approval_mode ?? (await loadApprovalSettings()).mode);
+
   // Tools record who asked: the conversation when there is one, "chat:new" for its first message.
   const reply = await respond(input.text, {
     history,
     by: `chat:${existing?.conversation.id ?? "new"}`,
     viewOnly: input.viewOnly,
+    mode,
     chat: input.chat,
   });
   if (reply.kind !== "answer") return { conversationId: existing?.conversation.id ?? null, reply };
@@ -70,10 +88,10 @@ export async function sendMessage(input: {
     let id = existing?.conversation.id;
     if (!id) {
       const [row] = await tx<{ id: string }[]>`
-        insert into practice_os.conversations (title) values (${titleFrom(input.text)}) returning id`;
+        insert into practice_os.conversations (title, approval_mode) values (${titleFrom(input.text)}, ${input.mode ?? null}) returning id`;
       id = row.id;
     } else {
-      await tx`update practice_os.conversations set updated_at = now() where id = ${id}`;
+      await tx`update practice_os.conversations set updated_at = now(), approval_mode = coalesce(${input.mode ?? null}, approval_mode) where id = ${id}`;
     }
     await tx`
       insert into practice_os.chat_messages (conversation_id, role, content)

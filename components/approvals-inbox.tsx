@@ -24,6 +24,7 @@ const KIND_LABEL: Record<string, string> = {
   web_chat_reply: "Web chat reply",
   state_rules: "State rules",
   gfe_issue: "Good Faith Estimate",
+  aeon_action: "Change Aeon wants to make",
 };
 
 function ApprovalStatus({ status }: { status: ApprovalView["status"] }) {
@@ -130,6 +131,7 @@ function ApprovalItem({
           <p className="text-small text-[var(--fg-muted)]">
             {KIND_LABEL[approval.kind] ?? approval.kind} · from {fromLabel(approval.created_by)} ·{" "}
             {timeAgo(approval.created_at, now)}
+            {approval.decided_by?.startsWith("auto:") && " · Aeon did this automatically"}
           </p>
         </div>
         <ApprovalStatus status={busy && approval.status === "pending" ? "running" : approval.status} />

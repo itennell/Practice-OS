@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { canDecide } from "@/lib/admin-guard";
+import { APPROVAL_MODES } from "@/lib/approval-policy";
 import { sendMessage } from "@/lib/aeon/chat";
 import { DEMO_RESTING, demoCapReached, isViewOnly } from "@/lib/aeon/demo";
 import { isUuid } from "../approvals/responses";
@@ -10,18 +12,21 @@ export const maxDuration = 120;
 const body = z.object({
   conversationId: z.string().nullable().optional(),
   text: z.string().trim().min(1, "Type a message first.").max(4000, "That message is too long. Keep it under 4,000 characters."),
+  /** The mode under the chat box. Bypass needs ADMIN_PASSWORD on the Vercel copy. */
+  mode: z.enum(APPROVAL_MODES).optional(),
 });
 
 export async function POST(request: Request) {
   const parsed = body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: parsed.error.issues[0]?.message ?? "Bad request." }, { status: 400 });
   const { conversationId, text } = parsed.data;
+  const mode = parsed.data.mode === "bypass" && !canDecide(request) ? "auto" : parsed.data.mode;
   if (conversationId && !isUuid(conversationId)) return Response.json({ error: "Unknown conversation." }, { status: 404 });
   if (await demoCapReached()) {
     return Response.json({ conversationId: conversationId ?? null, reply: { kind: "answer", text: DEMO_RESTING, steps: [], approvalIds: [] } });
   }
   try {
-    const result = await sendMessage({ conversationId, text, viewOnly: isViewOnly(request) });
+    const result = await sendMessage({ conversationId, text, viewOnly: isViewOnly(request), mode });
     return Response.json(result, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

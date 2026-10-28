@@ -11,6 +11,7 @@ export const APPROVAL_KINDS = [
   "test_note",
   "state_rules",
   "gfe_issue",
+  "aeon_action",
 ] as const;
 
 export type ApprovalKind = (typeof APPROVAL_KINDS)[number];
