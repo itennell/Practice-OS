@@ -26,6 +26,10 @@ describe.skipIf(!sql)("practice_os database", () => {
     for (const row of rows) {
       expect(row, row.relname).toMatchObject({ rls: true, policies: 0, anon: false, authenticated: false });
     }
+    const [schema] = await sql!`
+      select has_schema_privilege('anon', 'practice_os', 'usage') as anon,
+             has_schema_privilege('authenticated', 'practice_os', 'usage') as authenticated`;
+    expect(schema).toEqual({ anon: false, authenticated: false });
   });
 
   it("refuses edits and deletes on audit_log", async () => {
@@ -50,8 +54,15 @@ describe.skipIf(!sql)("practice_os database", () => {
 
   it("refuses a plain (unencrypted) token in connections", async () => {
     await expect(
-      sql!`insert into practice_os.connections (provider, access_token_enc) values ('twilio', 'plain-token')`,
+      sql!`insert into practice_os.connections (provider, access_token_enc) values ('phone', 'plain-token')`,
     ).rejects.toThrow(/connections_tokens_encrypted/);
+  });
+
+  it("refuses a plain sign-in secret in connect_states", async () => {
+    await expect(
+      sql!`insert into practice_os.connect_states (state, provider, redirect_uri, secret_enc)
+           values (${"x".repeat(43)}, 'google', 'http://127.0.0.1/', 'plain-verifier')`,
+    ).rejects.toThrow(/connect_states_secret_enc_check/);
   });
 
   it("accepts exactly the approval kinds in lib/approval-kinds.ts", async () => {

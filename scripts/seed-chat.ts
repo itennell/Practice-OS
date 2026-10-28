@@ -7,6 +7,9 @@ import path from "node:path";
 import { loadEnv } from "../lib/env";
 
 loadEnv();
+// No DATABASE_URL: use (and if needed start) the built-in database, with its encryption key.
+const { prepareDatabase } = await import("../lib/local-db");
+await prepareDatabase();
 const { sendMessage } = await import("../lib/aeon/chat");
 const { closeDb } = await import("../lib/db");
 const { SCENARIOS } = await import("../tests/fixtures/aeon-scenarios");

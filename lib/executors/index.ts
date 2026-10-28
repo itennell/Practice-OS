@@ -1,5 +1,6 @@
 import { aeonAction } from "./aeon_action";
 import { gfeIssue } from "./gfe_issue";
+import { referralLetter } from "./referral_letter";
 import { stateRules } from "./state_rules";
 import { testNote } from "./test_note";
 import type { Executor } from "./types";
@@ -16,6 +17,7 @@ export const executors: Partial<Record<string, Executor>> = {
   state_rules: stateRules,
   gfe_issue: gfeIssue,
   aeon_action: aeonAction,
+  referral_letter: referralLetter,
   // Front Desk
   text_consult_options: textConsultOptions,
   sms_reply: smsReply,
@@ -27,4 +29,5 @@ export const executors: Partial<Record<string, Executor>> = {
 // The payload field the clinician may edit before approving, per kind.
 export const editableField: Partial<Record<string, string>> = {
   test_note: "note",
+  referral_letter: "letter",
 };

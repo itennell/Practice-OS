@@ -3,7 +3,7 @@ import { decryptSecret, encryptSecret } from "./secrets";
 
 // The only code that reads or writes practice_os.connections. Tokens are
 // encrypted here before they reach the database and decrypted on the way out.
-export type Provider = "instagram" | "gmail" | "calcom" | "twilio";
+export type Provider = "instagram" | "google" | "calcom" | "phone" | "muse";
 
 export type Connection = {
   provider: Provider;

@@ -34,18 +34,23 @@ insert into practice_os.settings (id) values (true) on conflict (id) do nothing;
 
 -- Made-up referral sources (never real NPPES providers).
 insert into practice_os.referral_sources
-  (id, name, organization, taxonomy, city, state, email, stage, last_contacted_at, next_follow_up_on, notes, is_sample) values
+  (id, name, organization, taxonomy, specialty, npi_type, city, state, email, stage, last_contacted_at, next_follow_up_on, distance_miles, fit_score, notes, is_sample) values
   ('00000000-0000-4000-8000-000000000201', '[Sample] Lakeview Family Medicine', '[Sample] Lakeview Family Medicine',
-   'Family Medicine', 'Chicago', 'IL', 'frontdesk@example.com', 'found', null, null, '[Sample] Near the office.', true),
+   '207Q00000X', 'Family medicine', 'organization', 'Chicago', 'IL', 'frontdesk@example.com', 'found', null, null, 0.6, 81, '[Sample] Near the office.', true),
   ('00000000-0000-4000-8000-000000000202', '[Sample] Dr. Alex Example', '[Sample] North Side Internal Medicine',
-   'Internal Medicine', 'Chicago', 'IL', 'alex@example.com', 'contacted', now() - interval '8 days', current_date + 6,
+   '207R00000X', 'Internal medicine', 'individual', 'Chicago', 'IL', 'alex@example.com', 'contacted', now() - interval '8 days', current_date + 6, 1.4, 77,
    '[Sample] Sent intro letter.', true),
   ('00000000-0000-4000-8000-000000000203', '[Sample] Old Town OB-GYN', '[Sample] Old Town OB-GYN',
-   'Obstetrics & Gynecology', 'Chicago', 'IL', 'office@example.com', 'follow_up', now() - interval '20 days', current_date,
+   '207V00000X', 'OB/GYN', 'organization', 'Chicago', 'IL', 'office@example.com', 'follow_up', now() - interval '20 days', current_date, 1.1, 69,
    '[Sample] Follow-up due today.', true),
   ('00000000-0000-4000-8000-000000000204', '[Sample] Lincoln Park Pediatrics', '[Sample] Lincoln Park Pediatrics',
-   'Pediatrics', 'Chicago', 'IL', 'hello@example.com', 'connected', now() - interval '35 days', null,
+   '208000000X', 'Pediatrics', 'organization', 'Chicago', 'IL', 'hello@example.com', 'connected', now() - interval '35 days', null, 0.3, 79,
    '[Sample] Happy to share referrals for parents.', true);
+
+-- Dana's Referrals setup. Seeded only when missing: db:reset never overwrites her choice.
+insert into practice_os.referral_settings (id, home_zip, specialties)
+values (true, '60614', array['family_medicine', 'internal_medicine'])
+on conflict (id) do nothing;
 
 insert into practice_os.posts (id, topic, caption, status, is_sample) values
   ('00000000-0000-4000-8000-000000000301', 'first_session',

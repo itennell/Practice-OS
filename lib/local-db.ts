@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
-import { appendFile, mkdir, open, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, open, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import net from "node:net";
 import path from "node:path";
@@ -17,8 +17,8 @@ import { pendingMigrations, runMigrations } from "./migrations";
 // Layout of the data folder (PRACTICE_OS_DATA_DIR, default ./.data):
 //   postgres/        the database files
 //   local-db.json    port, user and a random password (owner-only file)
-//   secrets.json     the generated CONNECTIONS_ENCRYPTION_KEY (owner-only file)
-//   backups/         copies taken before every migration
+//   secrets.json     the generated CONNECTIONS_ENCRYPTION_KEY and BACKUP_ENCRYPTION_KEY (owner-only file)
+//   backups/         encrypted copies taken before every migration
 //   postgres.log
 //
 // Postgres runs as its own process (pg_ctl), so `next dev`, the MCP server and
@@ -51,6 +51,15 @@ function run(command: string, args: string[]): Promise<void> {
     const child = spawn(command, args, { stdio: "ignore", windowsHide: true });
     child.on("error", reject);
     child.on("exit", (code) => (code === 0 ? resolve() : reject(new Error(`${path.basename(command)} exited with code ${code}`))));
+  });
+}
+
+/** True when a Postgres is running on this data folder (pg_ctl status exits 0; 3 means none). */
+function serverRunning(pgdata: string): Promise<boolean> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(binary("pg_ctl"), ["status", "-D", pgdata], { stdio: "ignore", windowsHide: true });
+    child.on("error", reject);
+    child.on("exit", (code) => resolve(code === 0));
   });
 }
 
@@ -98,18 +107,35 @@ async function readJson<T>(file: string): Promise<T | null> {
   }
 }
 
+const LOCK_STALE_MS = 300_000;
+
+/** A lock is left behind by a crash when its owner process is gone, or it is older than 5 minutes. */
+async function lockIsStale(file: string): Promise<boolean> {
+  const age = Date.now() - (await stat(file).catch(() => ({ mtimeMs: Date.now() }))).mtimeMs;
+  if (age > LOCK_STALE_MS) return true;
+  const pid = Number(await readFile(file, "utf8").catch(() => ""));
+  if (!pid) return false; // just created, the owner hasn't written its pid yet
+  try {
+    process.kill(pid, 0);
+    return false;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === "ESRCH"; // EPERM: alive, just not ours
+  }
+}
+
 /** One starter at a time per data folder (next dev, the MCP server and scripts may start together). */
 async function withLock<T>(file: string, work: () => Promise<T>): Promise<T> {
-  const deadline = Date.now() + 90_000;
+  // A live owner may hold it the full 5 minutes (slow initdb, crash recovery), so wait a little longer.
+  const deadline = Date.now() + LOCK_STALE_MS + 30_000;
   for (;;) {
     try {
       const handle = await open(file, "wx");
+      await handle.writeFile(String(process.pid));
       await handle.close();
       break;
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
-      const age = Date.now() - (await stat(file).catch(() => ({ mtimeMs: Date.now() }))).mtimeMs;
-      if (age > 60_000) await rm(file, { force: true }); // left behind by a crash
+      if (await lockIsStale(file)) await rm(file, { force: true });
       else if (Date.now() > deadline) throw new Error(`Timed out waiting for ${file}`);
       else await new Promise((r) => setTimeout(r, 200));
     }
@@ -130,26 +156,50 @@ export async function startLocalDatabase(dir: string = dataDir()): Promise<strin
     let config = await readJson<LocalConfig>(configFile);
 
     if (!existsSync(path.join(pgdata, "PG_VERSION"))) {
+      // First start, or a first start that crashed part way: no database has been made
+      // yet (a finished one always has PG_VERSION), so clear what's left and start over.
+      // The password is saved before initdb, and the database is built in a side folder
+      // and renamed into place last, so a crash never leaves a database nobody can open.
+      const building = `${pgdata}.init`;
+      await rm(pgdata, { recursive: true, force: true });
+      await rm(building, { recursive: true, force: true });
       config = { port: await freePort(), user: "practiceos", password: randomBytes(24).toString("base64url"), database: "practice" };
+      await writeFile(configFile, JSON.stringify(config, null, 2), { mode: 0o600 });
       const pwfile = path.join(dir, "initdb.pw");
       await writeFile(pwfile, config.password, { mode: 0o600 });
       try {
-        await run(binary("initdb"), ["-D", pgdata, "-U", config.user, `--pwfile=${pwfile}`, "--auth=scram-sha-256", "-E", "UTF8", "--locale=C"]);
+        await run(binary("initdb"), ["-D", building, "-U", config.user, `--pwfile=${pwfile}`, "--auth=scram-sha-256", "-E", "UTF8", "--locale=C"]);
       } finally {
         await rm(pwfile, { force: true });
       }
       // Only this computer can connect, and only over TCP with the password (no socket files).
-      await appendFile(path.join(pgdata, "postgresql.conf"), "\nlisten_addresses = '127.0.0.1'\nunix_socket_directories = ''\n");
-      await writeFile(configFile, JSON.stringify(config, null, 2), { mode: 0o600 });
+      await appendFile(path.join(building, "postgresql.conf"), "\nlisten_addresses = '127.0.0.1'\nunix_socket_directories = ''\n");
+      await rename(building, pgdata);
     }
     if (!config) throw new Error(`${configFile} is missing, so the built-in database's password is unknown.`);
 
     if (!(await canConnect(toUrl(config, "postgres")))) {
-      if (!(await portIsFree(config.port))) {
-        config.port = await freePort();
-        await writeFile(configFile, JSON.stringify(config, null, 2), { mode: 0o600 });
+      if (await serverRunning(pgdata)) {
+        // Our own Postgres is up but not answering yet (busy, or recovering after a crash).
+        // Never move its port: wait for it, on the port it really listens on (line 4 of postmaster.pid).
+        const port = Number((await readFile(path.join(pgdata, "postmaster.pid"), "utf8")).split("\n")[3]);
+        if (port && port !== config.port) {
+          config.port = port;
+          await writeFile(configFile, JSON.stringify(config, null, 2), { mode: 0o600 });
+        }
+        const deadline = Date.now() + 30_000;
+        while (!(await canConnect(toUrl(config, "postgres")))) {
+          if (Date.now() > deadline) throw new Error(`The built-in database is running but not answering. See ${path.join(dir, "postgres.log")}.`);
+          await new Promise((r) => setTimeout(r, 500));
+        }
+      } else {
+        // Nothing owns this data folder, so the port is free to move if something else took it.
+        if (!(await portIsFree(config.port))) {
+          config.port = await freePort();
+          await writeFile(configFile, JSON.stringify(config, null, 2), { mode: 0o600 });
+        }
+        await run(binary("pg_ctl"), ["start", "-w", "-t", "60", "-D", pgdata, "-l", path.join(dir, "postgres.log"), "-o", `-p ${config.port}`]);
       }
-      await run(binary("pg_ctl"), ["start", "-w", "-t", "60", "-D", pgdata, "-l", path.join(dir, "postgres.log"), "-o", `-p ${config.port}`]);
     }
 
     const admin = postgres(toUrl(config, "postgres"), { max: 1, onnotice: () => {} });
@@ -163,26 +213,50 @@ export async function startLocalDatabase(dir: string = dataDir()): Promise<strin
   });
 }
 
-/** Stops the built-in Postgres if it is running. */
+/** Stops the built-in Postgres if it is running (a postmaster.pid left by a crash doesn't count). */
 export async function stopLocalDatabase(dir: string = dataDir()): Promise<void> {
   const pgdata = path.join(dir, "postgres");
   if (!existsSync(path.join(pgdata, "postmaster.pid"))) return;
+  if (!(await serverRunning(pgdata))) return;
   await run(binary("pg_ctl"), ["stop", "-w", "-m", "fast", "-D", pgdata]);
 }
 
-/** Generates CONNECTIONS_ENCRYPTION_KEY once for this data folder when .env doesn't set one. */
-export async function ensureLocalSecrets(dir: string = dataDir()): Promise<void> {
-  if (process.env.CONNECTIONS_ENCRYPTION_KEY) return;
+type Secrets = { CONNECTIONS_ENCRYPTION_KEY?: string; BACKUP_ENCRYPTION_KEY?: string };
+
+/** Reads secrets.json, generating any key it doesn't have yet (one writer at a time, never a half-written file). */
+async function localSecrets(dir: string): Promise<Required<Secrets>> {
   const file = path.join(dir, "secrets.json");
-  let secrets = await readJson<{ CONNECTIONS_ENCRYPTION_KEY: string }>(file);
-  if (!secrets) {
-    secrets = { CONNECTIONS_ENCRYPTION_KEY: randomBytes(32).toString("base64") };
-    await writeFile(file, JSON.stringify(secrets, null, 2), { mode: 0o600, flag: "wx" }).catch(async (err) => {
-      if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
-      secrets = await readJson(file); // another process wrote it first
-    });
-  }
-  process.env.CONNECTIONS_ENCRYPTION_KEY = secrets!.CONNECTIONS_ENCRYPTION_KEY;
+  const complete = (s: Secrets | null): s is Required<Secrets> => !!s?.CONNECTIONS_ENCRYPTION_KEY && !!s.BACKUP_ENCRYPTION_KEY;
+  const found = await readJson<Secrets>(file);
+  if (complete(found)) return found;
+  return withLock(path.join(dir, "secrets.lock"), async () => {
+    const secrets = await readJson<Secrets>(file);
+    if (complete(secrets)) return secrets; // another process wrote it first
+    // Overwriting a file we can't read would lose its keys for good.
+    if (!secrets && existsSync(file)) throw new Error(`${file} can't be read. Fix or restore it; it holds this practice's encryption keys.`);
+    const next = {
+      CONNECTIONS_ENCRYPTION_KEY: secrets?.CONNECTIONS_ENCRYPTION_KEY || randomBytes(32).toString("base64"),
+      BACKUP_ENCRYPTION_KEY: secrets?.BACKUP_ENCRYPTION_KEY || randomBytes(32).toString("base64"),
+    };
+    await writeFile(`${file}.tmp`, JSON.stringify(next, null, 2), { mode: 0o600 });
+    await rename(`${file}.tmp`, file);
+    return next;
+  });
+}
+
+/**
+ * Generates this data folder's keys once: CONNECTIONS_ENCRYPTION_KEY (used when
+ * .env doesn't set one) and BACKUP_ENCRYPTION_KEY, which encrypts the backups.
+ * Both live in secrets.json for now; phase 2 moves them to the OS keychain.
+ */
+export async function ensureLocalSecrets(dir: string = dataDir()): Promise<void> {
+  const secrets = await localSecrets(dir);
+  process.env.CONNECTIONS_ENCRYPTION_KEY ||= secrets.CONNECTIONS_ENCRYPTION_KEY;
+}
+
+/** The key this data folder's backups are encrypted with. */
+export async function backupKey(dir: string = dataDir()): Promise<Buffer> {
+  return Buffer.from((await localSecrets(dir)).BACKUP_ENCRYPTION_KEY, "base64");
 }
 
 async function hasPracticeData(url: string): Promise<boolean> {
@@ -200,7 +274,7 @@ async function hasPracticeData(url: string): Promise<boolean> {
  * a migration is pending, it backs up first (into <dir>/backups, newest 14 kept).
  * Returns the backup folder, or null when none was needed.
  */
-export async function migrateWithBackup(url: string, dir: string = dataDir()): Promise<string | null> {
+export async function migrateWithBackup(url: string, dir: string = dataDir(), log?: (line: string) => void): Promise<string | null> {
   const pending = await pendingMigrations(url);
   if (pending.length === 0) return null;
   let backup: string | null = null;
@@ -208,10 +282,10 @@ export async function migrateWithBackup(url: string, dir: string = dataDir()): P
     const root = path.join(dir, "backups");
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
     backup = path.join(root, `${stamp}-before-${pending[0].replace(/\.sql$/, "")}`);
-    await backupDatabase(url, backup, "before migrations");
+    await backupDatabase(url, backup, "before migrations", await backupKey(dir));
     await pruneBackups(root, BACKUPS_KEPT);
   }
-  await runMigrations(url);
+  await runMigrations(url, { log });
   return backup;
 }
 

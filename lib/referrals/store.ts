@@ -1,0 +1,184 @@
+// referral_sources: the Referrals board's cards. A search adds or refreshes
+// cards by NPI but never touches the stage, notes or follow-up date she set.
+import type postgres from "postgres";
+import { forgetAllowlist } from "../aeon/guard";
+import { audit } from "../audit";
+import { practiceToday } from "../compliance/store";
+import { db } from "../db";
+import { fitScore } from "./fit";
+import { nearbyZips, zipCenters, zipDistance } from "./geo";
+import { fetchProviders, SPECIALTY_BY_ID, type Provider, type SpecialtyId } from "./nppes";
+import { STAGES, STAGE_LABEL, type Stage } from "./stages";
+
+export { STAGES, STAGE_LABEL, type Stage };
+
+export type ReferralSource = {
+  id: string;
+  npi: string | null;
+  name: string;
+  organization: string | null;
+  taxonomy: string | null;
+  specialty: string | null;
+  npi_type: "individual" | "organization" | null;
+  credential: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+  phone: string | null;
+  email: string | null;
+  stage: Stage;
+  distance_miles: number | null;
+  fit_score: number | null;
+  last_contacted_at: string | null;
+  next_follow_up_on: string | null;
+  notes: string | null;
+  is_sample: boolean;
+};
+
+export type FoundSource = Provider & { distanceMiles: number | null; fitScore: number; id?: string };
+
+/** Searches NPPES around a ZIP, scores each provider and saves them. Best fit first. */
+export async function findReferralSources(
+  opts: { zip: string; specialties: SpecialtyId[]; radiusMiles?: number; perSpecialty?: number; fetcher?: Parameters<typeof fetchProviders>[2] },
+  sql: postgres.Sql = db(),
+): Promise<{ zips: string[]; found: FoundSource[]; matched: number; saved: number }> {
+  const centers = await zipCenters();
+  if (!centers[opts.zip]) throw new Error(`I don't know ZIP ${opts.zip}. Check it and try again.`);
+  const zips = nearbyZips(centers, opts.zip, opts.radiusMiles ?? 3, 5);
+  const providers = await fetchProviders(opts.specialties, zips, opts.fetcher);
+  const scored = providers
+    .map((p) => {
+      const distanceMiles = zipDistance(centers, opts.zip, p.zip);
+      return { ...p, distanceMiles, fitScore: fitScore(p, distanceMiles) };
+    })
+    .sort((a, b) => b.fitScore - a.fitScore || (a.distanceMiles ?? 99) - (b.distanceMiles ?? 99) || a.name.localeCompare(b.name));
+  // A city ZIP has thousands; the board keeps the best few of each kind.
+  const perKind = opts.perSpecialty ?? PER_SPECIALTY;
+  const found = opts.specialties.flatMap((s) => scored.filter((p) => p.specialty === s).slice(0, perKind));
+  const saved = await saveSources(found, sql);
+  await audit(
+    { actor: "aeon", action: "referral_sources_found", subjectType: "referral_sources", details: { zip: opts.zip, zips, specialties: opts.specialties, matched: scored.length, saved } },
+    sql,
+  );
+  return { zips, found, matched: scored.length, saved };
+}
+
+const PER_SPECIALTY = 20;
+
+/** The best of each kind in turn, so "primary care and oncology" shows both. */
+export function interleave(found: FoundSource[], count: number): FoundSource[] {
+  const groups = [...new Set(found.map((p) => p.specialty))].map((s) => found.filter((p) => p.specialty === s));
+  const out: FoundSource[] = [];
+  for (let i = 0; out.length < count && groups.some((g) => g[i]); i++) {
+    for (const g of groups) if (g[i] && out.length < count) out.push(g[i]);
+  }
+  return out;
+}
+
+export async function saveSources(found: FoundSource[], sql: postgres.Sql = db()): Promise<number> {
+  if (found.length === 0) return 0;
+  const rows = found.map((p) => ({
+    npi: p.npi,
+    name: p.name,
+    organization: p.organization,
+    taxonomy: p.taxonomy,
+    specialty: p.specialtyLabel,
+    npi_type: p.npiType,
+    credential: p.credential,
+    address: p.address,
+    city: p.city,
+    state: p.state,
+    zip: p.zip,
+    phone: p.phone,
+    distance_miles: p.distanceMiles,
+    fit_score: p.fitScore,
+  }));
+  const result = await sql`
+    insert into practice_os.referral_sources ${sql(rows)}
+    on conflict (npi) do update set
+      name = excluded.name, organization = excluded.organization, taxonomy = excluded.taxonomy,
+      specialty = excluded.specialty, npi_type = excluded.npi_type, credential = excluded.credential,
+      address = excluded.address, city = excluded.city, state = excluded.state, zip = excluded.zip,
+      phone = excluded.phone, distance_miles = excluded.distance_miles, fit_score = excluded.fit_score,
+      updated_at = now()
+    returning id, npi`;
+  const ids = new Map(result.map((r) => [r.npi as string, r.id as string]));
+  for (const p of found) p.id = ids.get(p.npi);
+  // The privacy guard lets her Referrals names through; let it see the new ones now.
+  forgetAllowlist();
+  return result.count;
+}
+
+/** Contacted cards whose follow-up day has come move to Follow up. */
+export async function moveDueFollowUps(sql: postgres.Sql = db()): Promise<number> {
+  const today = await practiceToday(sql);
+  const moved = await sql<{ id: string }[]>`
+    update practice_os.referral_sources set stage = 'follow_up', updated_at = now()
+     where stage = 'contacted' and next_follow_up_on <= ${today}
+    returning id`;
+  for (const { id } of moved) {
+    await audit({ actor: "system", action: "referral_follow_up_due", subjectType: "referral_source", subjectId: id }, sql);
+  }
+  return moved.length;
+}
+
+const COLUMNS = `id, npi, name, organization, taxonomy, specialty, npi_type, credential, address, city, state, zip,
+  phone, email, stage, distance_miles::float8 as distance_miles, fit_score, last_contacted_at, next_follow_up_on::text as next_follow_up_on,
+  notes, is_sample`;
+
+export async function listSources(sql: postgres.Sql = db()): Promise<ReferralSource[]> {
+  await moveDueFollowUps(sql);
+  return sql.unsafe<ReferralSource[]>(
+    `select ${COLUMNS} from practice_os.referral_sources
+      order by fit_score desc nulls last, distance_miles nulls last, name`,
+  );
+}
+
+export async function getSource(id: string, sql: postgres.Sql = db()): Promise<ReferralSource | null> {
+  const [row] = await sql.unsafe<ReferralSource[]>(`select ${COLUMNS} from practice_os.referral_sources where id = $1`, [id]);
+  return row ?? null;
+}
+
+/** Moves a card to another column. Returns the card, or null when there is no such card. */
+export async function moveSource(id: string, stage: Stage, by: "clinician" | "aeon", sql: postgres.Sql = db()) {
+  const before = await getSource(id, sql);
+  if (!before) return null;
+  if (before.stage === stage) return before;
+  await sql`update practice_os.referral_sources set stage = ${stage}, updated_at = now() where id = ${id}`;
+  await audit(
+    { actor: by, action: "referral_stage_moved", subjectType: "referral_source", subjectId: id, details: { from: before.stage, to: stage } },
+    sql,
+  );
+  return { ...before, stage };
+}
+
+/** The approved letter's bookkeeping: card to Contacted, follow-up a week out. */
+export async function markContacted(id: string, followUpDays: number, sql: postgres.Sql = db()): Promise<string> {
+  const today = await practiceToday(sql);
+  const [row] = await sql<{ next_follow_up_on: string }[]>`
+    update practice_os.referral_sources
+       set stage = 'contacted', last_contacted_at = now(),
+           next_follow_up_on = ${today}::date + ${followUpDays}::int, updated_at = now()
+     where id = ${id}
+    returning next_follow_up_on::text as next_follow_up_on`;
+  if (!row) throw new Error("That referral source is no longer on the board.");
+  return row.next_follow_up_on;
+}
+
+export function specialtyLabel(id: SpecialtyId): string {
+  return SPECIALTY_BY_ID.get(id)!.label;
+}
+
+export type LetterState = { approvalId: string; status: string; dryRun: boolean | null };
+
+/** The latest introduction letter for each card, so the board can say where it stands. */
+export async function latestLetters(sql: postgres.Sql = db()): Promise<Record<string, LetterState>> {
+  const rows = await sql<{ source_id: string; id: string; status: string; dry_run: boolean | null }[]>`
+    select distinct on (payload ->> 'referral_source_id')
+           payload ->> 'referral_source_id' as source_id, id, status, (result ->> 'dry_run')::boolean as dry_run
+      from practice_os.approvals
+     where kind = 'referral_letter' and payload ? 'referral_source_id'
+     order by payload ->> 'referral_source_id', created_at desc`;
+  return Object.fromEntries(rows.map((r) => [r.source_id, { approvalId: r.id, status: r.status, dryRun: r.dry_run }]));
+}
