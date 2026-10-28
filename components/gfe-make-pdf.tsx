@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { INPUT } from "./gfe-timing-check";
+import { DateField } from "./shared/date-field";
+import { SettingSelect, TextField } from "./shared/settings-controls";
 import { Button } from "./ui";
 
 // The client's details for one PDF. They go to the server only to build the
@@ -79,30 +80,38 @@ export function GfeMakePdf({ id, reference, issued }: { id: string; reference: s
         {issued ? "Keep the PDF with the client’s records for 6 years." : "Not approved yet, so the PDF says DRAFT."}
       </p>
       <div className="grid gap-3 sm:grid-cols-3">
-        {FIELDS.map((f) => (
-          <label key={f.key} className="flex flex-col gap-1 text-small font-medium">
-            {f.label}
-            <input
+        {FIELDS.map((f) =>
+          f.type === "date" ? (
+            <DateField
+              key={f.key}
+              label={f.label}
+              required={f.required}
+              value={form[f.key]}
+              onChange={(iso) => setForm((prev) => ({ ...prev, [f.key]: iso }))}
+            />
+          ) : (
+            <TextField
+              key={f.key}
+              compact
+              label={f.label}
               type={f.type ?? "text"}
               required={f.required}
               autoComplete={f.auto}
-              className={INPUT}
               value={form[f.key]}
               onChange={(e) => setForm((prev) => ({ ...prev, [f.key]: e.target.value }))}
             />
-          </label>
-        ))}
-        <label className="flex flex-col gap-1 text-small font-medium">
-          Contact by
-          <select
-            className={INPUT}
-            value={form.contactPreference}
-            onChange={(e) => setForm((prev) => ({ ...prev, contactPreference: e.target.value as "email" | "mail" }))}
-          >
-            <option value="email">Email</option>
-            <option value="mail">Mail</option>
-          </select>
-        </label>
+          ),
+        )}
+        <SettingSelect
+          compact
+          label="Contact by"
+          value={form.contactPreference}
+          onValueChange={(v) => setForm((prev) => ({ ...prev, contactPreference: v }))}
+          options={[
+            { value: "email", label: "Email" },
+            { value: "mail", label: "Mail" },
+          ]}
+        />
       </div>
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" variant="accent" disabled={busy}>

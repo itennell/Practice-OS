@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { gfeDueDate, type GfeDue, type OpenDays } from "@/lib/gfe/timing";
 import { formatDate } from "./deadline-card";
-import { INPUT } from "./gfe-timing-check";
+import { DateField } from "./shared/date-field";
+import { SettingSelect, TextField } from "./shared/settings-controls";
 import { Button } from "./ui";
 
 // A new Good Faith Estimate: dates, type of care and services from her fee
@@ -16,6 +17,8 @@ type Line = { code: string; quantity: number; location: "office" | "telehealth" 
 const KINDS = { individual: "Individual therapy", couples: "Couples therapy", family: "Family therapy", group: "Group therapy" };
 const LOCATIONS = { either: "Office or telehealth", office: "In the office", telehealth: "Telehealth" };
 const FREQUENCIES = { "": "One-time", weekly: "Once a week", every_2_weeks: "Every 2 weeks", monthly: "Once a month" };
+
+const toOptions = (m: Record<string, string>) => Object.entries(m).map(([value, label]) => ({ value, label }));
 
 const dollars = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
@@ -96,78 +99,49 @@ export function GfeDraftForm({ fees, open, today }: { fees: Fee[]; open: OpenDay
       <div className="grid gap-3 sm:grid-cols-3">
         {basis === "scheduled" ? (
           <>
-            <label className="flex flex-col gap-1 text-small font-medium">
-              Booked on
-              <input type="date" required className={INPUT} value={scheduledOn} onChange={(e) => setScheduledOn(e.target.value)} />
-            </label>
-            <label className="flex flex-col gap-1 text-small font-medium">
-              First visit
-              <input type="date" required className={INPUT} value={serviceOn} onChange={(e) => setServiceOn(e.target.value)} />
-            </label>
+            <DateField label="Booked on" required value={scheduledOn} onChange={setScheduledOn} />
+            <DateField label="First visit" required value={serviceOn} onChange={setServiceOn} />
           </>
         ) : (
-          <label className="flex flex-col gap-1 text-small font-medium">
-            Client asked on
-            <input type="date" required className={INPUT} value={requestedOn} onChange={(e) => setRequestedOn(e.target.value)} />
-          </label>
+          <DateField label="Client asked on" required value={requestedOn} onChange={setRequestedOn} />
         )}
-        <label className="flex flex-col gap-1 text-small font-medium">
-          Type of care
-          <select className={INPUT} value={kind} onChange={(e) => setKind(e.target.value as keyof typeof KINDS)}>
-            {Object.entries(KINDS).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-small font-medium">
-          How often
-          <select className={INPUT} value={frequency} onChange={(e) => setFrequency(e.target.value as keyof typeof FREQUENCIES)}>
-            {Object.entries(FREQUENCIES).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
-          </select>
-        </label>
+        <SettingSelect compact label="Type of care" value={kind} onValueChange={(v) => setKind(v as keyof typeof KINDS)} options={toOptions(KINDS)} />
+        <SettingSelect
+          compact
+          label="How often"
+          value={frequency}
+          onValueChange={(v) => setFrequency(v as keyof typeof FREQUENCIES)}
+          options={toOptions(FREQUENCIES)}
+        />
       </div>
 
       <fieldset className="flex flex-col gap-3">
         <legend className="mb-2 text-small font-medium">Services (from your fee list)</legend>
         {lines.map((l, i) => (
           <div key={i} className="grid gap-2 sm:grid-cols-[minmax(0,2fr)_6rem_minmax(0,1fr)_auto] sm:items-end">
-            <label className="flex flex-col gap-1 text-small">
-              Service {i + 1}
-              <select className={INPUT} value={l.code} onChange={(e) => setLine(i, { code: e.target.value })}>
-                {fees.map((f) => (
-                  <option key={f.code} value={f.code}>
-                    {f.code} {f.label} ({dollars(f.cents)})
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-small">
-              How many
-              <input
-                type="number"
-                min={1}
-                max={366}
-                className={INPUT}
-                value={l.quantity}
-                onChange={(e) => setLine(i, { quantity: Math.max(1, Number(e.target.value) || 1) })}
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-small">
-              Where
-              <select className={INPUT} value={l.location} onChange={(e) => setLine(i, { location: e.target.value as Line["location"] })}>
-                {Object.entries(LOCATIONS).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <SettingSelect
+              compact
+              label={`Service ${i + 1}`}
+              value={l.code}
+              onValueChange={(v) => setLine(i, { code: v })}
+              options={fees.map((f) => ({ value: f.code, label: `${f.code} ${f.label} (${dollars(f.cents)})` }))}
+            />
+            <TextField
+              compact
+              label="How many"
+              type="number"
+              min={1}
+              max={366}
+              value={l.quantity}
+              onChange={(e) => setLine(i, { quantity: Math.max(1, Number(e.target.value) || 1) })}
+            />
+            <SettingSelect
+              compact
+              label="Where"
+              value={l.location}
+              onValueChange={(v) => setLine(i, { location: v as Line["location"] })}
+              options={toOptions(LOCATIONS)}
+            />
             <Button type="button" variant="quiet" disabled={lines.length === 1} onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))}>
               Remove<span className="sr-only"> service {i + 1}</span>
             </Button>

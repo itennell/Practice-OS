@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { INPUT } from "./gfe-timing-check";
+import { DateField } from "./shared/date-field";
+import { TextField } from "./shared/settings-controls";
 import { Button } from "./ui";
 
 // The Illinois release form: who receives it, why, what, and until when. The
@@ -55,29 +56,18 @@ export function ReleaseFormBuilder({ initial, today }: { initial: Partial<Fields
       className="flex flex-col gap-4"
     >
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="flex flex-col gap-1 text-small font-medium">
-          Release to (person or agency)
-          <input className={INPUT} value={f.recipient} onChange={set("recipient")} maxLength={160} />
-        </label>
-        <label className="flex flex-col gap-1 text-small font-medium">
-          Their address, phone or fax
-          <input className={INPUT} value={f.recipient_address} onChange={set("recipient_address")} maxLength={200} />
-        </label>
-        <label className="flex flex-col gap-1 text-small font-medium">
-          Purpose
-          <input className={INPUT} value={f.purpose} onChange={set("purpose")} maxLength={300} />
-        </label>
-        <label className="flex flex-col gap-1 text-small font-medium">
-          Exactly what to release
-          <input className={INPUT} value={f.information} onChange={set("information")} maxLength={400} aria-describedby="release-info-hint" />
-          <span id="release-info-hint" className="font-normal text-[var(--fg-muted)]">
-            For example, dates of attendance and a treatment summary. “All records” isn’t valid in Illinois.
-          </span>
-        </label>
-        <label className="flex flex-col gap-1 text-small font-medium">
-          Consent ends on (required)
-          <input type="date" required min={today} className={INPUT} value={f.expires_on} onChange={set("expires_on")} />
-        </label>
+        <TextField compact label="Release to (person or agency)" value={f.recipient} onChange={set("recipient")} maxLength={160} />
+        <TextField compact label="Their address, phone or fax" value={f.recipient_address} onChange={set("recipient_address")} maxLength={200} />
+        <TextField compact label="Purpose" value={f.purpose} onChange={set("purpose")} maxLength={300} />
+        <TextField
+          compact
+          label="Exactly what to release"
+          description="For example, dates of attendance and a treatment summary. “All records” isn’t valid in Illinois."
+          value={f.information}
+          onChange={set("information")}
+          maxLength={400}
+        />
+        <DateField label="Consent ends on (required)" required min={today} value={f.expires_on} onChange={(iso) => setF((x) => ({ ...x, expires_on: iso }))} />
       </div>
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" variant="primary" disabled={busy}>

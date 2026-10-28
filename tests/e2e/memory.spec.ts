@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { execSync } from "node:child_process";
+import { pick } from "../helpers/controls";
 
 test.beforeEach(() => {
   execSync("npm run db:reset", { stdio: "ignore" });
@@ -18,7 +19,7 @@ test("Add, refuse, edit, switch off and delete a memory", async ({ page }) => {
   await expect(page.getByRole("alert").filter({ hasText: "person's name" })).toBeVisible();
   await expect(page.getByRole("list").getByText("Alvarez")).toHaveCount(0);
 
-  await page.getByLabel("Kind").selectOption("decision");
+  await pick(page, page, "Kind", "Decision");
   await what.fill("[Sample] Does not take Medicaid");
   await page.getByRole("button", { name: "Remember this" }).click();
   const item = page.getByRole("listitem").filter({ hasText: "Does not take Medicaid" });
@@ -34,6 +35,11 @@ test("Add, refuse, edit, switch off and delete a memory", async ({ page }) => {
   await expect(edited).toContainText("switched off");
   await expect(edited.getByRole("button", { name: "Use again" })).toBeVisible();
 
+  // Let toasts finish fading in: axe measures a half-faded title as low contrast.
+  // (The orb breathes forever, so only finite animations count.)
+  await page.waitForFunction(() =>
+    document.getAnimations().every((a) => a.playState !== "running" || a.effect?.getTiming().iterations === Infinity),
+  );
   const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
   const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
   expect(serious.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);

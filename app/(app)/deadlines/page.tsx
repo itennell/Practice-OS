@@ -151,11 +151,11 @@ function ListSkeleton() {
     <div aria-hidden className="flex flex-col gap-3">
       <div className="flex flex-wrap gap-2">
         {["w-36", "w-36", "w-24", "w-40"].map((w, i) => (
-          <div key={i} className={`h-chip ${w} animate-pulse rounded-full bg-[var(--glass-strong)]`} />
+          <div key={i} className={`h-chip ${w} animate-pulse rounded-full bg-[var(--hairline)]`} />
         ))}
       </div>
       {[0, 1, 2, 3].map((i) => (
-        <div key={i} className="h-36 animate-pulse rounded-[20px] bg-[var(--glass-strong)]" />
+        <div key={i} className="h-36 animate-pulse rounded-[20px] bg-[var(--hairline)]" />
       ))}
     </div>
   );

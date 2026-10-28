@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { INPUT } from "./gfe-timing-check";
-import { Button } from "./ui";
+import { DateField } from "./shared/date-field";
+import { TextField } from "./shared/settings-controls";
+import { Button, chipClass } from "./ui";
 
 // Her office hours (Good Faith Estimate due dates count only open days) and self-pay fees.
 
@@ -58,9 +59,7 @@ export function OfficeSettings({ initialHours, initialFees }: { initialHours: Ho
                 type="button"
                 aria-pressed={on}
                 onClick={() => toggleDay(d)}
-                className={`inline-flex h-chip min-w-14 items-center justify-center rounded-full px-4 text-small font-medium ${
-                  on ? "bg-[var(--primary-bg)] text-[var(--primary-fg)]" : "border border-border bg-[var(--chip-off-bg)] text-[var(--fg)]"
-                }`}
+                className={chipClass(on, true, "justify-center min-w-14")}
               >
                 {label}
               </button>
@@ -82,10 +81,7 @@ export function OfficeSettings({ initialHours, initialFees }: { initialHours: Ho
           Closed on federal holidays
         </label>
         <div className="flex flex-wrap items-end gap-2">
-          <label className="flex flex-col gap-1 text-small font-medium">
-            Another day you’re closed
-            <input type="date" className={INPUT} value={closedDate} onChange={(e) => setClosedDate(e.target.value)} />
-          </label>
+          <DateField label="Another day you’re closed" value={closedDate} onChange={setClosedDate} />
           <Button
             type="button"
             variant="quiet"
@@ -122,25 +118,17 @@ export function OfficeSettings({ initialHours, initialFees }: { initialHours: Ho
         </h3>
         {fees.map((f, i) => (
           <div key={i} className="grid gap-2 sm:grid-cols-[7rem_minmax(0,1fr)_8rem_auto] sm:items-end">
-            <label className="flex flex-col gap-1 text-small">
-              Code
-              <input className={INPUT} value={f.code} onChange={(e) => setFees((fs) => fs.map((x, j) => (j === i ? { ...x, code: e.target.value } : x)))} />
-            </label>
-            <label className="flex flex-col gap-1 text-small">
-              What it is
-              <input className={INPUT} value={f.label} onChange={(e) => setFees((fs) => fs.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))} />
-            </label>
-            <label className="flex flex-col gap-1 text-small">
-              Fee ($)
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                className={INPUT}
-                value={f.dollars}
-                onChange={(e) => setFees((fs) => fs.map((x, j) => (j === i ? { ...x, dollars: e.target.value } : x)))}
-              />
-            </label>
+            <TextField compact label="Code" value={f.code} onChange={(e) => setFees((fs) => fs.map((x, j) => (j === i ? { ...x, code: e.target.value } : x)))} />
+            <TextField compact label="What it is" value={f.label} onChange={(e) => setFees((fs) => fs.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))} />
+            <TextField
+              compact
+              label="Fee ($)"
+              type="number"
+              min={0}
+              step="0.01"
+              value={f.dollars}
+              onChange={(e) => setFees((fs) => fs.map((x, j) => (j === i ? { ...x, dollars: e.target.value } : x)))}
+            />
             <Button type="button" variant="quiet" onClick={() => setFees((fs) => fs.filter((_, j) => j !== i))}>
               Remove<span className="sr-only"> {f.code}</span>
             </Button>

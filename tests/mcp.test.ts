@@ -1,7 +1,7 @@
 // queue_approval through a real MCP client over stdio, against the live database.
 // Runs only when DATABASE_URL is set; deletes the rows it creates.
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { StdioClientTransport, getDefaultEnvironment } from "@modelcontextprotocol/sdk/client/stdio.js";
 import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadEnv } from "../lib/env";
@@ -19,7 +19,16 @@ beforeAll(async () => {
   const [s] = await sql`select approval_mode from practice_os.settings limit 1`.catch(() => [] as { approval_mode?: string }[]);
   savedMode = s?.approval_mode ?? null;
   if (savedMode) await sql`update practice_os.settings set approval_mode = 'auto'`;
-  await client.connect(new StdioClientTransport({ command: "npx", args: ["tsx", "mcp/server.ts"], stderr: "pipe" }));
+  // Hand the server this test's DATABASE_URL: by default the SDK passes only PATH and HOME, so the server
+  // would read .env and write to a different database than the one this test checks and cleans up.
+  await client.connect(
+    new StdioClientTransport({
+      command: "npx",
+      args: ["tsx", "mcp/server.ts"],
+      stderr: "pipe",
+      env: { ...getDefaultEnvironment(), DATABASE_URL: url! },
+    }),
+  );
 });
 
 afterAll(async () => {

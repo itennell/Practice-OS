@@ -1,22 +1,23 @@
 @import "tailwindcss";
 
-/* Caseload design tokens (AGENTS.md > Design system; design board page 7). */
+/* Design tokens (AGENTS.md > Design system). Calm warm neutrals; purple is only the accent and Aeon's orb. */
 @theme {
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 
-  --color-canvas: #f5f3fc;
-  --color-glow-lilac: #e2d8ff;
-  --color-glow-blue: #c9dbff;
-  --color-ink: #17142b;
-  --color-muted: #5d5878;
+  --color-canvas: #faf9f5;
+  --color-card: #ffffff;
+  --color-ink: #1f1e1d;
+  --color-muted: #65635c;
   --color-accent: #5b47c9;
   --color-accent-hover: #43349a;
-  --color-primary: #1e1a3a;
-  --color-border: #d4cdf0;
+  --color-primary: #1f1e1d;
+  /* Decorative hairlines follow the theme (--line); control outlines use --fg-muted for 3:1. */
+  --color-border: var(--line);
   --color-success: #2f7a55;
 
-  --color-dark-surface: #100d24;
-  --color-dark-surface-2: #121022;
+  --color-dark-canvas: #262624;
+  --color-dark-card: #30302e;
+  --color-dark-ink: #f5f4ef;
   --color-dark-accent: #8e7cf8;
 
   /* Board type scale: title 27-34/600, body 15/400 at 1.5, label 12/600, small 12-13. */
@@ -69,15 +70,16 @@
   --fg-muted: var(--color-muted);
   --link: var(--color-accent);
   --accent-fg: var(--color-accent);
-  --glass: rgb(255 255 255 / 0.64);
-  --glass-strong: rgb(255 255 255 / 0.78);
-  --glass-line: rgb(255 255 255 / 0.85);
-  --hairline: rgb(23 20 43 / 0.08);
-  --glow-1: var(--color-glow-lilac);
-  --glow-2: var(--color-glow-blue);
+  /* Cards are solid (the class is still called glass so every screen picks this up). */
+  --glass: var(--color-card);
+  --glass-strong: var(--color-card);
+  --glass-line: rgb(31 30 29 / 0.1);
+  --line: #e3e1d9;
+  --hairline: rgb(31 30 29 / 0.07);
+  --card-shadow: 0 1px 2px rgb(31 30 29 / 0.04);
   --primary-bg: var(--color-primary);
   --primary-fg: #ffffff;
-  --primary-hover: #2c2752;
+  --primary-hover: #3b3a37;
   --chip-off-bg: #ffffff;
 
   /* Approval status pills (light text on tinted ground, all >= 4.5:1). */
@@ -89,24 +91,24 @@
   --status-done-bg: #e2f2e9;
   --status-failed-fg: #a1261b;
   --status-failed-bg: #fce9e6;
-  --status-rejected-fg: #504b69;
-  --status-rejected-bg: #ecebf2;
+  --status-rejected-fg: #55534d;
+  --status-rejected-bg: #efeee9;
   --danger-fg: #a1261b;
   /* Danger pill (Confirm dialog): solid red with white text in light. */
   --danger-bg: #a1261b;
   --danger-on: #ffffff;
   --danger-hover: #861d14;
-  --scrim: rgb(23 20 43 / 0.32);
+  --scrim: rgb(31 30 29 / 0.32);
 
   /* Avatars: initials on soft tints. The clinician is lilac; callers and contacts get a tone from their name. */
   /* Raised card (attachments, small tiles): white hairline, top highlight and a soft two-layer shadow. */
-  --tile-bg: rgb(255 255 255 / 0.82);
-  --tile-line: rgb(23 20 43 / 0.06);
-  --tile-shadow: inset 0 1px 0 rgb(255 255 255 / 0.9), 0 1px 2px rgb(23 20 43 / 0.06), 0 6px 18px -4px rgb(43 33 110 / 0.14);
-  --tile-shadow-hover: inset 0 1px 0 rgb(255 255 255 / 0.9), 0 2px 4px rgb(23 20 43 / 0.06), 0 12px 28px -6px rgb(43 33 110 / 0.2);
+  --tile-bg: #ffffff;
+  --tile-line: rgb(31 30 29 / 0.1);
+  --tile-shadow: 0 1px 2px rgb(31 30 29 / 0.05), 0 4px 12px -4px rgb(31 30 29 / 0.08);
+  --tile-shadow-hover: 0 2px 4px rgb(31 30 29 / 0.06), 0 10px 24px -6px rgb(31 30 29 / 0.14);
   /* Errors on raised cards: a soft red hairline and a faint red glow instead of a hard red outline. */
   --tile-error-line: rgb(161 38 27 / 0.28);
-  --tile-error-shadow: inset 0 1px 0 rgb(255 255 255 / 0.9), 0 1px 2px rgb(23 20 43 / 0.06), 0 8px 22px -6px rgb(161 38 27 / 0.22);
+  --tile-error-shadow: 0 1px 2px rgb(31 30 29 / 0.05), 0 8px 22px -6px rgb(161 38 27 / 0.18);
   /* Toasts float over anything, so they are solid. */
   --toast-bg: #ffffff;
 
@@ -137,19 +139,20 @@
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
-    --bg: var(--color-dark-surface);
-    --fg: #f1eeff;
-    --fg-muted: #b3adcf;
-    --link: var(--color-dark-accent);
+    --bg: var(--color-dark-canvas);
+    --fg: var(--color-dark-ink);
+    --fg-muted: #b5b3ab;
+    /* #8E7CF8 is the dark accent for fills; text links use a lighter tint so they read on #30302E. */
+    --link: #b0a3fb;
     --accent-fg: #b0a3fb;
-    --glass: rgb(18 16 34 / 0.64);
-    --glass-strong: rgb(18 16 34 / 0.82);
-    --glass-line: rgb(255 255 255 / 0.1);
-    --hairline: rgb(255 255 255 / 0.08);
-    --glow-1: rgb(142 124 248 / 0.18);
-    --glow-2: rgb(78 105 218 / 0.16);
-    --primary-bg: #f1eeff;
-    --primary-fg: #17142b;
+    --glass: var(--color-dark-card);
+    --glass-strong: var(--color-dark-card);
+    --glass-line: rgb(255 255 255 / 0.08);
+    --line: #44433f;
+    --hairline: rgb(255 255 255 / 0.07);
+    --card-shadow: none;
+    --primary-bg: var(--color-dark-ink);
+    --primary-fg: var(--color-ink);
     --primary-hover: #ffffff;
     --chip-off-bg: transparent;
 
@@ -161,19 +164,19 @@
     --status-done-bg: rgb(143 216 174 / 0.12);
     --status-failed-fg: #ffaea3;
     --status-failed-bg: rgb(255 174 163 / 0.12);
-    --status-rejected-fg: #c9c4de;
+    --status-rejected-fg: #cfcdc5;
     --status-rejected-bg: rgb(255 255 255 / 0.08);
     --danger-fg: #ffaea3;
     --danger-bg: rgb(255 174 163 / 0.16);
     --danger-on: #ffaea3;
-    --danger-hover: rgb(255 174 163 / 0.24);
+    --danger-hover: rgb(255 174 163 / 0.2);
     --scrim: rgb(0 0 0 / 0.55);
 
-    --tile-bg: rgb(30 26 58 / 0.72);
+    --tile-bg: #383835;
     --tile-line: rgb(255 255 255 / 0.07);
     --tile-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 22px -6px rgb(0 0 0 / 0.5);
     --tile-shadow-hover: inset 0 1px 0 rgb(255 255 255 / 0.08), 0 2px 4px rgb(0 0 0 / 0.3), 0 14px 32px -8px rgb(0 0 0 / 0.6);
-    --toast-bg: #1d1938;
+    --toast-bg: #383835;
     --tile-error-line: rgb(255 174 163 / 0.3);
     --tile-error-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 1px 2px rgb(0 0 0 / 0.3), 0 10px 26px -8px rgb(255 120 100 / 0.28);
     --event-deadline: #f6c56b;
@@ -198,10 +201,6 @@ body {
   min-height: 100vh;
   color: var(--fg);
   background-color: var(--bg);
-  background-image:
-    radial-gradient(60rem 40rem at 0% 0%, var(--glow-1), transparent 70%),
-    radial-gradient(60rem 40rem at 100% 100%, var(--glow-2), transparent 70%);
-  background-attachment: fixed;
   font-size: var(--text-body);
   line-height: 1.5;
 }
@@ -225,13 +224,13 @@ textarea {
   caret-color: var(--accent-fg);
 }
 
-/* Glass card: white at 64%, 18px blur, white hairline at 85%, radius 24. */
+/* Card: solid white (dark #30302E), one hairline, radius 24. No blur on everyday screens.
+   The name stays "glass" so every screen moved over at once. */
 @utility glass {
   background: var(--glass);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
   border: 1px solid var(--glass-line);
   border-radius: var(--radius-card);
+  box-shadow: var(--card-shadow);
 }
 
 /* Raised card for small things that sit on a glass card: attachments, toasts, file tiles.
@@ -241,8 +240,6 @@ textarea {
   border: 1px solid var(--tile-line);
   border-radius: var(--radius-card-sm);
   box-shadow: var(--tile-shadow);
-  backdrop-filter: blur(var(--blur-glass));
-  -webkit-backdrop-filter: blur(var(--blur-glass));
 }
 
 /* Label style from the board: 12 / 600 / uppercase, in accent. */

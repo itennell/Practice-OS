@@ -19,10 +19,24 @@ import { ConfirmDialog } from "./confirm-dialog";
 
 const FOCUS = "outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] focus-visible:outline-solid";
 
-function Text({ id, label, description, htmlFor }: { id?: string; label: ReactNode; description?: ReactNode; htmlFor?: string }) {
+/** In forms (compact) labels are small and fields fill their column; `hideLabel` keeps the label for screen readers only. */
+export type FieldLayout = { compact?: boolean; hideLabel?: boolean };
+
+export const LABEL_CLASS = (compact?: boolean, hide?: boolean) =>
+  cn(compact ? "text-small font-medium" : "text-body font-medium", "text-[var(--fg)]", hide && "sr-only");
+export const WRAP_CLASS = (compact?: boolean) => (compact ? "flex min-w-0 flex-col gap-1" : "flex flex-col gap-2 py-2");
+
+function Text({
+  id,
+  label,
+  description,
+  htmlFor,
+  compact,
+  hideLabel,
+}: { id?: string; label: ReactNode; description?: ReactNode; htmlFor?: string } & FieldLayout) {
   return (
-    <span className="flex min-w-0 flex-col gap-0.5">
-      <label htmlFor={htmlFor} className="text-body font-medium text-[var(--fg)]">
+    <span className={cn("flex min-w-0 flex-col gap-0.5", hideLabel && !description && "contents")}>
+      <label htmlFor={htmlFor} className={LABEL_CLASS(compact, hideLabel)}>
         {label}
       </label>
       {description && (
@@ -97,17 +111,29 @@ export type SettingSelectProps<V extends string> = {
   value: V;
   onValueChange: (value: V) => void;
   options: { value: V; label: string }[];
-};
+  disabled?: boolean;
+  className?: string;
+} & FieldLayout;
 
 /** A labelled dropdown with a 48px pill trigger. */
-export function SettingSelect<V extends string>({ label, description, value, onValueChange, options }: SettingSelectProps<V>) {
+export function SettingSelect<V extends string>({
+  label,
+  description,
+  value,
+  onValueChange,
+  options,
+  disabled,
+  compact,
+  hideLabel,
+  className,
+}: SettingSelectProps<V>) {
   const id = useId();
   const items = Object.fromEntries(options.map((o) => [o.value, o.label]));
   return (
-    <div className="flex flex-col gap-2 py-2">
-      <Select.Root items={items} value={value} onValueChange={(v) => v && onValueChange(v as V)}>
-        <span className="flex min-w-0 flex-col gap-0.5">
-          <Select.Label className="text-body font-medium text-[var(--fg)]">{label}</Select.Label>
+    <div className={cn(WRAP_CLASS(compact), className)}>
+      <Select.Root items={items} value={value} disabled={disabled} onValueChange={(v) => v !== null && onValueChange(v as V)}>
+        <span className={cn("flex min-w-0 flex-col gap-0.5", hideLabel && !description && "contents")}>
+          <Select.Label className={LABEL_CLASS(compact, hideLabel)}>{label}</Select.Label>
           {description && (
             <span id={`${id}-d`} className="text-small text-[var(--fg-muted)]">
               {description}
@@ -117,11 +143,12 @@ export function SettingSelect<V extends string>({ label, description, value, onV
         <Select.Trigger
           aria-describedby={description ? `${id}-d` : undefined}
           className={cn(
-            "inline-flex h-input w-full max-w-sm items-center justify-between gap-2 rounded-full border border-[var(--fg-muted)] bg-[var(--chip-off-bg)] px-5 text-body text-[var(--fg)] data-[popup-open]:border-[var(--accent-fg)]",
+            "inline-flex h-input w-full items-center justify-between gap-2 rounded-full border border-[var(--fg-muted)] bg-[var(--chip-off-bg)] px-5 text-left text-body text-[var(--fg)] data-[popup-open]:border-[var(--accent-fg)] data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50",
+            !compact && "max-w-sm",
             FOCUS,
           )}
         >
-          <Select.Value />
+          <Select.Value className="min-w-0 truncate" />
           <Select.Icon>
             <ChevronDown aria-hidden size={18} className="text-[var(--fg-muted)]" />
           </Select.Icon>
@@ -129,7 +156,7 @@ export function SettingSelect<V extends string>({ label, description, value, onV
         <Select.Portal>
           <Select.Positioner sideOffset={6} alignItemWithTrigger={false} className="z-50">
             <Select.Popup className="tile min-w-[var(--anchor-width)] bg-[var(--toast-bg)]! p-1.5 outline-none">
-              <Select.List>
+              <Select.List className="max-h-[min(24rem,var(--available-height))] overflow-y-auto">
                 {options.map((o) => (
                   <Select.Item
                     key={o.value}
@@ -201,21 +228,28 @@ export function SettingRadio<V extends string>({ label, description, value, onVa
   );
 }
 
-export type TextFieldProps = Omit<ComponentProps<"input">, "id"> & { label: string; description?: string; error?: string };
+export type TextFieldProps = Omit<ComponentProps<"input">, "id"> & {
+  label: string;
+  description?: string;
+  error?: string;
+  /** Classes for the outer wrapper (grid placement); `className` styles the input. */
+  wrapClassName?: string;
+} & FieldLayout;
 
 /** A labelled 48px pill text input, with an optional error in words. */
-export function TextField({ label, description, error, className, ...props }: TextFieldProps) {
+export function TextField({ label, description, error, className, wrapClassName, compact, hideLabel, ...props }: TextFieldProps) {
   const id = useId();
   const describedBy = [description && `${id}-d`, error && `${id}-e`].filter(Boolean).join(" ") || undefined;
   return (
-    <div className="flex flex-col gap-2 py-2">
-      <Text label={label} description={description} htmlFor={id} id={`${id}-d`} />
+    <div className={cn(WRAP_CLASS(compact), wrapClassName)}>
+      <Text label={label} description={description} htmlFor={id} id={`${id}-d`} compact={compact} hideLabel={hideLabel} />
       <input
         id={id}
         aria-describedby={describedBy}
         aria-invalid={error ? true : undefined}
         className={cn(
-          "h-input w-full max-w-sm rounded-full border border-[var(--fg-muted)] bg-[var(--chip-off-bg)] px-5 text-body text-[var(--fg)] placeholder:text-[var(--fg-muted)]",
+          "h-input w-full rounded-full border border-[var(--fg-muted)] bg-[var(--chip-off-bg)] px-5 text-body text-[var(--fg)] placeholder:text-[var(--fg-muted)] disabled:cursor-not-allowed disabled:opacity-50",
+          !compact && "max-w-sm",
           "aria-invalid:border-[var(--danger-fg)]",
           FOCUS,
           className,

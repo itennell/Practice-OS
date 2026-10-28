@@ -21,11 +21,11 @@ export default function Page() {
       <ComingNext title="Settings">
         Connect Instagram, Gmail, Cal.com and your phone number.
       </ComingNext>
-      <Suspense fallback={<div aria-hidden className="h-96 max-w-3xl animate-pulse rounded-[24px] bg-[var(--glass-strong)]" />}>
+      <Suspense fallback={<div aria-hidden className="h-96 max-w-3xl animate-pulse rounded-[24px] bg-[var(--hairline)]" />}>
         <Modes />
         <Office />
       </Suspense>
-      <Suspense fallback={<div aria-hidden className="h-64 max-w-3xl animate-pulse rounded-[24px] bg-[var(--glass-strong)]" />}>
+      <Suspense fallback={<div aria-hidden className="h-64 max-w-3xl animate-pulse rounded-[24px] bg-[var(--hairline)]" />}>
         <Aeon />
       </Suspense>
     </>

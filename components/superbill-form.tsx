@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { INPUT } from "./gfe-timing-check";
+import { DateField } from "./shared/date-field";
+import { SettingSelect, TextField } from "./shared/settings-controls";
 import { Button } from "./ui";
 
 // A superbill by hand: sessions, codes, place of service and what was paid.
@@ -85,49 +86,30 @@ export function SuperbillForm({ cpts, fees, today }: { cpts: Cpt[]; fees: Fee[];
         <legend className="mb-2 text-small font-medium">Sessions</legend>
         {lines.map((l, i) => (
           <div key={i} className="grid gap-2 sm:grid-cols-[9.5rem_minmax(0,2fr)_minmax(0,1.6fr)_8rem_7rem_auto] sm:items-end">
-            <label className="flex flex-col gap-1 text-small">
-              Date {i + 1}
-              <input type="date" required max={today} className={INPUT} value={l.date_of_service} onChange={(e) => setLine(i, { date_of_service: e.target.value })} />
-            </label>
-            <label className="flex flex-col gap-1 text-small">
-              Service
-              <select className={INPUT} value={l.cpt} onChange={(e) => setLine(i, { cpt: e.target.value })}>
-                {cpts.map((c) => (
-                  <option key={c.code} value={c.code}>
-                    {c.code} {c.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-small">
-              Where
-              <select className={INPUT} value={l.pos} onChange={(e) => setLine(i, { pos: e.target.value as Line["pos"] })}>
-                {Object.entries(PLACES).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-small">
-              Modifier
-              <select
-                className={INPUT}
-                value={l.modifier}
-                disabled={l.pos === "11"}
-                onChange={(e) => setLine(i, { modifier: e.target.value as Line["modifier"] })}
-              >
-                {Object.entries(MODS).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-small">
-              Fee ($)
-              <input inputMode="decimal" required className={INPUT} value={l.dollars} onChange={(e) => setLine(i, { dollars: e.target.value })} />
-            </label>
+            <DateField label={`Date ${i + 1}`} required max={today} value={l.date_of_service} onChange={(iso) => setLine(i, { date_of_service: iso })} />
+            <SettingSelect
+              compact
+              label="Service"
+              value={l.cpt}
+              onValueChange={(v) => setLine(i, { cpt: v })}
+              options={cpts.map((c) => ({ value: c.code, label: `${c.code} ${c.label}` }))}
+            />
+            <SettingSelect
+              compact
+              label="Where"
+              value={l.pos}
+              onValueChange={(v) => setLine(i, { pos: v })}
+              options={Object.entries(PLACES).map(([k, v]) => ({ value: k as Line["pos"], label: v }))}
+            />
+            <SettingSelect
+              compact
+              label="Modifier"
+              value={l.modifier}
+              disabled={l.pos === "11"}
+              onValueChange={(v) => setLine(i, { modifier: v })}
+              options={Object.entries(MODS).map(([k, v]) => ({ value: k as Line["modifier"], label: v }))}
+            />
+            <TextField compact label="Fee ($)" inputMode="decimal" required value={l.dollars} onChange={(e) => setLine(i, { dollars: e.target.value })} />
             <Button type="button" variant="quiet" disabled={lines.length === 1} onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))}>
               Remove<span className="sr-only"> session {i + 1}</span>
             </Button>
@@ -140,10 +122,7 @@ export function SuperbillForm({ cpts, fees, today }: { cpts: Cpt[]; fees: Fee[];
         </div>
       </fieldset>
 
-      <label className="flex max-w-xs flex-col gap-1 text-small font-medium">
-        Client already paid ($)
-        <input inputMode="decimal" className={INPUT} value={paid} onChange={(e) => setPaid(e.target.value)} />
-      </label>
+      <TextField compact wrapClassName="max-w-xs" label="Client already paid ($)" inputMode="decimal" value={paid} onChange={(e) => setPaid(e.target.value)} />
 
       <p aria-live="polite">
         Total <strong>${asDollars(total)}</strong> · Balance <strong>${asDollars(Math.max(0, total - (cents(paid) || 0)))}</strong>

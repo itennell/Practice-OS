@@ -111,9 +111,9 @@ async function StartCards() {
 function ChatSkeleton() {
   return (
     <div aria-hidden className="mx-auto flex w-full max-w-[760px] flex-col items-center gap-4 pt-6">
-      <div className="size-28 animate-pulse rounded-full bg-[var(--glass-strong)]" />
-      <div className="h-9 w-72 max-w-full animate-pulse rounded-full bg-[var(--glass-strong)]" />
-      <div className="h-[52px] w-full animate-pulse rounded-full bg-[var(--glass-strong)]" />
+      <div className="size-28 animate-pulse rounded-full bg-[var(--hairline)]" />
+      <div className="h-9 w-72 max-w-full animate-pulse rounded-full bg-[var(--hairline)]" />
+      <div className="h-[52px] w-full animate-pulse rounded-full bg-[var(--hairline)]" />
     </div>
   );
 }

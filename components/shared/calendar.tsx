@@ -8,7 +8,7 @@
 // was the visual reference only (AGPL, no code taken). Put it inside a glass card.
 
 import { createContext, useContext, useEffect, useMemo, useRef } from "react";
-import { DayPicker, type DayButtonProps } from "react-day-picker";
+import { DayPicker, type DayButtonProps, type Matcher } from "react-day-picker";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { dayKey, dayLabel, groupByDay, type CalendarEvent, type CalendarEventKind } from "./calendar-labels";
@@ -83,6 +83,8 @@ export type CalendarProps = {
   defaultMonth?: Date;
   /** For fixed screenshots and tests; defaults to the real today. */
   today?: Date;
+  /** Days that can't be picked (e.g. before `min` in a date field). */
+  disabled?: Matcher | Matcher[];
   className?: string;
 };
 
@@ -94,6 +96,7 @@ export function Calendar({
   onMonthChange,
   defaultMonth,
   today,
+  disabled,
   className,
 }: CalendarProps) {
   const byDay = useMemo(() => groupByDay(events), [events]);
@@ -109,6 +112,7 @@ export function Calendar({
         onMonthChange={onMonthChange}
         defaultMonth={defaultMonth ?? selected}
         today={today}
+        disabled={disabled}
         weekStartsOn={0}
         showOutsideDays
         fixedWeeks

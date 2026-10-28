@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { execSync } from "node:child_process";
+import { pick, typeDate } from "../helpers/controls";
 
 test.beforeEach(() => {
   execSync("npm run db:reset", { stdio: "ignore" });
@@ -27,9 +28,9 @@ test("Marking BCBSIL approved sets a recredential date 36 months out", async ({ 
   await page.waitForLoadState("networkidle");
   const bcbs = page.getByRole("listitem", { name: "BCBSIL" });
   await bcbs.getByRole("button", { name: "Edit BCBSIL" }).click();
-  await bcbs.getByLabel("Status").selectOption("approved");
-  await bcbs.getByLabel("Approved", { exact: true }).fill("2026-10-27");
-  await bcbs.getByLabel("Follow up").fill("");
+  await pick(page, bcbs, "Status", "Approved");
+  await typeDate(bcbs, "Approved", "2026-10-27");
+  await typeDate(bcbs, "Follow up", "");
   await bcbs.getByRole("button", { name: "Save" }).click();
   await expect(page.getByRole("listitem", { name: "BCBSIL" }).getByText(/Recredential by Oct 27, 2029/)).toBeVisible();
 });

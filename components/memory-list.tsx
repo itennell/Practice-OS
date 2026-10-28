@@ -8,7 +8,8 @@
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { notify } from "@/components/shared/toaster";
-import { Button } from "./ui";
+import { SettingSelect, TextField } from "@/components/shared/settings-controls";
+import { Button, chipClass } from "./ui";
 
 export const KINDS = [
   { id: "preference", label: "Preferences", one: "Preference" },
@@ -27,8 +28,8 @@ export type MemoryView = {
   updated_at: string;
 };
 
-const fieldClass =
-  "rounded-[20px] border border-border bg-[var(--chip-off-bg)] px-5 py-3 text-body outline-none focus:border-accent";
+const areaClass =
+  "min-h-24 w-full rounded-[20px] border border-[var(--fg-muted)] bg-[var(--chip-off-bg)] px-5 py-3 text-body text-[var(--fg)]";
 
 function sourceWords(m: MemoryView): string {
   const from = m.source.startsWith("chat:") ? "from a chat" : m.source.startsWith("mcp:") ? `from ${m.source.slice(4)}` : "added by you";
@@ -77,7 +78,7 @@ function MemoryItem({ memory, onChange, onDelete }: { memory: MemoryView; onChan
   }
 
   return (
-    <li aria-labelledby={headingId} className={`tile flex flex-col gap-3 p-5 ${memory.archived ? "opacity-75" : ""}`}>
+    <li aria-labelledby={headingId} className={`tile flex flex-col gap-3 p-5 ${memory.archived ? "border-dashed bg-transparent! shadow-none!" : ""}`}>
       <p className="text-small text-[var(--fg-muted)]">
         {kind.one} · {sourceWords(memory)}
         {memory.archived ? " · switched off" : ""}
@@ -92,7 +93,7 @@ function MemoryItem({ memory, onChange, onDelete }: { memory: MemoryView; onChan
         >
           <label className="flex flex-col gap-2">
             <span className="label-caps">Edit memory</span>
-            <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={2} maxLength={500} className={fieldClass} />
+            <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={2} maxLength={500} className={areaClass} />
           </label>
           {problem && (
             <p role="alert" className="text-small font-medium text-[var(--danger-fg)]">
@@ -186,26 +187,23 @@ export function MemoryList({ initial }: { initial: MemoryView[] }) {
           Add something for Aeon to remember
         </h2>
         <div className="flex flex-col gap-3 md:flex-row">
-          <label className="flex flex-col gap-2 md:w-48">
-            <span className="label-caps">Kind</span>
-            <select value={kind} onChange={(e) => setKind(e.target.value as Kind)} className={`h-input ${fieldClass} py-0`}>
-              {KINDS.map((k) => (
-                <option key={k.id} value={k.id}>
-                  {k.one}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex flex-1 flex-col gap-2">
-            <span className="label-caps">What to remember</span>
-            <input
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              maxLength={500}
-              placeholder="I prefer consults on Tuesday afternoons"
-              className={`h-input ${fieldClass} py-0`}
-            />
-          </label>
+          <SettingSelect
+            compact
+            className="md:w-48"
+            label="Kind"
+            value={kind}
+            onValueChange={setKind}
+            options={KINDS.map((k) => ({ value: k.id, label: k.one }))}
+          />
+          <TextField
+            compact
+            wrapClassName="flex-1"
+            label="What to remember"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            maxLength={500}
+            placeholder="I prefer consults on Tuesday afternoons"
+          />
         </div>
         {problem && (
           <p role="alert" className="text-small font-medium text-[var(--danger-fg)]">
@@ -227,9 +225,7 @@ export function MemoryList({ initial }: { initial: MemoryView[] }) {
             type="button"
             aria-pressed={filter === k.id}
             onClick={() => setFilter(k.id)}
-            className={`inline-flex h-chip items-center rounded-full px-4 text-small font-medium ${
-              filter === k.id ? "bg-[var(--primary-bg)] text-[var(--primary-fg)]" : "border border-border bg-[var(--chip-off-bg)] text-[var(--fg)]"
-            }`}
+            className={chipClass(filter === k.id)}
           >
             {k.label}
           </button>

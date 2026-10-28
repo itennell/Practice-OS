@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { SpringCheck } from "./shared/spring-check";
-import { INPUT } from "./gfe-timing-check";
+import { DateField } from "./shared/date-field";
+import { SettingSelect, TextField } from "./shared/settings-controls";
 import { Button } from "./ui";
 
 // Her credentialing profile, one CAQH section per card, each with Edit and Save.
@@ -126,32 +127,25 @@ function fromInput(f: Field, v: unknown): unknown {
   return typeof v === "string" ? v.trim() : v;
 }
 
-function FieldInput({ f, value, onChange, idPrefix }: { f: Field; value: unknown; onChange: (v: unknown) => void; idPrefix: string }) {
+function FieldInput({ f, value, onChange }: { f: Field; value: unknown; onChange: (v: unknown) => void }) {
   if (f.kind === "checkbox") {
     return <SpringCheck label={f.label} checked={Boolean(value)} onChange={(c) => onChange(c)} strike={false} />;
   }
+  if (f.kind === "select") {
+    return <SettingSelect compact label={f.label} value={String(value)} onValueChange={onChange} options={f.options ?? []} />;
+  }
+  if (f.kind === "date") {
+    return <DateField label={f.label} value={String(value ?? "")} onChange={onChange} clearable={f.optional} />;
+  }
   return (
-    <label className="flex flex-col gap-1 text-small font-medium" htmlFor={`${idPrefix}-${f.key}`}>
-      {f.label}
-      {f.kind === "select" ? (
-        <select id={`${idPrefix}-${f.key}`} className={INPUT} value={String(value)} onChange={(e) => onChange(e.target.value)}>
-          {f.options?.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      ) : (
-        <input
-          id={`${idPrefix}-${f.key}`}
-          className={INPUT}
-          type={f.kind === "date" ? "date" : f.kind === "number" || f.kind === "money" ? "number" : "text"}
-          min={f.kind === "money" ? 0 : undefined}
-          value={String(value ?? "")}
-          onChange={(e) => onChange(e.target.value)}
-        />
-      )}
-    </label>
+    <TextField
+      compact
+      label={f.label}
+      type={f.kind === "number" || f.kind === "money" ? "number" : "text"}
+      min={f.kind === "money" ? 0 : undefined}
+      value={String(value ?? "")}
+      onChange={(e) => onChange(e.target.value)}
+    />
   );
 }
 
@@ -233,7 +227,7 @@ function ObjectSection({ id, title, fields, note, initial }: (typeof OBJECT_SECT
         >
           <div className="grid gap-3 sm:grid-cols-2">
             {fields.map((f) => (
-              <FieldInput key={f.key} f={f} idPrefix={id} value={draft[f.key]} onChange={(v) => setDraft((d) => ({ ...d, [f.key]: v }))} />
+              <FieldInput key={f.key} f={f} value={draft[f.key]} onChange={(v) => setDraft((d) => ({ ...d, [f.key]: v }))} />
             ))}
           </div>
           <div className="flex flex-wrap gap-2">
@@ -261,7 +255,7 @@ function ObjectSection({ id, title, fields, note, initial }: (typeof OBJECT_SECT
   );
 }
 
-function RowsEditor({ title, fields, rows, onChange, idPrefix }: { title: string; fields: Field[]; rows: Obj[]; onChange: (r: Obj[]) => void; idPrefix: string }) {
+function RowsEditor({ title, fields, rows, onChange }: { title: string; fields: Field[]; rows: Obj[]; onChange: (r: Obj[]) => void }) {
   return (
     <fieldset className="flex flex-col gap-3">
       <legend className="mb-1 text-small font-semibold">{title}</legend>
@@ -272,7 +266,6 @@ function RowsEditor({ title, fields, rows, onChange, idPrefix }: { title: string
               <FieldInput
                 key={f.key}
                 f={f}
-                idPrefix={`${idPrefix}-${i}`}
                 value={r[f.key]}
                 onChange={(v) => onChange(rows.map((x, j) => (j === i ? { ...x, [f.key]: v } : x)))}
               />
@@ -336,7 +329,7 @@ function ListSection({
           className="flex flex-col gap-4"
         >
           {lists.map((l) => (
-            <RowsEditor key={l.key} idPrefix={`${id}-${l.key}`} title={l.title} fields={l.fields} rows={draft[l.key]} onChange={(rows) => setDraft((d) => ({ ...d, [l.key]: rows }))} />
+            <RowsEditor key={l.key} title={l.title} fields={l.fields} rows={draft[l.key]} onChange={(rows) => setDraft((d) => ({ ...d, [l.key]: rows }))} />
           ))}
           <div className="flex flex-wrap gap-2">
             <Button type="submit" variant="primary" disabled={busy}>

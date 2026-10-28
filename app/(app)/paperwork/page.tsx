@@ -6,7 +6,7 @@ import { formatDate } from "@/components/deadline-card";
 import { GfeDraftForm } from "@/components/gfe-draft-form";
 import { GfeMakePdf } from "@/components/gfe-make-pdf";
 import { GfeTimingCheck } from "@/components/gfe-timing-check";
-import { GlassCard } from "@/components/ui";
+import { ButtonLink, ChipLink, GlassCard } from "@/components/ui";
 import { danaFacts } from "@/lib/compliance/demo";
 import { loadSavedRules } from "@/lib/compliance/researched";
 import { SHIPPED_RULES } from "@/lib/compliance/rules";
@@ -47,7 +47,7 @@ export default function PaperworkPage({ searchParams }: PageProps<"/paperwork">)
           Aeon prepares the forms. You send, sign and attest: Aeon never does those for you.
         </p>
       </header>
-      <Suspense fallback={<div aria-hidden className="h-96 animate-pulse rounded-[24px] bg-[var(--glass-strong)]" />}>
+      <Suspense fallback={<div aria-hidden className="h-96 animate-pulse rounded-[24px] bg-[var(--hairline)]" />}>
         <Tabs searchParams={searchParams} />
       </Suspense>
     </>
@@ -62,18 +62,9 @@ async function Tabs({ searchParams }: { searchParams: PageProps<"/paperwork">["s
     <>
       <nav aria-label="Paperwork sections" className="flex flex-wrap gap-2">
         {TABS.map((t) => (
-          <Link
-            key={t.id}
-            href={t.id === "gfe" ? "/paperwork" : `/paperwork?tab=${t.id}`}
-            aria-current={tab === t.id ? "page" : undefined}
-            className={`inline-flex h-touch items-center rounded-full px-5 text-body font-medium transition-colors duration-150 ${
-              tab === t.id
-                ? "bg-[var(--primary-bg)] text-[var(--primary-fg)]"
-                : "border border-border bg-[var(--chip-off-bg)] text-[var(--fg)] hover:border-accent"
-            }`}
-          >
+          <ChipLink key={t.id} href={t.id === "gfe" ? "/paperwork" : `/paperwork?tab=${t.id}`} on={tab === t.id}>
             {t.label}
-          </Link>
+          </ChipLink>
         ))}
       </nav>
       {tab === "gfe" ? (
@@ -270,12 +261,9 @@ async function Superbills() {
                     </span>
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-3">
-                    <a
-                      href={`/api/superbills/${b.id}/pdf`}
-                      className="inline-flex h-touch items-center rounded-full bg-[var(--primary-bg)] px-5 font-medium text-[var(--primary-fg)]"
-                    >
+                    <ButtonLink variant="primary" href={`/api/superbills/${b.id}/pdf`} className="h-touch! px-5!">
                       Download PDF<span className="sr-only"> for {b.reference}</span>
-                    </a>
+                    </ButtonLink>
                     {!b.issued_on && <MarkGiven id={b.id} reference={b.reference} />}
                   </div>
                 </li>
@@ -322,18 +310,12 @@ async function ReleaseForms({ draft }: { draft?: string }) {
           Blank forms
         </h2>
         <div className="flex flex-wrap gap-3">
-          <a
-            href="/api/release-forms/pdf?kind=blank"
-            className="inline-flex h-touch items-center rounded-full border border-border bg-[var(--chip-off-bg)] px-5 font-medium text-[var(--fg)] hover:border-accent"
-          >
+          <ButtonLink variant="quiet" href="/api/release-forms/pdf?kind=blank">
             Download blank release form
-          </a>
-          <a
-            href="/api/release-forms/pdf?kind=revocation"
-            className="inline-flex h-touch items-center rounded-full border border-border bg-[var(--chip-off-bg)] px-5 font-medium text-[var(--fg)] hover:border-accent"
-          >
+          </ButtonLink>
+          <ButtonLink variant="quiet" href="/api/release-forms/pdf?kind=revocation">
             Download revocation form
-          </a>
+          </ButtonLink>
         </div>
         <p className="max-w-[65ch] text-small text-[var(--fg-muted)]">
           Who signs: a client 12 or older signs for themselves; for a client under 12, a parent or guardian; for 12 to 17, both. The
@@ -425,13 +407,9 @@ async function Insurance() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <a
-                href="/api/payers/cms855i"
-                download
-                className="inline-flex h-btn-primary items-center rounded-full bg-[var(--primary-bg)] px-7 font-semibold text-[var(--primary-fg)] hover:bg-[var(--primary-hover)]"
-              >
+              <ButtonLink variant="primary" href="/api/payers/cms855i" download>
                 Download the prepared CMS-855I
-              </a>
+              </ButtonLink>
               <p className="text-small text-[var(--fg-muted)]">
                 {profile.isSample ? "[Sample] Every page is marked not for submission. " : ""}Aeon never signs or submits it.
               </p>

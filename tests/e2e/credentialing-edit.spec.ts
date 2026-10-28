@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { execSync } from "node:child_process";
+import { typeDate } from "../helpers/controls";
 
 test.beforeEach(() => {
   execSync("npm run db:reset", { stdio: "ignore" });
@@ -15,13 +16,13 @@ test("Renewing malpractice in the profile clears it from CAQH prep and survives 
 
   const malpractice = page.getByRole("listitem", { name: "Malpractice" });
   await malpractice.getByRole("button", { name: "Edit Malpractice" }).click();
-  await malpractice.getByLabel("Expires").fill("2027-12-01");
+  await typeDate(malpractice, "Expires", "2027-12-01");
   await malpractice.getByRole("button", { name: "Save" }).click();
   await expect(malpractice.getByText("2027-12-01")).toBeVisible();
 
   const documents = page.getByRole("listitem", { name: "Documents" });
   await documents.getByRole("button", { name: "Edit Documents" }).click();
-  await documents.getByLabel("Expires (blank if never)").nth(1).fill("2027-12-01");
+  await typeDate(documents, "Expires (blank if never)", "2027-12-01", { nth: 1 });
   await documents.getByRole("button", { name: "Save" }).click();
 
   await expect(page.getByText("Upload your renewed malpractice face sheet")).toHaveCount(0);

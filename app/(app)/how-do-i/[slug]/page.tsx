@@ -26,9 +26,9 @@ export default function GuidePage({ params }: PageProps<"/how-do-i/[slug]">) {
 function GuideSkeleton() {
   return (
     <div aria-hidden className="flex flex-col gap-3">
-      <div className="h-10 w-80 max-w-full animate-pulse rounded-full bg-[var(--glass-strong)]" />
+      <div className="h-10 w-80 max-w-full animate-pulse rounded-full bg-[var(--hairline)]" />
       {[0, 1].map((i) => (
-        <div key={i} className="h-48 animate-pulse rounded-[20px] bg-[var(--glass-strong)]" />
+        <div key={i} className="h-48 animate-pulse rounded-[20px] bg-[var(--hairline)]" />
       ))}
     </div>
   );
