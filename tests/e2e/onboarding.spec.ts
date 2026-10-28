@@ -19,6 +19,16 @@ function freshInstall() {
 }
 
 async function seriousViolations(page: Page) {
+  // Let colour transitions (a chip just tapped) finish, so axe reads the settled colours.
+  // Endless animations (Aeon breathing, Liquid Ether) never finish, so they're left out.
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((a) => Number.isFinite(Number(a.effect?.getComputedTiming().endTime)))
+        .map((a) => a.finished.catch(() => undefined)),
+    ),
+  );
   const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
   return results.violations
     .filter((v) => v.impact === "serious" || v.impact === "critical")
@@ -116,8 +126,10 @@ test("A new clinician sets up the whole practice, and the home page lists what s
   await step(page, /text clients/, () => radio(page, "Yes"));
   // Referrals' own setup question (lib/referrals/onboarding.ts); the ZIP one is skipped because she has an office.
   await step(page, /Who would you like to hear from\?/, async () => {
-    await page.getByRole("button", { name: "Family medicine" }).click();
+    // Referrals' load() prefills its defaults; she adds one more.
+    await expect(page.getByRole("button", { name: "Family medicine" })).toHaveAttribute("aria-pressed", "true");
     await page.getByRole("button", { name: "Oncology" }).click();
+    await expect(page.getByRole("button", { name: "Oncology" })).toHaveAttribute("aria-pressed", "true");
   });
   await step(page, /How should I ask/, () => radio(page, /Ask me first/));
   await step(page, /miss a call/, () => radio(page, "No"));

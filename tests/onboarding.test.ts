@@ -11,6 +11,8 @@ import {
   type Ctx,
 } from "@/lib/onboarding/chapters";
 import { acceptable, FALLBACK_FOLLOWUPS, writeFollowups } from "@/lib/onboarding/followups";
+import type { HelperBlock } from "@/lib/onboarding/helper-questions";
+import { helperPrefill } from "@/lib/onboarding/store";
 
 const base: Ctx = {
   state: "IL",
@@ -173,5 +175,40 @@ describe("Muse follow-up questions", () => {
     });
     expect(called).toBe(false);
     expect(out.source).toBe("fallback");
+  });
+});
+
+describe("helper answers when she comes back", () => {
+  const basics = { state: "IL", credential: "LCPC" as const, practiceStage: "beginning" as const, officeZip: "60614", telehealth: true };
+
+  it("prefills each helper screen from that helper's own load()", async () => {
+    const seen: unknown[] = [];
+    const block: HelperBlock = {
+      helper: "front_desk",
+      questions: [
+        { id: "minutes", kind: "number", ask: "How long is a consult?" },
+        { id: "calendar", kind: "choices", multi: false, ask: "Which calendar?", options: [{ value: "calcom", label: "Cal.com" }] },
+        { id: "greeting", kind: "text", ask: "Voicemail greeting?" },
+      ],
+      load: async (b) => {
+        seen.push(b);
+        return { minutes: 15, calendar: "calcom", greeting: null, extra: "ignored" };
+      },
+      save: async () => {},
+    };
+    expect(await helperPrefill([block], basics)).toEqual({ "front_desk:minutes": 15, "front_desk:calendar": "calcom" });
+    expect(seen).toEqual([basics]); // it gets what onboarding already knows
+  });
+
+  it("a helper that fails to load leaves its screens empty instead of breaking onboarding", async () => {
+    const broken: HelperBlock = {
+      helper: "instagram",
+      questions: [{ id: "topics", kind: "choices", multi: true, ask: "Topics?", options: [] }],
+      load: async () => {
+        throw new Error("table missing");
+      },
+      save: async () => {},
+    };
+    expect(await helperPrefill([broken], basics)).toEqual({});
   });
 });
