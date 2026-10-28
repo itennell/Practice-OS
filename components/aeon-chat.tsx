@@ -326,10 +326,8 @@ export function AeonChat({
               onStop={() => abort.current?.abort()}
               dictation
               placeholder="Ask Aeon anything about your practice"
+              controls={<ModePicker mode={mode} onChange={changeMode} readOnly={modeReadOnly} />}
             />
-          </div>
-          <div className="mt-2 flex items-center gap-3">
-            <ModePicker mode={mode} onChange={changeMode} readOnly={modeReadOnly} />
             <span aria-live="polite" className="sr-only">
               {modeNote}
             </span>

@@ -6,8 +6,8 @@ import { useState } from "react";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { APPROVAL_MODES, MODE_INFO, type ApprovalMode } from "@/lib/approval-modes";
 
-// The mode pill under the chat box, left, as in a coding agent: Manual, Auto,
-// Bypass. Clicking it opens a small box of choices; Shift+Tab in the message
+// The mode picker inside the Prompt Bar's bottom row (where React Bits keeps its
+// model picker), as in a coding agent: Manual, Auto, Bypass. Clicking it opens a small box of choices; Shift+Tab in the message
 // box cycles them (wired in AeonChat). Bypass asks first. Whatever the mode,
 // anything handed to a client still waits for her (lib/approval-policy.ts).
 
@@ -44,15 +44,16 @@ export function ModePicker({
         <Popover.Trigger
           disabled={readOnly}
           aria-label={`Mode: ${MODE_INFO[mode].label}. ${readOnly ? "View only." : "Change mode"}`}
-          className="inline-flex h-touch items-center gap-2 rounded-full border border-border bg-[var(--chip-off-bg)] px-4 text-small font-medium text-[var(--fg)] outline-none hover:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] disabled:cursor-default disabled:hover:border-border"
+          // Sits inside the Prompt Bar's bottom row, styled like its other buttons.
+          className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full px-3 text-small font-medium text-[var(--fg-muted)] outline-none hover:bg-[var(--hairline)] hover:text-[var(--fg)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] focus-visible:outline-solid disabled:cursor-default disabled:hover:bg-transparent"
         >
           <Icon aria-hidden className="size-4" />
           {MODE_INFO[mode].label}
-          {!readOnly && <ChevronDown aria-hidden className="size-4 text-[var(--fg-muted)]" />}
+          {!readOnly && <ChevronDown aria-hidden className="size-4" />}
         </Popover.Trigger>
         <Popover.Portal>
-          <Popover.Positioner side="top" align="start" sideOffset={8} className="z-50">
-            <Popover.Popup className="glass w-[min(20rem,calc(100vw-2rem))] rounded-[20px] p-2 shadow-lg outline-none">
+          <Popover.Positioner side="top" align="start" sideOffset={10} className="z-50">
+            <Popover.Popup className="tile w-[min(20rem,calc(100vw-2rem))] rounded-[20px] bg-[var(--toast-bg)]! p-2 shadow-lg outline-none">
               <Popover.Title className="px-3 pb-1 pt-2 text-small font-semibold text-[var(--fg-muted)]">How Aeon works in this chat</Popover.Title>
               <ul role="list" className="flex flex-col">
                 {APPROVAL_MODES.map((m) => {
