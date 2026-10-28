@@ -18,6 +18,9 @@ import * as cred from "../credentialing/store";
 import { isDryRun } from "../env";
 import { money } from "../gfe/build";
 import * as gfe from "../gfe/store";
+import { putReleaseDraft } from "../release/drafts";
+import { checkReleaseFields } from "../release/fields";
+import { practiceToday } from "../compliance/store";
 import { CPT, MODIFIERS, POS } from "../superbill/codes";
 import * as superbill from "../superbill/store";
 import * as cms855i from "../payers/cms855i";
@@ -324,6 +327,42 @@ export const TOOLS: AeonTool[] = [
         balance: money(sb.total_cents - sb.paid_cents),
         next: "Tell her: I filled in what I know. Open it on Paperwork > Superbills, type the client's name, birth date, address and diagnosis codes into the blank boxes, then give it to them your own way.",
       });
+    },
+  }),
+
+  tool({
+    name: "make_release_form",
+    title: "Fill an Illinois release of information form",
+    description:
+      "Fills an Illinois consent to release mental health information (740 ILCS 110/5, also meeting HIPAA 45 CFR 164.508) with what she tells you: " +
+      "who receives it, why, exactly what to release, and the calendar date the consent ends. The expiration date is required: refuse without one and ask her for it. " +
+      "Name exactly what to release; a blanket release such as 'all records' isn't valid in Illinois. " +
+      "Takes no client details: the client's name and birth date stay blank boxes she fills in herself, and nothing is saved. " +
+      "Returns a link to the Release forms tab with these boxes filled, where she downloads the PDF; she has it signed and keeps a copy. Aeon never sends or signs it.",
+    input: {
+      recipient: z.string().max(160).optional().describe("The person or agency receiving the information, e.g. 'Dr. Lee, primary care, Northside Clinic'."),
+      recipient_address: z.string().max(200).optional().describe("Their address, phone or fax, if she gave it."),
+      purpose: z.string().max(300).optional().describe("Why, e.g. 'coordinate care with the primary care doctor'."),
+      information: z.string().max(400).optional().describe("Exactly what to release, e.g. 'dates of attendance and a treatment summary'."),
+      expires_on: isoDay.describe("The calendar date the consent ends. Required."),
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+    label: "Filled a release of information form",
+    changesData: false,
+    run: async (input) => {
+      try {
+        const fields = checkReleaseFields(input, await practiceToday());
+        const draft = putReleaseDraft(fields);
+        const filled = Object.entries(fields).filter(([, v]) => v).map(([k]) => k);
+        return text({
+          open: `/paperwork?tab=release&draft=${draft}`,
+          filled,
+          left_for_her: ["client name", "client date of birth", ...["recipient", "purpose", "information"].filter((k) => !filled.includes(k)), "signatures"],
+          next: "Tell her: I filled in what I know. Open the Release forms tab, download the PDF, type the client's name and birth date, and have it signed. Keep a copy in the client's record.",
+        });
+      } catch (err) {
+        return { content: [{ type: "text", text: err instanceof Error ? err.message : "Couldn't fill it." }], isError: true };
+      }
     },
   }),
 

@@ -22,6 +22,8 @@ import { PayerTracker } from "@/components/payer-tracker";
 import { CPT } from "@/lib/superbill/codes";
 import { listSuperbills, summarize } from "@/lib/superbill/store";
 import { MarkGiven, SuperbillForm } from "@/components/superbill-form";
+import { ReleaseFormBuilder } from "@/components/release-form-builder";
+import { getReleaseDraft } from "@/lib/release/drafts";
 import { SERVICE_KINDS, estimateStatus, listEstimates, loadPracticeSettings, toOpenDays } from "@/lib/gfe/store";
 
 export const metadata: Metadata = { title: "Paperwork · Practice-OS" };
@@ -29,6 +31,7 @@ export const metadata: Metadata = { title: "Paperwork · Practice-OS" };
 const TABS = [
   { id: "gfe", label: "Good Faith Estimates" },
   { id: "superbills", label: "Superbills" },
+  { id: "release", label: "Release forms" },
   { id: "insurance", label: "Insurance" },
   { id: "credentialing", label: "Credentialing" },
 ] as const;
@@ -52,8 +55,9 @@ export default function PaperworkPage({ searchParams }: PageProps<"/paperwork">)
 }
 
 async function Tabs({ searchParams }: { searchParams: PageProps<"/paperwork">["searchParams"] }) {
-  const asked = (await searchParams).tab;
-  const tab = asked === "credentialing" || asked === "insurance" || asked === "superbills" ? asked : "gfe";
+  const params = await searchParams;
+  const asked = params.tab;
+  const tab = asked === "credentialing" || asked === "insurance" || asked === "superbills" || asked === "release" ? asked : "gfe";
   return (
     <>
       <nav aria-label="Paperwork sections" className="flex flex-wrap gap-2">
@@ -76,6 +80,8 @@ async function Tabs({ searchParams }: { searchParams: PageProps<"/paperwork">["s
         <GoodFaithEstimates />
       ) : tab === "superbills" ? (
         <Superbills />
+      ) : tab === "release" ? (
+        <ReleaseForms draft={typeof params.draft === "string" ? params.draft : undefined} />
       ) : tab === "insurance" ? (
         <Insurance />
       ) : (
@@ -284,6 +290,56 @@ async function Superbills() {
             See a sample PDF
           </a>
           .
+        </p>
+      </GlassCard>
+    </>
+  );
+}
+
+async function ReleaseForms({ draft }: { draft?: string }) {
+  await connection(); // read the database per request, never at build time
+  const today = await practiceToday();
+  const filled = getReleaseDraft(draft);
+  return (
+    <>
+      <GlassCard aria-labelledby="release-heading" className="flex flex-col gap-4 p-6 md:p-8">
+        <div className="flex flex-col gap-1">
+          <h2 id="release-heading" className="text-section font-semibold">
+            Release of information (Illinois)
+          </h2>
+          <p className="max-w-[65ch] text-[var(--fg-muted)]">
+            The consent form Illinois requires before you share a client’s records (740 ILCS 110/5), also meeting HIPAA. Fill in who gets
+            what, why and until when, and download it. The client’s name and birth date stay blank boxes you fill in yourself. Nothing is
+            saved here. Or ask Aeon in the chat, for example “release form so I can talk with Dr. Lee about attendance, until June 30.”
+          </p>
+          {filled && <p className="text-small font-medium">Aeon filled in these boxes. Check them, then download.</p>}
+        </div>
+        <ReleaseFormBuilder initial={filled} today={today} />
+      </GlassCard>
+
+      <GlassCard aria-labelledby="release-blank-heading" className="flex flex-col gap-4 p-6 md:p-8">
+        <h2 id="release-blank-heading" className="text-section font-semibold">
+          Blank forms
+        </h2>
+        <div className="flex flex-wrap gap-3">
+          <a
+            href="/api/release-forms/pdf?kind=blank"
+            className="inline-flex h-touch items-center rounded-full border border-border bg-[var(--chip-off-bg)] px-5 font-medium text-[var(--fg)] hover:border-accent"
+          >
+            Download blank release form
+          </a>
+          <a
+            href="/api/release-forms/pdf?kind=revocation"
+            className="inline-flex h-touch items-center rounded-full border border-border bg-[var(--chip-off-bg)] px-5 font-medium text-[var(--fg)] hover:border-accent"
+          >
+            Download revocation form
+          </a>
+        </div>
+        <p className="max-w-[65ch] text-small text-[var(--fg-muted)]">
+          Who signs: a client 12 or older signs for themselves; for a client under 12, a parent or guardian; for 12 to 17, both. The
+          expiration date is required: without one, Illinois lets the form be used only on the day you receive it. Keep a copy in the
+          client’s record. A revocation must be in writing and signed. This is paperwork help, not legal advice; have a colleague or attorney
+          read it once before real clients sign.
         </p>
       </GlassCard>
     </>
