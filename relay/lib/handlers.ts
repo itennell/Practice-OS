@@ -1,5 +1,5 @@
-import { randomBytes } from "node:crypto";
-import { authorizeUrl, exchangeCode, whoAmI, type InstagramToken } from "./instagram";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { authorizeUrl, exchangeCode, type InstagramToken } from "./instagram";
 import { isAllowedReturn, seal, unseal } from "./seal";
 
 // The Practice-OS Connect relay. It holds no database and logs no tokens. It
@@ -8,7 +8,9 @@ import { isAllowedReturn, seal, unseal } from "./seal";
 //      here, the relay swaps the code for a token, seals it with the app's
 //      one-time key and sends the browser back to the app.
 //   2. Post images: Instagram fetches each image from a public address. The
-//      app uploads the JPEG here, and it is deleted after an hour.
+//      app uploads the JPEG here with an upload key the relay itself issued at
+//      sign-in (an HMAC over her Instagram user id), at most 20 an hour. The
+//      app deletes it once Instagram has it; otherwise it goes after an hour.
 //   3. A cron that deletes any image older than an hour.
 // Handlers take their settings and outside calls as arguments so tests run them
 // without the network (tests/relay.test.ts).
@@ -29,14 +31,20 @@ export type Blobs = {
 
 export type Outside = {
   exchangeCode: typeof exchangeCode;
-  whoAmI: typeof whoAmI;
+  /** Decodes the image (sharp on Vercel); throws if it isn't one. */
+  inspectImage: (body: Uint8Array) => Promise<{ format: string; width: number; height: number }>;
   blobs: Blobs;
   now: () => number;
 };
 
 const STATE_TTL_MS = 10 * 60_000;
 export const IMAGE_TTL_MS = 60 * 60_000;
-const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+// Vercel refuses request bodies over 4.5 MB; Instagram's own limit is 8 MB but the app sends about 200 KB.
+export const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+const MAX_SIDE = 8192;
+export const UPLOADS_PER_HOUR = 20;
+// The CDN may keep serving a deleted image this long, so keep it short.
+export const IMAGE_CACHE_SECONDS = 600;
 
 const callbackUrl = (env: RelayEnv) => `${env.RELAY_URL.replace(/\/$/, "")}/api/connect/instagram/callback`;
 const stateKey = (env: RelayEnv) => Buffer.from(env.RELAY_STATE_KEY, "base64");
@@ -44,6 +52,15 @@ const jsonResponse = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 
 type RelayState = { returnTo: string; key: string; state: string; exp: number };
+
+/** What the app opens after sign-in: the token, plus the key that lets it upload post images. */
+export type SealedSignIn = InstagramToken & { uploadKey: string };
+
+const hmac = (env: RelayEnv, purpose: string, userId: string) => createHmac("sha256", stateKey(env)).update(`${purpose}:${userId}`).digest("base64url");
+/** Only the relay can make this: the app gets it once, sealed, at sign-in. */
+export const uploadKeyFor = (env: RelayEnv, userId: string) => hmac(env, "upload", userId);
+/** Images are filed under a per-account folder name that doesn't reveal the Instagram id. */
+const folderFor = (env: RelayEnv, userId: string) => `posts/${hmac(env, "folder", userId).slice(0, 22)}/`;
 
 /** POST {returnTo, key, state}: the app starts an Instagram sign-in. Server to server, so the key never sits in a URL. */
 export async function begin(request: Request, env: RelayEnv, outside: Pick<Outside, "now">): Promise<Response> {
@@ -87,33 +104,65 @@ export async function callback(request: Request, env: RelayEnv, outside: Pick<Ou
   } catch {
     return back(st.returnTo, { state: st.state, error: "exchange_failed" });
   }
-  const sealed = seal(JSON.stringify(token), Buffer.from(st.key, "base64"), `instagram-token:${st.state}`);
+  const signIn: SealedSignIn = { ...token, uploadKey: uploadKeyFor(env, token.userId) };
+  const sealed = seal(JSON.stringify(signIn), Buffer.from(st.key, "base64"), `instagram-token:${st.state}`);
   return back(st.returnTo, { state: st.state, sealed });
 }
 
-const isJpeg = (b: Uint8Array) => b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
-
-async function deleteOld(blobs: Blobs, now: number): Promise<number> {
-  const old = (await blobs.list("posts/")).filter((b) => now - b.uploadedAt.getTime() > IMAGE_TTL_MS).map((b) => b.url);
+async function deleteOld(blobs: Blobs, now: number, prefix = "posts/"): Promise<number> {
+  const old = (await blobs.list(prefix)).filter((b) => now - b.uploadedAt.getTime() > IMAGE_TTL_MS).map((b) => b.url);
   if (old.length > 0) await blobs.del(old);
   return old.length;
 }
 
-/** POST a JPEG with "Authorization: Bearer <her Instagram token>": public for one hour. */
-export async function uploadImage(request: Request, outside: Pick<Outside, "whoAmI" | "blobs" | "now">): Promise<Response> {
-  const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  if (!token) return jsonResponse({ error: "sign in to Instagram first" }, 401);
-  try {
-    await outside.whoAmI(token); // only a connected Instagram account may host an image
-  } catch {
-    return jsonResponse({ error: "that Instagram sign-in isn't valid" }, 401);
-  }
+/** The account an upload or delete is for, if its upload key is the one this relay issued. */
+function uploader(request: Request, env: RelayEnv): string | null {
+  const userId = request.headers.get("x-instagram-user") ?? "";
+  const given = Buffer.from(request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "");
+  if (!/^\d{1,32}$/.test(userId) || given.length === 0) return null;
+  const expected = Buffer.from(uploadKeyFor(env, userId));
+  return given.length === expected.length && timingSafeEqual(given, expected) ? userId : null;
+}
+
+/**
+ * POST a JPEG with "Authorization: Bearer <upload key>" and "X-Instagram-User: <id>".
+ * Public for at most an hour (sooner once the app deletes it).
+ */
+export async function uploadImage(request: Request, env: RelayEnv, outside: Pick<Outside, "inspectImage" | "blobs" | "now">): Promise<Response> {
+  const userId = uploader(request, env);
+  if (!userId) return jsonResponse({ error: "connect Instagram in Practice-OS first" }, 401);
+  // Check the declared size before reading the body.
+  const declared = Number(request.headers.get("content-length"));
+  if (!Number.isFinite(declared) || declared <= 0) return jsonResponse({ error: "send the image size" }, 411);
+  if (declared > MAX_IMAGE_BYTES) return jsonResponse({ error: "image is over 4 MB" }, 413);
   const body = new Uint8Array(await request.arrayBuffer());
-  if (body.length > MAX_IMAGE_BYTES) return jsonResponse({ error: "image is over 8 MB" }, 413);
-  if (!isJpeg(body)) return jsonResponse({ error: "Instagram needs a JPEG" }, 415);
-  const { url } = await outside.blobs.put(`posts/${randomBytes(16).toString("hex")}.jpg`, body);
-  await deleteOld(outside.blobs, outside.now());
-  return jsonResponse({ url, expiresAt: new Date(outside.now() + IMAGE_TTL_MS).toISOString() });
+  if (body.length > MAX_IMAGE_BYTES) return jsonResponse({ error: "image is over 4 MB" }, 413);
+  const image = await outside.inspectImage(body).catch(() => null);
+  if (!image || image.format !== "jpeg" || image.width > MAX_SIDE || image.height > MAX_SIDE) return jsonResponse({ error: "Instagram needs a JPEG" }, 415);
+
+  const folder = folderFor(env, userId);
+  const now = outside.now();
+  await deleteOld(outside.blobs, now, folder);
+  const recent = (await outside.blobs.list(folder)).filter((b) => now - b.uploadedAt.getTime() <= IMAGE_TTL_MS);
+  if (recent.length >= UPLOADS_PER_HOUR) return jsonResponse({ error: "too many images this hour" }, 429);
+  const { url } = await outside.blobs.put(`${folder}${randomBytes(16).toString("hex")}.jpg`, body);
+  return jsonResponse({ url, expiresAt: new Date(now + IMAGE_TTL_MS).toISOString() });
+}
+
+/** DELETE {url}: the app removes an image as soon as Instagram has it. */
+export async function deleteImage(request: Request, env: RelayEnv, outside: Pick<Outside, "blobs">): Promise<Response> {
+  const userId = uploader(request, env);
+  if (!userId) return jsonResponse({ error: "connect Instagram in Practice-OS first" }, 401);
+  const body = (await request.json().catch(() => null)) as { url?: unknown } | null;
+  let pathname = "";
+  try {
+    pathname = new URL(String(body?.url)).pathname.replace(/^\//, "");
+  } catch {
+    return jsonResponse({ error: "url is required" }, 400);
+  }
+  if (!pathname.startsWith(folderFor(env, userId))) return jsonResponse({ error: "not your image" }, 403);
+  await outside.blobs.del([String(body!.url)]);
+  return jsonResponse({ deleted: true });
 }
 
 /** Vercel cron: delete images older than an hour. */

@@ -1,6 +1,7 @@
 import { del, list, put } from "@vercel/blob";
-import { exchangeCode, whoAmI } from "./instagram";
-import type { Outside, RelayEnv } from "./handlers";
+import sharp from "sharp";
+import { exchangeCode } from "./instagram";
+import { IMAGE_CACHE_SECONDS, type Outside, type RelayEnv } from "./handlers";
 
 // Reads the relay's settings from Vercel's environment and wires the real outside calls.
 
@@ -21,12 +22,15 @@ export function relayEnv(): RelayEnv {
 
 export const outside: Outside = {
   exchangeCode,
-  whoAmI,
+  inspectImage: async (body) => {
+    const m = await sharp(Buffer.from(body)).metadata();
+    return { format: m.format ?? "", width: m.width ?? 0, height: m.height ?? 0 };
+  },
   now: () => Date.now(),
   blobs: {
     put: async (pathname, body) =>
-      put(pathname, Buffer.from(body), { access: "public", addRandomSuffix: true, contentType: "image/jpeg" }),
-    list: async (prefix) => (await list({ prefix })).blobs.map((b) => ({ url: b.url, uploadedAt: new Date(b.uploadedAt) })),
+      put(pathname, Buffer.from(body), { access: "public", addRandomSuffix: true, contentType: "image/jpeg", cacheControlMaxAge: IMAGE_CACHE_SECONDS }),
+    list: async (prefix) => (await list({ prefix, limit: 1000 })).blobs.map((b) => ({ url: b.url, uploadedAt: new Date(b.uploadedAt) })),
     del: async (urls) => del(urls),
   },
 };

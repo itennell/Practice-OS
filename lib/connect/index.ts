@@ -3,7 +3,7 @@ import { audit } from "../audit";
 import { deleteConnection, getConnection, saveConnection, type Connection } from "../connections";
 import { isAllowedGoogleScope } from "./google-scopes";
 import { emailFromIdToken, exchangeGoogleCode, GOOGLE_BASE_SCOPES, googleAuthUrl, refreshGoogle } from "./google";
-import { beginInstagram, openInstagramToken, refreshInstagram, uploadToRelay } from "./instagram";
+import { beginInstagram, deleteFromRelay, openInstagramToken, refreshInstagram, uploadToRelay, type Uploader } from "./instagram";
 import { ConnectError, createConnectState, takeConnectState, type ConnectProvider } from "./state";
 
 // Connect buttons: one place to start a sign-in, finish it, and get a working
@@ -84,7 +84,8 @@ export async function finishConnect(provider: ConnectProvider, params: URLSearch
       provider: "instagram",
       accountLabel: `@${token.username}`,
       accessToken: token.accessToken,
-      refreshToken: null,
+      // Instagram has no refresh token; this encrypted field holds the relay's upload key for her account.
+      refreshToken: token.uploadKey,
       scopes: token.scopes,
       expiresAt: new Date(Date.now() + token.expiresIn * 1000),
       meta: { userId: token.userId, connectedAt: new Date().toISOString() },
@@ -135,9 +136,25 @@ export async function getAccessToken(provider: ConnectProvider, requiredScopes: 
   return c.accessToken;
 }
 
-/** For Instagram: puts a post image (JPEG) on the relay for one hour. */
+export const INSTAGRAM_PUBLISH_SCOPE = "instagram_business_content_publish";
+
+/** Her account on the relay. Needs a sign-in that granted publishing. */
+async function instagramUploader(): Promise<Uploader> {
+  await getAccessToken("instagram", [INSTAGRAM_PUBLISH_SCOPE]);
+  const c = await getConnection("instagram");
+  const userId = String(c?.meta.userId ?? "");
+  if (!c?.refreshToken || !userId) throw new NeedsConnectError("instagram", []);
+  return { userId, uploadKey: c.refreshToken };
+}
+
+/** For Instagram: puts a post image (JPEG) on the relay; public for at most an hour. */
 export async function uploadPostImage(jpeg: Buffer): Promise<{ url: string; expiresAt: string }> {
-  return uploadToRelay(jpeg, await getAccessToken("instagram"));
+  return uploadToRelay(jpeg, await instagramUploader());
+}
+
+/** Call once Instagram's media container is FINISHED, so the image stops being public right away. */
+export async function deletePostImage(url: string): Promise<void> {
+  return deleteFromRelay(url, await instagramUploader());
 }
 
 export async function disconnect(provider: ConnectProvider): Promise<void> {

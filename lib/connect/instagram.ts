@@ -1,5 +1,6 @@
 import { requireEnv } from "../env";
-import { GRAPH, type InstagramToken } from "../../relay/lib/instagram";
+import { GRAPH } from "../../relay/lib/instagram";
+import type { SealedSignIn } from "../../relay/lib/handlers";
 import { unseal } from "../../relay/lib/seal";
 
 // The app's half of Instagram sign-in. Meta only returns a sign-in to a
@@ -21,8 +22,9 @@ export async function beginInstagram(state: string, returnTo: string, key: Buffe
   return json.authUrl;
 }
 
-export function openInstagramToken(sealed: string, key: Buffer, state: string): InstagramToken {
-  return JSON.parse(unseal(sealed, key, `instagram-token:${state}`)) as InstagramToken;
+/** The token plus the relay's upload key for her account (see relay/lib/handlers.ts). */
+export function openInstagramToken(sealed: string, key: Buffer, state: string): SealedSignIn {
+  return JSON.parse(unseal(sealed, key, `instagram-token:${state}`)) as SealedSignIn;
 }
 
 /** Long-lived tokens last about 60 days and can be refreshed once they are a day old (Meta's docs, 2026-10-28). */
@@ -33,14 +35,27 @@ export async function refreshInstagram(accessToken: string): Promise<{ accessTok
   return { accessToken: json.access_token, expiresIn: Number(json.expires_in) };
 }
 
-/** Puts a post image (JPEG, made with sharp) on the relay for one hour, for Instagram to fetch. */
-export async function uploadToRelay(jpeg: Buffer, accessToken: string): Promise<{ url: string; expiresAt: string }> {
+export type Uploader = { userId: string; uploadKey: string };
+const uploaderHeaders = (u: Uploader) => ({ authorization: `Bearer ${u.uploadKey}`, "x-instagram-user": u.userId });
+
+/** Puts a post image (JPEG, made with sharp) on the relay for at most an hour, for Instagram to fetch. */
+export async function uploadToRelay(jpeg: Buffer, u: Uploader): Promise<{ url: string; expiresAt: string }> {
   const res = await fetch(`${relay()}/api/images`, {
     method: "POST",
-    headers: { authorization: `Bearer ${accessToken}`, "content-type": "image/jpeg" },
+    headers: { ...uploaderHeaders(u), "content-type": "image/jpeg" },
     body: new Uint8Array(jpeg),
   });
   const json = (await res.json().catch(() => ({}))) as { url?: string; expiresAt?: string; error?: string };
   if (!res.ok || !json.url || !json.expiresAt) throw new Error(`Image upload failed: ${json.error ?? res.status}`);
   return { url: json.url, expiresAt: json.expiresAt };
+}
+
+/** Removes a post image from the relay once Instagram has fetched it. */
+export async function deleteFromRelay(url: string, u: Uploader): Promise<void> {
+  const res = await fetch(`${relay()}/api/images`, {
+    method: "DELETE",
+    headers: { ...uploaderHeaders(u), "content-type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+  if (!res.ok) throw new Error(`Image delete failed (${res.status})`);
 }

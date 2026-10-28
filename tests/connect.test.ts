@@ -4,7 +4,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import postgres from "postgres";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { begin, callback, type RelayEnv } from "../relay/lib/handlers";
+import { begin, callback, deleteImage, uploadImage, type Blobs, type RelayEnv } from "../relay/lib/handlers";
 
 const url = process.env.DATABASE_URL;
 const sql = url ? postgres(url, { max: 1, onnotice: () => {} }) : null;
@@ -118,6 +118,27 @@ describe.skipIf(!url)("Instagram Connect through the relay", () => {
     expect(JSON.stringify(status)).not.toContain("IGlong");
     const [row] = await sql!`select access_token_enc from practice_os.connections where provider = 'instagram'`;
     expect(row.access_token_enc).not.toContain("IGlong");
+
+    // Post images go up with the relay's own upload key, and come down once Instagram has them.
+    const stored: string[] = [];
+    const blobs: Blobs = { put: async (p) => (stored.push(p), { url: `https://blob.example/${p}` }), list: async () => [], del: async (urls) => void stored.splice(0, stored.length, ...stored.filter((p) => !urls.includes(`https://blob.example/${p}`))) };
+    const relayOutside = { blobs, now: Date.now, inspectImage: async () => ({ format: "jpeg", width: 1080, height: 1080 }) };
+    vi.stubGlobal("fetch", async (input: string | URL, init?: RequestInit) => {
+      const r = new Request(String(input), { ...init, headers: { ...(init?.headers as Record<string, string>), "content-length": String((init?.body as Uint8Array | string)?.length ?? 0) } });
+      return init?.method === "DELETE" ? deleteImage(r, relayEnv, relayOutside) : uploadImage(r, relayEnv, relayOutside);
+    });
+    const { uploadPostImage, deletePostImage } = await import("../lib/connect");
+    const image = await uploadPostImage(Buffer.from([0xff, 0xd8, 0xff, 0xe0]));
+    expect(stored).toHaveLength(1);
+    await deletePostImage(image.url);
+    expect(stored).toHaveLength(0);
+  });
+
+  it("won't upload a post image for a sign-in that didn't allow publishing", async () => {
+    const { uploadPostImage, NeedsConnectError } = await import("../lib/connect");
+    const { saveConnection } = await import("../lib/connections");
+    await saveConnection({ provider: "instagram", accountLabel: "@practiceos_", accessToken: "t", refreshToken: "k", scopes: ["instagram_business_basic"], expiresAt: new Date(Date.now() + 86_400_000), meta: { userId: "17841" } });
+    await expect(uploadPostImage(Buffer.from([0xff, 0xd8, 0xff]))).rejects.toBeInstanceOf(NeedsConnectError);
   });
 
   it("records a cancelled sign-in and saves nothing", async () => {
