@@ -129,6 +129,16 @@
 
   --focus-ring: #5b47c9;
 
+  /* The dark chat menu (UI-005): dark in both themes. */
+  --menu-bg: #1f1e1d;
+  --menu-fg: #f5f4ef;
+  --menu-muted: #b5b3ab;
+  --menu-hover: rgb(255 255 255 / 0.06);
+  --menu-active: rgb(255 255 255 / 0.11);
+  --menu-line: rgb(255 255 255 / 0.14);
+  --menu-badge: rgb(255 255 255 / 0.14);
+  --menu-focus: #b0a3fb;
+
   /* Motion durations. The orb breathes over --dur-breathe. */
   --dur-fast: 150ms;
   --dur-base: 240ms;
@@ -194,6 +204,8 @@
     --avatar-green-fg: #cbf0da;
 
     --focus-ring: #b0a3fb;
+
+    --menu-bg: #1b1a19;
   }
 }
 

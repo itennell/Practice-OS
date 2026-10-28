@@ -3,7 +3,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { AeonChat, type ChatEntry } from "@/components/aeon-chat";
 import { GlassCard } from "@/components/ui";
-import { getConversation, listConversations } from "@/lib/aeon/chat";
+import { getConversation } from "@/lib/aeon/chat";
 import { listApprovals } from "@/lib/approvals";
 import { loadApprovalSettings } from "@/lib/approval-settings";
 import { morningBrief, type BriefItem } from "@/lib/compliance/brief";
@@ -23,9 +23,8 @@ async function Chat({ searchParams }: { searchParams: PageProps<"/">["searchPara
   await connection(); // read the database per request, never at build time
   const { c } = await searchParams;
   const id = typeof c === "string" && /^[0-9a-f-]{36}$/i.test(c) ? c : null;
-  const [profile, conversations, found, settings] = await Promise.all([
+  const [profile, found, settings] = await Promise.all([
     getProfile(),
-    listConversations(),
     id ? getConversation(id) : null,
     loadApprovalSettings(),
   ]);
@@ -41,7 +40,6 @@ async function Chat({ searchParams }: { searchParams: PageProps<"/">["searchPara
       key={found?.conversation.id ?? "new"}
       conversationId={found?.conversation.id ?? null}
       initialMessages={messages}
-      conversations={conversations.map((x) => ({ id: x.id, title: x.title, updated_at: x.updated_at.toISOString() }))}
       firstName={profile?.full_name.split(" ")[0] ?? null}
       start={<StartCards />}
       mode={found?.conversation.approval_mode ?? settings.mode}

@@ -67,10 +67,16 @@ test("A saved chat shows what Aeon checked and the approval card, the same row a
   const card = log.getByRole("listitem").filter({ has: page.getByRole("heading", { name: /GFE-2026-\d{4}/ }) }).last();
   await expect(card.getByText("Waiting for you", { exact: true })).toBeVisible();
   await expect(card.getByText(/from your chat with Aeon/)).toBeVisible();
-  // On phones the chat list opens from the "Your chats" button.
-  const toggle = page.getByRole("button", { name: /Your chats/ });
-  if (await toggle.isVisible()) await toggle.click();
-  await expect(page.getByRole("navigation", { name: "Your chats with Aeon" }).getByRole("link").first()).toBeVisible();
+  // The chat menu marks it as the open chat; on phones the menu slides in from the menu button.
+  await page.waitForLoadState("networkidle");
+  const menuButton = page.getByRole("button", { name: "Open menu" });
+  const phone = await menuButton.isVisible();
+  if (phone) await menuButton.click();
+  await expect(page.locator(`a[aria-current="page"][href="/?c=${id}"]`).filter({ visible: true })).toBeVisible();
+  if (phone) {
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog", { name: "Menu" })).toHaveCount(0);
+  }
   expect(await seriousViolations(page)).toEqual([]);
 
   await card.getByRole("button", { name: "Decline" }).click();

@@ -4,13 +4,10 @@
 // POST /api/chat, which runs the crisis check and the sensitive-info guard
 // before any model call. A refused message is never shown or saved: her text
 // goes back into the box so she can take the detail out.
-// TODO(UI-005): the conversation list becomes the dark chat menu.
 // TODO(UI-019): type the greeting in with Text Type.
 
-import { MessageSquarePlus, ShieldAlert } from "lucide-react";
+import { ShieldAlert } from "lucide-react";
 import dynamic from "next/dynamic";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { PromptBar } from "@/components/shared/prompt-bar";
 import { ThoughtLine } from "@/components/shared/thought-line";
@@ -20,6 +17,7 @@ import { ApprovalsInbox } from "./approvals-inbox";
 import { ModePicker, nextMode } from "./mode-picker";
 import type { ApprovalMode } from "@/lib/approval-modes";
 import { AeonText } from "./aeon-text";
+import { CHATS_CHANGED, NEW_CHAT } from "./sidebar";
 import { Orb } from "./ui";
 
 const AgentBlob = dynamic(() => import("./agent-blob/agent-blob"), { ssr: false });
@@ -34,7 +32,6 @@ export type ChatEntry = {
   /** A fixed reply from the crisis check or the privacy check. Never saved. */
   guard?: "crisis" | "refused";
 };
-export type ConversationSummary = { id: string; title: string; updated_at: string };
 
 type Reply =
   | { kind: "crisis"; text: string }
@@ -106,7 +103,6 @@ function Message({ entry }: { entry: ChatEntry }) {
 export function AeonChat({
   conversationId: initialId,
   initialMessages,
-  conversations: initialConversations,
   firstName,
   start,
   mode: initialMode,
@@ -118,17 +114,13 @@ export function AeonChat({
   modeReadOnly?: boolean;
   conversationId: string | null;
   initialMessages: ChatEntry[];
-  conversations: ConversationSummary[];
   firstName: string | null;
   /** Shown before the first message: today's brief and what's waiting. */
   start: ReactNode;
 }) {
-  const router = useRouter();
   const [conversationId, setConversationId] = useState(initialId);
   const [messages, setMessages] = useState(initialMessages);
-  const [conversations, setConversations] = useState(initialConversations);
   const [busy, setBusy] = useState(false);
-  const [listOpen, setListOpen] = useState(false);
   const [mode, setMode] = useState<ApprovalMode>(initialMode);
   const [asked, setAsked] = useState(0);
   const [modeNote, setModeNote] = useState("");
@@ -141,10 +133,18 @@ export function AeonChat({
     end.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "end" });
   }, [messages.length, busy]);
 
-  async function refreshList() {
-    const res = await fetch("/api/conversations", { cache: "no-store" }).catch(() => null);
-    if (res?.ok) setConversations(((await res.json()) as { conversations: ConversationSummary[] }).conversations);
-  }
+  // The chat menu (components/sidebar.tsx) owns the list of chats; tell it when this one changes.
+  const refreshList = () => window.dispatchEvent(new Event(CHATS_CHANGED));
+
+  // New chat in the menu clears this chat even when the URL is already "/".
+  useEffect(() => {
+    const clear = () => {
+      setConversationId(null);
+      setMessages([]);
+    };
+    window.addEventListener(NEW_CHAT, clear);
+    return () => window.removeEventListener(NEW_CHAT, clear);
+  }, []);
 
   async function send(text: string) {
     const mine: ChatEntry = { key: nextKey(), role: "clinician", content: text };
@@ -170,7 +170,7 @@ export function AeonChat({
           setConversationId(data.conversationId);
           window.history.replaceState(null, "", `/?c=${data.conversationId}`);
         }
-        void refreshList();
+        refreshList();
         setAsked((n) => n + 1);
         return;
       }
@@ -206,66 +206,10 @@ export function AeonChat({
     }
   }
 
-  function newChat() {
-    setConversationId(null);
-    setMessages([]);
-    setListOpen(false);
-    router.push("/");
-  }
-
   const empty = messages.length === 0;
-  const list = (
-    <nav aria-label="Your chats with Aeon" className="flex flex-col gap-2">
-      <button
-        type="button"
-        onClick={newChat}
-        className="flex h-btn-accent items-center justify-center gap-2 rounded-full bg-[var(--primary-bg)] px-5 font-semibold text-[var(--primary-fg)] hover:bg-[var(--primary-hover)]"
-      >
-        <MessageSquarePlus aria-hidden size={18} />
-        New chat
-      </button>
-      {conversations.length > 0 && <p className="label-caps px-2 pt-3">Recent</p>}
-      <ul className="flex flex-col gap-1">
-        {conversations.map((c) => (
-          <li key={c.id}>
-            <Link
-              href={`/?c=${c.id}`}
-              aria-current={c.id === conversationId ? "page" : undefined}
-              onClick={() => setListOpen(false)}
-              className={`flex min-h-touch items-center rounded-[14px] px-3 py-2 text-small leading-snug ${
-                c.id === conversationId
-                  ? "bg-[var(--glass-strong)] font-semibold text-[var(--fg)]"
-                  : "text-[var(--fg-muted)] hover:bg-[var(--hairline)] hover:text-[var(--fg)]"
-              }`}
-            >
-              <span className="line-clamp-2">{c.title}</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </nav>
-  );
 
   return (
-    <div className="flex min-h-[calc(100vh-5rem)] flex-col gap-4 lg:flex-row lg:gap-8">
-      <aside className="hidden w-[220px] shrink-0 lg:block">{list}</aside>
-      <div className="lg:hidden">
-        <button
-          type="button"
-          aria-expanded={listOpen}
-          aria-controls="chat-list"
-          onClick={() => setListOpen((v) => !v)}
-          className="flex h-touch items-center gap-2 rounded-full border border-border bg-[var(--chip-off-bg)] px-5 text-body font-medium"
-        >
-          Your chats{conversations.length ? ` (${conversations.length})` : ""}
-        </button>
-        {listOpen && (
-          <div id="chat-list" className="glass mt-3 p-3">
-            {list}
-          </div>
-        )}
-      </div>
-
+    <div className="flex min-h-[calc(100vh-5rem)] flex-col gap-4">
       <section aria-label="Chat with Aeon" className="mx-auto flex w-full min-w-0 max-w-[760px] flex-1 flex-col gap-6">
         {empty && (
           <header className="flex flex-col items-center gap-4 pt-2 text-center md:pt-6">
