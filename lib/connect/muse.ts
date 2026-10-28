@@ -31,7 +31,7 @@ export async function checkMuseKey(key: string): Promise<MuseKeyCheck> {
 const SOURCE = "MODEL_API_KEY_SOURCE";
 const fromEnvFile = () => Boolean(process.env.MODEL_API_KEY) && process.env[SOURCE] !== "connections";
 
-function useSavedKey(key: string | null) {
+function applySavedKey(key: string | null) {
   if (fromEnvFile()) return;
   if (key) {
     process.env.MODEL_API_KEY = key;
@@ -45,7 +45,7 @@ function useSavedKey(key: string | null) {
 /** Saves her key. Returns false when a .env key is set, which keeps winning until it's removed from .env. */
 export async function saveMuseKey(key: string): Promise<{ inUse: boolean }> {
   await saveConnection({ provider: "muse", accountLabel: `Key ending ${key.slice(-4)}`, accessToken: key, refreshToken: null, scopes: [], expiresAt: null, meta: {} });
-  useSavedKey(key);
+  applySavedKey(key);
   await audit({ actor: "clinician", action: "connect", subjectType: "connection", subjectId: "muse" });
   return { inUse: !fromEnvFile() };
 }
@@ -53,7 +53,7 @@ export async function saveMuseKey(key: string): Promise<{ inUse: boolean }> {
 /** Forgets her key, in this process at once (other processes on their next loadMuseKey). */
 export async function removeMuseKey(): Promise<void> {
   await deleteConnection("muse");
-  useSavedKey(null);
+  applySavedKey(null);
   await audit({ actor: "clinician", action: "disconnect", subjectType: "connection", subjectId: "muse" });
 }
 
@@ -66,5 +66,5 @@ export async function loadMuseKey(): Promise<void> {
   if (fromEnvFile()) return;
   const saved = await getConnection("muse").catch(() => undefined);
   if (saved === undefined) return; // database unreachable: keep what we have
-  useSavedKey(saved?.accessToken ?? null);
+  applySavedKey(saved?.accessToken ?? null);
 }
