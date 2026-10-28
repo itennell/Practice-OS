@@ -9,8 +9,12 @@ import postgres from "postgres";
 
 export const MIGRATIONS_DIR = path.join(process.cwd(), "db", "migrations");
 
+// The ignore comments keep Next's file tracer from copying the whole project into
+// the server build: only the built-in database migrates, and it reads db/migrations
+// from the app folder (the desktop app ships that folder alongside the server).
+
 export async function migrationFiles(dir: string = MIGRATIONS_DIR): Promise<string[]> {
-  return (await readdir(dir)).filter((f) => f.endsWith(".sql")).sort();
+  return (await readdir(/* turbopackIgnore: true */ dir)).filter((f) => f.endsWith(".sql")).sort();
 }
 
 /** Migration files not yet recorded in schema_migrations (all of them on an empty database). */
@@ -55,7 +59,7 @@ export async function runMigrations(url: string, { dir = MIGRATIONS_DIR, upTo, l
     );
 
     for (const file of files) {
-      const body = await readFile(path.join(dir, file), "utf8");
+      const body = await readFile(/* turbopackIgnore: true */ path.join(/* turbopackIgnore: true */ dir, file), "utf8");
       const checksum = createHash("sha256").update(body).digest("hex");
       const previous = applied.get(file);
       if (previous) {
