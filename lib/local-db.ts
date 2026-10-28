@@ -213,10 +213,11 @@ export async function startLocalDatabase(dir: string = dataDir()): Promise<strin
   });
 }
 
-/** Stops the built-in Postgres if it is running. */
+/** Stops the built-in Postgres if it is running (a postmaster.pid left by a crash doesn't count). */
 export async function stopLocalDatabase(dir: string = dataDir()): Promise<void> {
   const pgdata = path.join(dir, "postgres");
   if (!existsSync(path.join(pgdata, "postmaster.pid"))) return;
+  if (!(await serverRunning(pgdata))) return;
   await run(binary("pg_ctl"), ["stop", "-w", "-m", "fast", "-D", pgdata]);
 }
 

@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
@@ -11,8 +11,23 @@ import postgres from "postgres";
 
 let dir: string | null = null;
 
+/** Test runs that were killed leave their folders, and sometimes a running Postgres, behind. Clear those over an hour old. */
+async function sweepOldRuns() {
+  const { stopLocalDatabase } = await import("../../lib/local-db");
+  const tmp = os.tmpdir();
+  for (const name of await readdir(tmp)) {
+    if (!name.startsWith("practice-os-test-") && !name.startsWith("practice-os-localdb-")) continue;
+    const folder = path.join(tmp, name);
+    const info = await stat(folder).catch(() => null);
+    if (!info?.isDirectory() || Date.now() - info.mtimeMs < 3_600_000) continue;
+    await stopLocalDatabase(folder).catch(() => {});
+    await rm(folder, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
 export async function setup() {
   if (process.env.DATABASE_URL) return;
+  await sweepOldRuns();
   dir = await mkdtemp(path.join(os.tmpdir(), "practice-os-test-"));
   process.env.PRACTICE_OS_DATA_DIR = dir;
   const { prepareDatabase } = await import("../../lib/local-db");
@@ -45,6 +60,6 @@ export async function setup() {
 export async function teardown() {
   if (!dir) return;
   const { stopLocalDatabase } = await import("../../lib/local-db");
-  await stopLocalDatabase(dir);
+  await stopLocalDatabase(dir).catch((err) => console.warn(`Couldn't stop the test database: ${err}`));
   await rm(dir, { recursive: true, force: true });
 }

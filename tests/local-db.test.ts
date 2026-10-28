@@ -85,6 +85,17 @@ describe("built-in database", () => {
     expect((await stat(path.join(dir, "local-db.json"))).mode & 0o077).toBe(0);
   });
 
+  it("db:stop returns quietly when postmaster.pid was left by a crash", async () => {
+    const dir = await freshDir();
+    await startLocalDatabase(dir);
+    const pidFile = path.join(dir, "postgres", "postmaster.pid");
+    const contents = await readFile(pidFile, "utf8");
+    await stopLocalDatabase(dir);
+    const dead = spawnSync(process.execPath, ["-e", ""]).pid;
+    await writeFile(pidFile, contents.replace(/^\d+/, String(dead)));
+    await expect(stopLocalDatabase(dir)).resolves.toBeUndefined();
+  });
+
   it("runs every migration on plain Postgres", async () => {
     const url = await startLocalDatabase(await freshDir());
     await runMigrations(url);
