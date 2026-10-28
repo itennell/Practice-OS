@@ -2,6 +2,12 @@
 
 Brand: **Caseload** (a sole proprietorship), developer of Practice-OS. Demo practice: Reyes Counseling (fictional). During the demo phase, texts go only to the developer's own verified phone.
 
+## Proof image
+
+The voicemail greeting and every message, as one picture:
+
+![SMS opt-in proof: voicemail greeting and the exact messages](sms/opt-in-proof.png)
+
 ## How people opt in
 
 A person opts in by calling the practice phone line and leaving a voicemail asking to be contacted. Nobody is texted from a list, and numbers are never bought or shared.
