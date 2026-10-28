@@ -35,7 +35,7 @@ async function step(page: Page, ask: RegExp, fill: () => Promise<void>, how: "ne
   expect(await seriousViolations(page), `axe on "${ask}"`).toEqual([]);
   const button = how === "next" ? next(page) : page.getByRole("button", { name: how === "skip" ? "Skip" : "Set up later" });
   await button.click();
-  await expect(heading(page)).not.toHaveText(ask);
+  await expect(heading(page)).not.toHaveText(ask, { timeout: 20_000 }); // the client-detail guard runs a local model
 }
 
 const radio = (page: Page, name: string | RegExp) => page.getByRole("radio", { name }).click();
