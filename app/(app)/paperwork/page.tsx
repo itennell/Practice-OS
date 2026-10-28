@@ -242,7 +242,7 @@ async function Superbills() {
           Superbills
         </h2>
         {bills === null ? (
-          <p className="text-[var(--fg-muted)]">Superbills aren’t set up in the database yet (migration 010).</p>
+          <p className="text-[var(--fg-muted)]">Superbills aren’t set up in the database yet (migration 011).</p>
         ) : bills.length === 0 ? (
           <p className="text-[var(--fg-muted)]">None yet.</p>
         ) : (
