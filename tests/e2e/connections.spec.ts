@@ -18,9 +18,11 @@ test("Connections lists each helper with its Connect button", async ({ page }) =
 
   const google = page.getByRole("region", { name: "Google" });
   await expect(google.getByText("Not connected")).toBeVisible();
-  const gmail = google.getByRole("link", { name: "Connect Gmail drafts" });
-  await expect(gmail).toHaveAttribute("href", /\/api\/connect\/google\/start\?scopes=.*gmail\.compose/);
-  await expect(google.getByRole("link", { name: "Connect Google Calendar" })).toHaveAttribute("href", /calendar\.events.*calendar\.freebusy/);
+  // Each Connect button is a small form that POSTs to the start route with its scopes.
+  const formOf = (name: string) => google.locator("form").filter({ has: page.getByRole("button", { name }) });
+  await expect(formOf("Connect Gmail drafts")).toHaveAttribute("action", "/api/connect/google/start");
+  await expect(formOf("Connect Gmail drafts").locator('input[name="scopes"]')).toHaveValue(/gmail\.compose$/);
+  await expect(formOf("Connect Google Calendar").locator('input[name="scopes"]')).toHaveValue(/calendar\.events,.*calendar\.freebusy$/);
 
   await page.waitForFunction(() =>
     document.getAnimations().every((a) => a.playState !== "running" || a.effect?.getTiming().iterations === Infinity),

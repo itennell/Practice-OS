@@ -37,7 +37,9 @@ export async function startConnect(provider: ConnectProvider, opts: { scopes?: s
     const unknown = (opts.scopes ?? []).filter((s) => !isAllowedGoogleScope(s));
     if (unknown.length > 0) throw new ConnectError("Practice-OS only asks Google for Gmail drafts and your calendar.");
     const existing = await getConnection("google");
-    const scopes = unique([...GOOGLE_BASE_SCOPES, ...(existing?.scopes ?? []), ...(opts.scopes ?? [])]);
+    // Only ever re-ask for allowlisted scopes, even if an older sign-in somehow holds more.
+    const kept = (existing?.scopes ?? []).filter(isAllowedGoogleScope);
+    const scopes = unique([...GOOGLE_BASE_SCOPES, ...kept, ...(opts.scopes ?? [])]);
     const verifier = randomBytes(32).toString("base64url");
     const challenge = createHash("sha256").update(verifier).digest("base64url");
     const state = await createConnectState("google", scopes, redirectUri, verifier);

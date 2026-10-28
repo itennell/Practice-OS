@@ -141,21 +141,29 @@ describe.skipIf(!url)("Connect routes", () => {
     new Request(`http://127.0.0.1:3000${path}`, { ...init, headers: { host: "127.0.0.1:3000", ...headers } });
   const errorOf = (res: Response) => new URL(res.headers.get("location")!).searchParams.get("error");
 
-  it("start a sign-in only from the app's own page on this computer", async () => {
-    const { GET } = await import("../app/api/connect/[provider]/start/route");
-    const remote = await GET(new Request("http://practice.example/api/connect/google/start", { headers: { host: "practice.example", "sec-fetch-site": "same-origin" } }), ctx);
-    expect(errorOf(remote)).toMatch(/your own computer/);
-    // Another website linking or redirecting to the start address.
-    expect(errorOf(await GET(req("/api/connect/google/start", { "sec-fetch-site": "cross-site" }), ctx))).toMatch(/your own computer/);
-    expect(errorOf(await GET(req("/api/connect/google/start", {}), ctx))).toMatch(/your own computer/);
-    const local = await GET(req("/api/connect/google/start?scopes=https://www.googleapis.com/auth/gmail.compose", { "sec-fetch-site": "same-origin" }), ctx);
+  const start = (headers: Record<string, string>, scopes = "", host = "127.0.0.1:3000") =>
+    new Request(`http://${host}/api/connect/google/start`, {
+      method: "POST",
+      headers: { host, "content-type": "application/x-www-form-urlencoded", ...headers },
+      body: new URLSearchParams({ scopes }),
+    });
+
+  it("start a sign-in only from the app's own page on this computer, and only by POST", async () => {
+    const route = await import("../app/api/connect/[provider]/start/route");
+    expect("GET" in route).toBe(false); // a plain link can't start a sign-in
+    const { POST } = route;
+    expect(errorOf(await POST(start({ "sec-fetch-site": "same-origin" }, "", "practice.example"), ctx))).toMatch(/your own computer/);
+    // Another website posting a form to the app.
+    expect(errorOf(await POST(start({ "sec-fetch-site": "cross-site" }), ctx))).toMatch(/your own computer/);
+    expect(errorOf(await POST(start({ origin: "https://evil.example" }), ctx))).toMatch(/your own computer/);
+    expect(errorOf(await POST(start({}), ctx))).toMatch(/your own computer/);
+    const local = await POST(start({ "sec-fetch-site": "same-origin" }, "https://www.googleapis.com/auth/gmail.compose"), ctx);
     expect(local.headers.get("location")).toMatch(/^https:\/\/accounts\.google\.com\//);
   });
 
   it("ask Google only for Gmail drafts and the calendar", async () => {
-    const { GET } = await import("../app/api/connect/[provider]/start/route");
-    const res = await GET(req(`/api/connect/google/start?scopes=${encodeURIComponent("https://mail.google.com/")}`, { "sec-fetch-site": "same-origin" }), ctx);
-    expect(errorOf(res)).toMatch(/only asks Google/);
+    const { POST } = await import("../app/api/connect/[provider]/start/route");
+    expect(errorOf(await POST(start({ "sec-fetch-site": "same-origin" }, "https://mail.google.com/"), ctx))).toMatch(/only asks Google/);
     const { startConnect } = await import("../lib/connect");
     await expect(startConnect("google", { scopes: ["https://www.googleapis.com/auth/drive"], origin: ORIGIN })).rejects.toThrow(/only asks Google/);
   });
@@ -167,6 +175,8 @@ describe.skipIf(!url)("Connect routes", () => {
     expect(crossSite.status).toBe(403);
     const foreignOrigin = await POST(req("/api/settings/muse-key", { origin: "https://evil.example", "content-type": "text/plain" }, { method: "POST", body }));
     expect(foreignOrigin.status).toBe(403);
+    const notJson = await POST(req("/api/settings/muse-key", { "sec-fetch-site": "same-origin", "content-type": "text/plain" }, { method: "POST", body }));
+    expect(notJson.status).toBe(415);
     const { DELETE } = await import("../app/api/connect/[provider]/route");
     expect((await DELETE(req("/api/connect/google", { "sec-fetch-site": "same-site" }, { method: "DELETE" }), ctx)).status).toBe(403);
     expect((await DELETE(req("/api/connect/google", { origin: "http://127.0.0.1:3000" }, { method: "DELETE" }), ctx)).status).toBe(200);
