@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
 import { GoogleCard } from "./google-card";
+import { InstagramCard } from "./instagram-card";
 import { MuseCard } from "./muse-card";
 
 /** One row per provider; lib/connect getConnectionStatus() fills it (until then: { provider, connected: false, scopes: [] }). */
@@ -21,4 +22,5 @@ export type ConnectionCard = {
 export const CONNECTION_CARDS: ConnectionCard[] = [
   { id: "muse", order: 0, Card: MuseCard },
   { id: "google", order: 20, Card: GoogleCard },
+  { id: "instagram", order: 30, Card: InstagramCard },
 ];

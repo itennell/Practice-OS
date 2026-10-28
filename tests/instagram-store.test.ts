@@ -106,3 +106,22 @@ describe.skipIf(!hasDb)("Instagram posts", () => {
     expect((await listPosts()).length).toBe(before);
   });
 });
+
+describe.skipIf(!hasDb)("onboarding answers", () => {
+  it("saves her topics and posts a week, and Plan this week follows them", async () => {
+    const { instagramQuestions, loadInstagramPrefs, saveInstagramPrefs, DEFAULT_PREFS } = await import("../lib/instagram/onboarding");
+    await expect(instagramQuestions.save({ topics: ["how_to_book", "nope"] })).rejects.toThrow(/from the list/);
+    await expect(instagramQuestions.save({ topics: [] })).rejects.toThrow(/at least one/);
+    await instagramQuestions.save({ topics: ["how_to_book", "fees_superbills", "first_session"], posts_per_week: "3" });
+    expect(await instagramQuestions.load()).toEqual({ topics: ["how_to_book", "fees_superbills", "first_session"], posts_per_week: "3" });
+
+    const { chat } = stubModels();
+    const r = await planWeek("test", { chat, graphic });
+    expect(r.saved).toHaveLength(3);
+    const week = await listPosts({ week: r.week });
+    expect(new Set(week.slice(0, 3).map((p) => p.pillar))).toEqual(new Set(["first_session", "fees_superbills", "how_to_book"]));
+
+    await saveInstagramPrefs(DEFAULT_PREFS);
+    expect(await loadInstagramPrefs()).toEqual(DEFAULT_PREFS);
+  });
+});

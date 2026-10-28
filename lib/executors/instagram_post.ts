@@ -67,7 +67,7 @@ export const instagramPost: Executor = async (approval, { dryRun }) => {
     const result = await publishImagePost(
       input,
       { containerId: post.ig_container_id, mediaId: post.ig_media_id, permalink: post.ig_permalink },
-      { graph: new InstagramGraph(account.token), uploadImage: (jpeg) => uploadPostImage(jpeg), igUserId: account.igUserId, save },
+      { graph: new InstagramGraph(account.token), uploadImage: uploadPostImage, igUserId: account.igUserId, save },
     );
     await audit({
       actor: "executor",

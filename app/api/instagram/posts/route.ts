@@ -1,8 +1,10 @@
+import { connection } from "next/server";
 import { z } from "zod";
 import { canDecide } from "@/lib/admin-guard";
 import { listPosts, requestPost } from "@/lib/instagram/store";
 
 export async function GET() {
+  await connection(); // per request, never at build time
   return Response.json({ posts: await listPosts() });
 }
 

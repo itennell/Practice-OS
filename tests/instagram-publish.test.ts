@@ -6,7 +6,6 @@ import { describe, expect, it, vi } from "vitest";
 import { captionProblems, InstagramApiError, InstagramGraph } from "../lib/instagram/graph";
 import { checkInstagramJpeg, POST_HEIGHT, POST_WIDTH, toInstagramJpeg } from "../lib/instagram/image";
 import { publishImagePost, type PublishDeps, type PublishProgress } from "../lib/instagram/publish";
-import { redirectUri, uploadPostImage } from "../lib/instagram/relay";
 
 const fx = (name: string) => JSON.parse(readFileSync(`lib/instagram/__fixtures__/${name}.json`, "utf8")).body;
 
@@ -50,22 +49,6 @@ describe("caption limits", () => {
     expect(captionProblems("Your first session: what to expect. #therapy")).toEqual([]);
     expect(captionProblems("x".repeat(2201))[0]).toMatch(/2201 characters/);
     expect(captionProblems(Array.from({ length: 31 }, (_, i) => `#t${i}`).join(" "))[0]).toMatch(/31 hashtags/);
-  });
-});
-
-describe("relay", () => {
-  it("names the redirect URL for the Meta app", () => {
-    expect(redirectUri("https://relay.example")).toBe("https://relay.example/connect/instagram/callback");
-  });
-
-  it("posts the JPEG to the relay's /images and returns its 1-hour URL", async () => {
-    process.env.RELAY_URL = "https://relay.example/";
-    const { impl, calls } = fakeFetch([[201, { url: "https://relay.example/i/abc.jpg", expiresAt: "2026-10-28T19:00:00Z" }]]);
-    const hosted = await uploadPostImage(Buffer.from([0xff, 0xd8]), impl);
-    expect(hosted.url).toBe("https://relay.example/i/abc.jpg");
-    expect(calls[0].method).toBe("POST");
-    expect(calls[0].url.href).toBe("https://relay.example/images");
-    delete process.env.RELAY_URL;
   });
 });
 

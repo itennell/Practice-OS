@@ -1,23 +1,26 @@
 "use client";
 
-// The Instagram card on Settings › Connections (connect interface v0: one line
-// in components/connections/registry.ts). Connect goes through lib/connect's
-// start route; the live check asks Instagram who the stored sign-in belongs to.
+// The Instagram card on Settings › Connections. Connect goes through lib/connect
+// (the relay does Meta's sign-in); the live check asks Instagram who the stored
+// sign-in belongs to, so a token Instagram stopped accepting shows a plain fix.
 
+import { Camera } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { StatusPill } from "@/components/shared/status-mark";
+import { notify } from "@/components/shared/toaster";
+import { Button, ButtonLink } from "@/components/ui";
 import type { LiveCheck } from "@/lib/instagram/account";
-import { SCOPES } from "@/lib/instagram/graph";
-import { StatusPill } from "../shared/status-mark";
-import { ButtonLink, GlassCard } from "../ui";
+import { ConnectionCardFrame } from "./card-frame";
+import type { ConnectionStatus } from "./registry";
 
-/** The shape lib/connect's getConnectionStatus returns (v0). */
-export type ConnectionStatus = { provider: string; connected: boolean; accountLabel?: string; scopes: string[]; expiresAt?: string };
-
-export const INSTAGRAM_CONNECT_HREF = `/api/connect/instagram/start?scopes=${SCOPES.join(",")}`;
+const CONNECT_HREF = "/api/connect/instagram/start";
 
 type Check = LiveCheck | { state: "checking" };
 
 export function InstagramCard({ status }: { status: ConnectionStatus }) {
+  const router = useRouter();
   const [check, setCheck] = useState<Check>(status.connected ? { state: "checking" } : { state: "not_connected" });
 
   useEffect(() => {
@@ -32,34 +35,49 @@ export function InstagramCard({ status }: { status: ConnectionStatus }) {
     };
   }, [status.connected]);
 
+  const disconnect = async () => {
+    const res = await fetch("/api/connect/instagram", { method: "DELETE" }).catch(() => null);
+    if (!res?.ok) throw new Error("Couldn't disconnect Instagram.");
+    notify.success("Instagram disconnected.");
+    router.refresh();
+  };
+
+  const connected = check.state === "connected";
   return (
-    <GlassCard aria-labelledby="instagram-card-title" className="flex flex-col gap-4 p-6">
-      <div className="flex items-center gap-3">
-        <span aria-hidden className="orb-instagram inline-block size-9 shrink-0" />
-        <h2 id="instagram-card-title" className="text-section font-semibold">
-          Instagram
-        </h2>
-      </div>
-      <p className="max-w-[55ch] text-[var(--fg-muted)]">Posts to your practice&rsquo;s Instagram, only after you approve each post.</p>
-      <div role="status" aria-live="polite" className="flex flex-col gap-3">
+    <ConnectionCardFrame
+      icon={<Camera className="size-5" />}
+      title="Instagram"
+      description="Posts about your practice go to your Instagram only after you approve each one."
+      connected={connected}
+      accountLabel={connected ? `@${check.username}` : undefined}
+    >
+      <div role="status" aria-live="polite" className="basis-full">
         {check.state === "checking" && <StatusPill status="running">Checking with Instagram…</StatusPill>}
-        {check.state === "connected" && <StatusPill status="done">Connected as @{check.username}</StatusPill>}
         {(check.state === "needs_reconnect" || check.state === "unreachable") && (
           <p className="max-w-[55ch] font-medium" style={{ color: "var(--danger-fg)" }}>
             {check.reason}
           </p>
         )}
+        {check.state === "not_connected" && (
+          <p className="text-small text-[var(--fg-muted)]">
+            You&rsquo;ll sign in on Instagram&rsquo;s own page. It needs an Instagram professional (business or creator) account.
+          </p>
+        )}
       </div>
-      {check.state !== "connected" && check.state !== "checking" && (
-        <ButtonLink variant="primary" href={INSTAGRAM_CONNECT_HREF} className="w-fit">
+      {!connected && check.state !== "checking" && (
+        <ButtonLink variant="accent" href={CONNECT_HREF}>
           {check.state === "not_connected" ? "Connect Instagram" : "Connect again"}
         </ButtonLink>
       )}
-      {check.state === "not_connected" && (
-        <p className="text-small text-[var(--fg-muted)]">
-          You&rsquo;ll sign in on Instagram&rsquo;s own page. You need an Instagram professional (business or creator) account.
-        </p>
+      {status.connected && (
+        <ConfirmDialog
+          trigger={<Button variant="quiet">Disconnect</Button>}
+          title="Disconnect Instagram?"
+          description="Practice-OS forgets this sign-in. Posts already on Instagram stay there. You can connect again any time."
+          confirmLabel="Disconnect Instagram"
+          onConfirm={disconnect}
+        />
       )}
-    </GlassCard>
+    </ConnectionCardFrame>
   );
 }

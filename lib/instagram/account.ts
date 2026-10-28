@@ -1,3 +1,4 @@
+import { getConnection } from "../connections";
 import { InstagramApiError, InstagramGraph, type Fetch } from "./graph";
 import { getInstagramToken, NeedsConnectError } from "./relay";
 
@@ -16,7 +17,9 @@ export async function liveCheck(fetchImpl?: Fetch): Promise<LiveCheck> {
     token = await getInstagramToken();
   } catch (err) {
     if (err instanceof NeedsConnectError) {
-      return err.missingScopes.length === 2 ? { state: "not_connected" } : { state: "needs_reconnect", reason: "The Instagram sign-in ran out. Press Connect again." };
+      return (await getConnection("instagram"))?.accessToken
+        ? { state: "needs_reconnect", reason: "The Instagram sign-in ran out. Press Connect again." }
+        : { state: "not_connected" };
     }
     throw err;
   }

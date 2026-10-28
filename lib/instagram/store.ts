@@ -6,6 +6,7 @@ import { db } from "../db";
 import { loadPracticeSettings } from "../gfe/store";
 import type { ChatFn, CriticResult } from "./critic";
 import { designPost, type GraphicDeps } from "./graphic";
+import { loadInstagramPrefs, weekTopics } from "./onboarding";
 import { PILLAR_BY_ID, type PillarId } from "./pillars";
 import { writeRequested, writeWeek, type Draft, type PracticeFacts } from "./write";
 
@@ -143,10 +144,10 @@ export function blockedSummary(c: CriticResult): string {
 
 export type PlanResult = { week: string; saved: SavedPost[]; blocked: number };
 
-/** Plan this week: five drafts, each checked, drawn and queued for approval. */
+/** Plan this week: one draft per topic she picked (five by default), each checked, drawn and queued for approval. */
 export async function planWeek(by: string, opts: { chat?: ChatFn; graphic?: GraphicDeps } = {}): Promise<PlanResult> {
   const facts = await practiceFacts();
-  const drafts = await writeWeek(facts, { chat: opts.chat });
+  const drafts = await writeWeek(facts, { chat: opts.chat, topics: weekTopics(await loadInstagramPrefs()) });
   const week = weekOf();
   const saved: SavedPost[] = [];
   for (const d of drafts) saved.push(await saveDraft(d, { by, week, facts, graphic: opts.graphic && { chat: opts.chat, ...opts.graphic } }));

@@ -102,13 +102,14 @@ export function criticContext(f: PracticeFacts): CriticContext {
   return { licenseLine: f.licenseLine, feesCents: f.fees.map((x) => x.cents) };
 }
 
-/** Five posts, one per pillar. */
-export async function writeWeek(f: PracticeFacts, opts: { chat?: ChatFn } = {}): Promise<Draft[]> {
+/** One post per pillar: all five, or the ones she picked in onboarding. */
+export async function writeWeek(f: PracticeFacts, opts: { chat?: ChatFn; topics?: PillarId[] } = {}): Promise<Draft[]> {
   const callModel = opts.chat ?? metaChat;
-  const words = await writeWords(f, `Write one post for each of these 5 pillars, in this order:\n${PILLARS.map(pillarAsk).join("\n")}`, callModel);
+  const pillars = opts.topics ? PILLARS.filter((p) => opts.topics!.includes(p.id)) : PILLARS;
+  const words = await writeWords(f, `Write one post for each of these ${pillars.length} pillars, in this order:\n${pillars.map(pillarAsk).join("\n")}`, callModel);
   const byPillar = new Map(words.map((w) => [w.pillar, w]));
   const drafts: Draft[] = [];
-  for (const p of PILLARS) {
+  for (const p of pillars) {
     const w = byPillar.get(p.id);
     if (w) drafts.push(await checked(w, f, criticContext(f), callModel));
   }
