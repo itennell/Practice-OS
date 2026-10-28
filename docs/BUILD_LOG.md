@@ -81,5 +81,5 @@
   - Google returns straight to the app on her computer (Desktop-app client with PKCE).
   - Instagram goes through `relay/`, a new small Vercel project with no database. It swaps Meta's code for a token, seals the token with a one-time key only the app holds, sends her back, and hosts post images for one hour (docs/relay.md).
   - Connect routes answer only on localhost.
-  - Migration 017 renames the 'gmail' provider to 'google', adds 'phone' and 'muse', and adds `connect_states` (one row per sign-in in progress, 10 minutes, single use, secret encrypted). It is shown to Isaiah before it runs on the shared database.
+  - Migration 017 renames the 'gmail' provider to 'google', adds 'phone' and 'muse', and adds `connect_states` (one row per sign-in in progress, 10 minutes, single use, secret encrypted). Isaiah approved it and it ran on the shared database on 2026-10-28, after PR #29 merged.
   - Checked on a throwaway built-in database: npm test (707 passed: relay tests without the network, and an end-to-end Connect test running the real relay code against fake Google and Meta servers), lint, `next build`, and Playwright with axe on Connections, desktop light and phone dark. The migration runner now carries file-tracer hints, so the server build no longer copies the whole project.
