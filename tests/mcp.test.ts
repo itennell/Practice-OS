@@ -3,10 +3,12 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport, getDefaultEnvironment } from "@modelcontextprotocol/sdk/client/stdio.js";
 import postgres from "postgres";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { loadEnv } from "../lib/env";
 
 loadEnv();
+// Each test talks to a separate server process; under a busy machine (a build running alongside) 20 s was too tight.
+vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 });
 const url = process.env.DATABASE_URL;
 const sql = url ? postgres(url, { max: 1, prepare: false, onnotice: () => {} }) : null;
 const client = new Client({ name: "Vitest MCP", version: "0.0.0" });

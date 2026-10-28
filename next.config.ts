@@ -18,6 +18,8 @@ const nextConfig: NextConfig = {
       "./node_modules/onnxruntime-node/bin/napi-v*/darwin/**",
       "./node_modules/onnxruntime-node/bin/napi-v*/win32/**",
       "./node_modules/onnxruntime-web/**",
+      // The built-in database's Postgres binaries: the Vercel copy always has DATABASE_URL.
+      "./node_modules/@embedded-postgres/**",
       "./.cache/**",
     ],
   },
