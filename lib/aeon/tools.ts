@@ -16,7 +16,10 @@ import { TOPICS } from "../compliance/research";
 import * as credActions from "../credentialing/actions";
 import * as cred from "../credentialing/store";
 import { isDryRun } from "../env";
+import { money } from "../gfe/build";
 import * as gfe from "../gfe/store";
+import { CPT, MODIFIERS, POS } from "../superbill/codes";
+import * as superbill from "../superbill/store";
 import * as cms855i from "../payers/cms855i";
 import * as payers from "../payers/store";
 import { guard, WITHHELD } from "./guard";
@@ -278,6 +281,49 @@ export const TOOLS: AeonTool[] = [
     run: async (input, ctx) => {
       const r = await gfe.draftEstimate(input, { createdBy: ctx.by });
       return text({ reference: r.reference, due_on: r.dueOn, approval_id: r.approvalId, next: "She approves it in Approvals, then makes the PDF on the Paperwork page." });
+    },
+  }),
+
+  tool({
+    name: "draft_superbill",
+    title: "Prepare a superbill",
+    description:
+      "Prepares a superbill (a statement a self-pay or out-of-network client sends to their insurer) and saves it by reference (SB-2026-0001). " +
+      "Fill each line from what she says: the date, the CPT code, place of service and modifier. Pick the code from session length: " +
+      "90832 for 16-37 minutes, 90834 for 38-52, 90837 for 53 or more; 90791 for a first (intake) session. " +
+      "Place of service: 11 office, 10 telehealth with the client at home, 02 telehealth elsewhere; telehealth takes modifier 95 (video) or 93 (audio only), office visits take none. " +
+      "Fees default to her fee list. Takes no client details: never a name, birthday, address or diagnosis. " +
+      "The PDF leaves those as blank boxes she fills in herself, then she gives it to the client her own way; Aeon never sends it.",
+    input: {
+      lines: z
+        .array(
+          z.object({
+            date_of_service: isoDay.describe("The session date; must be in the past."),
+            cpt: z.enum(Object.keys(CPT) as [keyof typeof CPT]).describe("CPT code from the list."),
+            modifier: z.enum(Object.keys(MODIFIERS) as [keyof typeof MODIFIERS]).nullable().optional().describe("Telehealth modifier, or null for an office visit."),
+            units: z.number().int().min(1).max(8).optional().describe("Leave out: 1. Only 90840 can be more."),
+            cents: z.number().int().min(0).optional().describe("Fee per session in cents if she named one; otherwise her fee list is used."),
+            pos: z.enum(Object.keys(POS) as [keyof typeof POS]).describe("Place of service."),
+            dx_pointers: z.array(z.enum(["A", "B", "C", "D"])).min(1).max(4).optional().describe("Which of her diagnosis boxes each line points to; default A."),
+          }).strict(),
+        )
+        .min(1)
+        .max(31),
+      paid_cents: z.number().int().min(0).optional().describe("What the client already paid, in cents."),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: false },
+    label: "Prepared a superbill",
+    changesData: true,
+    run: async (input, ctx) => {
+      const sb = await superbill.createSuperbill(input, { createdBy: ctx.by });
+      return text({
+        reference: sb.reference,
+        lines: sb.lines.map(superbill.describeLine),
+        total: money(sb.total_cents),
+        paid: money(sb.paid_cents),
+        balance: money(sb.total_cents - sb.paid_cents),
+        next: "Tell her: I filled in what I know. Open it on Paperwork > Superbills, type the client's name, birth date, address and diagnosis codes into the blank boxes, then give it to them your own way.",
+      });
     },
   }),
 

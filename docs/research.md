@@ -639,3 +639,31 @@ The second implication is commercial. The law that makes per-referral pricing il
 - The paper form CMS posts is version 05/23 ([CMS forms page](https://www.cms.gov/medicare/cms-forms/cms-forms/cms-forms-items/cms019477)); its OMB approval date (05/01/2026) has passed and no newer version is posted. It has 26 pages and 513 fillable fields (344 text, 167 checkboxes, 2 signature fields); Practice-OS ships it at `lib/forms/cms855i-05-23.pdf` (sha256 b98354a0…eae60).
 - Section 2H doesn't list Mental Health Counselor or Marriage and Family Therapist. CMS says: "MFTs and MHCs should select the Undefined Non-Physician Practitioner Specialty option in section 2H" and write in MFT or MHC ([CMS FAQ, May 2024](https://www.cms.gov/files/document/marriage-and-family-therapists-and-mental-health-counselors-faq.pdf)). PECOS lists both specialties and is the faster route.
 - Aeon fills name, NPI, school and year, active license and state, mailing address, specialty, legal business name and TIN, and the practice location. It never fills SSN, date of birth, license number or effective date, the adverse-action answers, the 4A payment choice (including the sole-proprietor EIN box), bank details or the Section 15 signature.
+
+## Superbill fields and the CMS-1500 (checked 2026-10-27)
+
+A superbill is the receipt a self-pay or out-of-network client sends to their insurer. Insurers rebuild a CMS-1500 claim from it, so each field follows the item it feeds in the [NUCC 1500 Claim Form Reference Instruction Manual, version 13 (July 2025)](https://www.nucc.org/images/stories/PDF/1500_claim_form_instruction_manual_2025_07-v13.pdf). Place of service codes come from the [CMS Place of Service code set](https://www.cms.gov/medicare/coding-billing/place-of-service-codes/code-sets).
+
+| Superbill field | CMS-1500 item | What the manual says (quoted) | Who fills it |
+| --- | --- | --- | --- |
+| Client name, birth date, address | 2, 3, 5 | Patient identity | Clinician, in the PDF's blank boxes; never stored |
+| Diagnosis codes A-D | 21 | "Relate lines A - L to the lines of service in 24E by the letter of the line." | Clinician, in the PDF; never stored |
+| Date of service | 24A | "If there is only one date of service, enter that date under 'From.'" | Aeon (saved) |
+| Place of service | 24B | "enter the appropriate two-digit code from the Place of Service Code list" | Aeon (saved): 02, 10 or 11 |
+| CPT code and modifier | 24D | "Enter the CPT or HCPCS code(s) and modifier(s) (if applicable)" | Aeon (saved) |
+| Diagnosis pointer | 24E | "enter the diagnosis code reference letter (pointer) as shown in Item Number 21 ... Do not enter them in 24E." | Aeon (saved letters only) |
+| Charge | 24F | "Enter the charge amount for each listed service." | Aeon (saved), from her fee schedule |
+| Units | 24G | "If only one service is performed, the numeral 1 must be entered." | Aeon (saved) |
+| Rendering NPI | 24J | Rendering provider's NPI | Credentialing profile (Type 1) |
+| Tax ID | 25 | "the tax ID number intended to be used for 1099 reporting purposes" | Credentialing profile |
+| Amount paid | 29 | "Enter total amount the patient and/or other payers paid on the covered services only." | Aeon (saved) |
+| Service location | 32 | Where the service was provided | Credentialing profile (practice address) |
+| Billing provider, phone, NPI | 33, 33a | "Enter the provider's or supplier's billing name, address, ZIP code, and phone number." | Credentialing profile (Type 2 NPI when she bills as a PLLC) |
+| Provider signature | 31 | Signature of physician or supplier | Left blank: Aeon never signs |
+
+Place of service codes, quoted from CMS:
+- **02** "Telehealth Provided Other than in Patient's Home"
+- **10** "Telehealth Provided in Patient's Home"
+- **11** "Office"
+
+The modifiers on the fixed list are 95 (synchronous telehealth), 93 (audio-only) and GT (older telehealth modifier some payers still ask for). The CPT time ranges Aeon uses to pick a psychotherapy code (90832 for 16-37 minutes, 90834 for 38-52, 90837 for 53 or more; 90839 for the first 30-74 minutes of crisis care, plus 90840 for each further 30) are the AMA CPT time rule as commonly published. **Not re-checked against a primary source in this session; confirm before a real practice relies on it.** CPT is a trademark of the American Medical Association; Practice-OS stores only the five-digit codes, never AMA descriptor text.

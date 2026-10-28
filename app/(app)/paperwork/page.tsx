@@ -19,12 +19,16 @@ import { money } from "@/lib/gfe/build";
 import { CMS855I_VERSION, LEFT_FOR_YOU, MFT_MHC_FAQ, cms855iEntries, specialtyFor } from "@/lib/payers/cms855i";
 import { listPayerApplications, payerDates } from "@/lib/payers/store";
 import { PayerTracker } from "@/components/payer-tracker";
+import { CPT } from "@/lib/superbill/codes";
+import { listSuperbills, summarize } from "@/lib/superbill/store";
+import { MarkGiven, SuperbillForm } from "@/components/superbill-form";
 import { SERVICE_KINDS, estimateStatus, listEstimates, loadPracticeSettings, toOpenDays } from "@/lib/gfe/store";
 
 export const metadata: Metadata = { title: "Paperwork · Practice-OS" };
 
 const TABS = [
   { id: "gfe", label: "Good Faith Estimates" },
+  { id: "superbills", label: "Superbills" },
   { id: "insurance", label: "Insurance" },
   { id: "credentialing", label: "Credentialing" },
 ] as const;
@@ -49,7 +53,7 @@ export default function PaperworkPage({ searchParams }: PageProps<"/paperwork">)
 
 async function Tabs({ searchParams }: { searchParams: PageProps<"/paperwork">["searchParams"] }) {
   const asked = (await searchParams).tab;
-  const tab = asked === "credentialing" || asked === "insurance" ? asked : "gfe";
+  const tab = asked === "credentialing" || asked === "insurance" || asked === "superbills" ? asked : "gfe";
   return (
     <>
       <nav aria-label="Paperwork sections" className="flex flex-wrap gap-2">
@@ -68,7 +72,15 @@ async function Tabs({ searchParams }: { searchParams: PageProps<"/paperwork">["s
           </Link>
         ))}
       </nav>
-      {tab === "gfe" ? <GoodFaithEstimates /> : tab === "insurance" ? <Insurance /> : <Credentialing />}
+      {tab === "gfe" ? (
+        <GoodFaithEstimates />
+      ) : tab === "superbills" ? (
+        <Superbills />
+      ) : tab === "insurance" ? (
+        <Insurance />
+      ) : (
+        <Credentialing />
+      )}
     </>
   );
 }
@@ -182,6 +194,96 @@ async function GoodFaithEstimates() {
             45 CFR 149.610
           </a>
           . Aeon tracks paperwork; it isn’t legal advice.
+        </p>
+      </GlassCard>
+    </>
+  );
+}
+
+async function Superbills() {
+  await connection(); // read the database per request, never at build time
+  const [{ fees }, today, profile] = await Promise.all([loadPracticeSettings(), practiceToday(), loadCredentialingProfile()]);
+  const bills = await listSuperbills().catch(() => null);
+  const cpts = Object.entries(CPT).map(([code, c]) => ({ code, label: c.label }));
+  return (
+    <>
+      <GlassCard aria-labelledby="new-superbill-heading" className="flex flex-col gap-4 p-6 md:p-8">
+        <div className="flex flex-col gap-1">
+          <h2 id="new-superbill-heading" className="text-section font-semibold">
+            New superbill
+          </h2>
+          <p className="max-w-[65ch] text-[var(--fg-muted)]">
+            For a client who pays you and asks their insurer to pay them back. Aeon fills in your practice, codes and fees. The client’s
+            name, birth date, address and diagnosis codes stay blank in the PDF: you type them on your own computer, then give it to the
+            client your own way. Or just tell Aeon in the chat, for example “superbill for four 53-minute video sessions in October, paid in
+            full.”
+          </p>
+          {(!profile?.npi.number || !profile?.tin) && (
+            <p className="text-small font-medium">
+              Add your NPI and tax ID on{" "}
+              <Link href="/paperwork?tab=credentialing" className="text-[var(--link)] underline underline-offset-2">
+                Credentialing
+              </Link>{" "}
+              first. The superbill needs both.
+            </p>
+          )}
+        </div>
+        <SuperbillForm cpts={cpts} fees={fees} today={today} />
+      </GlassCard>
+
+      <GlassCard aria-labelledby="superbill-list-heading" className="flex flex-col gap-4 p-6 md:p-8">
+        <h2 id="superbill-list-heading" className="text-section font-semibold">
+          Superbills
+        </h2>
+        {bills === null ? (
+          <p className="text-[var(--fg-muted)]">Superbills aren’t set up in the database yet (migration 010).</p>
+        ) : bills.length === 0 ? (
+          <p className="text-[var(--fg-muted)]">None yet.</p>
+        ) : (
+          <ul className="flex flex-col gap-3">
+            {bills.map((b) => {
+              const tone = b.issued_on ? "done" : "pending";
+              return (
+                <li key={b.id} aria-label={b.reference} className="rounded-[20px] border border-[var(--hairline)] bg-[var(--glass-strong)] p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex flex-col gap-1">
+                      <h3 className="font-semibold">
+                        {b.reference}
+                        {b.is_sample && " [Sample]"}: {b.lines.length} {b.lines.length === 1 ? "session" : "sessions"}, {money(b.total_cents)}
+                      </h3>
+                      <p className="text-small text-[var(--fg-muted)]">
+                        {summarize(b.lines)} · Paid {money(b.paid_cents)}
+                        {b.issued_on && ` · Given ${formatDate(b.issued_on, false)}`}
+                      </p>
+                    </div>
+                    <span
+                      className="inline-flex h-7 shrink-0 items-center rounded-full px-3 text-small font-semibold"
+                      style={{ color: `var(--status-${tone}-fg)`, background: `var(--status-${tone}-bg)` }}
+                    >
+                      {b.issued_on ? "Given to client" : "Ready for you"}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    <a
+                      href={`/api/superbills/${b.id}/pdf`}
+                      className="inline-flex h-touch items-center rounded-full bg-[var(--primary-bg)] px-5 font-medium text-[var(--primary-fg)]"
+                    >
+                      Download PDF<span className="sr-only"> for {b.reference}</span>
+                    </a>
+                    {!b.issued_on && <MarkGiven id={b.id} reference={b.reference} />}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <p className="text-small text-[var(--fg-muted)]">
+          Aeon never sends a superbill and never signs it. Open the PDF in Preview or Acrobat, fill in the blank boxes, sign it, then give it
+          to the client.{" "}
+          <a href="/api/superbills/sample" target="_blank" rel="noreferrer" className="text-[var(--link)] underline underline-offset-2">
+            See a sample PDF
+          </a>
+          .
         </p>
       </GlassCard>
     </>

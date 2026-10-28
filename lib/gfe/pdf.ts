@@ -9,20 +9,21 @@ import { DIAGNOSIS_NOT_YET, type GoodFaithEstimate } from "./types";
 // the CMS standard form: patient, primary service, summary, each provider's
 // itemized estimate, then the disclaimers.
 
-const INK = rgb(0.09, 0.08, 0.17);
-const MUTED = rgb(0.36, 0.35, 0.47);
-const LINE = rgb(0.83, 0.8, 0.94);
-const ACCENT = rgb(0.36, 0.28, 0.79);
-const W = 612;
-const H = 792;
-const M = 54;
+export const INK = rgb(0.09, 0.08, 0.17);
+export const MUTED = rgb(0.36, 0.35, 0.47);
+export const LINE = rgb(0.83, 0.8, 0.94);
+export const ACCENT = rgb(0.36, 0.28, 0.79);
+export const W = 612;
+export const H = 792;
+export const M = 54;
 
-function usDate(iso: string): string {
+export function usDate(iso: string): string {
   const [y, m, d] = iso.split("-");
   return `${m}/${d}/${y}`;
 }
 
-class Writer {
+/** Letter-size page writer shared by every Practice-OS form (GFE, superbill, release form). */
+export class Writer {
   page!: PDFPage;
   y = 0;
   constructor(

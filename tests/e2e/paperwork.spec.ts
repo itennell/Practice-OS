@@ -39,7 +39,35 @@ test("Credentialing: profile, CAQH date that matches Deadlines, and the attest l
   await expect(caqh.getByText(`Due ${attestBy}`)).toBeVisible();
 });
 
-for (const path of ["/paperwork", "/paperwork?tab=credentialing"]) {
+test("Superbills tab: the sample, a new one by hand, its PDF and Mark given", async ({ page, request }) => {
+  const errors: string[] = [];
+  page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+  await page.goto("/paperwork");
+  await page.getByRole("link", { name: "Superbills" }).click();
+  await expect(page).toHaveURL(/tab=superbills/);
+  await expect(page.getByRole("heading", { name: "New superbill" })).toBeVisible();
+  await expect(page.getByRole("listitem", { name: "SB-2026-0001" })).toContainText("4 sessions, $700.00");
+
+  // A new one by hand: one video session from home at her $175 fee, nothing paid yet.
+  await page.getByLabel("Date 1").fill("2026-10-20");
+  await page.getByLabel("Fee ($)").fill("175");
+  await page.getByRole("button", { name: "Save superbill" }).click();
+  await expect(page.getByRole("status")).toContainText(/Saved as SB-\d{4}-\d{4}/);
+  const reference = (await page.getByRole("status").innerText()).match(/SB-\d{4}-\d{4}/)![0];
+  const item = page.getByRole("listitem", { name: reference });
+  await expect(item).toContainText("Ready for you");
+
+  const href = await item.getByRole("link", { name: /Download PDF/ }).getAttribute("href");
+  const pdf = await request.get(href!);
+  expect(pdf.headers()["content-type"]).toBe("application/pdf");
+  expect((await pdf.body()).subarray(0, 5).toString()).toBe("%PDF-");
+
+  await item.getByRole("button", { name: /Mark given/ }).click();
+  await expect(item).toContainText("Given to client");
+  expect(errors).toEqual([]);
+});
+
+for (const path of ["/paperwork", "/paperwork?tab=superbills", "/paperwork?tab=credentialing"]) {
   test(`${path} has no serious accessibility problems`, async ({ page }) => {
     await page.goto(path);
     await page.waitForLoadState("networkidle");
@@ -52,6 +80,7 @@ for (const path of ["/paperwork", "/paperwork?tab=credentialing"]) {
 test("Screenshots of Paperwork", async ({ page }, info) => {
   for (const [name, path] of [
     ["gfe", "/paperwork"],
+    ["superbills", "/paperwork?tab=superbills"],
     ["credentialing", "/paperwork?tab=credentialing"],
   ]) {
     await page.goto(path);
