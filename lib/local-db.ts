@@ -107,18 +107,35 @@ async function readJson<T>(file: string): Promise<T | null> {
   }
 }
 
+const LOCK_STALE_MS = 300_000;
+
+/** A lock is left behind by a crash when its owner process is gone, or it is older than 5 minutes. */
+async function lockIsStale(file: string): Promise<boolean> {
+  const age = Date.now() - (await stat(file).catch(() => ({ mtimeMs: Date.now() }))).mtimeMs;
+  if (age > LOCK_STALE_MS) return true;
+  const pid = Number(await readFile(file, "utf8").catch(() => ""));
+  if (!pid) return false; // just created, the owner hasn't written its pid yet
+  try {
+    process.kill(pid, 0);
+    return false;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === "ESRCH"; // EPERM: alive, just not ours
+  }
+}
+
 /** One starter at a time per data folder (next dev, the MCP server and scripts may start together). */
 async function withLock<T>(file: string, work: () => Promise<T>): Promise<T> {
-  const deadline = Date.now() + 90_000;
+  // A live owner may hold it the full 5 minutes (slow initdb, crash recovery), so wait a little longer.
+  const deadline = Date.now() + LOCK_STALE_MS + 30_000;
   for (;;) {
     try {
       const handle = await open(file, "wx");
+      await handle.writeFile(String(process.pid));
       await handle.close();
       break;
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
-      const age = Date.now() - (await stat(file).catch(() => ({ mtimeMs: Date.now() }))).mtimeMs;
-      if (age > 60_000) await rm(file, { force: true }); // left behind by a crash
+      if (await lockIsStale(file)) await rm(file, { force: true });
       else if (Date.now() > deadline) throw new Error(`Timed out waiting for ${file}`);
       else await new Promise((r) => setTimeout(r, 200));
     }

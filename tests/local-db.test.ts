@@ -1,8 +1,9 @@
 // The built-in database (lib/local-db.ts) and its backups, each test in its own
 // throwaway data folder. Needs the Postgres build for this computer, which
 // `npm install` brings in through embedded-postgres.
+import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import postgres from "postgres";
@@ -48,6 +49,27 @@ describe("built-in database", () => {
     expect(await startLocalDatabase(dir)).toBe(url);
     const listen = await query(url, async (sql) => (await sql`show listen_addresses`)[0].listen_addresses);
     expect(listen).toBe("127.0.0.1");
+  });
+
+  it("waits on a live starter's lock however old it is, and breaks a dead one's", async () => {
+    const dir = await freshDir();
+    const lock = path.join(dir, "start.lock");
+    const old = new Date(Date.now() - 120_000);
+
+    // A live owner (this process) that has held the lock for 2 minutes: keep waiting.
+    await writeFile(lock, String(process.pid));
+    await utimes(lock, old, old);
+    let settled = false;
+    const starting = startLocalDatabase(dir).finally(() => (settled = true));
+    await new Promise((r) => setTimeout(r, 2_000));
+    expect(settled).toBe(false);
+    await rm(lock);
+    const url = await starting;
+
+    // An owner that has exited: the lock is stale at once.
+    const dead = spawnSync(process.execPath, ["-e", ""]).pid;
+    await writeFile(lock, String(dead));
+    expect(await startLocalDatabase(dir)).toBe(url);
   });
 
   it("runs every migration on plain Postgres", async () => {
