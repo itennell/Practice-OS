@@ -14,8 +14,8 @@ export default function InstagramPage() {
     <div className="mx-auto flex w-full max-w-[860px] flex-col gap-6">
       <header className="flex items-start gap-4">
         <span aria-hidden className="orb-instagram mt-1 inline-block size-10 shrink-0" />
-        <div className="flex flex-col gap-2">
-          <h1 className="text-title">Instagram</h1>
+        <div className="flex min-w-0 flex-col gap-2">
+          <h1 className="text-title break-words">Instagram</h1>
           <p className="max-w-[60ch] text-[var(--fg-muted)]">
             Posts about how your practice works: first sessions, fees, booking, you, and where you see clients. Nothing
             goes on Instagram until you approve it.

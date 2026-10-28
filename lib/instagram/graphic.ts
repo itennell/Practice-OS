@@ -110,6 +110,16 @@ export async function wordsSvg(w: Words): Promise<{ svg: Buffer; headlineBottom:
   return { svg: Buffer.from(svg), headlineBottom: cardTop + cardHeight };
 }
 
+/** SAM's mask is coarse; a slight blur of the alpha channel hides the stair-step edge. */
+async function softEdges(png: Buffer): Promise<Buffer> {
+  const { width, height, hasAlpha } = await sharp(png).metadata();
+  if (!hasAlpha || !width || !height) return png;
+  const alpha = await sharp(png).extractChannel(3).blur(1.6).raw().toBuffer();
+  // removeAlpha() must run in its own pipeline: chained, sharp applies it last and drops the new mask (see lib/cutout.ts).
+  const rgb = await sharp(png).removeAlpha().raw().toBuffer();
+  return sharp(rgb, { raw: { width, height, channels: 3 } }).joinChannel(alpha, { raw: { width, height, channels: 1 } }).png().toBuffer();
+}
+
 /** Background + cut-out + words, as Instagram's JPEG. */
 export async function composePost(input: { background: Buffer; cutout: Buffer | null; words: Words }): Promise<Buffer> {
   const bg = await sharp(input.background).resize(POST_WIDTH, POST_HEIGHT, { fit: "cover" }).toBuffer();
@@ -117,7 +127,7 @@ export async function composePost(input: { background: Buffer; cutout: Buffer | 
   const layers: OverlayOptions[] = [];
   if (input.cutout) {
     const height = Math.min(LAYOUT.portrait.height, POST_HEIGHT - headlineBottom - 24);
-    const portrait = await sharp(input.cutout).trim().resize({ height, fit: "inside" }).png().toBuffer();
+    const portrait = await softEdges(await sharp(input.cutout).trim().resize({ height, fit: "inside" }).png().toBuffer());
     const { width = 0 } = await sharp(portrait).metadata();
     layers.push({ input: portrait, top: POST_HEIGHT - height, left: POST_WIDTH - width - LAYOUT.portrait.rightInset });
   }
