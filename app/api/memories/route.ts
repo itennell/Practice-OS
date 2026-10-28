@@ -1,8 +1,10 @@
+import { connection } from "next/server";
 import { z } from "zod";
 import { canDecide } from "@/lib/admin-guard";
 import { MEMORY_KINDS, MemoryRefused, listMemories, remember } from "@/lib/aeon/memory";
 
 export async function GET() {
+  await connection(); // read the database per request, never at build time
   const memories = await listMemories({ includeArchived: true });
   return Response.json({ memories }, { headers: { "Cache-Control": "no-store" } });
 }
