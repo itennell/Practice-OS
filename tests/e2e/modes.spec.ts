@@ -6,15 +6,18 @@ import { execSync } from "node:child_process";
 // and the defaults in Settings. No model call is needed for any of this.
 
 // db:reset never touches settings, so each test puts the defaults back itself.
-test.beforeEach(async ({ request }) => {
+// Changes must come from the app's own origin (lib/request-guard.ts), so say which.
+test.beforeEach(async ({ request, baseURL }) => {
   execSync("npm run db:reset", { stdio: "ignore" });
-  expect((await request.put("/api/settings/approval-mode", { data: { mode: "auto" } })).ok()).toBe(true);
-  expect((await request.put("/api/settings/front-desk", { data: { text_missed_callers: true } })).ok()).toBe(true);
+  const headers = { origin: new URL(baseURL!).origin };
+  expect((await request.put("/api/settings/approval-mode", { data: { mode: "auto" }, headers })).ok()).toBe(true);
+  expect((await request.put("/api/settings/front-desk", { data: { text_missed_callers: true }, headers })).ok()).toBe(true);
 });
 
-test.afterAll(async ({ request }) => {
-  await request.put("/api/settings/approval-mode", { data: { mode: "auto" } });
-  await request.put("/api/settings/front-desk", { data: { text_missed_callers: true } });
+test.afterAll(async ({ request, baseURL }) => {
+  const headers = { origin: new URL(baseURL!).origin };
+  await request.put("/api/settings/approval-mode", { data: { mode: "auto" }, headers });
+  await request.put("/api/settings/front-desk", { data: { text_missed_callers: true }, headers });
 });
 
 async function seriousViolations(page: Page) {
