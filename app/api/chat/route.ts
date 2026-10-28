@@ -28,9 +28,8 @@ export async function POST(request: Request) {
     return Response.json({ conversationId: conversationId ?? null, reply: { kind: "answer", text: DEMO_RESTING, steps: [], approvalIds: [] } });
   }
   try {
-    const result = await sendMessage({ conversationId, text, viewOnly: isViewOnly(request), mode });
     const viewOnly = isViewOnly(request);
-    const result = await sendMessage({ conversationId, text, viewOnly });
+    const result = await sendMessage({ conversationId, text, viewOnly, mode });
     // Aeon's reflection pass on every 10th message she sends, after she has her reply.
     if (result.conversationId && !viewOnly) {
       const id = result.conversationId;
