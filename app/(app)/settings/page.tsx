@@ -3,9 +3,8 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { stat } from "node:fs/promises";
 import { AeonFiles, type AeonFile } from "@/components/aeon-files";
-import { ComingNext } from "@/components/coming-next";
 import { OfficeSettings } from "@/components/office-settings";
-import { GlassCard } from "@/components/ui";
+import { ButtonLink, GlassCard } from "@/components/ui";
 import { listMemories, memoryMarkdown } from "@/lib/aeon/memory";
 import { MEMORY_CAP_CHARS, usedChars } from "@/lib/aeon/memory-ops";
 import { SOUL_PATH, soul } from "@/lib/aeon/soul";
@@ -18,9 +17,18 @@ export const metadata: Metadata = { title: "Settings · Practice-OS" };
 export default function Page() {
   return (
     <>
-      <ComingNext title="Settings">
-        Connect Instagram, Gmail, Cal.com and your phone number.
-      </ComingNext>
+      <h1 className="text-title">Settings</h1>
+      <GlassCard aria-labelledby="connections-heading" className="flex max-w-3xl flex-wrap items-center justify-between gap-4 p-6 md:p-8">
+        <div className="flex flex-col gap-1">
+          <h2 id="connections-heading" className="text-section font-semibold">
+            Connections
+          </h2>
+          <p className="max-w-[52ch] text-[var(--fg-muted)]">Aeon&rsquo;s Muse key, Google, Instagram and your phone. Each one turns on with a Connect button.</p>
+        </div>
+        <ButtonLink variant="quiet" href="/settings/connections">
+          Open Connections
+        </ButtonLink>
+      </GlassCard>
       <Suspense fallback={<div aria-hidden className="h-96 max-w-3xl animate-pulse rounded-[24px] bg-[var(--hairline)]" />}>
         <Modes />
         <Office />

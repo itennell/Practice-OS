@@ -50,8 +50,15 @@ describe.skipIf(!sql)("practice_os database", () => {
 
   it("refuses a plain (unencrypted) token in connections", async () => {
     await expect(
-      sql!`insert into practice_os.connections (provider, access_token_enc) values ('twilio', 'plain-token')`,
+      sql!`insert into practice_os.connections (provider, access_token_enc) values ('phone', 'plain-token')`,
     ).rejects.toThrow(/connections_tokens_encrypted/);
+  });
+
+  it("refuses a plain sign-in secret in connect_states", async () => {
+    await expect(
+      sql!`insert into practice_os.connect_states (state, provider, redirect_uri, secret_enc)
+           values (${"x".repeat(43)}, 'google', 'http://127.0.0.1/', 'plain-verifier')`,
+    ).rejects.toThrow(/connect_states_secret_enc_check/);
   });
 
   it("accepts exactly the approval kinds in lib/approval-kinds.ts", async () => {

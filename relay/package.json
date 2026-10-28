@@ -1,0 +1,14 @@
+{
+  "name": "practice-os-relay",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Practice-OS Connect relay: Instagram sign-in hand-back and one-hour post images. No database.",
+  "dependencies": {
+    "@vercel/blob": "2.8.2",
+    "sharp": "0.35.5"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
