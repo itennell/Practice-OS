@@ -25,7 +25,8 @@ export function GoogleCard({ status }: { status: ConnectionStatus }) {
   const disconnect = async () => {
     const res = await fetch("/api/connect/google", { method: "DELETE" }).catch(() => null);
     if (!res?.ok) throw new Error("Couldn't disconnect Google.");
-    notify.success("Google disconnected.");
+    const { note } = (await res.json().catch(() => ({}))) as { note?: string };
+    notify.success("Google disconnected.", note ? { description: note } : {});
     router.refresh();
   };
 
@@ -52,7 +53,7 @@ export function GoogleCard({ status }: { status: ConnectionStatus }) {
         <ConfirmDialog
           trigger={<Button variant="quiet">Disconnect</Button>}
           title="Disconnect Google?"
-          description="Practice-OS forgets this sign-in. Drafts already in Gmail stay there. You can connect again any time."
+          description="Practice-OS forgets this sign-in and asks Google to cancel it. Drafts already in Gmail stay there. You can connect again any time."
           confirmLabel="Disconnect Google"
           onConfirm={disconnect}
         />

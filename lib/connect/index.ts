@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { audit } from "../audit";
 import { deleteConnection, getConnection, saveConnection, type Connection } from "../connections";
 import { isAllowedGoogleScope } from "./google-scopes";
-import { emailFromIdToken, exchangeGoogleCode, GOOGLE_BASE_SCOPES, googleAuthUrl, refreshGoogle } from "./google";
+import { emailFromIdToken, exchangeGoogleCode, GOOGLE_BASE_SCOPES, googleAuthUrl, GoogleTokenError, refreshGoogle, revokeGoogle } from "./google";
 import { beginInstagram, deleteFromRelay, openInstagramToken, refreshInstagram, uploadToRelay, type Uploader } from "./instagram";
 import { ConnectError, createConnectState, takeConnectState, type ConnectProvider } from "./state";
 
@@ -13,6 +13,9 @@ import { ConnectError, createConnectState, takeConnectState, type ConnectProvide
 
 export { ConnectError, type ConnectProvider };
 export { GOOGLE_SCOPES } from "./google";
+
+/** A sign-in that is fine but couldn't be refreshed just now (network, Google down). Try again later; don't ask her to reconnect. */
+export class ConnectUnavailableError extends Error {}
 
 /** Thrown by getAccessToken when she must press Connect (again) first. Callers turn it into a "Connect" prompt. */
 export class NeedsConnectError extends Error {
@@ -116,8 +119,10 @@ export async function getAccessToken(provider: ConnectProvider, requiredScopes: 
       const t = await refreshGoogle(c.refreshToken);
       await saveConnection({ ...c, accessToken: t.access_token, refreshToken: t.refresh_token ?? c.refreshToken, expiresAt: new Date(Date.now() + t.expires_in * 1000) });
       return t.access_token;
-    } catch {
-      throw new NeedsConnectError(provider, requiredScopes); // revoked, or a Testing app's 7-day limit
+    } catch (err) {
+      // invalid_grant: revoked, expired, or a Testing app's 7-day limit. Anything else is temporary.
+      if (err instanceof GoogleTokenError && err.code === "invalid_grant") throw new NeedsConnectError(provider, requiredScopes);
+      throw new ConnectUnavailableError("Couldn't reach Google just now. Try again in a minute.");
     }
   }
 
@@ -157,7 +162,19 @@ export async function deletePostImage(url: string): Promise<void> {
   return deleteFromRelay(url, await instagramUploader());
 }
 
-export async function disconnect(provider: ConnectProvider): Promise<void> {
+/**
+ * Forgets the sign-in here, and for Google also revokes it at Google. Instagram
+ * has no revoke call: she removes Practice-OS in Instagram's own settings
+ * (Settings › Website permissions › Apps and websites), which `note` says.
+ */
+export async function disconnect(provider: ConnectProvider): Promise<{ revoked: boolean; note?: string }> {
+  const c = await getConnection(provider);
+  let revoked = false;
+  if (provider === "google" && c) revoked = await revokeGoogle(c.refreshToken ?? c.accessToken ?? "");
   await deleteConnection(provider);
-  await audit({ actor: "clinician", action: "disconnect", subjectType: "connection", subjectId: provider });
+  await audit({ actor: "clinician", action: "disconnect", subjectType: "connection", subjectId: provider, details: { revoked } });
+  if (provider === "instagram") {
+    return { revoked, note: "To remove Practice-OS from your account too, open Instagram › Settings › Website permissions › Apps and websites." };
+  }
+  return { revoked, note: revoked ? undefined : "Google didn't confirm. You can also remove Practice-OS at myaccount.google.com › Security › Third-party access." };
 }

@@ -37,13 +37,20 @@ export function googleAuthUrl(scopes: string[], redirectUri: string, state: stri
   return `${AUTHORIZE}?${q}`;
 }
 
+/** Google said no. `code` is Google's error, e.g. "invalid_grant" when the sign-in was revoked or expired. */
+export class GoogleTokenError extends Error {
+  constructor(readonly code: string) {
+    super(`Google sign-in failed: ${code}`);
+  }
+}
+
 async function tokenRequest(fields: Record<string, string>): Promise<GoogleTokens> {
   const body = new URLSearchParams({ client_id: requireEnv("GOOGLE_CLIENT_ID"), ...fields });
   // A Desktop client's secret isn't confidential, but Google still accepts it; send it when set.
   if (process.env.GOOGLE_CLIENT_SECRET) body.set("client_secret", process.env.GOOGLE_CLIENT_SECRET);
   const res = await fetch(TOKEN, { method: "POST", body });
   const json = (await res.json().catch(() => ({}))) as GoogleTokens & { error?: string };
-  if (!res.ok) throw new Error(`Google sign-in failed: ${json.error ?? res.status}`); // never echo tokens
+  if (!res.ok) throw new GoogleTokenError(json.error ?? String(res.status)); // never echo tokens
   return json;
 }
 
@@ -64,4 +71,10 @@ export function emailFromIdToken(idToken: string | undefined): string | null {
   } catch {
     return null;
   }
+}
+
+/** Tells Google to forget this sign-in (all its scopes). Best effort: a token Google already dropped is fine. */
+export async function revokeGoogle(token: string): Promise<boolean> {
+  const res = await fetch("https://oauth2.googleapis.com/revoke", { method: "POST", body: new URLSearchParams({ token }) }).catch(() => null);
+  return Boolean(res && (res.ok || res.status === 400));
 }
