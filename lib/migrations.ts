@@ -61,6 +61,12 @@ export async function runMigrations(url: string, { dir = MIGRATIONS_DIR, upTo, l
         )
       `;
       await tx`alter table practice_os.schema_migrations enable row level security`;
+      // This table exists before 001 takes Supabase's API roles' default grants away, so revoke here too.
+      await tx`revoke all on practice_os.schema_migrations from public`;
+      for (const role of ["anon", "authenticated"]) {
+        const [found] = await tx`select 1 from pg_roles where rolname = ${role}`;
+        if (found) await tx.unsafe(`revoke all on practice_os.schema_migrations from ${role}`);
+      }
     });
 
     const applied = new Map(

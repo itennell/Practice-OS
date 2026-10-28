@@ -16,14 +16,24 @@ export async function setup() {
   dir = await mkdtemp(path.join(os.tmpdir(), "practice-os-test-"));
   process.env.PRACTICE_OS_DATA_DIR = dir;
   const { prepareDatabase } = await import("../../lib/local-db");
-  const { url } = await prepareDatabase({ dir });
+  const { runMigrations } = await import("../../lib/migrations");
+  const { url } = await prepareDatabase({ dir, migrate: false });
 
-  // tests/db.test.ts checks that Supabase's API roles can't read anything; give them something to check.
+  // tests/db.test.ts checks that Supabase's API roles can't read anything. Set them up the way
+  // a Supabase project has them BEFORE migrating, so the revokes in the migrations really run:
+  // the roles exist, and anything new in a schema the API can see is granted to them by default.
   const sql = postgres(url, { max: 1, onnotice: () => {} });
   for (const role of ["anon", "authenticated", "service_role"]) {
     await sql.unsafe(`do $$ begin create role ${role} nologin; exception when duplicate_object then null; end $$`);
   }
+  await sql.unsafe("grant usage on schema public to anon, authenticated, service_role");
+  await sql.unsafe("alter default privileges in schema public grant all on tables to anon, authenticated, service_role");
+  // As if practice_os had been exposed to the API too: migration 001 must take all of this back.
+  await sql.unsafe("create schema if not exists practice_os");
+  await sql.unsafe("grant usage on schema practice_os to anon, authenticated");
+  await sql.unsafe("alter default privileges in schema practice_os grant all on tables to anon, authenticated");
   await sql.end();
+  await runMigrations(url);
 
   // Dana's fictional demo practice, as `npm run db:reset` seeds it.
   execFileSync("npx", ["tsx", "scripts/db-reset.ts"], {
