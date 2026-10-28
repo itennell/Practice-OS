@@ -3,7 +3,7 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { candidateSlots, pickThree } from "../lib/frontdesk/calendar/slots";
-import { slotLabel, zonedTime } from "../lib/frontdesk/calendar/zone";
+import { shortSlotLabel, slotLabel, whenLabel, zonedTime } from "../lib/frontdesk/calendar/zone";
 import { vetExtraction } from "../lib/frontdesk/extract";
 import { prettyPhone, toE164 } from "../lib/frontdesk/phone/numbers";
 import { isValidTwilioSignature, twilioSignature } from "../lib/frontdesk/phone/twilio-signature";
@@ -35,6 +35,7 @@ describe("parseReply", () => {
     expect(parseReply("reschedule")).toEqual({ kind: "reschedule" });
     expect(parseReply("book")).toEqual({ kind: "book" });
     expect(parseReply("START")).toEqual({ kind: "start" });
+    expect(parseReply("YES")).toEqual({ kind: "start" });
     expect(parseReply("help")).toEqual({ kind: "help" });
   });
 
@@ -45,40 +46,62 @@ describe("parseReply", () => {
   });
 });
 
-describe("client text templates", () => {
-  const p = { practiceName: "[Sample] Reyes Counseling", clinicianFirstName: "Dana" };
-  const labels = ["Tue Nov 3, 10:00 am", "Wed Nov 4, 2:00 pm", "Thu Nov 5, 4:00 pm"];
-  const all = [
-    T.consultOptionsText(p, labels, { firstContact: true, name: "Sam", purpose: "book" }),
-    T.consultOptionsText(p, labels, { firstContact: false, purpose: "reschedule" }),
-    T.noTimesText(p, true),
-    T.bookedText(p, labels[1], "FD-1042"),
-    T.rescheduledText(p, labels[1], "FD-1042"),
-    T.cancelledText(p, "FD-1042"),
-    T.slotTakenText(),
-    T.reminderText(p, labels[1], "FD-1042"),
-    T.passedOnText(p, true),
-    T.pickHelpText(3),
-    T.noBookingText(),
-    T.stopText(p),
-    T.helpText(p),
-  ];
+describe("client text templates (word for word with docs/sms-opt-in.md, the registered campaign)", () => {
+  const p = { practiceName: "Reyes Counseling", clinicianFirstName: "Dana", consultMinutes: 15, demo: true };
+  const labels = ["Tue 10am", "Wed 2pm", "Thu 4pm"];
 
-  it("says it is an AI assistant on first contact", () => {
-    expect(all[0]).toBe(
-      "Hi Sam, this is the AI assistant for [Sample] Reyes Counseling. Open consult times: 1) Tue Nov 3, 10:00 am 2) Wed Nov 4, 2:00 pm 3) Thu Nov 6, 4:00 pm. Reply 1, 2 or 3. Reply STOP to opt out.".replace("Thu Nov 6", "Thu Nov 5"),
+  it("greeting, first text, confirmation, reminder and START/STOP/HELP match the registration", () => {
+    expect(T.greetingText(p)).toBe(
+      "Hi, this is Dana with Reyes Counseling. Please leave your name and number, and our AI assistant will text you times for a free consultation this week. Message and data rates may apply. Reply STOP to opt out.",
     );
+    expect(T.consultOptionsText(p, labels, { firstContact: true, name: "Sam", purpose: "book" })).toBe(
+      "Practice-OS demo: Hi Sam, this is the AI assistant for Reyes Counseling. Open consult times: 1) Tue 10am 2) Wed 2pm 3) Thu 4pm. Reply 1, 2 or 3 to book. Reply STOP to opt out.",
+    );
+    expect(T.startText(p)).toBe("Reyes Counseling: You'll get texts about booking a consultation. Msg & data rates may apply. Reply HELP for help, STOP to opt out.");
+    expect(T.stopText(p)).toBe("Reyes Counseling: You're unsubscribed and won't get more texts. Reply START to resubscribe.");
+    expect(T.helpText(p)).toBe(
+      "Reyes Counseling scheduling texts. For help call the practice line. In an emergency call 911; call or text 988 for the Suicide and Crisis Lifeline. Reply STOP to opt out.",
+    );
+    // Registered as "Reply RESCHEDULE or CANCEL to change it."; CANCEL alone is a carrier opt-out word,
+    // so the app says R and C until the registration is updated (flagged to the orchestrator 2026-10-28).
+    expect(T.bookedText(p, "Wed at 2pm", "FD-1042")).toBe(
+      "Reyes Counseling: You're booked for a free 15-minute phone consult Wed at 2pm (ref FD-1042). Reply R to reschedule or C to cancel. Reply STOP to opt out.",
+    );
+    expect(T.reminderText(p, "Wed at 2pm", "FD-1042")).toBe(
+      "Reyes Counseling reminder: your free 15-minute phone consult is tomorrow, Wed at 2pm (ref FD-1042). Reply R to reschedule or C to cancel. Reply STOP to opt out.",
+    );
+  });
+
+  it("drops the demo prefix outside the demo and the AI line after first contact", () => {
+    expect(T.consultOptionsText({ ...p, demo: false }, labels, { firstContact: true, name: null, purpose: "book" })).toMatch(/^Hi, this is the AI assistant for Reyes Counseling\./);
     expect(T.passedOnText(p, true)).toContain("AI assistant");
     expect(T.passedOnText(p, false)).not.toContain("AI assistant");
   });
 
+  const all = [
+    T.greetingText(p),
+    T.consultOptionsText(p, labels, { firstContact: true, name: "Sam", purpose: "book" }),
+    T.consultOptionsText(p, labels, { firstContact: false, purpose: "reschedule" }),
+    T.noTimesText(p, true),
+    T.bookedText(p, "Wed at 2pm", "FD-1042"),
+    T.rescheduledText(p, "Wed at 2pm", "FD-1042"),
+    T.cancelledText(p, "FD-1042"),
+    T.slotTakenText(p),
+    T.reminderText(p, "Wed at 2pm", "FD-1042"),
+    T.passedOnText(p, true),
+    T.pickHelpText(p, 3),
+    T.noBookingText(p),
+    T.startText(p),
+    T.stopText(p),
+  ];
+
   it("never uses empathy or advice phrases (HB 1806) and stays short", () => {
     const banned = /sorry to hear|understand how|must be hard|feel|feeling|support you|here for you|take care|hope you|you deserve|it's okay|be gentle/i;
-    for (const t of all) {
+    for (const t of [...all, T.helpText(p)]) {
       expect(t).not.toMatch(banned);
       expect(t.length).toBeLessThanOrEqual(320);
-      expect(checkCrisis(t).crisis && t !== T.helpText(p)).toBe(false);
     }
+    for (const t of all) expect(checkCrisis(t).crisis).toBe(false);
   });
 
   it("the crisis alert never quotes the caller", () => {
@@ -95,6 +118,9 @@ describe("slots and time zones", () => {
     expect(zonedTime(2026, 11, 4, 14, 0, tz).toISOString()).toBe("2026-11-04T20:00:00.000Z"); // CST
     expect(zonedTime(2026, 10, 28, 14, 0, tz).toISOString()).toBe("2026-10-28T19:00:00.000Z"); // CDT
     expect(slotLabel(new Date("2026-11-04T20:00:00Z"), tz)).toBe("Wed, Nov 4, 2:00 pm");
+    expect(shortSlotLabel(new Date("2026-11-04T20:00:00Z"), tz)).toBe("Wed 2pm");
+    expect(shortSlotLabel(new Date("2026-11-03T16:30:00Z"), tz)).toBe("Tue 10:30am");
+    expect(whenLabel(new Date("2026-11-04T20:00:00Z"), tz)).toBe("Wed at 2pm");
   });
 
   it("pickThree prefers three different days and skips the next two hours", () => {

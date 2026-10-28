@@ -1,7 +1,7 @@
 import { queueApproval } from "../approvals";
 import { db } from "../db";
 import { pickThree } from "./calendar/slots";
-import { slotLabel } from "./calendar/zone";
+import { shortSlotLabel } from "./calendar/zone";
 import { deps } from "./deps";
 import { prettyPhone } from "./phone/numbers";
 import { addAlert, getInquiry, isOptedOut, practice } from "./store";
@@ -11,7 +11,8 @@ import { consultOptionsText, noTimesText, passedOnText } from "./templates";
 // Runs on its own when her "Text callers I miss" switch is on (the Front Desk
 // rule origin set by the caller of this function).
 
-export const OFFER_DAYS = 14;
+// "times for a free consultation this week" (the registered greeting), so "Tue 10am" is unambiguous.
+export const OFFER_DAYS = 7;
 export const OFFER_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 
 export type OfferOutcome = "queued" | "no_phone" | "opted_out" | "no_calendar" | "no_times";
@@ -66,7 +67,7 @@ export async function offerTimes(
     insert into practice_os.consult_offers (inquiry_id, purpose, booking_id, slots)
     values (${inquiryId}, ${opts.purpose}, ${opts.bookingId ?? null}, ${db().json(json as never)})
     returning id`;
-  const labels = slots.map((s) => slotLabel(s.start, tz));
+  const labels = slots.map((s) => shortSlotLabel(s.start, tz));
   const body = consultOptionsText(p, labels, { firstContact, name: inquiry.contact_name, purpose: opts.purpose });
   const approvalId = await queueApproval({
     kind: "text_consult_options",

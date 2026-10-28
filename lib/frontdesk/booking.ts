@@ -3,7 +3,7 @@ import { loadApprovalSettings } from "../approval-settings";
 import { audit } from "../audit";
 import { db } from "../db";
 import { isDryRun } from "../env";
-import { slotLabel } from "./calendar/zone";
+import { whenLabel } from "./calendar/zone";
 import { deps } from "./deps";
 import { offerTimes } from "./offers";
 import { getInquiry, nextReference, practice, sendText, type BookingRow, type OfferRow } from "./store";
@@ -28,7 +28,7 @@ function chosenSlot(offer: OfferRow, index: unknown) {
 
 async function reofferAfterTaken(offer: OfferRow, approvalId: string, to: string) {
   await db()`update practice_os.consult_offers set status = 'expired' where id = ${offer.id}`;
-  await sendText({ to, body: slotTakenText(), inquiryId: offer.inquiry_id, actor: "executor", action: "slot_taken_sent", approvalId });
+  await sendText({ to, body: slotTakenText(await practice()), inquiryId: offer.inquiry_id, actor: "executor", action: "slot_taken_sent", approvalId });
   const { frontDesk } = await loadApprovalSettings();
   const next = await withOrigin({ rule: "front_desk", rules: frontDesk }, () =>
     offerTimes(offer.inquiry_id, { purpose: offer.purpose, bookingId: offer.booking_id }),
@@ -58,7 +58,7 @@ export async function bookFromOffer(approvalId: string, payload: Record<string, 
   await db()`update practice_os.inquiries set status = 'booked' where id = ${inquiry.id}`;
   await audit({ actor: "executor", action: "consult_booked", approvalId, subjectType: "consult_booking", subjectId: booking.id, details: { reference, calendar: cal.provider, dryRun: isDryRun() } });
 
-  const label = slotLabel(slot.start, await deps().timeZone());
+  const label = whenLabel(slot.start, await deps().timeZone());
   await sendText({ to: inquiry.contact_phone, body: bookedText(await practice(), label, reference), inquiryId: inquiry.id, actor: "executor", action: "booking_confirmation_sent", approvalId });
   return { booked: reference, starts_at: slot.start.toISOString(), calendar: cal.provider };
 }
@@ -82,7 +82,7 @@ export async function rescheduleFromOffer(approvalId: string, payload: Record<st
   await db()`update practice_os.inquiries set status = 'booked' where id = ${offer.inquiry_id}`;
   await audit({ actor: "executor", action: "consult_rescheduled", approvalId, subjectType: "consult_booking", subjectId: booking.id, details: { reference: booking.reference, dryRun: isDryRun() } });
 
-  const label = slotLabel(slot.start, await deps().timeZone());
+  const label = whenLabel(slot.start, await deps().timeZone());
   await sendText({ to: booking.contact_phone, body: rescheduledText(await practice(), label, booking.reference ?? ""), inquiryId: offer.inquiry_id, actor: "executor", action: "reschedule_confirmation_sent", approvalId });
   return { rescheduled: booking.reference, starts_at: slot.start.toISOString() };
 }

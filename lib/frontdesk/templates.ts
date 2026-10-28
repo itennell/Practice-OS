@@ -1,71 +1,86 @@
 // Every text a caller ever gets from Front Desk, in plain code (Illinois HB 1806:
 // logistics only, no advice, no empathy phrases, no guessing anyone's mood).
-// Model output never becomes client text. The first text to a number says it
-// comes from an AI assistant.
+// Model output never becomes client text. The first text says it comes from an
+// AI assistant. The greeting, first text, confirmation, reminder and the START,
+// STOP and HELP replies match the campaign registered with the carriers word for
+// word (docs/sms-opt-in.md); carriers check live traffic against it.
 
-export type Practice = { practiceName: string; clinicianFirstName: string };
+export type Practice = { practiceName: string; clinicianFirstName: string; consultMinutes: number; demo: boolean };
 
 const STOP_LINE = "Reply STOP to opt out.";
+// "CANCEL" alone is a carrier opt-out word, so consults are changed with R and C.
+const CHANGE_LINE = "Reply R to reschedule or C to cancel.";
 
-function hello(practice: Practice, firstContact: boolean, name?: string | null): string {
-  const greet = name ? `Hi ${name}, ` : "Hi, ";
-  return firstContact ? `${greet}this is the AI assistant for ${practice.practiceName}.` : `${greet}this is ${practice.practiceName}.`;
+/** The voicemail greeting she records in her phone app. */
+export function greetingText(p: Practice): string {
+  return `Hi, this is ${p.clinicianFirstName} with ${p.practiceName}. Please leave your name and number, and our AI assistant will text you times for a free consultation this week. Message and data rates may apply. ${STOP_LINE}`;
 }
 
-/** Three times, numbered. `labels` come from slotLabel(). */
+/** The first text: three numbered times ("Tue 10am"). */
 export function consultOptionsText(
-  practice: Practice,
+  p: Practice,
   labels: string[],
   opts: { firstContact: boolean; name?: string | null; purpose: "book" | "reschedule" },
 ): string {
-  const lead = opts.purpose === "reschedule" ? "New consult times:" : "Open consult times:";
   const list = labels.map((l, i) => `${i + 1}) ${l}`).join(" ");
-  const pick = labels.length === 1 ? "Reply 1 to book it." : `Reply ${labels.map((_, i) => i + 1).join(", ").replace(/, (\d)$/, " or $1")}.`;
-  return `${hello(practice, opts.firstContact, opts.name)} ${lead} ${list}. ${pick} ${STOP_LINE}`;
+  const nums = labels.map((_, i) => i + 1);
+  const pick = nums.length === 1 ? "Reply 1 to book." : `Reply ${nums.slice(0, -1).join(", ")} or ${nums.at(-1)} to book.`;
+  if (opts.purpose === "reschedule") return `${p.practiceName}: New consult times: ${list}. ${pick} ${STOP_LINE}`;
+  const hi = opts.name ? `Hi ${opts.name}` : "Hi";
+  const who = opts.firstContact ? `this is the AI assistant for ${p.practiceName}` : `this is ${p.practiceName}`;
+  return `${p.demo ? "Practice-OS demo: " : ""}${hi}, ${who}. Open consult times: ${list}. ${pick} ${STOP_LINE}`;
 }
 
-export function noTimesText(practice: Practice, firstContact: boolean, name?: string | null): string {
-  return `${hello(practice, firstContact, name)} There are no open consult times right now. ${practice.clinicianFirstName} will text you back. ${STOP_LINE}`;
+export function noTimesText(p: Practice, firstContact: boolean, name?: string | null): string {
+  const hi = name ? `Hi ${name}` : "Hi";
+  const who = firstContact ? `this is the AI assistant for ${p.practiceName}` : `this is ${p.practiceName}`;
+  return `${hi}, ${who}. There are no open consult times this week. ${p.clinicianFirstName} will text you back. ${STOP_LINE}`;
 }
 
-export function bookedText(practice: Practice, label: string, reference: string): string {
-  return `You're booked: phone consult with ${practice.practiceName}, ${label}. Ref ${reference}. Reply R to reschedule or C to cancel.`;
+/** `when` is "Wed at 2pm". */
+export function bookedText(p: Practice, when: string, reference: string): string {
+  return `${p.practiceName}: You're booked for a free ${p.consultMinutes}-minute phone consult ${when} (ref ${reference}). ${CHANGE_LINE} ${STOP_LINE}`;
 }
 
-export function rescheduledText(practice: Practice, label: string, reference: string): string {
-  return `Your phone consult with ${practice.practiceName} is moved to ${label}. Ref ${reference}. Reply R to reschedule or C to cancel.`;
+export function rescheduledText(p: Practice, when: string, reference: string): string {
+  return `${p.practiceName}: Your free ${p.consultMinutes}-minute phone consult is moved to ${when} (ref ${reference}). ${CHANGE_LINE} ${STOP_LINE}`;
 }
 
-export function cancelledText(practice: Practice, reference: string): string {
-  return `Your phone consult with ${practice.practiceName} (ref ${reference}) is cancelled. Reply BOOK any time for new times.`;
+export function cancelledText(p: Practice, reference: string): string {
+  return `${p.practiceName}: Your phone consult (ref ${reference}) is cancelled. Reply BOOK for new times. ${STOP_LINE}`;
 }
 
-export function slotTakenText(): string {
-  return "That time was just taken. Here are new times in the next text.";
+export function slotTakenText(p: Practice): string {
+  return `${p.practiceName}: That time was just taken. New times are in the next text.`;
 }
 
-export function reminderText(practice: Practice, label: string, reference: string): string {
-  return `Reminder: phone consult with ${practice.practiceName} tomorrow, ${label}. Ref ${reference}. Reply R to reschedule or C to cancel.`;
+export function reminderText(p: Practice, when: string, reference: string): string {
+  return `${p.practiceName} reminder: your free ${p.consultMinutes}-minute phone consult is tomorrow, ${when} (ref ${reference}). ${CHANGE_LINE} ${STOP_LINE}`;
 }
 
-export function passedOnText(practice: Practice, firstContact: boolean): string {
-  return `${hello(practice, firstContact)} I've passed your message to ${practice.clinicianFirstName}, who will reply. ${STOP_LINE}`;
+export function passedOnText(p: Practice, firstContact: boolean): string {
+  const who = firstContact ? `this is the AI assistant for ${p.practiceName}` : `this is ${p.practiceName}`;
+  return `Hi, ${who}. I've passed your message to ${p.clinicianFirstName}, who will reply. ${STOP_LINE}`;
 }
 
-export function pickHelpText(count: number): string {
-  return `Please reply with a number from 1 to ${count} to pick a time.`;
+export function pickHelpText(p: Practice, count: number): string {
+  return `${p.practiceName}: Please reply with a number from 1 to ${count} to pick a time.`;
 }
 
-export function noBookingText(): string {
-  return "There's no upcoming consult on this number. Reply BOOK for open times.";
+export function noBookingText(p: Practice): string {
+  return `${p.practiceName}: There's no upcoming consult on this number. Reply BOOK for open times.`;
 }
 
-export function stopText(practice: Practice): string {
-  return `You won't get more texts from ${practice.practiceName}. Reply START to undo.`;
+export function startText(p: Practice): string {
+  return `${p.practiceName}: You'll get texts about booking a consultation. Msg & data rates may apply. Reply HELP for help, STOP to opt out.`;
 }
 
-export function helpText(practice: Practice): string {
-  return `${practice.practiceName}: texts about consult times. Reply STOP to opt out. In an emergency call 911; for crisis support call or text 988.`;
+export function stopText(p: Practice): string {
+  return `${p.practiceName}: You're unsubscribed and won't get more texts. Reply START to resubscribe.`;
+}
+
+export function helpText(p: Practice): string {
+  return `${p.practiceName} scheduling texts. For help call the practice line. In an emergency call 911; call or text 988 for the Suicide and Crisis Lifeline. ${STOP_LINE}`;
 }
 
 /** The urgent alert to the clinician's own verified phone. Never quotes the caller's words. */

@@ -41,10 +41,20 @@ export type BookingRow = {
   contact_phone: string | null;
 };
 
+/** How texts name the practice: "Reyes Counseling" (no PLLC/LLC), her first name, consult length, and demo mode. */
 export async function practice(): Promise<Practice> {
-  const [p] = await db()`select full_name, practice_name from practice_os.clinician_profile limit 1`.catch(() => []);
+  const [p] = await db()`
+    select c.full_name, c.practice_name, s.front_desk_consult_minutes
+    from practice_os.clinician_profile c left join practice_os.settings s on true limit 1`.catch(() => []);
   const first = typeof p?.full_name === "string" ? p.full_name.split(" ")[0] : "the clinician";
-  return { practiceName: p?.practice_name ?? "the practice", clinicianFirstName: first };
+  const name = typeof p?.practice_name === "string" ? p.practice_name.replace(/,?\s+(PLLC|LLC|PC|P\.C\.|Inc\.?)$/i, "") : "the practice";
+  return {
+    practiceName: name,
+    clinicianFirstName: first,
+    consultMinutes: typeof p?.front_desk_consult_minutes === "number" ? p.front_desk_consult_minutes : 15,
+    // Isaiah's developer line is the demo: its first text starts "Practice-OS demo:" (registered campaign).
+    demo: process.env.FRONT_DESK_DEV_TWILIO === "true",
+  };
 }
 
 export async function getInquiry(id: string): Promise<InquiryRow | null> {

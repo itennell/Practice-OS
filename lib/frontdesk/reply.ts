@@ -14,7 +14,7 @@ export type Reply =
 // Carrier opt-out words (CTIA). A bare "cancel" is one of them, and Twilio opts the
 // number out on it, so it is treated as STOP; a consult is cancelled with "C".
 const STOP = /^(stop|stopall|stop all|unsubscribe|cancel|end|quit|revoke|opt ?out)$/;
-const START = /^(start|unstop|yes start)$/;
+const START = /^(start|unstop|yes|yes start)$/;
 const HELP = /^(help|info)$/;
 
 const ORDINALS: Record<string, number> = { one: 1, first: 1, "1st": 1, two: 2, second: 2, "2nd": 2, three: 3, third: 3, "3rd": 3 };

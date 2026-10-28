@@ -1,6 +1,8 @@
 import { audit } from "../audit";
 import { db } from "../db";
 import type { CalendarProvider } from "./calendar/types";
+import { practice } from "./store";
+import { greetingText } from "./templates";
 
 // Front Desk's setup answers (migration 016), for the onboarding helper-questions
 // registry and the Front Desk page: consult length, the voicemail greeting she
@@ -8,8 +10,10 @@ import type { CalendarProvider } from "./calendar/types";
 
 export type FrontDeskSetup = { consultMinutes: number; greeting: string | null; calendar: CalendarProvider | null };
 
-export const DEFAULT_GREETING =
-  "You've reached {practice}. I can't take your call right now. Please leave your name and number, and you'll get a text with times for a free phone consult. If this is an emergency, call 911. For crisis support, call or text 988.";
+/** The registered greeting (docs/sms-opt-in.md), filled in for her practice. */
+export async function defaultGreeting(): Promise<string> {
+  return greetingText(await practice());
+}
 
 export async function loadFrontDeskSetup(): Promise<FrontDeskSetup> {
   const [row] = await db()`select front_desk_consult_minutes, front_desk_greeting, front_desk_calendar from practice_os.settings limit 1`.catch(() => []);

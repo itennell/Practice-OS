@@ -10,6 +10,7 @@ import { ChipLink, GlassCard } from "@/components/ui";
 import { loadApprovalSettings } from "@/lib/approval-settings";
 import { calendarStatus, phoneStatus } from "@/lib/frontdesk/connect";
 import { prettyPhone } from "@/lib/frontdesk/phone/numbers";
+import { defaultGreeting, loadFrontDeskSetup } from "@/lib/frontdesk/setup";
 import { FILTERS, frontDeskView, type Filter, type InquiryView } from "@/lib/frontdesk/view";
 
 export const metadata = { title: "Front Desk · Practice-OS" };
@@ -54,7 +55,14 @@ async function FrontDesk({ searchParams }: { searchParams: PageProps<"/front-des
   await connection(); // read the database per request, never at build time
   const q = (await searchParams).filter;
   const filter: Filter = (FILTERS as readonly string[]).includes(String(q)) ? (q as Filter) : "all";
-  const [view, phone, calendar, settings] = await Promise.all([frontDeskView(filter), phoneStatus(), calendarStatus(), loadApprovalSettings()]);
+  const [view, phone, calendar, settings, setup, greeting] = await Promise.all([
+    frontDeskView(filter),
+    phoneStatus(),
+    calendarStatus(),
+    loadApprovalSettings(),
+    loadFrontDeskSetup(),
+    defaultGreeting(),
+  ]);
   const calcom = calendar.provider === "calcom" && calendar.connected;
   return (
     <>
@@ -136,6 +144,16 @@ async function FrontDesk({ searchParams }: { searchParams: PageProps<"/front-des
           }}
         />
       </div>
+
+      <GlassCard aria-labelledby="fd-greeting" className="flex flex-col gap-3 p-6 md:p-8">
+        <h2 id="fd-greeting" className="text-section">
+          Your voicemail greeting
+        </h2>
+        <p className="max-w-[65ch] text-[var(--fg-muted)]">
+          Record this as the voicemail greeting in your phone app. Callers who leave a message get one text with your open times.
+        </p>
+        <blockquote className="max-w-[65ch] rounded-[16px] border border-border bg-[var(--chip-off-bg)] p-4">{setup.greeting ?? greeting}</blockquote>
+      </GlassCard>
 
       <GlassCard aria-labelledby="fd-rules" className="flex flex-col gap-2 p-6 md:p-8">
         <h2 id="fd-rules" className="text-section">

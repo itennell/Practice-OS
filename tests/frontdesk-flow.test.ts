@@ -127,7 +127,7 @@ describe.skipIf(!localDb)("Front Desk flow (local database only)", () => {
     expect(await approvalsFor(inq.id)).toEqual([{ kind: "text_consult_options", status: "done", decided_by: "auto:front_desk", error: null }]);
     expect(sent).toHaveLength(1);
     expect(sent[0].to).toBe(SAM);
-    expect(sent[0].body).toMatch(/^Hi Sam, this is the AI assistant for .+ Open consult times: 1\) Tue, Nov 3, 10:00 am 2\) Wed, Nov 4, 2:00 pm 3\) Thu, Nov 5, 4:00 pm\. Reply 1, 2 or 3\. Reply STOP to opt out\.$/);
+    expect(sent[0].body).toBe("Hi Sam, this is the AI assistant for Reyes Counseling. Open consult times: 1) Tue 10am 2) Wed 2pm 3) Thu 4pm. Reply 1, 2 or 3 to book. Reply STOP to opt out.");
   });
 
   it("Sam replies 2: the time is re-checked, booked by reference only, and confirmed", async () => {
@@ -147,7 +147,7 @@ describe.skipIf(!localDb)("Front Desk flow (local database only)", () => {
     free = false;
     sent.length = 0;
     await processText(text(RILEY, "1"), phone);
-    expect(sent.map((s) => s.body)[0]).toBe("That time was just taken. Here are new times in the next text.");
+    expect(sent.map((s) => s.body)[0]).toBe("Reyes Counseling: That time was just taken. New times are in the next text.");
     expect(sent[1].body).toContain("Open consult times");
     expect(await db()`select 1 from practice_os.consult_bookings where contact_phone = ${RILEY}`).toHaveLength(0);
   });
@@ -180,7 +180,7 @@ describe.skipIf(!localDb)("Front Desk flow (local database only)", () => {
     expect(await db()`select 1 from practice_os.sms_opt_outs where phone = ${RILEY}`).toHaveLength(1);
     const inq = await inquiryOf(RILEY);
     expect((await offerTimes(inq.id, { purpose: "book" })).outcome).toBe("opted_out");
-    expect(sent).toHaveLength(0);
+    expect(sent).toEqual([{ to: RILEY, body: "Reyes Counseling: You're unsubscribed and won't get more texts. Reply START to resubscribe." }]);
   });
 
   it("a question goes to her inbox and the caller gets one passed-on text", async () => {
@@ -195,7 +195,7 @@ describe.skipIf(!localDb)("Front Desk flow (local database only)", () => {
   it("the day-before reminder goes out once", async () => {
     setFrontDeskDeps({ phone: async () => phone, calendar: async () => calendar, timeZone: async () => "America/Chicago", now: () => new Date("2026-11-03T15:30:00Z") });
     expect(await queueReminders()).toBe(1);
-    expect(sent.at(-1)!.body).toMatch(/^Reminder: phone consult with .+ tomorrow, Wed, Nov 4, 2:00 pm\. Ref FD-\d+\./);
+    expect(sent.at(-1)!.body).toMatch(/^Reyes Counseling reminder: your free 15-minute phone consult is tomorrow, Wed at 2pm \(ref FD-\d+\)\. Reply R to reschedule or C to cancel\. Reply STOP to opt out\.$/);
     expect(await queueReminders()).toBe(0);
     setFrontDeskDeps({ phone: async () => phone, calendar: async () => calendar, timeZone: async () => "America/Chicago", now: () => NOW });
   });

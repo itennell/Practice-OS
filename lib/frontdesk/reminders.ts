@@ -2,7 +2,7 @@ import { queueApproval } from "../approvals";
 import { withOrigin } from "../approval-policy";
 import { loadApprovalSettings } from "../approval-settings";
 import { db } from "../db";
-import { localDate, slotLabel } from "./calendar/zone";
+import { localDate, whenLabel } from "./calendar/zone";
 import { deps } from "./deps";
 import { prettyPhone } from "./phone/numbers";
 import { isOptedOut, practice, type BookingRow } from "./store";
@@ -40,7 +40,7 @@ export async function queueReminders(): Promise<number> {
       update practice_os.consult_bookings set reminder_sent_at = now()
       where id = ${b.id} and reminder_sent_at is null returning id`;
     if (!claimed.length) continue;
-    const body = reminderText(p, slotLabel(b.starts_at, tz), b.reference ?? "");
+    const body = reminderText(p, whenLabel(b.starts_at, tz), b.reference ?? "");
     // Reminders follow their own switch, so that switch stands in for text_missed_callers here.
     await withOrigin({ rule: "front_desk", rules: { ...frontDesk, text_missed_callers: frontDesk.send_reminders } }, () =>
       queueApproval({

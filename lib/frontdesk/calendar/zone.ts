@@ -45,7 +45,22 @@ export function localDate(at: Date, timeZone: string) {
   return { year: p.year, month: p.month, day: p.day, weekday: p.weekday };
 }
 
-/** "Tue Nov 4, 10:00 am" in her zone, for texts. */
+/** "Tue 10am", "Wed 2:30pm": the registered text format (docs/sms-opt-in.md). Offers stay within a week, so the weekday is enough. */
+export function shortSlotLabel(at: Date, timeZone: string): string {
+  const day = new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short" }).format(at);
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric", minute: "2-digit", hour12: true }).formatToParts(at).map((x) => [x.type, x.value]),
+  );
+  const time = `${p.hour}${p.minute === "00" ? "" : `:${p.minute}`}${String(p.dayPeriod).toLowerCase()}`;
+  return `${day} ${time}`;
+}
+
+/** "Wed at 2pm", for confirmations and reminders. */
+export function whenLabel(at: Date, timeZone: string): string {
+  return shortSlotLabel(at, timeZone).replace(" ", " at ");
+}
+
+/** "Tue Nov 4, 10:00 am" in her zone, for the Front Desk page. */
 export function slotLabel(at: Date, timeZone: string): string {
   const day = new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short", month: "short", day: "numeric" }).format(at);
   const time = new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric", minute: "2-digit" })

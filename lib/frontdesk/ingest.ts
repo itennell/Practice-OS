@@ -16,8 +16,8 @@ import { offerTimes, passToClinician } from "./offers";
 import { prettyPhone } from "./phone/numbers";
 import type { InboundText, PhoneAdapter, Voicemail } from "./phone/types";
 import { parseReply } from "./reply";
-import { activeBookingFor, addAlert, addMessage, hasMessage, inquiryForPhone, openOfferFor, practice } from "./store";
-import { helpText, noBookingText, pickHelpText } from "./templates";
+import { activeBookingFor, addAlert, addMessage, hasMessage, inquiryForPhone, openOfferFor, practice, sendText } from "./store";
+import { helpText, noBookingText, pickHelpText, startText, stopText } from "./templates";
 
 // One voicemail or one text, start to finish. Order is fixed (AGENTS.md):
 // save it, crisis check in plain code, only then any model, then the rules.
@@ -120,14 +120,18 @@ export async function processText(t: InboundText, phone: PhoneAdapter): Promise<
   const reply = parseReply(t.body, offer?.slots.length ?? 3);
   const who = inquiry.contact_name ?? prettyPhone(t.from);
 
+  // STOP and START: the registered one-line replies (docs/sms-opt-in.md). Carriers allow
+  // one confirmation after STOP; Twilio may send its own instead and drop ours.
   if (reply.kind === "stop") {
     await db()`insert into practice_os.sms_opt_outs (phone) values (${t.from}) on conflict do nothing`;
     await audit({ actor: "system", action: "sms_opt_out", subjectType: "inquiry", subjectId: inquiry.id });
+    await sendText({ to: t.from, body: stopText(await practice()), inquiryId: inquiry.id, actor: "executor", action: "stop_confirmation_sent", force: true, phone }).catch(() => {});
     return "done";
   }
   if (reply.kind === "start") {
     await db()`delete from practice_os.sms_opt_outs where phone = ${t.from}`;
     await audit({ actor: "system", action: "sms_opt_in", subjectType: "inquiry", subjectId: inquiry.id });
+    await sendText({ to: t.from, body: startText(await practice()), inquiryId: inquiry.id, actor: "executor", action: "start_confirmation_sent", phone }).catch(() => {});
     return "done";
   }
 
@@ -140,7 +144,7 @@ export async function processText(t: InboundText, phone: PhoneAdapter): Promise<
         return quick(helpText(await practice()), `Send ${who} the help text`);
       case "choice": {
         if (!offer) return passToClinician(inquiry.id, `${who} texted: "${t.body.slice(0, 200)}"`);
-        if (reply.index > offer.slots.length) return quick(pickHelpText(offer.slots.length), `Ask ${who} to pick 1 to ${offer.slots.length}`);
+        if (reply.index > offer.slots.length) return quick(pickHelpText(await practice(), offer.slots.length), `Ask ${who} to pick 1 to ${offer.slots.length}`);
         const kind = offer.purpose === "reschedule" ? "consult_reschedule" : "consult_booking";
         return queueApproval({
           kind,
@@ -153,7 +157,7 @@ export async function processText(t: InboundText, phone: PhoneAdapter): Promise<
       case "reschedule":
       case "cancel": {
         const booking = await activeBookingFor(t.from, now);
-        if (!booking) return quick(noBookingText(), `Tell ${who} there's no consult to change`);
+        if (!booking) return quick(noBookingText(await practice()), `Tell ${who} there's no consult to change`);
         return actOnIntent(inquiry.id, t.from, reply.kind, "");
       }
       case "book":
