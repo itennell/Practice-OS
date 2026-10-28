@@ -26,20 +26,45 @@ export async function checkMuseKey(key: string): Promise<MuseKeyCheck> {
   }
 }
 
-export async function saveMuseKey(key: string): Promise<void> {
-  await saveConnection({ provider: "muse", accountLabel: `Key ending ${key.slice(-4)}`, accessToken: key, refreshToken: null, scopes: [], expiresAt: null, meta: {} });
-  process.env.MODEL_API_KEY = key;
-  await audit({ actor: "clinician", action: "connect", subjectType: "connection", subjectId: "muse" });
+// Where this process's MODEL_API_KEY came from. "connections" means we copied the saved key in;
+// anything else set in MODEL_API_KEY came from .env (or the shell) and always wins.
+const SOURCE = "MODEL_API_KEY_SOURCE";
+const fromEnvFile = () => Boolean(process.env.MODEL_API_KEY) && process.env[SOURCE] !== "connections";
+
+function useSavedKey(key: string | null) {
+  if (fromEnvFile()) return;
+  if (key) {
+    process.env.MODEL_API_KEY = key;
+    process.env[SOURCE] = "connections";
+  } else {
+    delete process.env.MODEL_API_KEY;
+    delete process.env[SOURCE];
+  }
 }
 
+/** Saves her key. Returns false when a .env key is set, which keeps winning until it's removed from .env. */
+export async function saveMuseKey(key: string): Promise<{ inUse: boolean }> {
+  await saveConnection({ provider: "muse", accountLabel: `Key ending ${key.slice(-4)}`, accessToken: key, refreshToken: null, scopes: [], expiresAt: null, meta: {} });
+  useSavedKey(key);
+  await audit({ actor: "clinician", action: "connect", subjectType: "connection", subjectId: "muse" });
+  return { inUse: !fromEnvFile() };
+}
+
+/** Forgets her key, in this process at once (other processes on their next loadMuseKey). */
 export async function removeMuseKey(): Promise<void> {
   await deleteConnection("muse");
+  useSavedKey(null);
   await audit({ actor: "clinician", action: "disconnect", subjectType: "connection", subjectId: "muse" });
 }
 
-/** At start: if .env has no MODEL_API_KEY, use the one she saved. */
+/**
+ * Copies the saved key into MODEL_API_KEY unless .env set one. Cheap enough to
+ * call before each piece of work in a long-running process (the MCP server),
+ * so a key replaced or removed in the app takes effect there too.
+ */
 export async function loadMuseKey(): Promise<void> {
-  if (process.env.MODEL_API_KEY) return;
-  const saved = await getConnection("muse").catch(() => null);
-  if (saved?.accessToken) process.env.MODEL_API_KEY = saved.accessToken;
+  if (fromEnvFile()) return;
+  const saved = await getConnection("muse").catch(() => undefined);
+  if (saved === undefined) return; // database unreachable: keep what we have
+  useSavedKey(saved?.accessToken ?? null);
 }

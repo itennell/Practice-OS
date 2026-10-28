@@ -46,6 +46,7 @@ for (const tool of TOOLS) {
     // Outside agents follow the default mode from Settings, never above Auto.
     // With no database yet (a fresh install), tools run as they always have.
     async (args: unknown) => {
+      await loadMuseKey(); // pick up a key added, replaced or removed in the app since we started
       const mode = await loadApprovalSettings().then((s) => capForMcp(s.mode), () => undefined);
       return runTool(tool.name, args, { by: createdBy(), mode });
     },

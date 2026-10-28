@@ -14,8 +14,8 @@ export async function POST(request: Request) {
     const error = check.reason === "rejected" ? "Meta didn't accept that key. Copy it again from Meta's key page." : "Couldn't reach Meta to check the key. Check your internet and try again.";
     return Response.json({ error }, { status: check.reason === "rejected" ? 400 : 502 });
   }
-  await saveMuseKey(parsed.data.key);
-  return Response.json({ connected: true, accountLabel: `Key ending ${parsed.data.key.slice(-4)}` });
+  const { inUse } = await saveMuseKey(parsed.data.key);
+  return Response.json({ connected: true, inUse, accountLabel: `Key ending ${parsed.data.key.slice(-4)}` });
 }
 
 export async function DELETE(request: Request) {
