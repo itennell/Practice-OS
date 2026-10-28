@@ -58,6 +58,20 @@ test("The ask bar: Aeon needs your approval, Approve or Not now", async ({ page 
   await page.screenshot({ path: `test/screens/modes-chat-${test.info().project.name}.png`, fullPage: true });
 });
 
+test("The ask bar fits the chat column beside the sidebar: its words never squeeze into one column", async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 800 });
+  await page.goto("/");
+  const bar = page.getByRole("region", { name: "Waiting for your approval" });
+  const question = bar.getByText("Aeon needs your approval. Can Aeon get this done for you?");
+  await expect(question).toBeVisible();
+  const box = (await question.boundingBox())!;
+  const column = (await bar.boundingBox())!;
+  // The question spans most of the bar (buttons go below it), at most two lines.
+  expect(box.width).toBeGreaterThan(column.width * 0.6);
+  expect(box.height).toBeLessThan(60);
+  await page.screenshot({ path: `test/screens/modes-chat-narrow-${test.info().project.name}.png`, fullPage: true });
+});
+
 test("Settings: default mode and Front Desk's own rule", async ({ page }) => {
   await page.goto("/settings");
   await expect(page.getByRole("heading", { name: "How Aeon works in chat" })).toBeVisible();

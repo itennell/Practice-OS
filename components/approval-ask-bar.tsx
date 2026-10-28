@@ -50,38 +50,37 @@ export function ApprovalAskBar({ refreshKey }: { refreshKey: number }) {
   }
 
   return (
-    <div
-      role="region"
-      aria-label="Waiting for your approval"
-      className="glass mb-3 flex flex-col gap-3 rounded-[20px] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-    >
-      <div className="flex min-w-0 flex-col">
-        <p className="font-medium text-[var(--fg)]">
-          {failed ? "Something Aeon did on its own didn’t work." : "Aeon needs your approval. Can Aeon get this done for you?"}
-        </p>
-        <p className="truncate text-small text-[var(--fg-muted)]">
-          {first.title}
-          {shown.length > 1 && ` · ${shown.length - 1} more waiting`}
-        </p>
-      </div>
-      <div className="flex shrink-0 flex-wrap items-center gap-2">
-        {failed ? (
-          <Link href="/approvals" className="inline-flex h-touch items-center rounded-full bg-[var(--primary-bg)] px-5 font-medium text-[var(--primary-fg)]">
-            See what happened
-          </Link>
-        ) : (
-          <Button type="button" variant="primary" disabled={busy} onClick={() => void approve()}>
-            {busy ? "Working…" : "Approve"}
+    // Lays out by its own width, not the window's: beside the sidebar the chat column can be narrow.
+    <div role="region" aria-label="Waiting for your approval" className="@container mb-3">
+      <div className="glass flex flex-col gap-3 rounded-[20px] px-4 py-3 @xl:flex-row @xl:items-center @xl:justify-between">
+        <div className="flex min-w-0 flex-col">
+          <p className="font-medium text-[var(--fg)]">
+            {failed ? "Something Aeon did on its own didn’t work." : "Aeon needs your approval. Can Aeon get this done for you?"}
+          </p>
+          <p className="truncate text-small text-[var(--fg-muted)]">
+            {first.title}
+            {shown.length > 1 && ` · ${shown.length - 1} more waiting`}
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {failed ? (
+            <Link href="/approvals" className="inline-flex h-touch items-center rounded-full bg-[var(--primary-bg)] px-5 font-medium text-[var(--primary-fg)]">
+              See what happened
+            </Link>
+          ) : (
+            <Button type="button" variant="primary" disabled={busy} onClick={() => void approve()}>
+              {busy ? "Working…" : "Approve"}
+            </Button>
+          )}
+          <Button type="button" variant="quiet" onClick={() => setSkipped((s) => new Set(s).add(first.id))}>
+            Not now
           </Button>
-        )}
-        <Button type="button" variant="quiet" onClick={() => setSkipped((s) => new Set(s).add(first.id))}>
-          Not now
-        </Button>
-        {!failed && (
-          <Link href="/approvals" className="px-2 text-small font-semibold text-[var(--link)] underline-offset-4 hover:underline">
-            See details
-          </Link>
-        )}
+          {!failed && (
+            <Link href="/approvals" className="px-2 text-small font-semibold text-[var(--link)] underline-offset-4 hover:underline">
+              See details
+            </Link>
+          )}
+        </div>
       </div>
     </div>
   );
