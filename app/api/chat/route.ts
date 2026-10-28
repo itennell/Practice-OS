@@ -1,6 +1,8 @@
+import { after } from "next/server";
 import { z } from "zod";
 import { sendMessage } from "@/lib/aeon/chat";
 import { DEMO_RESTING, demoCapReached, isViewOnly } from "@/lib/aeon/demo";
+import { reflectIfDue } from "@/lib/aeon/reflect";
 import { isUuid } from "../approvals/responses";
 
 // One message to Aeon. The crisis check and the sensitive-info guard run before
@@ -21,7 +23,13 @@ export async function POST(request: Request) {
     return Response.json({ conversationId: conversationId ?? null, reply: { kind: "answer", text: DEMO_RESTING, steps: [], approvalIds: [] } });
   }
   try {
-    const result = await sendMessage({ conversationId, text, viewOnly: isViewOnly(request) });
+    const viewOnly = isViewOnly(request);
+    const result = await sendMessage({ conversationId, text, viewOnly });
+    // Aeon's reflection pass on every 10th message she sends, after she has her reply.
+    if (result.conversationId && !viewOnly) {
+      const id = result.conversationId;
+      after(() => reflectIfDue(id).catch((err) => console.error(`[reflect] ${err instanceof Error ? err.message : String(err)}`)));
+    }
     return Response.json(result, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
