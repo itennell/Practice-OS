@@ -5,9 +5,9 @@ import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 
 describe("design tokens", () => {
-  it("defines the Caseload colors in app/globals.css", async () => {
+  it("defines the calm neutral palette and the purple accent in app/globals.css", async () => {
     const css = await readFile("app/globals.css", "utf8");
-    for (const hex of ["#f5f3fc", "#17142b", "#5d5878", "#5b47c9", "#43349a", "#1e1a3a", "#d4cdf0", "#2f7a55"]) {
+    for (const hex of ["#faf9f5", "#ffffff", "#1f1e1d", "#262624", "#30302e", "#f5f4ef", "#5b47c9", "#8e7cf8", "#2f7a55"]) {
       expect(css.toLowerCase()).toContain(hex);
     }
   });

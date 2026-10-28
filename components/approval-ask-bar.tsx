@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { notify } from "@/components/shared/toaster";
-import { Button } from "./ui";
+import { Button, ButtonLink } from "./ui";
 
 // The plain-English bar just above the chat box whenever something is waiting
 // for her: "Aeon needs your approval. Can Aeon get this done for you?" Approve
@@ -64,9 +64,9 @@ export function ApprovalAskBar({ refreshKey }: { refreshKey: number }) {
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           {failed ? (
-            <Link href="/approvals" className="inline-flex h-touch items-center rounded-full bg-[var(--primary-bg)] px-5 font-medium text-[var(--primary-fg)]">
+            <ButtonLink href="/approvals" variant="primary">
               See what happened
-            </Link>
+            </ButtonLink>
           ) : (
             <Button type="button" variant="primary" disabled={busy} onClick={() => void approve()}>
               {busy ? "Working…" : "Approve"}

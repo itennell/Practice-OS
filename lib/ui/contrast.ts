@@ -1,4 +1,4 @@
-// WCAG 2.2 contrast checks for the Caseload tokens in app/globals.css.
+// WCAG 2.2 contrast checks for the design tokens in app/globals.css.
 // Reads the CSS text, resolves var() chains for light and dark, composites
 // translucent layers (glass, tinted pills) onto the page, and measures every
 // foreground/background pair the UI actually uses.
@@ -102,9 +102,8 @@ export type Pair = { fg: string; on: string[]; min: number; label: string };
 
 const surfaces: { name: string; on: string[] }[] = [
   { name: "page", on: ["--bg"] },
-  { name: "page glow", on: ["--bg", "--glow-1"] },
-  { name: "glass card", on: ["--bg", "--glass"] },
-  { name: "glass on glow", on: ["--bg", "--glow-1", "--glass"] },
+  { name: "card", on: ["--bg", "--glass"] },
+  { name: "raised tile", on: ["--bg", "--glass", "--tile-bg"] },
 ];
 
 export const PAIRS: Pair[] = [

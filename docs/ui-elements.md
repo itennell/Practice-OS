@@ -4,7 +4,7 @@ Every UI piece Isaiah picked for Practice-OS, where it goes, and how to build it
 
 - Status words: `built` (in the repo), `approved` (decided, not built yet), `collected` (idea, not decided), `parked` (reference only, not planned).
 - Priority: `must` or `nice`.
-- Colors always follow the Caseload palette in `AGENTS.md` and the tokens in `app/globals.css`, light and dark. Icons are lucide only (swap any Hugeicons). shadcn/ui pieces use Base UI primitives.
+- Colors always follow the palette in `AGENTS.md` (calm neutrals since 2026-10-28; purple only as the accent and Aeon's orb) and the tokens in `app/globals.css`, light and dark. Icons are lucide only (swap any Hugeicons). shadcn/ui pieces use Base UI primitives.
 - Rows marked *layout reference* came from screenshots of React Bits Pro demos. We do not have that code and do not copy it; we build our own from free parts. The screenshots stay private and are never committed.
 - Small cards that sit on a glass card (attachments, toasts, file tiles, and similar) use the raised `tile` style from `app/globals.css`: faint hairline, top highlight, soft shadow (Isaiah's pick, 2026-10-27).
 - Licenses: React Bits (free) and shadcn/ui are MIT. coss ui is AGPL-3.0, so it is a visual reference only; use the shadcn/ui equivalent.
@@ -47,7 +47,7 @@ Every UI piece Isaiah picked for Practice-OS, where it goes, and how to build it
 | UI-001 | Soft blue and purple glass gradients | GLB | Cards and surfaces | must | built | Design board p.8 | `app/globals.css` (`glass`) |
 | UI-002 | Animated orb agent | SHL | Aeon orb | must | built | Design board p.8 | `components/ui.tsx` (`Orb`) |
 | UI-003 | Chip selectors | ONB | Who you help | must | approved | Design board p.8 |  |
-| UI-004 | Pill buttons | GLB | Buttons and chips | must | built | Design board p.8 | `components/ui.tsx` (`Button`, `Chip`) |
+| UI-004 | Pill buttons | GLB | Buttons and chips | must | built | Design board p.8 | `components/ui.tsx` (`Button`, `ButtonLink`, `Chip`, `ChipLink`) |
 | UI-005 | Dark chat menu (ChatGPT style) | CHT | Conversation list | must | approved | Design board p.8 |  |
 | UI-006 | Chat bubbles with cut corners | CHT | Aeon bubble | must | approved | Design board p.7 |  |
 | UI-007 | Plugins page for connections | SET | Connections | nice | collected | Design board p.8 |  |
@@ -73,7 +73,7 @@ Every UI piece Isaiah picked for Practice-OS, where it goes, and how to build it
 | UI-027 | Approval card in the chat | CHT | Approval card in chat | must | built (basic) | Screenshot (layout reference only) (layout reference) | `components/approvals-inbox.tsx` (`ApprovalsInbox` with `ids`) |
 | UI-028 | Confirm dialog for permanent actions (Alert Dialog) | GLB | Confirm dialogs | must | built | shadcn/ui (MIT); coss ui reference only (AGPL) | `components/shared/confirm-dialog.tsx` (`ConfirmDialog`) |
 | UI-029 | Avatar (profile picture) | SHL | Profile (bottom of sidebar) | must | built | shadcn/ui (MIT); coss ui reference only (AGPL) | `components/shared/avatar.tsx` (`Avatar`) |
-| UI-030 | Calendar (shared month calendar) | DLN | Calendar | must | built | shadcn/ui (MIT); coss ui reference only (AGPL) | `components/shared/calendar.tsx` (`Calendar`) |
+| UI-030 | Calendar (shared month calendar) | DLN | Calendar | must | built | shadcn/ui (MIT); coss ui reference only (AGPL) | `components/shared/calendar.tsx` (`Calendar`); in forms `components/shared/date-field.tsx` (`DateField`, the Calendar in a popover) |
 | UI-031 | Toast notifications | GLB | Toasts | must | built | shadcn/ui (MIT) | `components/shared/toaster.tsx` (`Toaster`, `notify`) |
 | UI-032 | Settings controls (switches and selects) | SET | Auto-approve kinds | must | built | shadcn/ui (MIT) | `components/shared/settings-controls.tsx` (`SettingSwitch`, `SettingSelect`, `SettingRadio`, `TextField`) |
 

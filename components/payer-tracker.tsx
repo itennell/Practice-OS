@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { formatDate } from "./deadline-card";
-import { INPUT } from "./gfe-timing-check";
+import { DateField } from "./shared/date-field";
+import { SettingSelect, TextField } from "./shared/settings-controls";
 import { StatusPill, type Status } from "./shared/status-mark";
 import { Button } from "./ui";
 
@@ -111,26 +112,17 @@ function Row({ a }: { a: App }) {
           }}
         >
           <div className="grid gap-3 sm:grid-cols-3">
-            <label className="flex flex-col gap-1 text-small font-medium">
-              Status
-              <select className={INPUT} value={String(draft.status)} onChange={(e) => setDraft((d) => ({ ...d, status: e.target.value }))}>
-                {Object.entries(LABEL).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <SettingSelect
+              compact
+              label="Status"
+              value={String(draft.status)}
+              onValueChange={(v) => setDraft((d) => ({ ...d, status: v }))}
+              options={Object.entries(LABEL).map(([value, label]) => ({ value, label }))}
+            />
             {DATES.map((d) => (
-              <label key={d.key} className="flex flex-col gap-1 text-small font-medium">
-                {d.label}
-                <input type="date" className={INPUT} value={String(draft[d.key] ?? "")} onChange={(e) => setDraft((x) => ({ ...x, [d.key]: e.target.value }))} />
-              </label>
+              <DateField key={d.key} label={d.label} value={String(draft[d.key] ?? "")} onChange={(iso) => setDraft((x) => ({ ...x, [d.key]: iso }))} clearable />
             ))}
-            <label className="flex flex-col gap-1 text-small font-medium">
-              Payer reference (optional)
-              <input className={INPUT} value={String(draft.reference ?? "")} onChange={(e) => setDraft((x) => ({ ...x, reference: e.target.value }))} />
-            </label>
+            <TextField compact label="Payer reference (optional)" value={String(draft.reference ?? "")} onChange={(e) => setDraft((x) => ({ ...x, reference: e.target.value }))} />
           </div>
           <p className="text-small text-[var(--fg-muted)]">Leave Follow up or Recredential blank and Aeon sets them: 30 days after applying, 36 months after approval.</p>
           <div className="flex flex-wrap items-center gap-2">
@@ -175,10 +167,7 @@ export function PayerTracker({ apps }: { apps: App[] }) {
           }
         }}
       >
-        <label className="flex min-w-[14rem] flex-1 flex-col gap-1 text-small font-medium">
-          Add a payer
-          <input className={INPUT} value={payer} placeholder="e.g. Cigna" onChange={(e) => setPayer(e.target.value)} />
-        </label>
+        <TextField compact wrapClassName="min-w-[14rem] flex-1" label="Add a payer" value={payer} placeholder="e.g. Cigna" onChange={(e) => setPayer(e.target.value)} />
         <Button type="submit" variant="quiet" disabled={busy || payer.trim().length < 2}>
           Add
         </Button>

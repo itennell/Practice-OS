@@ -91,14 +91,14 @@ export function AeonFiles({ files, usage }: { files: AeonFile[]; usage: string }
         <Dialog.Portal>
           <Dialog.Backdrop
             className={cn(
-              "fixed inset-0 z-50 bg-[var(--scrim)] backdrop-blur-[2px] transition-opacity duration-200 ease-[var(--ease-calm)]",
+              "fixed inset-0 z-50 bg-[var(--scrim)] transition-opacity duration-200 ease-[var(--ease-calm)]",
               "data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 motion-reduce:transition-none",
             )}
           />
           <Dialog.Popup
             initialFocus={closeRef}
             className={cn(
-              "fixed inset-x-0 bottom-0 z-50 flex max-h-[88dvh] flex-col gap-4 rounded-t-[var(--radius-card)] border border-[var(--glass-line)] bg-[var(--glass-strong)] p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] text-[var(--fg)] shadow-[0_24px_64px_rgb(23_20_43/0.18)] backdrop-blur-[var(--blur-glass)] outline-none",
+              "fixed inset-x-0 bottom-0 z-50 flex max-h-[88dvh] flex-col gap-4 rounded-t-[var(--radius-card)] border border-[var(--glass-line)] bg-[var(--glass-strong)] p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] text-[var(--fg)] shadow-[0_24px_64px_rgb(23_20_43/0.18)] outline-none",
               "sm:inset-x-auto sm:bottom-auto sm:top-1/2 sm:left-1/2 sm:w-[min(40rem,calc(100vw-2rem))] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-[var(--radius-card)] sm:pb-6",
               "transition-[opacity,transform] duration-200 ease-[var(--ease-soft-out)] data-[ending-style]:opacity-0 data-[starting-style]:opacity-0",
               "data-[starting-style]:translate-y-4 data-[ending-style]:translate-y-4 motion-reduce:transition-none",

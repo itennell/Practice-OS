@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { execSync } from "node:child_process";
+import { pick, shown, typeDate } from "../helpers/controls";
 
 test.beforeEach(() => {
   execSync("npm run db:reset", { stdio: "ignore" });
@@ -14,12 +15,12 @@ test("Draft an estimate, approve it, then make the PDF with details that aren't 
   // Wait for the form to be interactive, or a fill can land before hydration and be reset.
   await page.waitForLoadState("networkidle");
   const form = page.getByRole("form").or(page.locator("form").first());
-  await page.getByLabel("Booked on").first().fill("2026-11-25");
-  await expect(page.getByLabel("Booked on").first()).toHaveValue("2026-11-25");
-  await page.getByLabel("First visit").fill("2026-12-15");
-  await page.getByLabel("Service 1").selectOption("90791");
+  await typeDate(page, "Booked on", "2026-11-25", { nth: 0 });
+  await expect(page.getByLabel("Booked on", { exact: true }).first()).toHaveValue(shown("2026-11-25"));
+  await typeDate(page, "First visit", "2026-12-15");
+  await pick(page, page, "Service 1", /^90791/);
   await page.getByRole("button", { name: "Add a service" }).click();
-  await page.getByLabel("Service 2").selectOption("90837");
+  await pick(page, page, "Service 2", /^90837/);
   await page.getByLabel("How many").nth(1).fill("40");
   // Dana is open Mon-Thu [Sample]: 10 open days out, so 3 open days after Wed Nov 25.
   await expect(form.getByText(/Total \$7,200\.00/)).toBeVisible();
@@ -39,7 +40,7 @@ test("Draft an estimate, approve it, then make the PDF with details that aren't 
   await row.getByText("Make the PDF").click();
   await row.getByLabel("First name").fill("Casey");
   await row.getByLabel("Last name").fill("Example");
-  await row.getByLabel("Date of birth").fill("1991-02-03");
+  await typeDate(row, "Date of birth", "1991-02-03");
   await row.getByLabel("Street").fill("200 Sample Ave");
   await row.getByLabel("City").fill("Chicago");
   await row.getByLabel("ZIP").fill("60614");

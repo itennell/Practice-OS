@@ -56,10 +56,10 @@ function HeaderSkeleton() {
   return (
     // Same chip widths as the real header so it wraps the same way (no layout shift on phones).
     <div aria-hidden className="flex flex-col gap-4">
-      <div className="h-10 w-48 animate-pulse rounded-full bg-[var(--glass-strong)]" />
+      <div className="h-10 w-48 animate-pulse rounded-full bg-[var(--hairline)]" />
       <div className="flex flex-wrap gap-2">
         {["w-36", "w-56", "w-80", "w-20"].map((w) => (
-          <div key={w} className={`h-chip ${w} max-w-full animate-pulse rounded-full bg-[var(--glass-strong)]`} />
+          <div key={w} className={`h-chip ${w} max-w-full animate-pulse rounded-full bg-[var(--hairline)]`} />
         ))}
       </div>
     </div>
@@ -70,7 +70,7 @@ function InboxSkeleton() {
   return (
     <div aria-hidden className="flex flex-col gap-3">
       {[0, 1, 2].map((i) => (
-        <div key={i} className="h-28 animate-pulse rounded-[20px] bg-[var(--glass-strong)]" />
+        <div key={i} className="h-28 animate-pulse rounded-[20px] bg-[var(--hairline)]" />
       ))}
     </div>
   );

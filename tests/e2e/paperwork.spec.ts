@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { execSync } from "node:child_process";
+import { typeDate } from "../helpers/controls";
 
 test.beforeAll(() => {
   execSync("npm run db:reset", { stdio: "ignore" });
@@ -15,7 +16,7 @@ test("Good Faith Estimates tab: timing check uses her hours, and the sample PDF 
 
   // Thanksgiving week, Dana open Mon-Thu [Sample]: 10 open days out, due Wed Dec 2.
   await expect(page.getByText(/Give it by Wed, Dec 2, 2026/)).toBeVisible();
-  await page.getByLabel("Or: client asked on").fill("2026-11-10");
+  await typeDate(page, "Or: client asked on", "2026-11-10");
   await expect(page.getByText(/Give it by Tue, Nov 17, 2026/)).toBeVisible();
 
   const pdf = await request.get("/api/gfe/sample");
@@ -49,7 +50,7 @@ test("Superbills tab: the sample, a new one by hand, its PDF and Mark given", as
   await expect(page.getByRole("listitem", { name: "SB-2026-0001" })).toContainText("4 sessions, $700.00");
 
   // A new one by hand: one video session from home at her $175 fee, nothing paid yet.
-  await page.getByLabel("Date 1").fill("2026-10-20");
+  await typeDate(page, "Date 1", "2026-10-20");
   await page.getByLabel("Fee ($)").fill("175");
   await page.getByRole("button", { name: "Save superbill" }).click();
   await expect(page.getByRole("status")).toContainText(/Saved as SB-\d{4}-\d{4}/);
@@ -84,7 +85,7 @@ test("Release forms tab: blank and revocation PDFs, a filled form downloads, bla
   await page.getByLabel("Release to (person or agency)").fill("Dr. Lee, Northside Clinic [Sample]");
   await page.getByLabel("Purpose").fill("Coordinate care");
   await page.getByLabel("Exactly what to release").fill("All records");
-  await page.getByLabel("Consent ends on (required)").fill("2027-06-30");
+  await typeDate(page, "Consent ends on (required)", "2027-06-30");
   await page.getByRole("button", { name: "Download filled form" }).click();
   await expect(page.getByRole("alert").filter({ hasText: "blanket" })).toBeVisible();
 

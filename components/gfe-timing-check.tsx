@@ -3,11 +3,9 @@
 import { useState } from "react";
 import { gfeDueDate, type GfeDue, type OpenDays } from "@/lib/gfe/timing";
 import { formatDate } from "./deadline-card";
+import { DateField } from "./shared/date-field";
 
 // Try any booking: when would the Good Faith Estimate be due?
-
-export const INPUT =
-  "h-input w-full rounded-full border border-border bg-[var(--chip-off-bg)] px-5 text-body text-[var(--fg)] focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]";
 
 export function GfeTimingCheck({ open, initial }: { open: OpenDays; initial: { bookedOn: string; visitOn: string } }) {
   const [bookedOn, setBookedOn] = useState(initial.bookedOn);
@@ -26,18 +24,9 @@ export function GfeTimingCheck({ open, initial }: { open: OpenDays; initial: { b
   return (
     <div className="flex flex-col gap-4">
       <div className="grid gap-3 sm:grid-cols-3">
-        <label className="flex flex-col gap-1 text-small font-medium">
-          Booked on
-          <input type="date" className={INPUT} value={bookedOn} onChange={(e) => setBookedOn(e.target.value)} />
-        </label>
-        <label className="flex flex-col gap-1 text-small font-medium">
-          Visit on
-          <input type="date" className={INPUT} value={visitOn} onChange={(e) => setVisitOn(e.target.value)} />
-        </label>
-        <label className="flex flex-col gap-1 text-small font-medium">
-          Or: client asked on
-          <input type="date" className={INPUT} value={requestedOn} onChange={(e) => setRequestedOn(e.target.value)} />
-        </label>
+        <DateField label="Booked on" value={bookedOn} onChange={setBookedOn} />
+        <DateField label="Visit on" value={visitOn} onChange={setVisitOn} />
+        <DateField label="Or: client asked on" clearable value={requestedOn} onChange={setRequestedOn} />
       </div>
       <p aria-live="polite" className="text-body">
         {error ? (

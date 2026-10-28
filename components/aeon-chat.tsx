@@ -235,7 +235,7 @@ export function AeonChat({
               className={`flex min-h-touch items-center rounded-[14px] px-3 py-2 text-small leading-snug ${
                 c.id === conversationId
                   ? "bg-[var(--glass-strong)] font-semibold text-[var(--fg)]"
-                  : "text-[var(--fg-muted)] hover:bg-[var(--glass-strong)] hover:text-[var(--fg)]"
+                  : "text-[var(--fg-muted)] hover:bg-[var(--hairline)] hover:text-[var(--fg)]"
               }`}
             >
               <span className="line-clamp-2">{c.title}</span>

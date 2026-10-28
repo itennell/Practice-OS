@@ -14,7 +14,7 @@ export default function MemoryPage() {
           facts only: no client names or clinical details until there is a business associate agreement.
         </p>
       </header>
-      <Suspense fallback={<div aria-hidden className="h-40 animate-pulse rounded-[24px] bg-[var(--glass-strong)]" />}>
+      <Suspense fallback={<div aria-hidden className="h-40 animate-pulse rounded-[24px] bg-[var(--hairline)]" />}>
         <Memories />
       </Suspense>
     </div>

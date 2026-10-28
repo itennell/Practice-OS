@@ -21,10 +21,10 @@ describe("contrast maths", () => {
   });
 });
 
-describe("Caseload tokens", () => {
+describe("design tokens", () => {
   it("resolves var() chains in both themes", () => {
-    expect(resolve(themeVars(css, "light"), "--bg")).toMatchObject({ r: 0xf5, g: 0xf3, b: 0xfc });
-    expect(resolve(themeVars(css, "dark"), "--bg")).toMatchObject({ r: 0x10, g: 0x0d, b: 0x24 });
+    expect(resolve(themeVars(css, "light"), "--bg")).toMatchObject({ r: 0xfa, g: 0xf9, b: 0xf5 });
+    expect(resolve(themeVars(css, "dark"), "--bg")).toMatchObject({ r: 0x26, g: 0x26, b: 0x24 });
   });
 
   it("every used pair meets WCAG AA in light and dark", () => {

@@ -22,7 +22,7 @@ export default function GuidesPage() {
             <li key={g.slug}>
               <Link
                 href={`/how-do-i/${g.slug}`}
-                className="flex min-h-touch flex-col gap-1 rounded-[18px] px-4 py-3 hover:bg-[var(--glass-strong)]"
+                className="flex min-h-touch flex-col gap-1 rounded-[18px] px-4 py-3 hover:bg-[var(--hairline)]"
               >
                 <span className="font-semibold text-[var(--link)]">{g.title}</span>
                 <span className="text-small text-[var(--fg-muted)]">{g.summary}</span>

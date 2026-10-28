@@ -32,7 +32,7 @@ function NavLink({ href, label, icon: Icon, onNavigate }: NavItem & { onNavigate
       className={`flex h-touch items-center gap-3 rounded-full px-4 text-body font-medium transition-colors duration-150 ${
         active
           ? "bg-[var(--primary-bg)] text-[var(--primary-fg)]"
-          : "text-[var(--fg-muted)] hover:bg-[var(--glass-strong)] hover:text-[var(--fg)]"
+          : "text-[var(--fg-muted)] hover:bg-[var(--hairline)] hover:text-[var(--fg)]"
       }`}
     >
       <Icon aria-hidden size={18} strokeWidth={1.75} />
@@ -89,7 +89,7 @@ export function Sidebar() {
           aria-expanded={open}
           aria-controls="mobile-nav"
           aria-label={open ? "Close menu" : "Open menu"}
-          className="flex size-touch items-center justify-center rounded-full hover:bg-[var(--glass-strong)]"
+          className="flex size-touch items-center justify-center rounded-full hover:bg-[var(--hairline)]"
         >
           {open ? <X aria-hidden size={20} /> : <Menu aria-hidden size={20} />}
         </button>
