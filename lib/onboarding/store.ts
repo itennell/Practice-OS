@@ -191,7 +191,7 @@ async function savedValues(row: ProfileRow, sql: postgres.Sql): Promise<Record<s
     if (settings.alert_phone) out.alert_phone = settings.alert_phone;
     if (settings.approval_mode) out.mode = settings.approval_mode;
     if (settings.front_desk_rules) out.text_missed_callers = settings.front_desk_rules.text_missed_callers;
-    if (settings.helpers_enabled) out.team = settings.helpers_enabled;
+    // The team screen starts from her stage's picks, not the table's all-on default.
   }
   for (const k of Object.keys(out)) if (out[k] === null || out[k] === undefined) delete out[k];
   return out;

@@ -22,6 +22,12 @@ const FIRST = new Set(["name", "practice_name", "state", "license"]);
 
 type Followup = { question: string; topic: string };
 const noSubscribe = () => () => {};
+const WIDE = "(min-width: 768px)";
+const subscribeWide = (cb: () => void) => {
+  const mq = window.matchMedia(WIDE);
+  mq.addEventListener("change", cb);
+  return () => mq.removeEventListener("change", cb);
+};
 const readDraft = () => {
   try {
     return localStorage.getItem(DRAFT_KEY);
@@ -67,6 +73,7 @@ function OnboardingFlow({ initial, startAt }: { initial: OnboardingState; startA
 
   // Before her profile exists, the first answers live in this browser (lib/onboarding/store.ts).
   const draftRaw = useSyncExternalStore(noSubscribe, readDraft, () => null);
+  const wide = useSyncExternalStore(subscribeWide, () => window.matchMedia(WIDE).matches, () => true);
   const draft = useMemo<Record<string, unknown>>(() => {
     try {
       const d = JSON.parse(draftRaw ?? "{}");
@@ -208,7 +215,7 @@ function OnboardingFlow({ initial, startAt }: { initial: OnboardingState; startA
       >
         <div className="flex items-center gap-4 md:flex-col md:items-center">
           <div className="size-16 shrink-0 md:size-[120px]">
-            <AgentBlob agent="aeon" eyes size={120} state={busy ? "work" : "rest"} splashOnMount label={busy ? "Aeon is saving" : "Aeon"} className="size-full" />
+            <AgentBlob key={wide ? "wide" : "narrow"} agent="aeon" eyes size={wide ? 120 : 64} state={busy ? "work" : "rest"} splashOnMount label={busy ? "Aeon is saving" : "Aeon"} />
           </div>
           <p aria-live="polite" className="bubble-aeon min-w-0 flex-1 rounded-[20px] rounded-tl-[4px] border border-[var(--hairline)] bg-[var(--color-card)] px-4 py-3 text-body dark:bg-[var(--color-dark-card)] md:w-full">
             {screen.aeonSays}
@@ -249,8 +256,9 @@ function OnboardingFlow({ initial, startAt }: { initial: OnboardingState; startA
         <p className="text-small font-medium text-[var(--fg-muted)]">
           {CHAPTERS[chapterIndex].title} · question {progress.at} of {progress.of}
         </p>
-        <h1 ref={heading} tabIndex={-1} className="mt-2 text-title outline-none">
-          {screen.kind === "connect" || screen.kind === "team" || screen.kind === "slot" ? screen.ask : screen.ask}
+        {/* Focused by script so a screen reader reads the new question; it isn't a control, so no focus ring. */}
+        <h1 ref={heading} tabIndex={-1} className="mt-2 text-title" style={{ outline: "none" }}>
+          {screen.ask}
         </h1>
         {screen.help && <p className="mt-2 max-w-prose text-body text-[var(--fg-muted)]">{screen.help}</p>}
 
