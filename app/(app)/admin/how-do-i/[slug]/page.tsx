@@ -10,12 +10,12 @@ export function generateStaticParams() {
   return guideSlugs().map((slug) => ({ slug }));
 }
 
-export async function generateMetadata({ params }: PageProps<"/how-do-i/[slug]">): Promise<Metadata> {
+export async function generateMetadata({ params }: PageProps<"/admin/how-do-i/[slug]">): Promise<Metadata> {
   const guide = getGuide((await params).slug);
   return { title: `${guide?.title ?? "How do I"} · Practice-OS` };
 }
 
-export default function GuidePage({ params }: PageProps<"/how-do-i/[slug]">) {
+export default function GuidePage({ params }: PageProps<"/admin/how-do-i/[slug]">) {
   return (
     <Suspense fallback={<GuideSkeleton />}>
       <GuideBody params={params} />
@@ -34,14 +34,14 @@ function GuideSkeleton() {
   );
 }
 
-async function GuideBody({ params }: { params: PageProps<"/how-do-i/[slug]">["params"] }) {
+async function GuideBody({ params }: { params: PageProps<"/admin/how-do-i/[slug]">["params"] }) {
   const guide = getGuide((await params).slug);
   if (!guide) notFound();
 
   return (
     <>
       <nav aria-label="Breadcrumb" className="text-small">
-        <Link href="/how-do-i" className="inline-flex h-touch items-center text-[var(--link)] underline underline-offset-2">
+        <Link href="/admin/how-do-i" className="inline-flex h-touch items-center text-[var(--link)] underline underline-offset-2">
           All how-do-i guides
         </Link>
       </nav>

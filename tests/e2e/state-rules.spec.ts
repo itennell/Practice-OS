@@ -31,7 +31,7 @@ test("Approve researched rules, see the badge on Deadlines, then confirm one", a
   await card.getByRole("button", { name: "Approve", exact: true }).click();
   await expect(page.getByRole("listitem", { name: /Illinois rules for your LCPC license to review/ }).getByText("Done")).toBeVisible();
 
-  await page.goto("/deadlines");
+  await page.goto("/admin/deadlines");
   const rule = page.getByRole("listitem", { name: "[Sample] Researched rule for tests" });
   await expect(rule.getByText(/Aeon researched this\. Please confirm it with your board\./)).toBeVisible();
   await expect(rule.getByText(/found this quote on the official page/)).toBeVisible();

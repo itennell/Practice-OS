@@ -87,7 +87,7 @@ test("Phones: the menu slides in, traps focus, and closes on Escape", async ({ p
   await expect(page.getByRole("button", { name: "Open menu" })).toBeFocused();
 });
 
-for (const path of ["/", "/approvals", "/deadlines"]) {
+for (const path of ["/", "/approvals", "/admin/deadlines"]) {
   test(`Screenshot with the menu: ${path}`, async ({ page }, info) => {
     await page.goto(path);
     await page.waitForLoadState("networkidle");

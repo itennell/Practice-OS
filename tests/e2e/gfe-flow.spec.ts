@@ -11,7 +11,7 @@ test("Draft an estimate, approve it, then make the PDF with details that aren't 
   const errors: string[] = [];
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
 
-  await page.goto("/paperwork");
+  await page.goto("/admin?panel=gfe");
   // Wait for the form to be interactive, or a fill can land before hydration and be reset.
   await page.waitForLoadState("networkidle");
   const form = page.getByRole("form").or(page.locator("form").first());
@@ -34,7 +34,7 @@ test("Draft an estimate, approve it, then make the PDF with details that aren't 
   await card.getByRole("button", { name: "Approve", exact: true }).click();
   await expect(page.getByRole("listitem", { name: /individual therapy, \$7,200\.00/ }).getByText("Done")).toBeVisible();
 
-  await page.goto("/paperwork");
+  await page.goto("/admin?panel=gfe");
   const row = page.getByRole("listitem").filter({ hasText: /individual therapy, \$7,200\.00/ });
   await expect(row.getByText("Issued on time")).toBeVisible();
   await row.getByText("Make the PDF").click();
@@ -60,18 +60,18 @@ test("Office hours in Settings change the due date", async ({ page }) => {
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByText("Saved. New estimates use these hours and fees.")).toBeVisible();
 
-  await page.goto("/paperwork");
+  await page.goto("/admin?panel=gfe");
   // Open Mon-Fri now: the Thanksgiving-week booking is due Tue Dec 1, not Wed Dec 2.
   await expect(page.getByText(/Give it by Tue, Dec 1, 2026/)).toBeVisible();
 });
 
 test("The seeded estimates show issued and waiting", async ({ page }) => {
-  await page.goto("/paperwork");
+  await page.goto("/admin?panel=gfe");
   await expect(page.getByRole("listitem", { name: "GFE-2026-0001" }).getByText("Issued on time")).toBeVisible();
   await expect(page.getByRole("listitem", { name: "GFE-2026-0002" }).getByText("Waiting for you")).toBeVisible();
 });
 
-for (const path of ["/paperwork", "/settings"]) {
+for (const path of ["/admin?panel=gfe", "/settings"]) {
   test(`${path} has no serious accessibility problems`, async ({ page }) => {
     await page.goto(path);
     await page.waitForLoadState("networkidle");
@@ -85,7 +85,7 @@ for (const path of ["/paperwork", "/settings"]) {
 
 test("Screenshots of the estimate flow", async ({ page }, info) => {
   for (const [name, path] of [
-    ["gfe-saved", "/paperwork"],
+    ["gfe-saved", "/admin?panel=gfe"],
     ["settings-office", "/settings"],
   ]) {
     await page.goto(path);

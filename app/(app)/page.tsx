@@ -9,8 +9,8 @@ import { loadApprovalSettings } from "@/lib/approval-settings";
 import { morningBrief, type BriefItem } from "@/lib/compliance/brief";
 import { getProfile } from "@/lib/profile";
 
-// The app opens on a conversation with Aeon (AGENTS.md, UI-026). The old home
-// with the full approvals inbox is now /dashboard.
+// The app opens on a conversation with Aeon (AGENTS.md, UI-026). The full approvals
+// inbox is /approvals; what the practice needs next is at the top of /admin.
 export default function ChatHome({ searchParams }: PageProps<"/">) {
   return (
     <Suspense fallback={<ChatSkeleton />}>
@@ -21,7 +21,7 @@ export default function ChatHome({ searchParams }: PageProps<"/">) {
 
 async function Chat({ searchParams }: { searchParams: PageProps<"/">["searchParams"] }) {
   await connection(); // read the database per request, never at build time
-  const { c } = await searchParams;
+  const { c, ask } = await searchParams;
   const id = typeof c === "string" && /^[0-9a-f-]{36}$/i.test(c) ? c : null;
   const [profile, found, settings] = await Promise.all([
     getProfile(),
@@ -42,6 +42,7 @@ async function Chat({ searchParams }: { searchParams: PageProps<"/">["searchPara
       initialMessages={messages}
       firstName={profile?.full_name.split(" ")[0] ?? null}
       start={<StartCards />}
+      ask={typeof ask === "string" && !found ? ask.slice(0, 500) : undefined}
       mode={found?.conversation.approval_mode ?? settings.mode}
       // The Vercel demo copy is view only: the pill shows the mode but can't change it.
       modeReadOnly={Boolean(process.env.VERCEL)}
@@ -79,7 +80,7 @@ async function StartCards() {
             ))}
           </ul>
         )}
-        <Link href="/deadlines" className="mt-auto text-small font-semibold text-[var(--link)] underline-offset-4 hover:underline">
+        <Link href="/admin/deadlines" className="mt-auto text-small font-semibold text-[var(--link)] underline-offset-4 hover:underline">
           All deadlines
         </Link>
       </GlassCard>

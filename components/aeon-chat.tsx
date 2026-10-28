@@ -107,7 +107,10 @@ export function AeonChat({
   start,
   mode: initialMode,
   modeReadOnly = false,
+  ask,
 }: {
+  /** A question waiting in the box (from Admin's "Ask Aeon" buttons). She reads it and presses send. */
+  ask?: string;
   /** This chat's mode, or the default from Settings for a new chat. */
   mode: ApprovalMode;
   /** The Vercel demo copy: the pill shows but can't change. */
@@ -270,6 +273,7 @@ export function AeonChat({
               onStop={() => abort.current?.abort()}
               dictation
               placeholder="Ask Aeon anything about your practice"
+              defaultValue={ask}
               controls={<ModePicker mode={mode} onChange={changeMode} readOnly={modeReadOnly} />}
             />
             <span aria-live="polite" className="sr-only">
