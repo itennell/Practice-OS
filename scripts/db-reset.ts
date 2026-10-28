@@ -30,6 +30,8 @@ export const DEMO_TABLES = [
   "memories",
   "chat_messages",
   "conversations",
+  // Front Desk (016)
+  "consult_offers",
 ] as const;
 
 export const ALL_TABLES = [
@@ -38,6 +40,9 @@ export const ALL_TABLES = [
   "connections",
   "audit_log",
   "model_calls",
+  // Front Desk (016): her callers' STOP list and where each phone stream was read; never reset.
+  "sms_opt_outs",
+  "front_desk_sync",
 ] as const;
 
 // Without DATABASE_URL this is the built-in database, which reports as project "local".

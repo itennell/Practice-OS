@@ -1,4 +1,5 @@
 import { db } from "../db";
+import { deps } from "../frontdesk/deps";
 import { OFFER_TTL_MS } from "../frontdesk/offers";
 import { sendText } from "../frontdesk/store";
 import type { Executor } from "./types";
@@ -12,9 +13,10 @@ export const textConsultOptions: Executor = async (approval) => {
   if (!offer) throw new Error("That offer no longer exists.");
   if (offer.status !== "pending") throw new Error("Newer times were offered since; this text is out of date.");
   const out = await sendText({ to, body, inquiryId: inquiry_id ?? null, actor: "executor", action: "consult_options_sent", approvalId: approval.id });
+  const now = deps().now();
   await db()`
     update practice_os.consult_offers
-    set status = 'sent', sent_at = now(), expires_at = now() + ${`${OFFER_TTL_MS / 1000} seconds`}::interval
+    set status = 'sent', sent_at = ${now}, expires_at = ${new Date(now.getTime() + OFFER_TTL_MS)}
     where id = ${offer_id}`;
   if (inquiry_id) {
     await db()`
