@@ -11,7 +11,7 @@ Every UI piece Isaiah picked for Practice-OS, where it goes, and how to build it
 
 ## Decisions from the review (2026-10-26)
 
-- Chat-first home: the app opens on a conversation with Aeon; the dashboard and a Kanban-style board are reached from the sidebar.
+- Chat-first home: the app opens on a conversation with Aeon; Admin (which replaced the dashboard on 2026-10-28) and a Kanban-style board are reached from the sidebar.
 - Aeon's orb gains a liquid active state (Liquid Aeon, UI-017). Isaiah picked the Chrome surface with eyes on (2026-10-27); eyes only where the clinician sees Aeon, never on the public Front Desk or web chat.
 - React Bits is allowed in the app for the picked pieces only (micro controls, Stepper, Card Nav, Liquid Aeon, Liquid Ether, the typing greeting), each checked for speed, accessibility and calm.
 - No GSAP in the app. The typing greeting is rebuilt with motion; Animated Content is landing-page only.

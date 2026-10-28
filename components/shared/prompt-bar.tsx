@@ -52,6 +52,8 @@ export type PromptBarProps = {
   busy?: boolean;
   onStop?: () => void;
   placeholder?: string;
+  /** Text already in the box when it opens (e.g. from an Admin "Ask Aeon" button). Never sent on its own. */
+  defaultValue?: string;
   /** Accessible name for the box. */
   label?: string;
   /** Show the mic. Clinician only; never on the public website chat. */
@@ -77,6 +79,7 @@ export function PromptBar({
   busy = false,
   onStop,
   placeholder = "Ask anything",
+  defaultValue = "",
   label = "Message Aeon",
   dictation = false,
   transcribe = transcribeWav,
@@ -87,7 +90,7 @@ export function PromptBar({
   maxRows = 6,
   className,
 }: PromptBarProps) {
-  const [text, setText] = useState("");
+  const [text, setText] = useState(defaultValue);
   const [dict, setDict] = useState<DictationState>({ kind: "idle" });
   const boxRef = useRef<HTMLTextAreaElement>(null);
   const composing = useRef(false);

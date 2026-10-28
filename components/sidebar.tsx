@@ -23,21 +23,14 @@ export const NEW_CHAT = "aeon:new-chat";
 // The ring sits inside each row so the scrolling list never clips it.
 const FOCUS = "outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--menu-focus)] focus-visible:outline-solid";
 
-type PracticeLink = { href: string; label: string; icon: LucideIcon; count?: keyof MenuData["counts"]; countWord?: string; also?: string[] };
+type PracticeLink = { href: string; label: string; icon: LucideIcon; count?: keyof MenuData["counts"]; countWord?: string };
 
 const PRACTICE: PracticeLink[] = [
-  // Until /admin exists, Admin is a group over the pages it will replace.
-  { href: "/deadlines", label: "Admin", icon: ClipboardList, count: "admin", countWord: "due soon", also: ["/paperwork", "/how-do-i", "/dashboard"] },
+  { href: "/admin", label: "Admin", icon: ClipboardList, count: "admin", countWord: "need you" },
   { href: "/approvals", label: "Approvals", icon: Inbox, count: "approvals", countWord: "waiting" },
   { href: "/referrals", label: "Referrals", icon: Users },
   { href: "/instagram", label: "Instagram", icon: Camera },
   { href: "/front-desk", label: "Front Desk", icon: Phone },
-];
-
-const ADMIN_PAGES = [
-  { href: "/deadlines", label: "Deadlines" },
-  { href: "/paperwork", label: "Paperwork" },
-  { href: "/how-do-i", label: "How do I" },
 ];
 
 const isAt = (pathname: string, href: string) => pathname === href || pathname.startsWith(`${href}/`);
@@ -118,12 +111,12 @@ function MenuBody({ data, chatId, onNavigate }: { data: MenuData; chatId: string
           <div className="flex flex-col gap-0.5">
             <p className="px-3 pb-1 text-label font-semibold tracking-[0.06em] text-[var(--menu-muted)] uppercase">Practice</p>
             <ul className="flex flex-col gap-0.5">
-              {PRACTICE.map(({ href, label, icon: Icon, count, countWord, also }) => {
+              {PRACTICE.map(({ href, label, icon: Icon, count, countWord }) => {
                 const n = count ? data.counts[count] : 0;
-                const here = isAt(pathname, href) || (also ?? []).some((h) => isAt(pathname, h));
+                const here = isAt(pathname, href);
                 return (
                   <li key={label}>
-                    <Link href={href} onClick={onNavigate} aria-current={here && label !== "Admin" ? "page" : undefined} className={row(here)}>
+                    <Link href={href} onClick={onNavigate} aria-current={here ? "page" : undefined} className={row(here)}>
                       <Icon aria-hidden size={18} strokeWidth={1.75} className="shrink-0" />
                       <span className="flex-1">{label}</span>
                       {n > 0 && (
@@ -133,22 +126,6 @@ function MenuBody({ data, chatId, onNavigate }: { data: MenuData; chatId: string
                         </span>
                       )}
                     </Link>
-                    {label === "Admin" && (
-                      <ul className="ml-[2.375rem] flex flex-col">
-                        {ADMIN_PAGES.map((p) => (
-                          <li key={p.href}>
-                            <Link
-                              href={p.href}
-                              onClick={onNavigate}
-                              aria-current={isAt(pathname, p.href) ? "page" : undefined}
-                              className={cn(row(isAt(pathname, p.href)), "min-h-10 text-small")}
-                            >
-                              {p.label}
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
                   </li>
                 );
               })}

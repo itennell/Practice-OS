@@ -85,7 +85,7 @@ export function GfeDraftForm({ fees, open, today }: { fees: Fee[]; open: OpenDay
   }
 
   return (
-    <form onSubmit={(e) => { e.preventDefault(); void submit(); }} className="flex flex-col gap-4">
+    <form onSubmit={(e) => { e.preventDefault(); void submit(); }} className="@container flex flex-col gap-4">
       <fieldset className="flex flex-wrap gap-4">
         <legend className="mb-2 text-small font-medium">Why are you making it?</legend>
         {(["scheduled", "requested"] as const).map((b) => (
@@ -118,7 +118,8 @@ export function GfeDraftForm({ fees, open, today }: { fees: Fee[]; open: OpenDay
       <fieldset className="flex flex-col gap-3">
         <legend className="mb-2 text-small font-medium">Services (from your fee list)</legend>
         {lines.map((l, i) => (
-          <div key={i} className="grid gap-2 sm:grid-cols-[minmax(0,2fr)_6rem_minmax(0,1fr)_auto] sm:items-end">
+          // Laid out by the form's own width, so it fits the narrower Admin side panel too.
+          <div key={i} className="grid gap-2 @sm:grid-cols-[minmax(0,1fr)_6rem] @sm:items-end @3xl:grid-cols-[minmax(0,2fr)_6rem_minmax(0,1fr)_auto]">
             <SettingSelect
               compact
               label={`Service ${i + 1}`}

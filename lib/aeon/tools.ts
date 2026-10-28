@@ -370,7 +370,7 @@ export const TOOLS: AeonTool[] = [
         const draft = putReleaseDraft(fields);
         const filled = Object.entries(fields).filter(([, v]) => v).map(([k]) => k);
         return text({
-          open: `/paperwork?tab=release&draft=${draft}`,
+          open: `/admin?panel=release&draft=${draft}`,
           filled,
           left_for_her: ["client name", "client date of birth", ...["recipient", "purpose", "information"].filter((k) => !filled.includes(k)), "signatures"],
           next: "Tell her: I filled in what I know. Open the Release forms tab, download the PDF, type the client's name and birth date, and have it signed. Keep a copy in the client's record.",

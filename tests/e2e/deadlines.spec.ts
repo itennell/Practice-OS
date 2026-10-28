@@ -6,7 +6,7 @@ test.beforeEach(() => {
 });
 
 test("Deadlines shows Dana's urgent items with what to do and the source", async ({ page }) => {
-  await page.goto("/deadlines");
+  await page.goto("/admin/deadlines");
   const caqh = page.getByRole("listitem", { name: "CAQH re-attestation (Illinois: every 180 days)" });
   await expect(caqh.getByText("9 days")).toBeVisible();
   await expect(caqh.getByText("You do this:")).toBeVisible();
@@ -18,7 +18,7 @@ test("Deadlines shows Dana's urgent items with what to do and the source", async
 });
 
 test("A setup answer is saved and the reminder comes back later, not now", async ({ page }) => {
-  await page.goto("/deadlines");
+  await page.goto("/admin/deadlines");
   const group = page.getByRole("group", { name: "Answer: Retirement plan" });
   await group.getByRole("button", { name: "Not yet" }).click();
   await expect(page.getByRole("heading", { name: "Retirement plan" })).toHaveCount(0);
@@ -28,7 +28,7 @@ test("A setup answer is saved and the reminder comes back later, not now", async
 });
 
 test("Screenshot of Deadlines", async ({ page }, info) => {
-  await page.goto("/deadlines");
+  await page.goto("/admin/deadlines");
   await page.waitForLoadState("networkidle");
   await page.screenshot({ path: `test/screens/deadlines-${info.project.name}.png`, fullPage: true });
 });

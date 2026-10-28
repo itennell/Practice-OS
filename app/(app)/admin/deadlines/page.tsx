@@ -82,7 +82,7 @@ async function Deadlines() {
               </li>
             ))}
           </ul>
-          <Link href="/paperwork?tab=insurance" className="text-small text-[var(--link)] underline underline-offset-2">
+          <Link href="/admin?panel=insurance" className="text-small text-[var(--link)] underline underline-offset-2">
             Your insurance applications
           </Link>
         </GlassCard>

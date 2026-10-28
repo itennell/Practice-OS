@@ -134,7 +134,7 @@ export function DeadlineCard({ o }: { o: ObligationView }) {
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         {o.guide_slug && (
           <Link
-            href={`/how-do-i/${o.guide_slug}`}
+            href={`/admin/how-do-i/${o.guide_slug}`}
             className="inline-flex h-touch items-center font-semibold text-[var(--link)] underline underline-offset-2"
           >
             How do I do this?

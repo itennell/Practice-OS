@@ -1,12 +1,11 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
-import { Suspense } from "react";
 import { formatDate } from "@/components/deadline-card";
 import { GfeDraftForm } from "@/components/gfe-draft-form";
 import { GfeMakePdf } from "@/components/gfe-make-pdf";
 import { GfeTimingCheck } from "@/components/gfe-timing-check";
-import { ButtonLink, ChipLink, GlassCard } from "@/components/ui";
+import { StatusPill } from "@/components/shared/status-mark";
+import { ButtonLink, GlassCard } from "@/components/ui";
 import { danaFacts } from "@/lib/compliance/demo";
 import { loadSavedRules } from "@/lib/compliance/researched";
 import { SHIPPED_RULES } from "@/lib/compliance/rules";
@@ -26,70 +25,20 @@ import { ReleaseFormBuilder } from "@/components/release-form-builder";
 import { getReleaseDraft } from "@/lib/release/drafts";
 import { SERVICE_KINDS, estimateStatus, listEstimates, loadPracticeSettings, toOpenDays } from "@/lib/gfe/store";
 
-export const metadata: Metadata = { title: "Paperwork · Practice-OS" };
-
-const TABS = [
-  { id: "gfe", label: "Good Faith Estimates" },
-  { id: "superbills", label: "Superbills" },
-  { id: "release", label: "Release forms" },
-  { id: "insurance", label: "Insurance" },
-  { id: "credentialing", label: "Credentialing" },
-] as const;
+// The Admin page's side panels (?panel=...): each form opens already filled with what
+// Aeon knows (today's date, her fees, her profile), next to its list. These were the
+// Paperwork tabs. Server components; the forms inside them are client components.
 
 const WEEKDAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-export default function PaperworkPage({ searchParams }: PageProps<"/paperwork">) {
-  return (
-    <>
-      <header className="flex flex-col gap-2">
-        <h1 className="text-title">Paperwork</h1>
-        <p className="max-w-[65ch] text-[var(--fg-muted)]">
-          Aeon prepares the forms. You send, sign and attest: Aeon never does those for you.
-        </p>
-      </header>
-      <Suspense fallback={<div aria-hidden className="h-96 animate-pulse rounded-[24px] bg-[var(--hairline)]" />}>
-        <Tabs searchParams={searchParams} />
-      </Suspense>
-    </>
-  );
-}
-
-async function Tabs({ searchParams }: { searchParams: PageProps<"/paperwork">["searchParams"] }) {
-  const params = await searchParams;
-  const asked = params.tab;
-  const tab = asked === "credentialing" || asked === "insurance" || asked === "superbills" || asked === "release" ? asked : "gfe";
-  return (
-    <>
-      <nav aria-label="Paperwork sections" className="flex flex-wrap gap-2">
-        {TABS.map((t) => (
-          <ChipLink key={t.id} href={t.id === "gfe" ? "/paperwork" : `/paperwork?tab=${t.id}`} on={tab === t.id}>
-            {t.label}
-          </ChipLink>
-        ))}
-      </nav>
-      {tab === "gfe" ? (
-        <GoodFaithEstimates />
-      ) : tab === "superbills" ? (
-        <Superbills />
-      ) : tab === "release" ? (
-        <ReleaseForms draft={typeof params.draft === "string" ? params.draft : undefined} />
-      ) : tab === "insurance" ? (
-        <Insurance />
-      ) : (
-        <Credentialing />
-      )}
-    </>
-  );
-}
-
-async function GoodFaithEstimates() {
+export async function GoodFaithEstimates() {
   await connection(); // read the database per request, never at build time
   const [{ hours, fees }, estimates, today] = await Promise.all([loadPracticeSettings(), listEstimates(), practiceToday()]);
   const open = toOpenDays(hours);
   const days = open.weekdays.map((d) => WEEKDAY[d]).join(", ");
   return (
     <>
-      <GlassCard aria-labelledby="new-gfe-heading" className="flex flex-col gap-4 p-6 md:p-8">
+      <GlassCard aria-labelledby="new-gfe-heading" className="flex flex-col gap-4 p-5 md:p-6">
         <div className="flex flex-col gap-1">
           <h2 id="new-gfe-heading" className="text-section font-semibold">
             New Good Faith Estimate
@@ -106,7 +55,7 @@ async function GoodFaithEstimates() {
         <GfeDraftForm fees={fees} open={open} today={today} />
       </GlassCard>
 
-      <GlassCard aria-labelledby="gfe-list-heading" className="flex flex-col gap-4 p-6 md:p-8">
+      <GlassCard aria-labelledby="gfe-list-heading" className="flex flex-col gap-4 p-5 md:p-6">
         <h2 id="gfe-list-heading" className="text-section font-semibold">
           Estimates
         </h2>
@@ -116,7 +65,7 @@ async function GoodFaithEstimates() {
           <ul className="flex flex-col gap-3">
             {estimates.map((e) => {
               const status = estimateStatus(e);
-              const tone = e.issued_on ? (e.on_time ? "done" : "failed") : e.approval_status === "rejected" ? "rejected" : "pending";
+              const tone = e.issued_on ? (e.on_time ? "done" : "failed") : e.approval_status === "rejected" ? "declined" : "pending";
               return (
                 <li key={e.id} aria-label={e.reference} className="rounded-[20px] border border-[var(--hairline)] bg-[var(--glass-strong)] p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -132,12 +81,7 @@ async function GoodFaithEstimates() {
                         {e.issued_on && ` · Issued ${formatDate(e.issued_on, false)}`}
                       </p>
                     </div>
-                    <span
-                      className="inline-flex h-7 shrink-0 items-center rounded-full px-3 text-small font-semibold"
-                      style={{ color: `var(--status-${tone}-fg)`, background: `var(--status-${tone}-bg)` }}
-                    >
-                      {status}
-                    </span>
+                    <StatusPill status={tone}>{status}</StatusPill>
                   </div>
                   {!e.issued_on && e.approval_status === "pending" && (
                     <p className="mt-2 text-small">
@@ -169,7 +113,7 @@ async function GoodFaithEstimates() {
         </p>
       </GlassCard>
 
-      <GlassCard aria-labelledby="timing-heading" className="flex flex-col gap-4 p-6 md:p-8">
+      <GlassCard aria-labelledby="timing-heading" className="flex flex-col gap-4 p-5 md:p-6">
         <div className="flex flex-col gap-1">
           <h2 id="timing-heading" className="text-section font-semibold">
             When is an estimate due?
@@ -197,14 +141,14 @@ async function GoodFaithEstimates() {
   );
 }
 
-async function Superbills() {
+export async function Superbills() {
   await connection(); // read the database per request, never at build time
   const [{ fees }, today, profile] = await Promise.all([loadPracticeSettings(), practiceToday(), loadCredentialingProfile()]);
   const bills = await listSuperbills().catch(() => null);
   const cpts = Object.entries(CPT).map(([code, c]) => ({ code, label: c.label }));
   return (
     <>
-      <GlassCard aria-labelledby="new-superbill-heading" className="flex flex-col gap-4 p-6 md:p-8">
+      <GlassCard aria-labelledby="new-superbill-heading" className="flex flex-col gap-4 p-5 md:p-6">
         <div className="flex flex-col gap-1">
           <h2 id="new-superbill-heading" className="text-section font-semibold">
             New superbill
@@ -218,7 +162,7 @@ async function Superbills() {
           {(!profile?.npi.number || !profile?.tin) && (
             <p className="text-small font-medium">
               Add your NPI and tax ID on{" "}
-              <Link href="/paperwork?tab=credentialing" className="text-[var(--link)] underline underline-offset-2">
+              <Link href="/admin?panel=credentialing" className="text-[var(--link)] underline underline-offset-2">
                 Credentialing
               </Link>{" "}
               first. The superbill needs both.
@@ -228,7 +172,7 @@ async function Superbills() {
         <SuperbillForm cpts={cpts} fees={fees} today={today} />
       </GlassCard>
 
-      <GlassCard aria-labelledby="superbill-list-heading" className="flex flex-col gap-4 p-6 md:p-8">
+      <GlassCard aria-labelledby="superbill-list-heading" className="flex flex-col gap-4 p-5 md:p-6">
         <h2 id="superbill-list-heading" className="text-section font-semibold">
           Superbills
         </h2>
@@ -253,12 +197,7 @@ async function Superbills() {
                         {b.issued_on && ` · Given ${formatDate(b.issued_on, false)}`}
                       </p>
                     </div>
-                    <span
-                      className="inline-flex h-7 shrink-0 items-center rounded-full px-3 text-small font-semibold"
-                      style={{ color: `var(--status-${tone}-fg)`, background: `var(--status-${tone}-bg)` }}
-                    >
-                      {b.issued_on ? "Given to client" : "Ready for you"}
-                    </span>
+                    <StatusPill status={tone}>{b.issued_on ? "Given to client" : "Ready for you"}</StatusPill>
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-3">
                     <ButtonLink variant="primary" href={`/api/superbills/${b.id}/pdf`} className="h-touch! px-5!">
@@ -284,13 +223,13 @@ async function Superbills() {
   );
 }
 
-async function ReleaseForms({ draft }: { draft?: string }) {
+export async function ReleaseForms({ draft }: { draft?: string }) {
   await connection(); // read the database per request, never at build time
   const today = await practiceToday();
   const filled = getReleaseDraft(draft);
   return (
     <>
-      <GlassCard aria-labelledby="release-heading" className="flex flex-col gap-4 p-6 md:p-8">
+      <GlassCard aria-labelledby="release-heading" className="flex flex-col gap-4 p-5 md:p-6">
         <div className="flex flex-col gap-1">
           <h2 id="release-heading" className="text-section font-semibold">
             Release of information (Illinois)
@@ -305,7 +244,7 @@ async function ReleaseForms({ draft }: { draft?: string }) {
         <ReleaseFormBuilder initial={filled} today={today} />
       </GlassCard>
 
-      <GlassCard aria-labelledby="release-blank-heading" className="flex flex-col gap-4 p-6 md:p-8">
+      <GlassCard aria-labelledby="release-blank-heading" className="flex flex-col gap-4 p-5 md:p-6">
         <h2 id="release-blank-heading" className="text-section font-semibold">
           Blank forms
         </h2>
@@ -328,7 +267,7 @@ async function ReleaseForms({ draft }: { draft?: string }) {
   );
 }
 
-async function Insurance() {
+export async function Insurance() {
   await connection(); // read the database per request, never at build time
   const [apps, profile, today] = await Promise.all([listPayerApplications(), loadCredentialingProfile(), practiceToday()]);
   const entries = profile ? cms855iEntries(profile) : [];
@@ -336,7 +275,7 @@ async function Insurance() {
   const dates = payerDates(apps, today, 90);
   return (
     <>
-      <GlassCard aria-labelledby="payers-heading" className="flex flex-col gap-4 p-6 md:p-8">
+      <GlassCard aria-labelledby="payers-heading" className="flex flex-col gap-4 p-5 md:p-6">
         <div className="flex flex-col gap-1">
           <h2 id="payers-heading" className="text-section font-semibold">
             Insurance applications
@@ -358,7 +297,7 @@ async function Insurance() {
         <PayerTracker apps={apps} />
       </GlassCard>
 
-      <GlassCard aria-labelledby="cms855i-heading" className="flex flex-col gap-4 p-6 md:p-8">
+      <GlassCard aria-labelledby="cms855i-heading" className="flex flex-col gap-4 p-5 md:p-6">
         <div className="flex flex-col gap-1">
           <h2 id="cms855i-heading" className="text-section font-semibold">
             Medicare enrollment (CMS-855I)
@@ -386,7 +325,7 @@ async function Insurance() {
                 says to.
               </p>
             )}
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
                 <h3 className="font-semibold">Aeon fills ({entries.length})</h3>
                 <ul className="flex flex-col gap-1 text-small">
@@ -421,7 +360,7 @@ async function Insurance() {
   );
 }
 
-async function Credentialing() {
+export async function Credentialing() {
   await connection(); // read the database per request, never at build time
   const today = await practiceToday();
   const facts = (await loadFacts()) ?? danaFacts(today);
@@ -431,8 +370,8 @@ async function Credentialing() {
   const state = STATES[facts.practice_state] ?? facts.practice_state;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-      <GlassCard aria-labelledby="profile-heading" className="flex flex-col gap-4 p-6 md:p-8">
+    <div className="flex flex-col gap-6">
+      <GlassCard aria-labelledby="profile-heading" className="flex flex-col gap-4 p-5 md:p-6">
         <div className="flex flex-col gap-1">
           <h2 id="profile-heading" className="text-section font-semibold">
             Credentialing profile
@@ -453,7 +392,7 @@ async function Credentialing() {
         <CredentialingEditor values={sectionValues(p)} npiCheck={p.npiCheck} />
       </GlassCard>
 
-      <GlassCard aria-labelledby="caqh-heading" className="flex h-fit flex-col gap-4 p-6 md:p-8">
+      <GlassCard aria-labelledby="caqh-heading" className="flex h-fit flex-col gap-4 p-5 md:p-6">
         <div className="flex flex-col gap-1">
           <h2 id="caqh-heading" className="text-section font-semibold">
             CAQH prep
@@ -491,7 +430,7 @@ async function Credentialing() {
                 </p>
                 {i.detail && <p className="text-small text-[var(--fg-muted)]">{i.detail}</p>}
                 {i.id === "caqh_date" && (
-                  <Link href="/deadlines" className="text-small text-[var(--link)] underline underline-offset-2">
+                  <Link href="/admin/deadlines" className="text-small text-[var(--link)] underline underline-offset-2">
                     Add it on Deadlines
                   </Link>
                 )}

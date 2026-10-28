@@ -80,12 +80,16 @@ export function SuperbillForm({ cpts, fees, today }: { cpts: Cpt[]; fees: Fee[];
         e.preventDefault();
         void submit();
       }}
-      className="flex flex-col gap-4"
+      className="@container flex flex-col gap-4"
     >
       <fieldset className="flex flex-col gap-3">
         <legend className="mb-2 text-small font-medium">Sessions</legend>
         {lines.map((l, i) => (
-          <div key={i} className="grid gap-2 sm:grid-cols-[9.5rem_minmax(0,2fr)_minmax(0,1.6fr)_8rem_7rem_auto] sm:items-end">
+          // Laid out by the form's own width, so it fits the narrower Admin side panel too.
+          <div
+            key={i}
+            className="grid gap-2 border-b border-[var(--hairline)] pb-3 last:border-b-0 @sm:grid-cols-2 @sm:items-end @4xl:grid-cols-[9.5rem_minmax(0,2fr)_minmax(0,1.6fr)_8rem_7rem_auto] @4xl:border-b-0 @4xl:pb-0"
+          >
             <DateField label={`Date ${i + 1}`} required max={today} value={l.date_of_service} onChange={(iso) => setLine(i, { date_of_service: iso })} />
             <SettingSelect
               compact

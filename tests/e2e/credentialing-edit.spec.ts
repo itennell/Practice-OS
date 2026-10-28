@@ -10,7 +10,7 @@ test.beforeEach(() => {
 test("Renewing malpractice in the profile clears it from CAQH prep and survives a reload", async ({ page }) => {
   const errors: string[] = [];
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
-  await page.goto("/paperwork?tab=credentialing");
+  await page.goto("/admin?panel=credentialing");
   await page.waitForLoadState("networkidle");
   await expect(page.getByText("Upload your renewed malpractice face sheet")).toBeVisible();
 
@@ -33,7 +33,7 @@ test("Renewing malpractice in the profile clears it from CAQH prep and survives 
 });
 
 test("A bad NPI is refused with a plain message", async ({ page }) => {
-  await page.goto("/paperwork?tab=credentialing");
+  await page.goto("/admin?panel=credentialing");
   await page.waitForLoadState("networkidle");
   const npi = page.getByRole("listitem", { name: "NPI" });
   await npi.getByRole("button", { name: "Edit NPI" }).click();
@@ -43,7 +43,7 @@ test("A bad NPI is refused with a plain message", async ({ page }) => {
 });
 
 test("The license section has no number field", async ({ page }) => {
-  await page.goto("/paperwork?tab=credentialing");
+  await page.goto("/admin?panel=credentialing");
   await page.waitForLoadState("networkidle");
   const license = page.getByRole("listitem", { name: "License" });
   await license.getByRole("button", { name: "Edit License" }).click();
@@ -52,7 +52,7 @@ test("The license section has no number field", async ({ page }) => {
 });
 
 test("Credentialing edit form has no serious accessibility problems", async ({ page }) => {
-  await page.goto("/paperwork?tab=credentialing");
+  await page.goto("/admin?panel=credentialing");
   await page.waitForLoadState("networkidle");
   await page.getByRole("button", { name: "Edit Work history" }).click();
   const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
@@ -61,7 +61,7 @@ test("Credentialing edit form has no serious accessibility problems", async ({ p
 });
 
 test("Screenshot of the editable profile", async ({ page }, info) => {
-  await page.goto("/paperwork?tab=credentialing");
+  await page.goto("/admin?panel=credentialing");
   await page.waitForLoadState("networkidle");
   await page.getByRole("button", { name: "Edit Malpractice" }).click();
   await page.screenshot({ path: `test/screens/credentialing-edit-${info.project.name}.png`, fullPage: true });
