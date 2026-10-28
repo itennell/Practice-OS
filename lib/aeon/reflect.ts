@@ -316,3 +316,16 @@ export async function tidyUp(opts: { chat?: ChatFn } = {}): Promise<ReflectResul
   await summarize({ type: "memory", id: null }, result);
   return result;
 }
+
+/** The daily tidy-up for a local install, which has no cron: runs when the last one is a day old. */
+export async function tidyIfDue(opts: { chat?: ChatFn } = {}): Promise<ReflectResult | null> {
+  const [last] = await db()<{ at: Date }[]>`
+    select at from practice_os.audit_log
+    where action in ('memory_reflection', 'memory_tidy_checked') and subject_type = 'memory'
+    order by at desc limit 1`;
+  if (last && Date.now() - last.at.getTime() < 24 * 60 * 60 * 1000) return null;
+  const result = await tidyUp(opts);
+  // A day with nothing to tidy still counts, so the check doesn't repeat on every load.
+  if (result.status !== "done") await audit({ actor: "aeon", action: "memory_tidy_checked", subjectType: "memory" });
+  return result;
+}

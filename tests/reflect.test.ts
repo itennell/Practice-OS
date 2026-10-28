@@ -180,6 +180,13 @@ describe.skipIf(!ready)("reflection pass (live database)", async () => {
     expect(await marker()).toBe(last);
   });
 
+  it("runs the local daily tidy-up at most once a day", async () => {
+    const { tidyIfDue } = await import("../lib/aeon/reflect");
+    const chat = replay({ ops: [{ op: "NOOP", reason: "" }] });
+    await tidyIfDue({ chat }); // may or may not run, depending on the last tidy
+    expect(await tidyIfDue({ chat })).toBeNull();
+  });
+
   it("a demo visitor's chat is marked reflected and never read", async () => {
     const { sendMessage } = await import("../lib/aeon/chat");
     const fakeChat = async () => ({ choices: [{ message: { role: "assistant", content: "[Sample] Sure." } }] });
