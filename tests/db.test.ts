@@ -26,6 +26,10 @@ describe.skipIf(!sql)("practice_os database", () => {
     for (const row of rows) {
       expect(row, row.relname).toMatchObject({ rls: true, policies: 0, anon: false, authenticated: false });
     }
+    const [schema] = await sql!`
+      select has_schema_privilege('anon', 'practice_os', 'usage') as anon,
+             has_schema_privilege('authenticated', 'practice_os', 'usage') as authenticated`;
+    expect(schema).toEqual({ anon: false, authenticated: false });
   });
 
   it("refuses edits and deletes on audit_log", async () => {
