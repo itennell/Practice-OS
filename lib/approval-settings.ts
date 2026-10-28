@@ -3,7 +3,7 @@ import { DEFAULT_FRONT_DESK_RULES, isApprovalMode, type ApprovalMode, type Front
 import { audit } from "./audit";
 import { db } from "./db";
 
-// Where the modes are kept (migration 011): the default on settings, a chat's own
+// Where the modes are kept (migration 012): the default on settings, a chat's own
 // pick on its conversation row, and Front Desk's standing rules.
 
 export async function loadApprovalSettings(sql: postgres.Sql = db()): Promise<{ mode: ApprovalMode; frontDesk: FrontDeskRules }> {

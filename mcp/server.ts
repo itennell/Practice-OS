@@ -35,7 +35,11 @@ for (const tool of TOOLS) {
       annotations: tool.annotations,
     },
     // Outside agents follow the default mode from Settings, never above Auto.
-    async (args: unknown) => runTool(tool.name, args, { by: createdBy(), mode: capForMcp((await loadApprovalSettings()).mode) }),
+    // With no database yet (a fresh install), tools run as they always have.
+    async (args: unknown) => {
+      const mode = await loadApprovalSettings().then((s) => capForMcp(s.mode), () => undefined);
+      return runTool(tool.name, args, { by: createdBy(), mode });
+    },
   );
 }
 

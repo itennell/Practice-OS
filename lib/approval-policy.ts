@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { ApprovalKind } from "./approval-kinds";
 
-// How much Aeon may do on its own (migration 011), like a coding agent's
+// How much Aeon may do on its own (migration 012), like a coding agent's
 // permission modes. Plain code, no model involved: a kind runs without her tap
 // only when shouldAutoRun() says so. The clinician-only lock is a constant, not
 // a setting, so no switch, chat message or MCP call can turn it off.

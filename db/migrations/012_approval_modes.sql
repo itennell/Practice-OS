@@ -1,4 +1,4 @@
--- 011: how much Aeon may do on its own, like a coding agent's permission modes.
+-- 012: how much Aeon may do on its own, like a coding agent's permission modes.
 --
 -- 1. settings.approval_mode: the default for new chats and for outside agents
 --    over MCP (capped at auto in code). manual = ask before anything; auto = run
