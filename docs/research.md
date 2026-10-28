@@ -667,3 +667,31 @@ Place of service codes, quoted from CMS:
 - **11** "Office"
 
 The modifiers on the fixed list are 95 (synchronous telehealth), 93 (audio-only) and GT (older telehealth modifier some payers still ask for). The CPT time ranges Aeon uses to pick a psychotherapy code (90832 for 16-37 minutes, 90834 for 38-52, 90837 for 53 or more; 90839 for the first 30-74 minutes of crisis care, plus 90840 for each further 30) are the AMA CPT time rule as commonly published. **Not re-checked against a primary source in this session; confirm before a real practice relies on it.** CPT is a trademark of the American Medical Association; Practice-OS stores only the five-digit codes, never AMA descriptor text.
+
+## Illinois release of information form (checked 2026-10-27)
+
+Read on ilga.gov: [740 ILCS 110/5](https://www.ilga.gov/Documents/legislation/ilcs/documents/074001100K5.htm) (current through P.A. 104-270, eff. 8-15-25), [110/4](https://www.ilga.gov/Documents/legislation/ilcs/documents/074001100K4.htm) and [110/2](https://www.ilga.gov/Documents/legislation/ilcs/documents/074001100K2.htm). HIPAA from eCFR: [45 CFR 164.508(c)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.508). Each row is checked by `tests/release-form.test.ts` against the PDF's own text.
+
+| Required by | Quoted text | Form field |
+| --- | --- | --- |
+| 110/5(b)(1); 164.508(c)(1)(iii) | "the person or agency to whom disclosure is to be made" | Release to (name, address) |
+| 110/5(b)(2); 164.508(c)(1)(iv) | "the purpose for which disclosure is to be made" | Purpose |
+| 110/5(b)(3); 164.508(c)(1)(i) | "the nature of the information to be disclosed" / "identifies the information in a specific and meaningful fashion" | Information to release |
+| 110/5(c) | "Blanket consent to the disclosure of unspecified information shall not be valid." | The form and the tool refuse "all records" and the like |
+| 110/5(b)(4) | "the right to inspect and copy the information to be disclosed" | Fixed statement |
+| 110/5(b)(5); 164.508(c)(2)(ii) | "the consequences of a refusal to consent, if any" / whether treatment can be conditioned on signing | Fixed statement: treatment, payment and eligibility don't depend on signing |
+| 110/5(b)(6); 164.508(c)(1)(v) | "the calendar date on which the consent expires, provided that if no calendar date is stated, information may be released only on the day the consent form is received by the therapist" | Expiration date. Required: Aeon won't fill a form without one |
+| 110/5(b)(7); 164.508(c)(2)(i) | "the right to revoke the consent at any time" / revoke "in writing" and how | Fixed statement, plus a blank revocation form |
+| 110/5(b) | "Any revocation of consent shall be in writing, signed by the person who gave the consent." | Revocation form |
+| 110/5(c) | "any such revocation shall have no effect on disclosures made prior thereto" | Fixed statement |
+| 110/5(d) | "No person or agency to whom any information is disclosed under this Section may redisclose such information unless the person who consented to the disclosure specifically consents to such redisclosure." | Fixed statement |
+| 164.508(c)(2)(iii) | "The potential for information disclosed ... to be subject to redisclosure by the recipient and no longer be protected by this subpart." | Fixed statement, next to the Illinois one |
+| 164.508(c)(1)(ii) | "the person(s) ... authorized to make the requested use or disclosure" | Who may release: the practice and therapist, filled from her profile |
+| 110/5(b); 164.508(c)(1)(vi) | "signed by the person entitled to give consent" / signature and date, and a personal representative's authority | Signature lines: client (12 or older), parent or guardian, representative with their authority |
+| 110/4(a) | Entitled to inspect: "the parent or guardian of a recipient who is under 12"; "the recipient if he is 12 years of age or older"; the parent or guardian of a 12-17 year old "if the recipient is informed and does not object" | Instructions: under 12, a parent or guardian signs; 12-17, the client and a parent or guardian both sign |
+| 110/5(b) | "A copy of the consent and a notation as to any action taken thereon shall be entered in the recipient's record." | "For the provider" note at the bottom |
+| 164.508(c)(4) | "provide the individual with a copy of the signed authorization" | Fixed statement |
+
+**Witness.** The current Section 5 has no witness requirement (older versions of the Act did). The form keeps an optional witness line for checking the signer's identity, labeled optional.
+
+**Not legal advice.** Have one practicing Illinois LCPC or health-law attorney read a sample before real clients sign it.

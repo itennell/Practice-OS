@@ -67,7 +67,37 @@ test("Superbills tab: the sample, a new one by hand, its PDF and Mark given", as
   expect(errors).toEqual([]);
 });
 
-for (const path of ["/paperwork", "/paperwork?tab=superbills", "/paperwork?tab=credentialing"]) {
+test("Release forms tab: blank and revocation PDFs, a filled form downloads, blanket releases refused", async ({ page, request }) => {
+  const errors: string[] = [];
+  page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+  await page.goto("/paperwork");
+  await page.getByRole("link", { name: "Release forms" }).click();
+  await expect(page).toHaveURL(/tab=release/);
+  await expect(page.getByRole("heading", { name: "Release of information (Illinois)" })).toBeVisible();
+
+  for (const kind of ["blank", "revocation"]) {
+    const pdf = await request.get(`/api/release-forms/pdf?kind=${kind}`);
+    expect(pdf.headers()["content-type"]).toBe("application/pdf");
+    expect((await pdf.body()).subarray(0, 5).toString()).toBe("%PDF-");
+  }
+
+  await page.getByLabel("Release to (person or agency)").fill("Dr. Lee, Northside Clinic [Sample]");
+  await page.getByLabel("Purpose").fill("Coordinate care");
+  await page.getByLabel("Exactly what to release").fill("All records");
+  await page.getByLabel("Consent ends on (required)").fill("2027-06-30");
+  await page.getByRole("button", { name: "Download filled form" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "blanket" })).toBeVisible();
+
+  await page.getByLabel("Exactly what to release").fill("Dates of attendance");
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download filled form" }).click();
+  expect((await download).suggestedFilename()).toBe("release-of-information.pdf");
+  await expect(page.getByRole("status")).toContainText("Downloaded");
+  // The one 400 is the blanket release the server refused on purpose.
+  expect(errors.filter((e) => !e.includes("status of 400"))).toEqual([]);
+});
+
+for (const path of ["/paperwork", "/paperwork?tab=superbills", "/paperwork?tab=release", "/paperwork?tab=credentialing"]) {
   test(`${path} has no serious accessibility problems`, async ({ page }) => {
     await page.goto(path);
     await page.waitForLoadState("networkidle");
@@ -81,6 +111,7 @@ test("Screenshots of Paperwork", async ({ page }, info) => {
   for (const [name, path] of [
     ["gfe", "/paperwork"],
     ["superbills", "/paperwork?tab=superbills"],
+    ["release", "/paperwork?tab=release"],
     ["credentialing", "/paperwork?tab=credentialing"],
   ]) {
     await page.goto(path);

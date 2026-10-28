@@ -1,7 +1,7 @@
-import { PDFDocument, StandardFonts, type PDFForm } from "pdf-lib";
+import { PDFDocument, StandardFonts } from "pdf-lib";
 import type { CredentialingProfile } from "../credentialing/profile";
 import { money } from "../gfe/build";
-import { LINE, M, MUTED, W, Writer, usDate } from "../gfe/pdf";
+import { M, MUTED, W, Writer, formBox, signatureLine, usDate } from "../gfe/pdf";
 import { CPT, POS } from "./codes";
 
 const PLACE_KEY = Object.entries(POS).map(([code, label]) => `${code} ${label}`).join("; ");
@@ -30,15 +30,6 @@ export class MissingProviderDetails extends Error {
   }
 }
 
-function blankBox(w: Writer, form: PDFForm, name: string, label: string) {
-  const labelWidth = 190;
-  w.ensure(22);
-  w.page.drawText(label, { x: M, y: w.y - 13, size: 9.5, font: w.bold });
-  const field = form.createTextField(name);
-  field.addToPage(w.page, { x: M + labelWidth, y: w.y - 18, width: W - 2 * M - labelWidth, height: 17, borderColor: LINE, borderWidth: 0.8 });
-  w.y -= 22;
-}
-
 export async function renderSuperbillPdf(sb: SuperbillRow, p: CredentialingProfile, preparedOn: string): Promise<Uint8Array> {
   if (!p.npi.number || !p.tin) throw new MissingProviderDetails();
   const pdf = await PDFDocument.create();
@@ -63,11 +54,11 @@ export async function renderSuperbillPdf(sb: SuperbillRow, p: CredentialingProfi
 
   w.heading("Client (filled in by the provider)");
   w.text("Aeon left these boxes blank on purpose. Type the client's details here before you give this to them.", { size: 9, color: MUTED });
-  for (const f of CLIENT_FIELDS) blankBox(w, form, f.name, f.label);
+  for (const f of CLIENT_FIELDS) formBox(w, form, f.name, f.label);
 
   w.heading("Diagnosis codes (filled in by the provider)");
   w.text("Each service line below points to these letters (CMS-1500 item 24E).", { size: 9, color: MUTED });
-  for (const f of DIAGNOSIS_FIELDS) blankBox(w, form, f.name, f.label);
+  for (const f of DIAGNOSIS_FIELDS) formBox(w, form, f.name, f.label);
 
   w.heading("Provider");
   w.field("Rendering provider", `${p.identity.name}, ${p.identity.credential}${demo}`);
@@ -107,13 +98,7 @@ export async function renderSuperbillPdf(sb: SuperbillRow, p: CredentialingProfi
     size: 9,
     color: MUTED,
   });
-  w.ensure(40);
-  w.y -= 26;
-  w.page.drawLine({ start: { x: M, y: w.y }, end: { x: M + 280, y: w.y }, thickness: 0.6, color: MUTED });
-  w.page.drawLine({ start: { x: M + 320, y: w.y }, end: { x: W - M, y: w.y }, thickness: 0.6, color: MUTED });
-  w.y -= 12;
-  w.page.drawText("Provider signature", { x: M, y: w.y, size: 8, font: regular, color: MUTED });
-  w.page.drawText("Date", { x: M + 320, y: w.y, size: 8, font: regular, color: MUTED });
+  signatureLine(w, "Provider signature");
 
   form.updateFieldAppearances(regular);
   const pages = pdf.getPages();

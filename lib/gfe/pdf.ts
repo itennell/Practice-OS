@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, degrees, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import { PDFDocument, StandardFonts, degrees, rgb, type PDFFont, type PDFForm, type PDFPage } from "pdf-lib";
 import { addMonths } from "../compliance/dates";
 import { assertComplete, grandTotal, lineTotal, money, providerTotal } from "./build";
 import { DISCLAIMERS, separateSchedulingDisclaimer } from "./disclaimers";
@@ -109,6 +109,36 @@ export class Writer {
     this.y -= height;
     this.page.drawLine({ start: { x: M, y: this.y + 2 }, end: { x: W - M, y: this.y + 2 }, thickness: 0.4, color: LINE });
   }
+}
+
+/**
+ * A labeled fillable box (AcroForm text field): what she types into it stays in
+ * her copy of the PDF and never comes back to Practice-OS. `value` pre-fills it.
+ */
+export function formBox(w: Writer, form: PDFForm, name: string, label: string, opts: { value?: string; lines?: number } = {}) {
+  const labelWidth = 190;
+  const height = 17 + ((opts.lines ?? 1) - 1) * 12;
+  w.ensure(height + 5);
+  const labels = w.wrap(label, w.bold, 9.5, labelWidth - 10);
+  labels.forEach((l, i) => w.page.drawText(l, { x: M, y: w.y - 13 - i * 11, size: 9.5, font: w.bold, color: INK }));
+  const field = form.createTextField(name);
+  if ((opts.lines ?? 1) > 1) field.enableMultiline();
+  field.addToPage(w.page, { x: M + labelWidth, y: w.y - 1 - height, width: W - 2 * M - labelWidth, height, borderColor: LINE, borderWidth: 0.8 });
+  field.setFontSize(9.5);
+  if (opts.value) field.setText(opts.value);
+  w.y -= Math.max(height + 5, labels.length * 11 + 8);
+}
+
+/** A blank line for a person to sign by hand, with its caption. Aeon never signs. */
+export function signatureLine(w: Writer, caption: string, dateCaption = "Date") {
+  w.ensure(44);
+  w.y -= 28;
+  w.page.drawLine({ start: { x: M, y: w.y }, end: { x: M + 300, y: w.y }, thickness: 0.6, color: MUTED });
+  w.page.drawLine({ start: { x: M + 330, y: w.y }, end: { x: W - M, y: w.y }, thickness: 0.6, color: MUTED });
+  w.y -= 11;
+  w.page.drawText(caption, { x: M, y: w.y, size: 8, font: w.regular, color: MUTED });
+  w.page.drawText(dateCaption, { x: M + 330, y: w.y, size: 8, font: w.regular, color: MUTED });
+  w.y -= 4;
 }
 
 export async function renderGfePdf(g: GoodFaithEstimate): Promise<Uint8Array> {
