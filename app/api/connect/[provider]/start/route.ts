@@ -1,5 +1,6 @@
 import { ConnectError, startConnect } from "@/lib/connect";
-import { isConnectProvider, isLocalRequest } from "@/lib/connect/local-only";
+import { isConnectProvider, isLocalAppRequest } from "@/lib/connect/local-only";
+import { isAllowedGoogleScope } from "@/lib/connect/google-scopes";
 
 // The Connect button: GET /api/connect/google/start?scopes=a,b sends her to Google's
 // (or, through the relay, Instagram's) own sign-in page.
@@ -8,8 +9,9 @@ export async function GET(request: Request, ctx: RouteContext<"/api/connect/[pro
   const url = new URL(request.url);
   const back = (error: string) => Response.redirect(new URL(`/settings/connections?error=${encodeURIComponent(error)}`, url.origin), 303);
   if (!isConnectProvider(provider)) return Response.json({ error: "Unknown connection." }, { status: 404 });
-  if (!isLocalRequest(request)) return back("Connect from Practice-OS on your own computer.");
+  if (!isLocalAppRequest(request)) return back("Connect from Practice-OS on your own computer.");
   const scopes = (url.searchParams.get("scopes") ?? "").split(",").filter(Boolean);
+  if (provider === "google" && !scopes.every(isAllowedGoogleScope)) return back("Practice-OS only asks Google for Gmail drafts and your calendar.");
   try {
     const { authUrl } = await startConnect(provider, { scopes, origin: url.origin });
     return Response.redirect(authUrl, 303);
