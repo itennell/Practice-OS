@@ -74,6 +74,12 @@ describe.skipIf(!url)("Google Connect", () => {
     expect(new URL(authUrl).searchParams.get("scope")!.split(" ")).toEqual(["openid", "email", GOOGLE_SCOPES.gmailCompose, GOOGLE_SCOPES.calendarEvents]);
 
     expect(await getAccessToken("google", [GOOGLE_SCOPES.gmailCompose])).toBe("a");
+
+    // An older sign-in that somehow holds full Gmail never gets that asked for again.
+    await saveConnection({ provider: "google", accountLabel: null, accessToken: "a", refreshToken: "r", scopes: ["openid", "email", "https://mail.google.com/", GOOGLE_SCOPES.gmailCompose], expiresAt: null, meta: {} });
+    const again = new URL((await startConnect("google", { scopes: [], origin: ORIGIN })).authUrl).searchParams.get("scope")!.split(" ");
+    expect(again).not.toContain("https://mail.google.com/");
+    expect(again).toContain(GOOGLE_SCOPES.gmailCompose);
     await expect(getAccessToken("google", [GOOGLE_SCOPES.calendarEvents])).rejects.toBeInstanceOf(NeedsConnectError);
   });
 
@@ -148,16 +154,16 @@ describe.skipIf(!url)("Instagram Connect through the relay", () => {
     // Post images go up with the relay's own upload key, and come down once Instagram has them.
     const stored: string[] = [];
     const blobs: Blobs = { put: async (p) => (stored.push(p), { url: `https://blob.example/${p}` }), list: async () => [], del: async (urls) => void stored.splice(0, stored.length, ...stored.filter((p) => !urls.includes(`https://blob.example/${p}`))) };
-    const relayOutside = { blobs, now: Date.now, inspectImage: async () => ({ format: "jpeg", width: 1080, height: 1080 }) };
+    const relayOutside = { blobs, now: Date.now, reencodeImage: async (b: Uint8Array) => ({ format: "jpeg", width: 1080, height: 1080, jpeg: b }) };
     vi.stubGlobal("fetch", async (input: string | URL, init?: RequestInit) => {
       const r = new Request(String(input), { ...init, headers: { ...(init?.headers as Record<string, string>), "content-length": String((init?.body as Uint8Array | string)?.length ?? 0) } });
       return init?.method === "DELETE" ? deleteImage(r, relayEnv, relayOutside) : uploadImage(r, relayEnv, relayOutside);
     });
     const { uploadPostImage, deletePostImage } = await import("../lib/connect");
     const image = await uploadPostImage(Buffer.from([0xff, 0xd8, 0xff, 0xe0]));
-    expect(stored).toHaveLength(1);
+    expect(stored.filter((p) => p.endsWith(".jpg"))).toHaveLength(1);
     await deletePostImage(image.url);
-    expect(stored).toHaveLength(0);
+    expect(stored.filter((p) => p.endsWith(".jpg"))).toHaveLength(0);
   });
 
   it("won't upload a post image for a sign-in that didn't allow publishing", async () => {
@@ -266,6 +272,16 @@ describe.skipIf(!url)("Connect routes", () => {
     expect(foreignOrigin.status).toBe(403);
     const notJson = await POST(req("/api/settings/muse-key", { "sec-fetch-site": "same-origin", "content-type": "text/plain" }, { method: "POST", body }));
     expect(notJson.status).toBe(415);
+    const museRoute = await import("../app/api/settings/muse-key/route");
+    const json = { "content-type": "application/json" };
+    // A spoofed Host (someone on the same network, or a DNS trick), even with a matching Origin.
+    const spoofed = new Request("http://attacker.example:3000/api/settings/muse-key", { method: "POST", headers: { host: "attacker.example:3000", origin: "http://attacker.example:3000", ...json }, body });
+    expect((await museRoute.POST(spoofed)).status).toBe(403);
+    // No Origin and no Sec-Fetch-Site at all.
+    expect((await museRoute.POST(req("/api/settings/muse-key", json, { method: "POST", body }))).status).toBe(403);
+    expect((await museRoute.DELETE(req("/api/settings/muse-key", {}, { method: "DELETE" }))).status).toBe(403);
+    expect((await museRoute.DELETE(req("/api/settings/muse-key", { "sec-fetch-site": "cross-site" }, { method: "DELETE" }))).status).toBe(403);
+    expect((await museRoute.DELETE(new Request("http://attacker.example/api/settings/muse-key", { method: "DELETE", headers: { host: "attacker.example", "sec-fetch-site": "same-origin" } }))).status).toBe(403);
     const { DELETE } = await import("../app/api/connect/[provider]/route");
     expect((await DELETE(req("/api/connect/google", { "sec-fetch-site": "same-site" }, { method: "DELETE" }), ctx)).status).toBe(403);
     expect((await DELETE(req("/api/connect/google", { origin: "http://127.0.0.1:3000" }, { method: "DELETE" }), ctx)).status).toBe(200);

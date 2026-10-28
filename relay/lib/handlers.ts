@@ -9,7 +9,8 @@ import { isAllowedReturn, seal, unseal } from "./seal";
 //      one-time key and sends the browser back to the app.
 //   2. Post images: Instagram fetches each image from a public address. The
 //      app uploads the JPEG here with an upload key the relay itself issued at
-//      sign-in (an HMAC over her Instagram user id), at most 20 an hour. The
+//      sign-in (an HMAC over her Instagram user id), at most 20 an hour, counted
+//      by a small marker per upload that outlives the image. The
 //      app deletes it once Instagram has it; otherwise it goes after an hour.
 //   3. A cron that deletes any image older than an hour.
 // Handlers take their settings and outside calls as arguments so tests run them
@@ -24,15 +25,19 @@ export type RelayEnv = {
 };
 
 export type Blobs = {
-  put(pathname: string, body: Uint8Array): Promise<{ url: string }>;
+  put(pathname: string, body: Uint8Array, contentType?: string): Promise<{ url: string }>;
   list(prefix: string): Promise<{ url: string; uploadedAt: Date }[]>;
   del(urls: string[]): Promise<void>;
 };
 
 export type Outside = {
   exchangeCode: typeof exchangeCode;
-  /** Decodes the image (sharp on Vercel); throws if it isn't one. */
-  inspectImage: (body: Uint8Array) => Promise<{ format: string; width: number; height: number }>;
+  /**
+   * Decodes the upload and writes a fresh JPEG from its pixels (sharp on Vercel),
+   * so nothing but the image survives: no appended bytes, no metadata. Throws if
+   * it isn't an image. `format` and the size are the original's.
+   */
+  reencodeImage: (body: Uint8Array) => Promise<{ format: string; width: number; height: number; jpeg: Uint8Array }>;
   blobs: Blobs;
   now: () => number;
 };
@@ -128,7 +133,7 @@ function uploader(request: Request, env: RelayEnv): string | null {
  * POST a JPEG with "Authorization: Bearer <upload key>" and "X-Instagram-User: <id>".
  * Public for at most an hour (sooner once the app deletes it).
  */
-export async function uploadImage(request: Request, env: RelayEnv, outside: Pick<Outside, "inspectImage" | "blobs" | "now">): Promise<Response> {
+export async function uploadImage(request: Request, env: RelayEnv, outside: Pick<Outside, "reencodeImage" | "blobs" | "now">): Promise<Response> {
   const userId = uploader(request, env);
   if (!userId) return jsonResponse({ error: "connect Instagram in Practice-OS first" }, 401);
   // Check the declared size before reading the body.
@@ -137,15 +142,20 @@ export async function uploadImage(request: Request, env: RelayEnv, outside: Pick
   if (declared > MAX_IMAGE_BYTES) return jsonResponse({ error: "image is over 4 MB" }, 413);
   const body = new Uint8Array(await request.arrayBuffer());
   if (body.length > MAX_IMAGE_BYTES) return jsonResponse({ error: "image is over 4 MB" }, 413);
-  const image = await outside.inspectImage(body).catch(() => null);
+  const image = await outside.reencodeImage(body).catch(() => null);
   if (!image || image.format !== "jpeg" || image.width > MAX_SIDE || image.height > MAX_SIDE) return jsonResponse({ error: "Instagram needs a JPEG" }, 415);
 
   const folder = folderFor(env, userId);
+  const marks = `marks/${folder.slice("posts/".length)}`;
   const now = outside.now();
   await deleteOld(outside.blobs, now, folder);
-  const recent = (await outside.blobs.list(folder)).filter((b) => now - b.uploadedAt.getTime() <= IMAGE_TTL_MS);
+  await deleteOld(outside.blobs, now, marks);
+  // Count markers, not images: an image the app deleted right away still counts.
+  const recent = (await outside.blobs.list(marks)).filter((b) => now - b.uploadedAt.getTime() <= IMAGE_TTL_MS);
   if (recent.length >= UPLOADS_PER_HOUR) return jsonResponse({ error: "too many images this hour" }, 429);
-  const { url } = await outside.blobs.put(`${folder}${randomBytes(16).toString("hex")}.jpg`, body);
+  const name = randomBytes(16).toString("hex");
+  await outside.blobs.put(`${marks}${name}`, new Uint8Array([1]), "application/octet-stream");
+  const { url } = await outside.blobs.put(`${folder}${name}.jpg`, image.jpeg);
   return jsonResponse({ url, expiresAt: new Date(now + IMAGE_TTL_MS).toISOString() });
 }
 
@@ -165,8 +175,9 @@ export async function deleteImage(request: Request, env: RelayEnv, outside: Pick
   return jsonResponse({ deleted: true });
 }
 
-/** Vercel cron: delete images older than an hour. */
+/** Vercel cron: delete images (and upload markers) older than an hour. */
 export async function prune(request: Request, env: RelayEnv, outside: Pick<Outside, "blobs" | "now">): Promise<Response> {
   if (!env.CRON_SECRET || request.headers.get("authorization") !== `Bearer ${env.CRON_SECRET}`) return jsonResponse({ error: "unauthorized" }, 401);
-  return jsonResponse({ deleted: await deleteOld(outside.blobs, outside.now()) });
+  const now = outside.now();
+  return jsonResponse({ deleted: (await deleteOld(outside.blobs, now)) + (await deleteOld(outside.blobs, now, "marks/")) });
 }
