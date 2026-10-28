@@ -8,5 +8,9 @@ export async function register() {
     await prepareDatabase();
   }
 
+  // Her own Muse key, saved in onboarding or Settings › Connections, when .env has none.
+  const { loadMuseKey } = await import("./lib/connect/muse");
+  await loadMuseKey();
+
   // Background jobs that need the database go below this line (never on the Vercel copy).
 }

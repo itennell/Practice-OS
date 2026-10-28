@@ -17,10 +17,12 @@ Required to start:
 
 | Setting | Ask her for | Where it comes from |
 |---|---|---|
-| `MODEL_API_KEY` | Her Meta Model API key | api.meta.ai > API keys. Muse powers Aeon, the state research and the front desk. |
+| `MODEL_API_KEY` | Her Meta Model API key, or nothing | api.meta.ai > API keys. Muse powers Aeon, the state research and the front desk. She can also paste it herself in Settings › Connections, where it is checked and kept encrypted. |
 | `DRY_RUN` | Nothing | Leave `true` until she has tested everything. |
 
 Leave `DATABASE_URL` and `CONNECTIONS_ENCRYPTION_KEY` empty. Practice-OS then runs its own built-in database on her computer, in the `.data` folder, and generates the encryption key there itself. Tell her: "Your practice's data stays in one folder on this computer, and a backup is taken before every update." Only if she already wants Supabase instead: set `DATABASE_URL` and `SUPABASE_PROJECT_REF` (supabase.com > New project > Connect > Transaction pooler; use the shared pooler host, not `db.<ref>.supabase.co`, which is IPv6-only) and `CONNECTIONS_ENCRYPTION_KEY` (`openssl rand -base64 32`).
+
+Google (Gmail drafts, Calendar) and Instagram connect from Settings › Connections with the company's own sign-in page. They need `GOOGLE_CLIENT_ID` (a Desktop-app client) and `RELAY_URL` (the Connect relay, docs/relay.md) in `.env`.
 
 Later, only for the helpers she turns on (Front Desk: Twilio, Cal.com; Referrals: Google; Instagram: Meta app). Each is described in `.env.example`.
 
