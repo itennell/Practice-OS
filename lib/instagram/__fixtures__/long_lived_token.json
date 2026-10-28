@@ -1,0 +1,8 @@
+{
+  "_source": "Shape from Meta's docs (developers.facebook.com/docs/instagram-platform), checked 2026-10-28. Replace with a live recording once @practiceos_ is connected.",
+  "body": {
+    "access_token": "IGAAsample-long",
+    "token_type": "bearer",
+    "expires_in": 5183944
+  }
+}
