@@ -6,6 +6,8 @@ export default defineConfig({
   resolve: { alias: { "@": fileURLToPath(new URL(".", import.meta.url)) } },
   test: {
     include: ["tests/**/*.test.ts"],
+    // A throwaway built-in database unless DATABASE_URL is exported (tests/setup/database.ts).
+    globalSetup: ["tests/setup/database.ts"],
     testTimeout: 20_000,
     // Several files use the same live database (Dana's demo); run files one at a time so they don't race.
     fileParallelism: false,

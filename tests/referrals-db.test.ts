@@ -130,11 +130,13 @@ describe.skipIf(!hasDb)("Referrals setup (onboarding)", () => {
     savedSetup = row ? { home_zip: row.home_zip, specialties: row.specialties } : null;
 
     const zipQ = referralsQuestions.questions.find((q) => q.id === "home_zip")!;
-    expect(zipQ.appliesWhen!({ officeZip: "60614" })).toBe(false);
-    expect(zipQ.appliesWhen!({ officeZip: null })).toBe(true);
+    const basics = (officeZip: string | null) => ({ state: "IL", credential: "LCPC", practiceStage: "beginning", officeZip, telehealth: false }) as const;
+    expect(zipQ.appliesWhen!(basics("60614"))).toBe(false);
+    expect(Object.keys(zipQ)).not.toContain("appliesWhen"); // functions can't reach the onboarding page's client component
+    expect(zipQ.appliesWhen!(basics(null))).toBe(true);
 
     await db()`delete from practice_os.referral_settings`;
-    expect(await referralsQuestions.load({ officeZip: "60657" })).toEqual({ home_zip: "60657", specialties: ["family_medicine", "internal_medicine"] });
+    expect(await referralsQuestions.load(basics("60657"))).toEqual({ home_zip: "60657", specialties: ["family_medicine", "internal_medicine"] });
 
     await referralsQuestions.save({ specialties: ["oncology", "pediatrics"] });
     await referralsQuestions.save({ home_zip: "60610" });

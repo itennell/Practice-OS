@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 
@@ -22,6 +22,8 @@ describe("MCP server", () => {
       args: ["--no-install", "--prefix", root, "tsx", `${root}/mcp/server.ts`],
       cwd: tmpdir(),
       stderr: "pipe",
+      // The test run's database (tests/setup/database.ts); without it the server would start the built-in one in .data.
+      env: { ...getDefaultEnvironment(), DATABASE_URL: process.env.DATABASE_URL ?? "" },
     });
     const client = new Client({ name: "smoke-test", version: "0.0.0" });
     await client.connect(transport);

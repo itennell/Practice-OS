@@ -2,21 +2,25 @@
 // shape is lib/onboarding/helper-questions.ts (HelperBlock, onboarding session).
 // Her office ZIP is already asked in chapter 1, so the ZIP question only shows
 // for a telehealth-only practice with no office.
+import type { HelperBlock, HelperQuestion, PracticeBasics } from "../onboarding/helper-questions";
 import { SPECIALTIES } from "./nppes";
 import { DEFAULT_SPECIALTIES, getReferralSettings, saveReferralSettings } from "./settings";
 
-type Basics = { officeZip: string | null };
-
-export const referralsQuestions = {
-  helper: "referrals" as const,
+export const referralsQuestions: HelperBlock = {
+  helper: "referrals",
   questions: [
-    {
-      id: "home_zip",
-      kind: "zip" as const,
-      ask: "What ZIP code should Aeon search around for doctors who could send you clients?",
-      help: "Use the ZIP where most of your clients live.",
-      appliesWhen: (b: Basics) => !b.officeZip,
-    },
+    // appliesWhen is a function, so it is kept non-enumerable: the onboarding page
+    // hands each question to a client component, and React can't pass functions there.
+    Object.defineProperty(
+      {
+        id: "home_zip",
+        kind: "zip" as const,
+        ask: "What ZIP code should Aeon search around for doctors who could send you clients?",
+        help: "Use the ZIP where most of your clients live.",
+      },
+      "appliesWhen",
+      { value: (b: PracticeBasics) => !b.officeZip, enumerable: false },
+    ) as HelperQuestion,
     {
       id: "specialties",
       kind: "choices" as const,
@@ -26,14 +30,14 @@ export const referralsQuestions = {
       options: SPECIALTIES.map((s) => ({ value: s.id, label: s.id === "therapists" ? "Other therapists" : s.label })),
     },
   ],
-  async load(basics: Basics) {
+  async load(basics) {
     const saved = await getReferralSettings();
     return {
       home_zip: saved.homeZip ?? basics.officeZip ?? "",
       specialties: saved.specialties.length ? saved.specialties : DEFAULT_SPECIALTIES,
     };
   },
-  async save(answers: Record<string, unknown>) {
+  async save(answers) {
     const zip = answers.home_zip;
     const specialties = answers.specialties;
     if (zip !== undefined && typeof zip !== "string") throw new Error("Type your 5-digit ZIP code.");

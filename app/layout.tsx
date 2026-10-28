@@ -15,8 +15,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${inter.variable} h-full antialiased`}>
-      <body className="min-h-full font-sans">{children}</body>
+    <html lang="en" className={`${inter.variable} h-full antialiased`} suppressHydrationWarning>
+      <body className="min-h-full font-sans">
+        {/* "Larger text" (set in onboarding) before the first paint, on every page. */}
+        <script dangerouslySetInnerHTML={{ __html: `try{if(localStorage.getItem("po-text-size")==="large")document.documentElement.dataset.textSize="large"}catch(e){}` }} />
+        {children}
+      </body>
     </html>
   );
 }

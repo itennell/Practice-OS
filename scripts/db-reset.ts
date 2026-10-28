@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import postgres from "postgres";
 import { loadEnv, requireEnv } from "../lib/env";
+import { prepareDatabase } from "../lib/local-db";
 import { danaFacts } from "../lib/compliance/demo";
 import { practiceToday, syncCalendar } from "../lib/compliance/store";
 
@@ -39,8 +40,10 @@ export const ALL_TABLES = [
   "model_calls",
 ] as const;
 
-const url = new URL(requireEnv("DATABASE_URL"));
-const ref = url.username.split(".")[1] ?? url.hostname.split(".")[1];
+// Without DATABASE_URL this is the built-in database, which reports as project "local".
+const url = new URL((await prepareDatabase()).url);
+const isLocalHost = url.hostname === "127.0.0.1" || url.hostname === "localhost";
+const ref = url.username.split(".")[1] ?? (isLocalHost ? "local" : url.hostname.split(".")[1]);
 const expected = requireEnv("SUPABASE_PROJECT_REF");
 if (ref !== expected) {
   console.error(`Refusing to reset: DATABASE_URL points at project "${ref}", not SUPABASE_PROJECT_REF "${expected}".`);

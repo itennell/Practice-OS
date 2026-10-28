@@ -35,3 +35,19 @@ test("Referrals board passes axe", async ({ page }) => {
   const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
   expect(results.violations.map((v) => `${v.id}: ${v.nodes.length}`)).toEqual([]);
 });
+
+test("Referrals changes only come from the app's own page, as JSON", async ({ request, baseURL }) => {
+  const board = await request.get("/api/menu");
+  expect(board.ok()).toBe(true);
+  const id = "00000000-0000-4000-8000-000000000203"; // [Sample] Old Town OB-GYN
+  const own = await request.post(`/api/referrals/${id}/stage`, { headers: { origin: baseURL! }, data: { stage: "connected" } });
+  expect(own.status()).toBe(200);
+  expect((await own.json()).card.stage).toBe("connected");
+
+  const otherSite = await request.post(`/api/referrals/${id}/stage`, { headers: { origin: "https://evil.example" }, data: { stage: "not_a_fit" } });
+  expect(otherSite.status()).toBe(403);
+  const form = await request.post(`/api/referrals/${id}/stage`, { headers: { origin: baseURL!, "content-type": "text/plain" }, data: '{"stage":"not_a_fit"}' });
+  expect(form.status()).toBe(403);
+  const back = await request.post(`/api/referrals/${id}/stage`, { headers: { origin: baseURL! }, data: { stage: "follow_up" } });
+  expect(back.status()).toBe(200);
+});

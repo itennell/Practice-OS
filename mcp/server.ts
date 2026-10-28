@@ -6,7 +6,16 @@ import { loadEnv } from "../lib/env";
 
 // Load .env from the repo root, wherever the MCP client starts us from.
 // MCP client configs never carry secrets.
-loadEnv(path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."));
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+loadEnv(root);
+// MCP clients may start us from any folder; migrations and the Postgres binaries are found from the repo root.
+process.chdir(root);
+
+// No DATABASE_URL: start (or join) the built-in database the app uses.
+const { prepareDatabase } = await import("../lib/local-db");
+await prepareDatabase();
+const { loadMuseKey } = await import("../lib/connect/muse");
+await loadMuseKey();
 
 // Imported after loadEnv so DATABASE_URL is set before the first query.
 // Every tool is defined once in lib/aeon/tools.ts, shared with Aeon's chat.
@@ -37,6 +46,7 @@ for (const tool of TOOLS) {
     // Outside agents follow the default mode from Settings, never above Auto.
     // With no database yet (a fresh install), tools run as they always have.
     async (args: unknown) => {
+      await loadMuseKey(); // pick up a key added, replaced or removed in the app since we started
       const mode = await loadApprovalSettings().then((s) => capForMcp(s.mode), () => undefined);
       return runTool(tool.name, args, { by: createdBy(), mode });
     },

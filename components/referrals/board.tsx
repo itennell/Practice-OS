@@ -228,7 +228,7 @@ export function ReferralBoard({ initial, letters: initialLetters }: { initial: R
   async function draft(card: ReferralSource) {
     setDrafting(card.id);
     try {
-      const res = await fetch(`/api/referrals/${card.id}/draft`, { method: "POST" });
+      const res = await fetch(`/api/referrals/${card.id}/draft`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
       const data = (await res.json()) as { approval_id?: string; error?: string };
       if (!res.ok || !data.approval_id) throw new Error(data.error ?? "I couldn't write the letter. Try again.");
       setLetters((l) => ({ ...l, [card.id]: { approvalId: data.approval_id!, status: "pending", dryRun: null } }));

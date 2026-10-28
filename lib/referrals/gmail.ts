@@ -3,24 +3,25 @@
 // message as RFC 2822 text, base64url-encoded, in message.raw.
 // https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.drafts/create
 
-export const GMAIL_COMPOSE = "https://www.googleapis.com/auth/gmail.compose";
+import { GOOGLE_SCOPES, getAccessToken, NeedsConnectError } from "../connect";
 
-/** Thrown when Google isn't connected (or lacks gmail.compose). Matches lib/connect's NeedsConnectError by name. */
+export const GMAIL_COMPOSE = GOOGLE_SCOPES.gmailCompose;
+
+/** Google isn't connected (or lacks gmail.compose), in her words. The letter stays in Approvals. */
 export class NeedsGoogleError extends Error {
-  readonly name = "NeedsConnectError";
   constructor() {
-    super("Connect Google first: open Settings › Connections and press Connect Google. The letter is saved here until then.");
+    super("Connect Google first: open Settings › Connections and press Connect for Gmail drafts. The letter is saved here until then.");
   }
 }
 
-/**
- * The access token from the desktop app's Google Connect (lib/connect,
- * getAccessToken('google', [gmail.compose]), interface v0). That module isn't on
- * main yet; until it is, Google counts as not connected.
- * TODO(desktop-app): import { getAccessToken } from "../connect" once it lands.
- */
-export async function gmailToken(): Promise<string> {
-  throw new NeedsGoogleError();
+/** A working token from Settings › Connections (lib/connect), gmail.compose only. */
+export async function gmailToken(getToken: typeof getAccessToken = getAccessToken): Promise<string> {
+  try {
+    return await getToken("google", [GMAIL_COMPOSE]);
+  } catch (err) {
+    if (err instanceof NeedsConnectError) throw new NeedsGoogleError();
+    throw err;
+  }
 }
 
 /** Encodes a header value that isn't plain ASCII (RFC 2047). */

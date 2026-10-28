@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import fixture from "./fixtures/nppes-60614.json";
 import { fitScore } from "../lib/referrals/fit";
-import { createDraft, mimeMessage } from "../lib/referrals/gmail";
+import { NeedsConnectError } from "../lib/connect";
+import { createDraft, gmailToken, mimeMessage } from "../lib/referrals/gmail";
 import { checkLetter } from "../lib/referrals/outreach";
 import { haversineMiles, nearbyZips, zipCenters, zipDistance } from "../lib/referrals/geo";
 import {
@@ -125,6 +126,20 @@ describe("Gmail draft message", () => {
     expect(Buffer.from(raw.split("\r\n\r\n")[1], "base64").toString()).toBe("Hi\r\nthere");
     expect(() => mimeMessage("dr@clinic.com, other@x.com", "s", "b")).toThrow();
   });
+  it("asks lib/connect for gmail.compose only, and turns 'not connected' into plain words", async () => {
+    const asked: unknown[] = [];
+    expect(await gmailToken((async (p: string, s: string[]) => (asked.push([p, s]), "tok")) as never)).toBe("tok");
+    expect(asked).toEqual([["google", ["https://www.googleapis.com/auth/gmail.compose"]]]);
+    const notConnected = (async () => {
+      throw new NeedsConnectError("google", ["https://www.googleapis.com/auth/gmail.compose"]);
+    }) as never;
+    await expect(gmailToken(notConnected)).rejects.toThrow(/^Connect Google first: open Settings › Connections/);
+    const down = (async () => {
+      throw new Error("Couldn't reach Google just now.");
+    }) as never;
+    await expect(gmailToken(down)).rejects.toThrow("Couldn't reach Google just now.");
+  });
+
   it("posts the draft to users.drafts.create and treats 401 as not connected", async () => {
     const calls: { url: string; body: string }[] = [];
     const ok = (async (url: string, init: RequestInit) => {

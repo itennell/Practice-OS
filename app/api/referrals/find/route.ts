@@ -1,10 +1,10 @@
-import { canDecide } from "@/lib/admin-guard";
+import { canChange } from "@/lib/referrals/http";
 import { SPECIALTIES, type SpecialtyId } from "@/lib/referrals/nppes";
 import { findReferralSources } from "@/lib/referrals/store";
 
 // The board's search box: the same search Aeon runs from the chat.
 export async function POST(request: Request) {
-  if (!canDecide(request)) return Response.json({ error: "Not allowed to change this here." }, { status: 403 });
+  if (!canChange(request)) return Response.json({ error: "Not allowed to change this here." }, { status: 403 });
   const body = (await request.json().catch(() => ({}))) as { zip?: unknown; specialties?: unknown };
   const zip = typeof body.zip === "string" ? body.zip.trim() : "";
   if (!/^\d{5}$/.test(zip)) return Response.json({ error: "Type a 5-digit ZIP code." }, { status: 400 });
