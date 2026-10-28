@@ -69,8 +69,8 @@ Every UI piece Isaiah picked for Practice-OS, where it goes, and how to build it
 | UI-023 | Attachment (file and image cards) | IGM | Post composer | must | built | shadcn/ui (MIT) | `components/shared/attachment.tsx` (`Attachment`, `AttachmentList`) |
 | UI-024 | Library page (file manager layout) | LIB | Whole page | must | approved | Screenshot (React Bits Pro demo, layout reference only) (layout reference) |  |
 | UI-025 | Front Desk work queue (list plus schedule panel) | FDK | Inquiries list | must | approved | Screenshot (React Bits Pro demo, layout reference only) (layout reference) |  |
-| UI-026 | Chat-first home (the app opens on Aeon) | HOM | Opening view (whole page) | must | approved | Screenshot (layout reference only) (layout reference) |  |
-| UI-027 | Approval card in the chat | CHT | Approval card in chat | must | approved | Screenshot (layout reference only) (layout reference) |  |
+| UI-026 | Chat-first home (the app opens on Aeon) | HOM | Opening view (whole page) | must | built | Screenshot (layout reference only) (layout reference) | `app/(app)/page.tsx`, `components/aeon-chat.tsx` (`AeonChat`) |
+| UI-027 | Approval card in the chat | CHT | Approval card in chat | must | built (basic) | Screenshot (layout reference only) (layout reference) | `components/approvals-inbox.tsx` (`ApprovalsInbox` with `ids`) |
 | UI-028 | Confirm dialog for permanent actions (Alert Dialog) | GLB | Confirm dialogs | must | built | shadcn/ui (MIT); coss ui reference only (AGPL) | `components/shared/confirm-dialog.tsx` (`ConfirmDialog`) |
 | UI-029 | Avatar (profile picture) | SHL | Profile (bottom of sidebar) | must | built | shadcn/ui (MIT); coss ui reference only (AGPL) | `components/shared/avatar.tsx` (`Avatar`) |
 | UI-030 | Calendar (shared month calendar) | DLN | Calendar | must | built | shadcn/ui (MIT); coss ui reference only (AGPL) | `components/shared/calendar.tsx` (`Calendar`) |

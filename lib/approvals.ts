@@ -51,6 +51,14 @@ export async function listApprovals(opts: { includeDecided?: boolean; limit?: nu
   return rows.map(toView);
 }
 
+/** These approvals, in the order given (for the approval cards inside Aeon's chat). */
+export async function listApprovalsById(ids: string[]) {
+  if (ids.length === 0) return [];
+  const rows = await db()<ApprovalRow[]>`select * from practice_os.approvals where id in ${db()(ids)}`;
+  const byId = new Map(rows.map((r) => [r.id, toView(r)]));
+  return ids.flatMap((id) => byId.get(id) ?? []);
+}
+
 export type ApproveResult =
   | { ok: true; approval: ApprovalView }
   | { ok: false; reason: "not_pending" | "not_found" | "not_editable" | "bad_edit"; approval?: ApprovalView };

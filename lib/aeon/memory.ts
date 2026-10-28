@@ -101,6 +101,17 @@ export async function forget(id: string, by: { actor: Actor; source: string }): 
   return row;
 }
 
+/** Switches an archived memory back on. Guarded again: the rules may have tightened since it was saved. */
+export async function restore(id: string, by: { actor: Actor; source: string }): Promise<Memory | null> {
+  const existing = await getMemory(id);
+  if (!existing) return null;
+  await guarded(existing.text);
+  const [row] = await db()<Memory[]>`update practice_os.memories set archived = false where id = ${id} returning *`;
+  await audit({ actor: by.actor, action: "memory_restored", subjectType: "memory", subjectId: id, details: { kind: row.kind, source: by.source } });
+  await renderMemoryFile();
+  return row;
+}
+
 export async function editMemory(
   id: string,
   change: { text?: string; kind?: MemoryKind },
