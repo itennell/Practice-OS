@@ -17,10 +17,10 @@ Required to start:
 
 | Setting | Ask her for | Where it comes from |
 |---|---|---|
-| `DATABASE_URL`, `SUPABASE_PROJECT_REF` | A new, empty Supabase project just for Practice-OS | supabase.com > New project > Connect > Transaction pooler. Use the shared pooler host, not `db.<ref>.supabase.co` (IPv6-only). |
 | `MODEL_API_KEY` | Her Meta Model API key | api.meta.ai > API keys. Muse powers Aeon, the state research and the front desk. |
-| `CONNECTIONS_ENCRYPTION_KEY` | Nothing: you generate it | `openssl rand -base64 32`. Tell her it protects stored sign-ins and to keep `.env` backed up. |
 | `DRY_RUN` | Nothing | Leave `true` until she has tested everything. |
+
+Leave `DATABASE_URL` and `CONNECTIONS_ENCRYPTION_KEY` empty. Practice-OS then runs its own built-in database on her computer, in the `.data` folder, and generates the encryption key there itself. Tell her: "Your practice's data stays in one folder on this computer, and a backup is taken before every update." Only if she already wants Supabase instead: set `DATABASE_URL` and `SUPABASE_PROJECT_REF` (supabase.com > New project > Connect > Transaction pooler; use the shared pooler host, not `db.<ref>.supabase.co`, which is IPv6-only) and `CONNECTIONS_ENCRYPTION_KEY` (`openssl rand -base64 32`).
 
 Later, only for the helpers she turns on (Front Desk: Twilio, Cal.com; Referrals: Google; Instagram: Meta app). Each is described in `.env.example`.
 
@@ -28,8 +28,9 @@ Optional for maintainers: `FIRECRAWL_URL` (a self-hosted Firecrawl) runs the liv
 
 ## 3. Database
 
-1. Run `npm run db:migrate`. It creates the `practice_os` schema and its tables, each with row-level security on. It never touches any other schema.
-2. Optional, to look around first: `npm run db:reset` loads the fictional demo practice (Dana Reyes, Illinois). Every row is marked `[Sample]`. It only runs against the project named in `SUPABASE_PROJECT_REF`.
+1. Built-in database (no `DATABASE_URL`): nothing to do. The app creates and updates its database when it starts. It stays running after the app stops; `npm run db:stop` stops it. Never delete the `.data` folder: it is her practice.
+2. Supabase (`DATABASE_URL` set): run `npm run db:migrate`. It creates the `practice_os` schema and its tables, each with row-level security on. It never touches any other schema.
+3. Optional, to look around first: `npm run db:reset` loads the fictional demo practice (Dana Reyes, Illinois). Every row is marked `[Sample]`. It replaces her practice's rows, so only run it before she starts. It only runs when `SUPABASE_PROJECT_REF` names the database: `local` for the built-in one.
 
 ## 4. Start the app
 
@@ -72,6 +73,6 @@ Point her agent at the skills in this repo (or copy them into its skills folder)
 
 ## 7. Check it worked
 
-- `npm test` passes (database tests run because `DATABASE_URL` is set).
+- `npm test` passes. It runs on a throwaway built-in database of its own, never on hers.
 - The app opens, and the Deadlines page loads.
 - The agent answers "What needs me this week?" using `morning_brief`.

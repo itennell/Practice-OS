@@ -64,3 +64,6 @@ test/
 
 # Aeon's memory, rendered from practice_os.memories
 aeon/MEMORY.md
+
+# The built-in database, its generated keys and its backups (lib/local-db.ts)
+/.data/
