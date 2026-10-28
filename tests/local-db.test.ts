@@ -123,6 +123,20 @@ describe("built-in database", () => {
     await expect(restoreDatabase(target, backupDir)).rejects.toThrow(/empty/);
   });
 
+  it.skipIf(process.platform === "win32")("waits for its own slow Postgres instead of moving the port", async () => {
+    const dir = await freshDir();
+    const url = await startLocalDatabase(dir);
+    const pid = Number((await readFile(path.join(dir, "postgres", "postmaster.pid"), "utf8")).split("\n")[0]);
+    process.kill(pid, "SIGSTOP"); // still running, but not answering
+    const resume = setTimeout(() => process.kill(pid, "SIGCONT"), 3_000);
+    try {
+      expect(await startLocalDatabase(dir)).toBe(url);
+    } finally {
+      clearTimeout(resume);
+      process.kill(pid, "SIGCONT");
+    }
+  });
+
   it.skipIf(process.platform === "win32")("loses no confirmed write when Postgres is killed", async () => {
     const dir = await freshDir();
     const url = await startLocalDatabase(dir);

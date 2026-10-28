@@ -54,6 +54,15 @@ function run(command: string, args: string[]): Promise<void> {
   });
 }
 
+/** True when a Postgres is running on this data folder (pg_ctl status exits 0; 3 means none). */
+function serverRunning(pgdata: string): Promise<boolean> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(binary("pg_ctl"), ["status", "-D", pgdata], { stdio: "ignore", windowsHide: true });
+    child.on("error", reject);
+    child.on("exit", (code) => resolve(code === 0));
+  });
+}
+
 function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
     const server = net.createServer();
@@ -145,11 +154,27 @@ export async function startLocalDatabase(dir: string = dataDir()): Promise<strin
     if (!config) throw new Error(`${configFile} is missing, so the built-in database's password is unknown.`);
 
     if (!(await canConnect(toUrl(config, "postgres")))) {
-      if (!(await portIsFree(config.port))) {
-        config.port = await freePort();
-        await writeFile(configFile, JSON.stringify(config, null, 2), { mode: 0o600 });
+      if (await serverRunning(pgdata)) {
+        // Our own Postgres is up but not answering yet (busy, or recovering after a crash).
+        // Never move its port: wait for it, on the port it really listens on (line 4 of postmaster.pid).
+        const port = Number((await readFile(path.join(pgdata, "postmaster.pid"), "utf8")).split("\n")[3]);
+        if (port && port !== config.port) {
+          config.port = port;
+          await writeFile(configFile, JSON.stringify(config, null, 2), { mode: 0o600 });
+        }
+        const deadline = Date.now() + 30_000;
+        while (!(await canConnect(toUrl(config, "postgres")))) {
+          if (Date.now() > deadline) throw new Error(`The built-in database is running but not answering. See ${path.join(dir, "postgres.log")}.`);
+          await new Promise((r) => setTimeout(r, 500));
+        }
+      } else {
+        // Nothing owns this data folder, so the port is free to move if something else took it.
+        if (!(await portIsFree(config.port))) {
+          config.port = await freePort();
+          await writeFile(configFile, JSON.stringify(config, null, 2), { mode: 0o600 });
+        }
+        await run(binary("pg_ctl"), ["start", "-w", "-t", "60", "-D", pgdata, "-l", path.join(dir, "postgres.log"), "-o", `-p ${config.port}`]);
       }
-      await run(binary("pg_ctl"), ["start", "-w", "-t", "60", "-D", pgdata, "-l", path.join(dir, "postgres.log"), "-o", `-p ${config.port}`]);
     }
 
     const admin = postgres(toUrl(config, "postgres"), { max: 1, onnotice: () => {} });
