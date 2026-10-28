@@ -22,11 +22,11 @@ Only callers who leave a voicemail get a text, and they get it once.
 
 **3. Confirmation:**
 
-> Reyes Counseling: You're booked for a free 15-minute phone consult Wed at 2pm (ref FD-1042). Reply RESCHEDULE or CANCEL to change it. Reply STOP to opt out.
+> Reyes Counseling: You're booked for a free 15-minute phone consult Wed at 2pm (ref FD-1042). Reply R to reschedule or C to cancel. Reply STOP to opt out.
 
 **4. Reminder, the day before:**
 
-> Reyes Counseling reminder: your free 15-minute phone consult is tomorrow, Wed at 2pm (ref FD-1042). Reply RESCHEDULE or CANCEL to change it. Reply STOP to opt out.
+> Reyes Counseling reminder: your free 15-minute phone consult is tomorrow, Wed at 2pm (ref FD-1042). Reply R to reschedule or C to cancel. Reply STOP to opt out.
 
 ## Keywords
 
