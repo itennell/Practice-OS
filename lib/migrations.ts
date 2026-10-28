@@ -6,6 +6,12 @@ import postgres from "postgres";
 // Runs db/migrations/*.sql in name order, once each, inside schema practice_os.
 // Applied files are recorded with a checksum in practice_os.schema_migrations;
 // a migration that was edited after it ran stops the runner.
+// `next dev`, the MCP server and `npm run db:migrate` may start together, so
+// each step holds one Postgres advisory lock: only one runner applies a file,
+// and the others see it recorded and skip it.
+
+// Any fixed number works, as long as every runner uses the same one.
+const LOCK = "select pg_advisory_xact_lock(7340221905118311)";
 
 export const MIGRATIONS_DIR = path.join(process.cwd(), "db", "migrations");
 
@@ -44,15 +50,24 @@ export async function runMigrations(url: string, { dir = MIGRATIONS_DIR, upTo, l
   const sql = postgres(url, { max: 1, prepare: false, onnotice: () => {} });
   const ran: string[] = [];
   try {
-    await sql`create schema if not exists practice_os`;
-    await sql`
-      create table if not exists practice_os.schema_migrations (
-        name text primary key,
-        checksum text not null,
-        applied_at timestamptz not null default now()
-      )
-    `;
-    await sql`alter table practice_os.schema_migrations enable row level security`;
+    await sql.begin(async (tx) => {
+      await tx.unsafe(LOCK);
+      await tx`create schema if not exists practice_os`;
+      await tx`
+        create table if not exists practice_os.schema_migrations (
+          name text primary key,
+          checksum text not null,
+          applied_at timestamptz not null default now()
+        )
+      `;
+      await tx`alter table practice_os.schema_migrations enable row level security`;
+      // This table exists before 001 takes Supabase's API roles' default grants away, so revoke here too.
+      await tx`revoke all on practice_os.schema_migrations from public`;
+      for (const role of ["anon", "authenticated"]) {
+        const [found] = await tx`select 1 from pg_roles where rolname = ${role}`;
+        if (found) await tx.unsafe(`revoke all on practice_os.schema_migrations from ${role}`);
+      }
+    });
 
     const applied = new Map(
       (await sql`select name, checksum from practice_os.schema_migrations`).map((r) => [r.name as string, r.checksum as string]),
@@ -68,10 +83,19 @@ export async function runMigrations(url: string, { dir = MIGRATIONS_DIR, upTo, l
         }
         continue;
       }
-      await sql.begin(async (tx) => {
+      const didRun = await sql.begin(async (tx) => {
+        await tx.unsafe(LOCK);
+        // Another runner may have applied it while this one waited for the lock.
+        const [done] = await tx`select checksum from practice_os.schema_migrations where name = ${file}`;
+        if (done) {
+          if (done.checksum !== checksum) throw new Error(`${file} was changed after it ran. Write a new migration instead of editing it.`);
+          return false;
+        }
         await tx.unsafe(body);
         await tx`insert into practice_os.schema_migrations (name, checksum) values (${file}, ${checksum})`;
+        return true;
       });
+      if (!didRun) continue;
       log(`Applied ${file}`);
       ran.push(file);
     }

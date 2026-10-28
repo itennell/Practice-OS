@@ -30,7 +30,7 @@ Optional for maintainers: `FIRECRAWL_URL` (a self-hosted Firecrawl) runs the liv
 
 ## 3. Database
 
-1. Built-in database (no `DATABASE_URL`): nothing to do. The app creates and updates its database when it starts. It stays running after the app stops; `npm run db:stop` stops it. Never delete the `.data` folder: it is her practice.
+1. Built-in database (no `DATABASE_URL`): nothing to do. The app creates and updates its database when it starts. It stays running after the app stops; `npm run db:stop` stops it. Never delete the `.data` folder: it is her practice. It also holds the keys that unlock her saved sign-ins and her backups (the backups in `.data/backups` are encrypted). Keep the Practice-OS folder out of synced folders (iCloud Drive, Dropbox, OneDrive, Google Drive): syncing a running database can corrupt it, and it would copy her keys to that service.
 2. Supabase (`DATABASE_URL` set): run `npm run db:migrate`. It creates the `practice_os` schema and its tables, each with row-level security on. It never touches any other schema.
 3. Optional, to look around first: `npm run db:reset` loads the fictional demo practice (Dana Reyes, Illinois). Every row is marked `[Sample]`. It replaces her practice's rows, so only run it before she starts. It only runs when `SUPABASE_PROJECT_REF` names the database: `local` for the built-in one.
 
