@@ -5,13 +5,15 @@
 // append-only and the text must stay deletable).
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
+import type postgres from "postgres";
 import { fileURLToPath } from "node:url";
 import { audit, type AuditEntry } from "../audit";
 import { db } from "../db";
 import { guard, REFUSAL, type GuardKind } from "./guard";
+import { MEMORY_KINDS, type MemoryKind, type MemoryTopic, type PlannedOp } from "./memory-ops";
+import { scanMemory, type ScanKind } from "./memory-scan";
 
-export const MEMORY_KINDS = ["preference", "decision", "fact", "what_worked"] as const;
-export type MemoryKind = (typeof MEMORY_KINDS)[number];
+export { MEMORY_KINDS, MEMORY_TOPICS, type MemoryKind, type MemoryTopic } from "./memory-ops";
 
 export type Memory = {
   id: string;
@@ -19,6 +21,8 @@ export type Memory = {
   text: string;
   source: string;
   supersedes_id: string | null;
+  superseded_by: string | null;
+  topic: MemoryTopic | null;
   archived: boolean;
   is_sample: boolean;
   created_at: Date;
@@ -27,15 +31,27 @@ export type Memory = {
 
 type Actor = AuditEntry["actor"];
 
-/** Thrown when the guard refuses a memory. The message is the fixed refusal line. */
+export type RefusalKind = GuardKind | ScanKind;
+
+const SCAN_REFUSAL: Record<ScanKind, string> = {
+  injection: "That reads like an instruction to Aeon rather than a fact about the practice, so it wasn't saved.",
+  critical_number:
+    "That looks like an account, card, tax, license or ID number, or a password or key. Aeon doesn't keep those in memory.",
+  client_initials: "That looks like a client's initials, and I can't keep client details yet. Say it without them.",
+};
+
+/** Thrown when a memory is refused. The message is the fixed refusal line, never the text. */
 export class MemoryRefused extends Error {
-  constructor(readonly kind: GuardKind) {
-    super(REFUSAL[kind]);
+  constructor(readonly kind: RefusalKind) {
+    super(kind in SCAN_REFUSAL ? SCAN_REFUSAL[kind as ScanKind] : REFUSAL[kind as GuardKind]);
   }
 }
 
+/** Every memory write: the memory screens (memory-scan.ts), then the client-detail guard. */
 async function guarded(text: string): Promise<string> {
   const clean = text.trim().replace(/\s+/g, " ");
+  const scan = scanMemory(clean);
+  if (!scan.ok) throw new MemoryRefused(scan.kind);
   const check = await guard(clean, "memory");
   if (!check.ok) throw new MemoryRefused(check.kind);
   return clean;
@@ -58,7 +74,7 @@ export async function getMemory(id: string): Promise<Memory | null> {
  * With `replaces`, the older memory is archived and the new one points to it.
  */
 export async function remember(
-  input: { kind: MemoryKind; text: string; replaces?: string },
+  input: { kind: MemoryKind; text: string; replaces?: string; topic?: MemoryTopic },
   by: { actor: Actor; source: string },
 ): Promise<{ memory: Memory; created: boolean }> {
   const text = await guarded(input.text);
@@ -68,13 +84,13 @@ export async function remember(
   if (existing) return { memory: existing, created: false };
 
   const memory = await sql.begin(async (tx) => {
-    if (input.replaces) {
-      await tx`update practice_os.memories set archived = true where id = ${input.replaces}`;
-    }
     const [row] = await tx<Memory[]>`
-      insert into practice_os.memories (kind, text, source, supersedes_id)
-      values (${input.kind}, ${text}, ${by.source}, ${input.replaces ?? null})
+      insert into practice_os.memories (kind, text, source, supersedes_id, topic)
+      values (${input.kind}, ${text}, ${by.source}, ${input.replaces ?? null}, ${input.topic ?? null})
       returning *`;
+    if (input.replaces) {
+      await tx`update practice_os.memories set archived = true, superseded_by = ${row.id} where id = ${input.replaces}`;
+    }
     await audit(
       {
         actor: by.actor,
@@ -139,6 +155,139 @@ export async function deleteMemory(id: string, by: { actor: Actor; source: strin
   return true;
 }
 
+// ---- the reflection pass writes ----------------------------------------------
+
+export type Tx = postgres.TransactionSql;
+
+/** One memory batch at a time, across the local app and the Vercel copy. */
+const MEMORY_LOCK = 7_340_010;
+
+export type AppliedCounts = { added: number; updated: number; retired: number; refused: number };
+
+/**
+ * Applies the ops memory-ops.ts allowed, in one transaction. Each text passes
+ * the memory screens and the client-detail guard first; a refused op is
+ * skipped and audited by kind only. `alsoInTx` runs inside the same
+ * transaction (the reflection marker), so the ops and the marker land together.
+ */
+export async function applyOps(
+  ops: PlannedOp[],
+  by: { actor: Actor; source: string },
+  alsoInTx?: (tx: Tx) => Promise<void>,
+): Promise<AppliedCounts> {
+  const counts: AppliedCounts = { added: 0, updated: 0, retired: 0, refused: 0 };
+  const ready: (PlannedOp & { clean?: string })[] = [];
+  const refused: { kind: MemoryKind; reason: RefusalKind; op: string }[] = [];
+  for (const op of ops) {
+    if (op.op === "retire") {
+      ready.push(op);
+      continue;
+    }
+    try {
+      ready.push({ ...op, clean: await guarded(op.text) });
+    } catch (err) {
+      if (!(err instanceof MemoryRefused)) throw err;
+      refused.push({ kind: op.kind, reason: err.kind, op: op.op });
+    }
+  }
+
+  await db().begin(async (tx) => {
+    await tx`select pg_advisory_xact_lock(${MEMORY_LOCK})`;
+    for (const r of refused) {
+      await audit(
+        { actor: by.actor, action: "memory_refused", subjectType: "memory", details: { kind: r.kind, reason: r.reason, op: r.op, source: by.source } },
+        tx as never,
+      );
+      counts.refused++;
+    }
+    for (const op of ready) {
+      if (op.op === "retire") {
+        const [row] = await tx<{ kind: string }[]>`
+          update practice_os.memories set archived = true where id = ${op.id} and not archived returning kind`;
+        if (!row) continue;
+        await audit({ actor: by.actor, action: "memory_retired", subjectType: "memory", subjectId: op.id, details: { kind: row.kind, source: by.source } }, tx as never);
+        counts.retired++;
+        continue;
+      }
+      const text = op.clean!;
+      const self = op.op === "update" ? op.id : null;
+      const [same] = await tx<{ id: string }[]>`
+        select id from practice_os.memories
+        where not archived and lower(text) = lower(${text}) and id is distinct from ${self}::uuid limit 1`;
+      if (same) continue;
+      if (op.op === "update") {
+        const [old] = await tx<{ id: string }[]>`
+          select id from practice_os.memories where id = ${op.id} and not archived for update`;
+        if (!old) continue;
+        const [row] = await tx<{ id: string }[]>`
+          insert into practice_os.memories (kind, text, source, supersedes_id, topic)
+          values (${op.kind}, ${text}, ${by.source}, ${op.id}, ${op.topic}) returning id`;
+        await tx`update practice_os.memories set archived = true, superseded_by = ${row.id} where id = ${op.id}`;
+        await audit(
+          { actor: by.actor, action: "memory_updated", subjectType: "memory", subjectId: row.id, details: { kind: op.kind, topic: op.topic, replaces: op.id, source: by.source } },
+          tx as never,
+        );
+        counts.updated++;
+        continue;
+      }
+      const [row] = await tx<{ id: string }[]>`
+        insert into practice_os.memories (kind, text, source, topic)
+        values (${op.kind}, ${text}, ${by.source}, ${op.topic}) returning id`;
+      await audit(
+        { actor: by.actor, action: "memory_saved", subjectType: "memory", subjectId: row.id, details: { kind: op.kind, topic: op.topic, source: by.source } },
+        tx as never,
+      );
+      counts.added++;
+    }
+    if (alsoInTx) await alsoInTx(tx as unknown as Tx);
+  });
+  if (counts.added + counts.updated + counts.retired > 0) await renderMemoryFile();
+  return counts;
+}
+
+// ---- what changed lately (the recent_memory_changes tool) ---------------------
+
+export type MemoryChange = {
+  at: Date;
+  action: "added" | "updated" | "retired" | "refused" | "forgotten" | "edited" | "restored" | "deleted";
+  kind: string | null;
+  topic: string | null;
+  /** The memory's text while it is in use; never for refused, retired or forgotten ones. */
+  text: string | null;
+  by: string;
+};
+
+const ACTIONS: Record<string, MemoryChange["action"]> = {
+  memory_saved: "added",
+  memory_updated: "updated",
+  memory_retired: "retired",
+  memory_refused: "refused",
+  memory_forgotten: "forgotten",
+  memory_edited: "edited",
+  memory_restored: "restored",
+  memory_deleted: "deleted",
+};
+
+/** From audit_log joined to memories: what Aeon remembered, changed or refused since a date. */
+export async function recentChanges(sinceDays = 7, limit = 50): Promise<MemoryChange[]> {
+  const rows = await db()<{ at: Date; action: string; details: Record<string, unknown>; text: string | null; topic: string | null }[]>`
+    select a.at, a.action, a.details, case when m.archived then null else m.text end as text, m.topic
+    from practice_os.audit_log a
+    left join practice_os.memories m on m.id::text = a.subject_id and a.action <> 'memory_refused'
+    where a.subject_type = 'memory' and a.action = any(${Object.keys(ACTIONS)})
+      and a.at > now() - make_interval(days => ${sinceDays})
+    order by a.at desc
+    limit ${limit}`;
+  return rows.map((r) => ({
+    at: r.at,
+    action: ACTIONS[r.action],
+    kind: typeof r.details.kind === "string" ? r.details.kind : null,
+    topic: r.topic ?? (typeof r.details.topic === "string" ? r.details.topic : null),
+    text: r.action === "memory_refused" ? null : r.text,
+    by: typeof r.details.source === "string" ? r.details.source : "",
+  }));
+}
+
 // ---- which memories go into a model call -------------------------------------
 
 const STOP = new Set(
@@ -193,7 +342,7 @@ export function memoryMarkdown(memories: Pick<Memory, "kind" | "text" | "updated
   const lines = [
     "# What Aeon remembers about this practice",
     "",
-    "Generated from practice_os.memories. Edit on the Memory page in the app, not here.",
+    "Generated from practice_os.memories. To change it, tell Aeon in chat or use the Memory page in the app, not this file.",
     "Practice-business facts only: no client names or clinical details before a BAA.",
   ];
   for (const kind of MEMORY_KINDS) {

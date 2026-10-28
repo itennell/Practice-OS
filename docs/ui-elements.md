@@ -51,7 +51,7 @@ Every UI piece Isaiah picked for Practice-OS, where it goes, and how to build it
 | UI-005 | Dark chat menu (ChatGPT style) | CHT | Conversation list | must | approved | Design board p.8 |  |
 | UI-006 | Chat bubbles with cut corners | CHT | Aeon bubble | must | approved | Design board p.7 |  |
 | UI-007 | Plugins page for connections | SET | Connections | nice | collected | Design board p.8 |  |
-| UI-008 | Agent profile page | TBD | Anywhere it fits | nice | collected | Design board p.8 |  |
+| UI-008 | Agent profile page | Settings | Settings → Aeon | nice | built (Aeon only) | Design board p.8; Isaiah screenshot 2026-10-28 | `components/aeon-files.tsx` |
 | UI-009 | Primary button pinned to the bottom on phones | GLB | Buttons and chips | must | approved | Design board p.7 |  |
 | UI-010 | Status Mark (animated status icon) | GLB | Status pills | must | built | React Bits (app exception) | `components/shared/status-mark.tsx` (`StatusMark`, `StatusPill`) |
 | UI-011 | Prompt Bar ("Ask anything" with dictation) | CHT | Message input | must | built | React Bits (app exception) | `components/shared/prompt-bar.tsx` (`PromptBar`) |
@@ -123,9 +123,9 @@ A row of connected service icons, a list with + buttons to add more, and a float
 
 ### UI-008 Agent profile page
 
-**TBD · Anywhere it fits** · nice · collected · Design board p.8
+**Settings · Settings → Aeon** · nice · built (Aeon only) · Design board p.8
 
-One page per helper showing its personality, memory, tools and history. The board marked it as the next screen to design.
+One page per helper showing its personality, memory, tools and history. Built first for Aeon (2026-10-28, `components/aeon-files.tsx`): Aeon's orb and name, then two gradient cards, Soul (blue) and Memory (violet), each marked "Handle with care" with its last-updated date. A card opens a read-only sheet (Base UI Dialog, shaped like UI-028) with the file and a warning: to change a memory, tell Aeon in chat. The helpers' own profiles come later.
 
 ### UI-009 Primary button pinned to the bottom on phones
 

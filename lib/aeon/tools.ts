@@ -20,7 +20,7 @@ import * as gfe from "../gfe/store";
 import * as cms855i from "../payers/cms855i";
 import * as payers from "../payers/store";
 import { guard, WITHHELD } from "./guard";
-import { forget, MEMORY_KINDS, MemoryRefused, remember } from "./memory";
+import { forget, MEMORY_KINDS, MemoryRefused, recentChanges, remember } from "./memory";
 
 export type ToolContext = {
   /** Who is calling, for created_by and audit rows: "mcp:<client>" or "chat:<conversation id>". */
@@ -437,6 +437,25 @@ export const TOOLS: AeonTool[] = [
         if (err instanceof MemoryRefused) return { content: [{ type: "text", text: `Not saved. ${err.message}` }], isError: true };
         throw err;
       }
+    },
+  }),
+
+  tool({
+    name: "recent_memory_changes",
+    title: "What Aeon remembered lately",
+    description:
+      "Lists what Aeon added to, changed in, retired from or refused for its memory about this practice in the last few days, newest first. " +
+      "Use it when she asks what you remembered or learned. Refused ones show only their kind, never the text.",
+    input: { days: z.number().int().min(1).max(90).default(7) },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+    label: "Checked what I remembered",
+    changesData: false,
+    run: async ({ days }) => {
+      const changes = await recentChanges(days);
+      return text({
+        days,
+        changes: changes.map((c) => ({ on: c.at.toISOString().slice(0, 10), what: c.action, kind: c.kind, topic: c.topic, text: c.text })),
+      });
     },
   }),
 

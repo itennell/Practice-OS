@@ -78,9 +78,15 @@ export async function sendMessage(input: {
     await tx`
       insert into practice_os.chat_messages (conversation_id, role, content)
       values (${id}, 'clinician', ${input.text.trim()})`;
-    await tx`
+    const [last] = await tx<{ id: string }[]>`
       insert into practice_os.chat_messages (conversation_id, role, content, steps, approval_ids)
-      values (${id}, 'aeon', ${reply.text}, ${tx.json(reply.steps as never)}, ${reply.approvalIds}::uuid[])`;
+      values (${id}, 'aeon', ${reply.text}, ${tx.json(reply.steps as never)}, ${reply.approvalIds}::uuid[])
+      returning id`;
+    // Demo visitors on the view-only copy can't change saved data, memory included:
+    // their messages are marked as already reflected, so Aeon never learns from them.
+    if (input.viewOnly) {
+      await tx`update practice_os.conversations set reflected_through = ${last.id}, reflected_at = now() where id = ${id}`;
+    }
     return id;
   });
   return { conversationId, reply };
