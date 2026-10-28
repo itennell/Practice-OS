@@ -3,7 +3,7 @@ import {
   CHAPTERS,
   firstFor,
   flatten,
-  normalizeEin,
+  checkEin,
   normalizeUsPhone,
   progressFor,
   QUESTIONS,
@@ -113,8 +113,11 @@ describe("onboarding chapters", () => {
     expect(normalizeUsPhone("(312) 555-0100")).toBe("+13125550100");
     expect(normalizeUsPhone("1 312 555 0100")).toBe("+13125550100");
     expect(normalizeUsPhone("555-0100")).toBeNull();
-    expect(normalizeEin("123456789")).toBe("12-3456789");
-    expect(normalizeEin("12-345")).toBeNull();
+    expect(checkEin("12-3456789")).toEqual({ ok: true, ein: "12-3456789" });
+    expect(checkEin("123-45-6789")).toEqual({ ok: false, reason: "ssn" }); // never stored
+    expect(checkEin("123 45 6789")).toEqual({ ok: false, reason: "ssn" });
+    expect(checkEin("123456789")).toEqual({ ok: false, reason: "shape" }); // could be either
+    expect(checkEin("12-345")).toEqual({ ok: false, reason: "shape" });
   });
 
   it("guesses the time zone from the state", () => {

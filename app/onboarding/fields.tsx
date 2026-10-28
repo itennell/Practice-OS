@@ -184,7 +184,7 @@ export function Field({ screen: s, value, onChange, setupItems, stage, homeState
     case "npi":
       return <TextField label="NPI" inputMode="numeric" autoComplete="off" placeholder="10 digits" value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} maxLength={14} error={error} />;
     case "ein":
-      return <TextField label="Tax ID (EIN)" inputMode="numeric" autoComplete="off" placeholder="12-3456789" value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} maxLength={12} error={error} />;
+      return <TextField label="Tax ID (EIN)" autoComplete="off" placeholder="12-3456789" value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} maxLength={12} error={error} />;
     case "number":
       return <TextField label="Number" inputMode="numeric" value={String(value ?? "")} onChange={(e) => onChange(e.target.value.replace(/[^\d.]/g, ""))} error={error} />;
     case "contact":

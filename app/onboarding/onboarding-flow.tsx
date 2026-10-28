@@ -91,7 +91,7 @@ function OnboardingFlow({ initial, connections, startAt }: Props & { startAt?: s
   useEffect(() => {
     if (screen?.kind !== "followups" || followups) return;
     let live = true;
-    fetch("/api/onboarding/followups", { method: "POST" })
+    fetch("/api/onboarding/followups", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
       .then((r) => r.json())
       .then((d: { questions?: Followup[] }) => live && setFollowups(d.questions?.length ? d.questions : []))
       .catch(() => live && setFollowups([]));
@@ -138,7 +138,7 @@ function OnboardingFlow({ initial, connections, startAt }: Props & { startAt?: s
 
   async function finish() {
     setStatus({ kind: "saving" });
-    const res = await fetch("/api/onboarding/finish", { method: "POST" }).catch(() => null);
+    const res = await fetch("/api/onboarding/finish", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).catch(() => null);
     if (!res?.ok) {
       setStatus({ kind: "error", text: "I couldn't finish just now. Please try again." });
       return;

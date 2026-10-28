@@ -54,7 +54,7 @@ describe.skipIf(!local)("onboarding on a fresh install", () => {
       { npi: "1234567893" },
       { pllc: { yes: true, date: "2026-01-15" } },
       { entity_tax: "single_owner" },
-      { ein: "123456789" },
+      { ein: "12-3456789" },
       { staff: { employees: 0, contractors: true } },
       { malpractice: { carrier: "Example Mutual", expires_on: "2027-06-30", per_claim: 1_000_000, aggregate: 3_000_000 } },
       { office_days: { weekdays: [1, 2, 3, 4], close_federal_holidays: true } },
@@ -112,6 +112,9 @@ describe.skipIf(!local)("onboarding on a fresh install", () => {
     const payers = await sql`select payer, status from practice_os.payer_applications order by payer`;
     expect(payers.map((x) => [x.payer, x.status])).toEqual([["Aetna", "preparing"], ["Medicare", "preparing"]]);
 
+    // IDs and contact details stay out of onboarding_answers.
+    expect(JSON.stringify(p.onboarding_answers)).not.toMatch(/12-3456789|1234567893|sam@example|555/);
+
     const memories = await sql`select text from practice_os.memories where source = 'onboarding' order by text`;
     expect(memories.map((m) => m.text)).toEqual(["Likes to work: Evenings", "Works with: Adults; Couples; Work stress and life changes"]);
 
@@ -129,7 +132,8 @@ describe.skipIf(!local)("onboarding on a fresh install", () => {
   });
 
   it("refuses bad input in plain words and saves nothing", async () => {
-    await expect(store.saveAnswers({ ein: "12345" })).rejects.toThrow(/9 digits/);
+    await expect(store.saveAnswers({ ein: "123-45-6789" })).rejects.toThrow(/Social Security number/);
+    await expect(store.saveAnswers({ ein: "123456789" })).rejects.toThrow(/dash/);
     await expect(store.saveAnswers({ alert_phone: "555" })).rejects.toThrow(/10-digit/);
   });
 
@@ -138,9 +142,20 @@ describe.skipIf(!local)("onboarding on a fresh install", () => {
     expect(await store.stillToSetUp()).toEqual([]); // not finished yet
     const done = await store.finishOnboarding();
     expect(done.researchState).toBeNull(); // Illinois rules ship verified
+    expect((await store.finishOnboarding()).researchState).toBeNull(); // a second finish changes nothing
     const todo = await store.stillToSetUp();
     expect(todo.map((t) => t.id)).toEqual(["caqh"]);
     const [p] = await db()`select onboarding_completed_at from practice_os.clinician_profile`;
     expect(p.onboarding_completed_at).toBeInstanceOf(Date);
+  });
+
+  it("starts state research once for a state Aeon has to research, never twice", async () => {
+    await db()`update practice_os.clinician_profile set state = 'OH', onboarding_completed_at = null`;
+    expect((await store.finishOnboarding()).researchState).toBe("OH");
+    expect((await store.finishOnboarding()).researchState).toBeNull(); // already finished
+    await db()`update practice_os.clinician_profile set onboarding_completed_at = null`;
+    const [a] = await db()`insert into practice_os.approvals (kind, title, preview, payload, created_by) values ('state_rules', 'Ohio rules', '{}', '{}', 'test') returning id`;
+    expect((await store.finishOnboarding()).researchState).toBeNull(); // her rules already wait in Approvals
+    await db()`delete from practice_os.approvals where id = ${a.id}`;
   });
 });

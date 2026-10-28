@@ -6,7 +6,7 @@ import { audit } from "../audit";
 import { remember } from "../aeon/memory";
 import { answerSetup, ANSWERS, type Answer } from "../compliance/answers";
 import { updateFacts, type FactUpdate } from "../compliance/actions";
-import { STATES } from "../compliance/states";
+import { STATES, VERIFIED_STATES } from "../compliance/states";
 import { checkNpiInRegistry, loadCredentialingProfile, updateCredentialingSection } from "../credentialing/store";
 import { getConnectionStatus } from "../connect/status";
 import { db } from "../db";
@@ -15,8 +15,8 @@ import { listPayerApplications, savePayerApplication } from "../payers/store";
 import {
   CHAPTERS,
   flatten,
+  checkEin,
   HELPERS,
-  normalizeEin,
   normalizeUsPhone,
   QUESTIONS,
   TAXONOMY,
@@ -152,9 +152,10 @@ export async function loadOnboarding(sql: postgres.Sql = db()): Promise<Onboardi
         select id, title, status from practice_os.obligations
          where kind = 'setup' and status in ('upcoming', 'not_yet') order by title`.catch(() => [])
     : [];
+  const values = Object.fromEntries(Object.entries(progress.values).filter(([id]) => !PRIVATE.has(id)));
   return {
     screens: screensFor(progress.values, row, { museReady: await museReady() }),
-    progress,
+    progress: { ...progress, values },
     completed: Boolean(row?.onboarding_completed_at),
     hasProfile: Boolean(row),
     saved: row ? await savedValues(row, sql) : {},
@@ -219,6 +220,13 @@ async function savedValues(row: ProfileRow, sql: postgres.Sql): Promise<Record<s
   return out;
 }
 
+/** The Vercel copy is view only: her IDs, contact details and address stay on the server. */
+export function viewOnlyState(state: OnboardingState): OnboardingState {
+  const hide = new Set([...PRIVATE, "office", "name", "practice_name"]);
+  const keep = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).filter(([id]) => !hide.has(id)));
+  return { ...state, saved: keep(state.saved), progress: { ...state.progress, values: keep(state.progress.values) } };
+}
+
 async function saveProgress(progress: Progress, sql: postgres.Sql): Promise<void> {
   await sql`
     update practice_os.clinician_profile
@@ -230,6 +238,8 @@ async function saveProgress(progress: Progress, sql: postgres.Sql): Promise<void
 const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a date.");
 const optionalDay = isoDay.nullable().optional();
 const PROFILE_FIRST = new Set(["name", "practice_name", "state", "license"]);
+/** Answers that never go into onboarding_answers, only into the table that owns them. */
+const PRIVATE = new Set(["contact", "alert_phone", "npi", "ein", "malpractice"]);
 
 export class AnswerError extends Error {}
 
@@ -262,7 +272,8 @@ export async function saveAnswers(
       const note = await saveOne(id, value, { ...progress.values, ...answers }, row, sql);
       if (note) notes.push(note);
     }
-    progress.values[id] = value;
+    // IDs and contact details live only in their own tables; progress just notes they're answered.
+    progress.values[id] = PRIVATE.has(id) ? true : value;
     progress.skipped = progress.skipped.filter((x) => x !== id);
     progress.later = progress.later.filter((x) => x !== id);
   }
@@ -453,9 +464,15 @@ async function saveOne(id: string, value: unknown, all: Record<string, unknown>,
       await facts({ entity_tax: z.enum(["single_owner", "partnership", "s_corp"]).parse(value) });
       return null;
     case "ein": {
-      const tin = normalizeEin(String(value ?? ""));
-      if (!tin) throw new AnswerError("A tax ID is 9 digits, like 12-3456789.");
-      await updateCredentialingSection("tin", { tin }, BY, sql);
+      const ein = checkEin(String(value ?? ""));
+      if (!ein.ok) {
+        throw new AnswerError(
+          ein.reason === "ssn"
+            ? "That looks like a Social Security number. Practice-OS only stores your practice's EIN, like 12-3456789."
+            : "Please type your EIN with the dash after the first two digits, like 12-3456789.",
+        );
+      }
+      await updateCredentialingSection("tin", { tin: ein.ein }, BY, sql);
       return null;
     }
     case "staff": {
@@ -614,9 +631,15 @@ function locationOf(cred: NonNullable<Awaited<ReturnType<typeof loadCredentialin
 export async function finishOnboarding(sql: postgres.Sql = db()): Promise<{ researchState: string | null }> {
   const row = await loadProfileRow(sql);
   if (!row) throw new AnswerError("Please answer the first questions first.");
-  await sql`update practice_os.clinician_profile set onboarding_completed_at = coalesce(onboarding_completed_at, now())`;
+  // Only the first finish counts: a retry or a later visit from "Still to set up" changes nothing.
+  const first = await sql`
+    update practice_os.clinician_profile set onboarding_completed_at = now()
+     where onboarding_completed_at is null returning 1`;
+  if (first.length === 0) return { researchState: null };
   await audit({ actor: "clinician", action: "onboarding_finished", subjectType: "clinician_profile", details: { by: BY } }, sql);
-  return { researchState: row.state === "IL" ? null : row.state };
+  if (VERIFIED_STATES.has(row.state)) return { researchState: null };
+  const [waiting] = await sql`select 1 from practice_os.approvals where kind = 'state_rules' and status = 'pending' limit 1`;
+  return { researchState: waiting ? null : row.state };
 }
 
 /** What she skipped or put off, for the "Still to set up" card on the home page. */

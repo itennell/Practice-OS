@@ -595,10 +595,16 @@ export const TAXONOMY: Record<Credential, string> = {
   Psychologist: "103TC0700X",
 };
 
-/** "12-3456789" from what she typed, or null. */
-export function normalizeEin(input: string): string | null {
-  const d = input.replace(/\D/g, "");
-  return d.length === 9 ? `${d.slice(0, 2)}-${d.slice(2)}` : null;
+/**
+ * An EIN exactly as the IRS writes it, 12-3456789. A Social Security number
+ * (123-45-6789) is refused by name: Practice-OS never stores one. Nine digits with no
+ * dash could be either, so she's asked to type the dash.
+ */
+export function checkEin(input: string): { ok: true; ein: string } | { ok: false; reason: "ssn" | "shape" } {
+  const t = input.trim();
+  if (/^\d{2}-\d{7}$/.test(t)) return { ok: true, ein: t };
+  if (/^\d{3}[- ]\d{2}[- ]\d{4}$/.test(t)) return { ok: false, reason: "ssn" };
+  return { ok: false, reason: "shape" };
 }
 
 /** "+13125550100" from a US number she typed, or null. */

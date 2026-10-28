@@ -1,11 +1,17 @@
+import { demoCapReached, isViewOnly } from "@/lib/aeon/demo";
 import { loadOnboarding } from "@/lib/onboarding/store";
-import { writeFollowups } from "@/lib/onboarding/followups";
+import { FALLBACK_FOLLOWUPS, writeFollowups } from "@/lib/onboarding/followups";
+import { canWrite } from "../safety";
 
 // muse-spark-1.3 writes 2 or 3 business questions from what she has told Aeon so far
 // (lib/onboarding/followups.ts checks her words before and every question after).
+// Only her own app may spend her Muse calls; the demo copy gets the fixed questions.
 export const maxDuration = 60;
 
-export async function POST() {
+export async function POST(request: Request) {
+  if (!canWrite(request) || isViewOnly(request) || (await demoCapReached())) {
+    return Response.json({ questions: FALLBACK_FOLLOWUPS, source: "fallback" }, { headers: { "Cache-Control": "no-store" } });
+  }
   const { progress } = await loadOnboarding();
   const v = progress.values;
   const who = v.who as { chips?: string[]; work?: string[]; text?: string } | undefined;

@@ -1,13 +1,15 @@
 import { ZodError, z } from "zod";
-import { canDecide } from "@/lib/admin-guard";
-import { AnswerError, loadOnboarding, markSkipped, saveAnswers } from "@/lib/onboarding/store";
-import { checkAnswers } from "./safety";
+import { isViewOnly } from "@/lib/aeon/demo";
+import { AnswerError, loadOnboarding, markSkipped, saveAnswers, viewOnlyState } from "@/lib/onboarding/store";
+import { canWrite, checkAnswers } from "./safety";
 
 // Aeon's onboarding interview. GET: the questions that apply to her, where she is and
 // what's already saved. POST: one answer (or Skip / Set up later), saved as she goes.
 
-export async function GET() {
-  return Response.json(await loadOnboarding(), { headers: { "Cache-Control": "no-store" } });
+export async function GET(request: Request) {
+  const state = await loadOnboarding();
+  // The Vercel copy is view only: no IDs, contact details or address leave the server.
+  return Response.json(isViewOnly(request) ? viewOnlyState(state) : state, { headers: { "Cache-Control": "no-store" } });
 }
 
 const body = z.union([
@@ -16,7 +18,7 @@ const body = z.union([
 ]);
 
 export async function POST(request: Request) {
-  if (!canDecide(request)) return Response.json({ error: "This demo copy is view only." }, { status: 403 });
+  if (!canWrite(request)) return Response.json({ error: "Answers can only be saved from Practice-OS itself." }, { status: 403 });
   const parsed = body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "Something went wrong. Please try again." }, { status: 400 });
   try {
