@@ -572,6 +572,59 @@ export const TOOLS: AeonTool[] = [
       return text(row ? { forgotten: true, id } : { forgotten: false, id, reason: "No active memory with that id." });
     },
   }),
+
+  // ---- Front Desk (lib/frontdesk). Callers' names, numbers and words never
+  // reach the model: these tools give counts, statuses and reference ids only.
+  tool({
+    name: "front_desk_status",
+    title: "Front Desk: calls, texts and consults",
+    description:
+      "Answers 'Who called today?' and 'What's booked?' for the practice line: how many calls and texts are new, need the clinician, " +
+      "are waiting on the caller or are booked; upcoming consult times; whether her phone company and calendar are connected; " +
+      "and the open inquiries by id, channel, status and time. Never includes callers' names, numbers or messages.",
+    input: {},
+    annotations: { readOnlyHint: true, openWorldHint: false },
+    label: "Checked Front Desk",
+    changesData: false,
+    run: async () => {
+      const { frontDeskSummary } = await import("../frontdesk/summary");
+      return text(await frontDeskSummary());
+    },
+  }),
+
+  tool({
+    name: "front_desk_check_now",
+    title: "Front Desk: check for new voicemails and texts",
+    description:
+      "Reads new voicemails and texts from the clinician's own phone company now (it also runs every minute while the app is open). " +
+      "Each one is crisis-checked first; Front Desk then follows her Front Desk switches.",
+    input: {},
+    annotations: { readOnlyHint: false, openWorldHint: true, idempotentHint: true },
+    label: "Checked the practice line for new calls and texts",
+    changesData: true,
+    run: async () => {
+      const { checkFrontDesk } = await import("../frontdesk/check");
+      return text(await checkFrontDesk());
+    },
+  }),
+
+  tool({
+    name: "offer_consult_times",
+    title: "Front Desk: offer a caller three consult times",
+    description:
+      "Puts a text with three open consult times for one inquiry (id from front_desk_status) in her approvals. " +
+      "The wording is fixed; nothing is sent until she approves, unless her mode allows it.",
+    input: { inquiry_id: z.string().uuid().describe("The inquiry id from front_desk_status.") },
+    output: { outcome: z.string(), approval_id: z.string().uuid().optional() },
+    annotations: { destructiveHint: false, openWorldHint: false, idempotentHint: false },
+    label: "Put consult times for a caller in your approvals",
+    changesData: false,
+    run: async ({ inquiry_id }) => {
+      const { offerTimes } = await import("../frontdesk/offers");
+      const out = await offerTimes(inquiry_id, { purpose: "book", createdBy: "aeon" });
+      return { ...text(out), structuredContent: out };
+    },
+  }),
 ];
 
 export const TOOLS_BY_NAME = new Map(TOOLS.map((t) => [t.name, t]));

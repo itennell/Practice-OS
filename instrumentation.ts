@@ -9,4 +9,9 @@ export async function register() {
   }
 
   // Background jobs that need the database go below this line (never on the Vercel copy).
+
+  // Front Desk (lib/frontdesk/poller.ts): check her phone company every minute
+  // while the app is open. Off on Vercel and when FRONT_DESK_POLL=off.
+  const { startFrontDeskPoller } = await import("./lib/frontdesk/poller");
+  startFrontDeskPoller();
 }
