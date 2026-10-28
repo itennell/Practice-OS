@@ -8,10 +8,10 @@ import { Button, chipClass } from "@/components/ui";
 import { SPECIALTIES, type SpecialtyId } from "@/lib/referrals/nppes";
 
 // The same search Aeon runs when she asks in the chat.
-export function ReferralSearch() {
+export function ReferralSearch({ zip: savedZip, specialties }: { zip: string; specialties: SpecialtyId[] }) {
   const router = useRouter();
-  const [zip, setZip] = useState("60614");
-  const [picked, setPicked] = useState<SpecialtyId[]>(["family_medicine", "internal_medicine"]);
+  const [zip, setZip] = useState(savedZip);
+  const [picked, setPicked] = useState<SpecialtyId[]>(specialties);
   const [busy, setBusy] = useState(false);
   const zipOk = /^\d{5}$/.test(zip);
 

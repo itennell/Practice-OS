@@ -29,6 +29,7 @@ import * as cms855i from "../payers/cms855i";
 import * as payers from "../payers/store";
 import { SPECIALTIES, type SpecialtyId } from "../referrals/nppes";
 import { draftOutreach } from "../referrals/outreach";
+import { DEFAULT_SPECIALTIES, getReferralSettings } from "../referrals/settings";
 import { findReferralSources, interleave, listSources, moveSource, STAGE_LABEL, STAGES } from "../referrals/store";
 import { guard, WITHHELD } from "./guard";
 import { forget, MEMORY_KINDS, MemoryRefused, recentChanges, remember } from "./memory";
@@ -586,18 +587,23 @@ export const TOOLS: AeonTool[] = [
       "family medicine and internal medicine). Keeps only active providers whose main specialty matches, scores each for fit " +
       "(0-100) and adds them to the Referrals board (column Found). Returns the best matches first. Sends nothing.",
     input: {
-      zip: z.string().regex(/^\d{5}$/, "a 5-digit ZIP").describe("The ZIP code to search around, usually her office's."),
+      zip: z.string().regex(/^\d{5}$/, "a 5-digit ZIP").optional().describe("The ZIP code to search around. Omit to use the one she set up (her office's)."),
       specialties: z
         .array(z.enum(SPECIALTIES.map((s) => s.id) as [SpecialtyId, ...SpecialtyId[]]))
         .min(1)
-        .describe("Which kinds of referral sources to look for."),
+        .optional()
+        .describe("Which kinds of referral sources to look for. Omit to use the ones she picked in setup."),
       radius_miles: z.number().min(0).max(10).optional().describe("Also search ZIPs whose center is this close. Default 3."),
       show: z.number().int().min(1).max(25).optional().describe("How many to list in the answer. Default 10."),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: true },
     label: "Found referral sources",
     changesData: true,
-    run: async ({ zip, specialties, radius_miles, show }) => {
+    run: async ({ zip: askedZip, specialties: asked, radius_miles, show }) => {
+      const setup = await getReferralSettings();
+      const zip = askedZip ?? setup.searchZip;
+      if (!zip) return text({ needs: "Ask her which ZIP code to search around; she hasn't set one up yet." });
+      const specialties = asked ?? (setup.specialties.length ? setup.specialties : DEFAULT_SPECIALTIES);
       const { zips, found, matched } = await findReferralSources({ zip, specialties, radiusMiles: radius_miles });
       const top = interleave(found, show ?? 10).map((p, i) => ({
         rank: i + 1,

@@ -12,6 +12,8 @@ const { closeDb, db } = await import("../lib/db");
 const { draftOutreach } = await import("../lib/referrals/outreach");
 const { getSource, moveDueFollowUps } = await import("../lib/referrals/store");
 const { practiceToday } = await import("../lib/compliance/store");
+const { getReferralSettings, saveReferralSettings } = await import("../lib/referrals/settings");
+const { referralsQuestions } = await import("../lib/referrals/onboarding");
 
 const LETTER =
   "Dear Dr. Rivera,\n\nI'm Dana Reyes, a licensed clinical professional counselor in Lincoln Park. I work with adults " +
@@ -27,6 +29,7 @@ const sources: string[] = [];
 const approvals: string[] = [];
 let savedDryRun: string | undefined;
 let savedInbox: string | undefined;
+let savedSetup: { home_zip: string | null; specialties: string[] } | null | undefined;
 
 async function makeSource() {
   const npi = `19${String(Date.now() + sources.length).slice(-8)}`;
@@ -54,6 +57,9 @@ afterAll(async () => {
   process.env.DRY_RUN = savedDryRun;
   process.env.TEST_INBOX_EMAIL = savedInbox;
   if (!hasDb) return;
+  // Put her Referrals setup back exactly as it was.
+  if (savedSetup === null) await db()`delete from practice_os.referral_settings`;
+  else if (savedSetup) await db()`update practice_os.referral_settings set home_zip = ${savedSetup.home_zip}, specialties = ${savedSetup.specialties}`;
   if (approvals.length) await db()`delete from practice_os.approvals where id in ${db()(approvals)}`;
   if (sources.length) await db()`delete from practice_os.referral_sources where id in ${db()(sources)}`;
   await closeDb();
@@ -115,5 +121,29 @@ describe.skipIf(!hasDb)("referral letters", () => {
     await db()`update practice_os.referral_sources set stage = 'contacted', next_follow_up_on = current_date - 1 where id = ${sourceId}`;
     expect(await moveDueFollowUps()).toBeGreaterThanOrEqual(1);
     expect((await getSource(sourceId))!.stage).toBe("follow_up");
+  });
+});
+
+describe.skipIf(!hasDb)("Referrals setup (onboarding)", () => {
+  it("asks the ZIP only without an office ZIP, prefills, saves, and the search falls back to it", async () => {
+    const [row] = await db()`select home_zip, specialties from practice_os.referral_settings`;
+    savedSetup = row ? { home_zip: row.home_zip, specialties: row.specialties } : null;
+
+    const zipQ = referralsQuestions.questions.find((q) => q.id === "home_zip")!;
+    expect(zipQ.appliesWhen!({ officeZip: "60614" })).toBe(false);
+    expect(zipQ.appliesWhen!({ officeZip: null })).toBe(true);
+
+    await db()`delete from practice_os.referral_settings`;
+    expect(await referralsQuestions.load({ officeZip: "60657" })).toEqual({ home_zip: "60657", specialties: ["family_medicine", "internal_medicine"] });
+
+    await referralsQuestions.save({ specialties: ["oncology", "pediatrics"] });
+    await referralsQuestions.save({ home_zip: "60610" });
+    const setup = await getReferralSettings();
+    expect(setup).toMatchObject({ homeZip: "60610", searchZip: "60610", specialties: ["oncology", "pediatrics"] });
+
+    await expect(referralsQuestions.save({ home_zip: "6061" })).rejects.toThrow("Type your 5-digit ZIP code.");
+    await expect(referralsQuestions.save({ specialties: ["dentists"] })).rejects.toThrow("Pick from the list.");
+    await saveReferralSettings({ homeZip: null });
+    expect((await getReferralSettings()).homeZip).toBeNull();
   });
 });

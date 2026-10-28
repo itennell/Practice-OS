@@ -47,6 +47,11 @@ insert into practice_os.referral_sources
    '208000000X', 'Pediatrics', 'organization', 'Chicago', 'IL', 'hello@example.com', 'connected', now() - interval '35 days', null, 0.3, 79,
    '[Sample] Happy to share referrals for parents.', true);
 
+-- Dana's Referrals setup. Seeded only when missing: db:reset never overwrites her choice.
+insert into practice_os.referral_settings (id, home_zip, specialties)
+values (true, '60614', array['family_medicine', 'internal_medicine'])
+on conflict (id) do nothing;
+
 insert into practice_os.posts (id, topic, caption, status, is_sample) values
   ('00000000-0000-4000-8000-000000000301', 'first_session',
    E'[Sample] What happens at a first session? We go over paperwork, scheduling and fees, and you can ask any questions about how sessions work.\n\nDana Reyes, LCPC (fictional demo practice)',
