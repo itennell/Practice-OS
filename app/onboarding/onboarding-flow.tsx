@@ -106,7 +106,10 @@ function OnboardingFlow({ initial, connections, startAt }: Props & { startAt?: s
   }, [screen?.id]);
 
   if (!screen) return null;
-  const value = values[screen.id] ?? (state.hasProfile ? undefined : draft[screen.id]) ?? emptyValue(screen, stage, homeState);
+  // What she typed here, else what's saved (refreshed after each answer, so helper
+  // prefills from load() show up on a first run too), else the draft or an empty value.
+  const value =
+    values[screen.id] ?? state.saved[screen.id] ?? (state.hasProfile ? undefined : draft[screen.id]) ?? emptyValue(screen, stage, homeState);
   const isLast = index === screens.length - 1;
   const nextId = screens[index + 1]?.id ?? null;
 
