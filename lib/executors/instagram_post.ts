@@ -3,7 +3,7 @@ import { db } from "../db";
 import { instagramAccount } from "../instagram/account";
 import { InstagramGraph } from "../instagram/graph";
 import { publishImagePost, publishProblems, type PublishProgress } from "../instagram/publish";
-import { RelayClient, relayUrl } from "../instagram/relay";
+import { uploadPostImage } from "../instagram/relay";
 import type { Executor } from "./types";
 
 // She approved a post: publish it to her Instagram. The approval's payload names
@@ -49,10 +49,7 @@ export const instagramPost: Executor = async (approval, { dryRun }) => {
     return { dryRun: true, post_id: post.id, would_publish: true };
   }
 
-  const relay = relayUrl();
-  if (!relay) throw new Error("Instagram images need the Practice-OS relay, and it is not set up yet (RELAY_URL).");
   const account = await instagramAccount();
-  if (!account) throw new Error("Connect Instagram first: Settings › Connections › Instagram.");
 
   await db()`update practice_os.posts set status = 'publishing', failed_reason = null where id = ${post.id}`;
   const save = async (p: PublishProgress) => {
@@ -68,7 +65,7 @@ export const instagramPost: Executor = async (approval, { dryRun }) => {
     const result = await publishImagePost(
       input,
       { containerId: post.ig_container_id, mediaId: post.ig_media_id, permalink: post.ig_permalink },
-      { graph: new InstagramGraph(account.token), relay: new RelayClient(relay), token: account.token, igUserId: account.igUserId, save },
+      { graph: new InstagramGraph(account.token), uploadImage: (jpeg) => uploadPostImage(jpeg), igUserId: account.igUserId, save },
     );
     await audit({
       actor: "executor",

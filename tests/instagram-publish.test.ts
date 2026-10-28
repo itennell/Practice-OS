@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import { captionProblems, InstagramApiError, InstagramGraph } from "../lib/instagram/graph";
 import { checkInstagramJpeg, POST_HEIGHT, POST_WIDTH, toInstagramJpeg } from "../lib/instagram/image";
 import { publishImagePost, type PublishDeps, type PublishProgress } from "../lib/instagram/publish";
-import { authorizeUrl, redirectUri } from "../lib/instagram/relay";
+import { redirectUri, uploadPostImage } from "../lib/instagram/relay";
 
 const fx = (name: string) => JSON.parse(readFileSync(`lib/instagram/__fixtures__/${name}.json`, "utf8")).body;
 
@@ -53,15 +53,19 @@ describe("caption limits", () => {
   });
 });
 
-describe("sign-in link", () => {
-  it("asks only for the two business scopes and returns to the relay", () => {
-    const url = new URL(authorizeUrl({ appId: "123", relay: "https://relay.example", state: "S" }));
-    expect(url.origin + url.pathname).toBe("https://www.instagram.com/oauth/authorize");
-    expect(url.searchParams.get("scope")).toBe("instagram_business_basic,instagram_business_content_publish");
-    expect(url.searchParams.get("redirect_uri")).toBe("https://relay.example/oauth/instagram/callback");
-    expect(url.searchParams.get("response_type")).toBe("code");
-    expect(url.searchParams.get("state")).toBe("S");
-    expect(redirectUri("https://relay.example")).toBe("https://relay.example/oauth/instagram/callback");
+describe("relay", () => {
+  it("names the redirect URL for the Meta app", () => {
+    expect(redirectUri("https://relay.example")).toBe("https://relay.example/connect/instagram/callback");
+  });
+
+  it("posts the JPEG to the relay's /images and returns its 1-hour URL", async () => {
+    process.env.RELAY_URL = "https://relay.example/";
+    const { impl, calls } = fakeFetch([[201, { url: "https://relay.example/i/abc.jpg", expiresAt: "2026-10-28T19:00:00Z" }]]);
+    const hosted = await uploadPostImage(Buffer.from([0xff, 0xd8]), impl);
+    expect(hosted.url).toBe("https://relay.example/i/abc.jpg");
+    expect(calls[0].method).toBe("POST");
+    expect(calls[0].url.href).toBe("https://relay.example/images");
+    delete process.env.RELAY_URL;
   });
 });
 
@@ -73,12 +77,6 @@ describe("Graph client", () => {
     expect(calls[0].url.searchParams.get("fields")).toBe("user_id,username");
   });
 
-  it("refreshes on the unversioned endpoint", async () => {
-    const { impl, calls } = fakeFetch([[200, fx("refresh")]]);
-    await new InstagramGraph("T", impl).refresh();
-    expect(calls[0].url.pathname).toBe("/refresh_access_token");
-    expect(calls[0].url.searchParams.get("grant_type")).toBe("ig_refresh_token");
-  });
 
   it("marks an expired token so the card can ask her to reconnect", async () => {
     const { impl } = fakeFetch([[400, fx("error_token_expired")]]);
@@ -91,14 +89,10 @@ describe("Graph client", () => {
 async function deps(replies: Array<[number, unknown]>) {
   const { impl, calls } = fakeFetch(replies);
   const saved: PublishProgress[] = [];
-  const relay = {
-    uploadJpeg: vi.fn(async () => ({ id: "img1", url: "https://relay.example/m/img1.jpg", expiresAt: "" })),
-    deleteImage: vi.fn(async () => undefined),
-  };
+  const relay = { uploadJpeg: vi.fn(async () => ({ url: "https://relay.example/m/img1.jpg", expiresAt: "" })) };
   const d: PublishDeps = {
     graph: new InstagramGraph("T", impl),
-    relay,
-    token: "T",
+    uploadImage: relay.uploadJpeg,
     igUserId: "17841400000000001",
     save: async (p) => void saved.push({ ...p }),
     sleep: async () => undefined,
@@ -132,7 +126,6 @@ describe("publishing", async () => {
     expect(calls[4].body?.get("creation_id")).toBe("17889455560051444");
     // The container id is saved before publishing, so a retry cannot post twice.
     expect(saved[0]).toEqual({ containerId: "17889455560051444", mediaId: null, permalink: null });
-    expect(relay.deleteImage).toHaveBeenCalledWith("img1", "T");
   });
 
   it("stops at a saved media id without calling Instagram", async () => {

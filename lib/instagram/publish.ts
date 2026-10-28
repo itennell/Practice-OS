@@ -1,6 +1,6 @@
 import { captionProblems, InstagramApiError, LIMITS, type ContainerStatus, type InstagramGraph } from "./graph";
 import { checkInstagramJpeg } from "./image";
-import type { RelayClient } from "./relay";
+import type { HostedImage } from "./relay";
 
 // Publishing one image post: host the JPEG on the relay for an hour, make a
 // media container, wait until Meta has fetched it, then publish. Each step's
@@ -12,8 +12,8 @@ export type PublishProgress = { containerId: string | null; mediaId: string | nu
 
 export type PublishDeps = {
   graph: Pick<InstagramGraph, "createImageContainer" | "containerStatus" | "publish" | "permalink" | "publishingLimit">;
-  relay: Pick<RelayClient, "uploadJpeg" | "deleteImage">;
-  token: string;
+  /** lib/connect's uploadPostImage: the relay keeps it public for 1 hour, then deletes it. */
+  uploadImage: (jpeg: Buffer) => Promise<HostedImage>;
   igUserId: string;
   /** Persists each id the moment Meta returns it. */
   save: (progress: PublishProgress) => Promise<void>;
@@ -57,7 +57,6 @@ export async function publishImagePost(input: PublishInput, prior: PublishProgre
   }
   const resumed = progress.containerId !== null;
 
-  let hosted: { id: string } | null = null;
   if (!progress.containerId) {
     const problems = await publishProblems(input);
     if (problems.length) throw new Error(problems.join(" "));
@@ -65,8 +64,7 @@ export async function publishImagePost(input: PublishInput, prior: PublishProgre
     if (quota.used >= quota.total) {
       throw new Error(`Instagram's limit of ${quota.total} posts a day is used up. Try again tomorrow.`);
     }
-    const image = await deps.relay.uploadJpeg(input.jpeg, deps.token);
-    hosted = image;
+    const image = await deps.uploadImage(input.jpeg);
     const container = await deps.graph.createImageContainer(deps.igUserId, {
       imageUrl: image.url,
       caption: input.caption,
@@ -108,7 +106,5 @@ export async function publishImagePost(input: PublishInput, prior: PublishProgre
       }
     }
   }
-  // Only once it is live: a run that stops early may still need the hosted copy.
-  if (hosted) await deps.relay.deleteImage(hosted.id, deps.token);
   return { ...progress, resumed, checks };
 }

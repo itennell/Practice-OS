@@ -1,29 +1,23 @@
-// The desktop relay's Instagram routes (proposed to the desktop-app session on
-// 2026-10-28). The relay is a small public web service; the app on her computer
-// is not reachable from Meta, so Meta returns to the relay and the relay hands
-// off to the app through a practiceos:// link.
-//
-//   GET  <RELAY>/oauth/instagram/callback?code&state
-//        exchanges the code and the long-lived token with INSTAGRAM_APP_SECRET
-//        (relay env only), keeps the result 5 minutes under a one-time handoff
-//        id, then 302s to practiceos://connect/instagram?handoff=H&state=S
-//   POST <RELAY>/oauth/instagram/redeem   {handoff, state} -> RedeemedToken (once)
-//   POST <RELAY>/media     Bearer <IG token>, image/jpeg -> {url, expiresAt} (1 hour)
-//   DELETE <RELAY>/media/<id>  Bearer <IG token>
-//
-// Electron opens the practiceos:// link as /api/connect/instagram/return.
-import { randomBytes } from "node:crypto";
+// What the Instagram helper needs from the desktop app's Connect layer
+// (connect interface v0, owned by the desktop-app session):
+//   getAccessToken("instagram", scopes) -> the stored token, refreshed when needed
+//   uploadPostImage(jpeg)               -> {url, expiresAt}, public for 1 hour
+// Sign-in itself (start, the relay's code exchange, redeem by state) is all
+// lib/connect's. Until lib/connect lands on main, this file is the stand-in:
+// it reads the token through lib/connections.ts and posts to the relay's
+// POST /images. Once lib/connect exists, the bodies below become re-exports.
+import { randomUUID } from "node:crypto";
+import { getConnection } from "../connections";
 import { SCOPES, type Fetch } from "./graph";
 
-export type RedeemedToken = {
-  access_token: string;
-  user_id: string;
-  permissions: string[];
-  /** Seconds until the long-lived token expires (about 60 days). */
-  expires_in: number;
-};
+export type HostedImage = { url: string; expiresAt: string };
 
-export type HostedImage = { id: string; url: string; expiresAt: string };
+/** Thrown when Instagram isn't connected or lacks a scope; the page shows Connect. */
+export class NeedsConnectError extends Error {
+  constructor(readonly missingScopes: string[]) {
+    super("Connect Instagram first: Settings › Connections › Instagram.");
+  }
+}
 
 export class RelayError extends Error {
   constructor(
@@ -39,67 +33,30 @@ export function relayUrl(): string | null {
   return url ? url.replace(/\/+$/, "") : null;
 }
 
-/** The redirect URL Isaiah pastes into the Meta app (App Dashboard > Instagram > Business login settings). */
+/** The redirect URL Isaiah pastes into the Meta app (Business login settings). */
 export function redirectUri(base: string): string {
-  return `${base}/oauth/instagram/callback`;
+  return `${base}/connect/instagram/callback`;
 }
 
-export function newState(): string {
-  return randomBytes(32).toString("base64url");
+export async function getInstagramToken(): Promise<string> {
+  const c = await getConnection("instagram");
+  if (!c?.accessToken) throw new NeedsConnectError([...SCOPES]);
+  const missing = SCOPES.filter((s) => !c.scopes.includes(s));
+  if (missing.length) throw new NeedsConnectError(missing);
+  if (c.expiresAt && c.expiresAt.getTime() <= Date.now()) throw new NeedsConnectError([]);
+  return c.accessToken;
 }
 
-export function authorizeUrl(opts: { appId: string; relay: string; state: string }): string {
-  const url = new URL("https://www.instagram.com/oauth/authorize");
-  url.search = new URLSearchParams({
-    client_id: opts.appId,
-    redirect_uri: redirectUri(opts.relay),
-    response_type: "code",
-    scope: SCOPES.join(","),
-    state: opts.state,
-    // Only Instagram professional-account sign-in, no Facebook detour.
-    enable_fb_login: "false",
-  }).toString();
-  return url.toString();
-}
-
-export class RelayClient {
-  constructor(
-    private readonly base: string,
-    private readonly fetchImpl: Fetch = fetch,
-  ) {}
-
-  private async json<T>(res: Response, what: string): Promise<T> {
-    const text = await res.text();
-    if (!res.ok) throw new RelayError(`The relay could not ${what} (HTTP ${res.status}): ${text.slice(0, 200)}`, res.status);
-    return JSON.parse(text) as T;
-  }
-
-  async redeem(handoff: string, state: string): Promise<RedeemedToken> {
-    const res = await this.fetchImpl(`${this.base}/oauth/instagram/redeem`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ handoff, state }),
-      signal: AbortSignal.timeout(15_000),
-    });
-    return this.json<RedeemedToken>(res, "finish the sign-in");
-  }
-
-  async uploadJpeg(jpeg: Buffer, token: string): Promise<HostedImage> {
-    const res = await this.fetchImpl(`${this.base}/media`, {
-      method: "POST",
-      headers: { "content-type": "image/jpeg", authorization: `Bearer ${token}` },
-      body: new Uint8Array(jpeg),
-      signal: AbortSignal.timeout(60_000),
-    });
-    return this.json<HostedImage>(res, "host the image");
-  }
-
-  /** Best effort: the relay deletes it after an hour anyway. */
-  async deleteImage(id: string, token: string): Promise<void> {
-    await this.fetchImpl(`${this.base}/media/${encodeURIComponent(id)}`, {
-      method: "DELETE",
-      headers: { authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(15_000),
-    }).catch(() => undefined);
-  }
+export async function uploadPostImage(jpeg: Buffer, fetchImpl: Fetch = fetch): Promise<HostedImage> {
+  const base = relayUrl();
+  if (!base) throw new RelayError("Instagram pictures need the Practice-OS relay, and it isn't set up yet.", null);
+  const res = await fetchImpl(`${base}/images`, {
+    method: "POST",
+    headers: { "content-type": "image/jpeg", "x-install-id": process.env.PRACTICEOS_INSTALL_ID ?? randomUUID() },
+    body: new Uint8Array(jpeg),
+    signal: AbortSignal.timeout(60_000),
+  });
+  const text = await res.text();
+  if (!res.ok) throw new RelayError(`The relay could not host the picture (HTTP ${res.status}): ${text.slice(0, 200)}`, res.status);
+  return JSON.parse(text) as HostedImage;
 }

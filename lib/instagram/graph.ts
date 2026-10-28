@@ -5,8 +5,8 @@
 // - Publishing: developers.facebook.com/docs/instagram-platform/content-publishing
 // - /media params: .../instagram-graph-api/reference/ig-user/media
 // - Quota: .../instagram-graph-api/reference/ig-user/content_publishing_limit
-// The app secret is never needed here: the code exchange and the long-lived
-// exchange run on the relay (lib/instagram/relay.ts). Refresh needs no secret.
+// Sign-in, token exchange and refresh belong to lib/connect and the relay;
+// this client only uses a token it is given.
 
 export const IG_GRAPH = "https://graph.instagram.com";
 export const IG_API_VERSION = "v26.0";
@@ -49,8 +49,7 @@ export class InstagramGraph {
   ) {}
 
   private async call<T>(method: "GET" | "POST", path: string, params: Record<string, string> = {}): Promise<T> {
-    // A leading "/" means an unversioned endpoint (refresh_access_token).
-    const url = new URL(path.startsWith("/") ? `${IG_GRAPH}${path}` : `${IG_GRAPH}/${IG_API_VERSION}/${path}`);
+    const url = new URL(`${IG_GRAPH}/${IG_API_VERSION}/${path}`);
     const body = new URLSearchParams({ ...params, access_token: this.token });
     let res: Response;
     if (method === "GET") {
@@ -119,12 +118,6 @@ export class InstagramGraph {
     return { used: row?.quota_usage ?? 0, total: row?.config?.quota_total ?? 50 };
   }
 
-  /** Long-lived tokens refresh only when at least 24 hours old and not yet expired. */
-  refresh() {
-    return this.call<{ access_token: string; token_type: string; expires_in: number }>("GET", "/refresh_access_token", {
-      grant_type: "ig_refresh_token",
-    });
-  }
 }
 
 /** Counts hashtags and @ tags the way Meta's limits do. */
