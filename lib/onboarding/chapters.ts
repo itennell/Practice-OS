@@ -538,7 +538,8 @@ export function flatten(
             ask: hq.ask,
             help: hq.help,
             aeonSays: HELPER_SAYS[block.helper] ?? "One more setup question for your team.",
-            helper: { helper: block.helper, question: hq },
+            // appliesWhen ran above, on the server; a function can't go to the browser.
+            helper: { helper: block.helper, question: { ...hq, appliesWhen: undefined } },
           });
         }
       }

@@ -96,6 +96,27 @@ describe("onboarding chapters", () => {
     expect(screens.some((s) => s.id === "referrals:zip")).toBe(false);
   });
 
+  it("hands the browser plain data only, even when a helper uses appliesWhen", () => {
+    const screens = flatten(base, {
+      helpers: [
+        {
+          helper: "front_desk",
+          questions: [{ id: "minutes", kind: "number", ask: "How long is a consult?", appliesWhen: (b) => b.state === "IL" }],
+        },
+      ],
+      basics: { state: "IL", credential: "LCPC", practiceStage: "beginning", officeZip: "60614", telehealth: true },
+    });
+    const functions: string[] = [];
+    const walk = (v: unknown, path: string) => {
+      if (typeof v === "function") functions.push(path);
+      else if (v && typeof v === "object") for (const [k, x] of Object.entries(v)) walk(x, `${path}.${k}`);
+    };
+    walk(screens, "screens");
+    expect(functions).toEqual([]); // React refuses to send a function to a client component
+    expect(screens.find((s) => s.id === "front_desk:minutes")?.helper?.question.ask).toBe("How long is a consult?");
+    expect(() => structuredClone(screens)).not.toThrow();
+  });
+
   it("drops another session's screen in as one entry (the Muse key step)", () => {
     const screens = flatten(base, {
       extra: [{ after: "name", screen: { id: "muse-key", chapter: "you", kind: "slot", ask: "Connect Aeon's brain", aeonSays: "…" } }],
