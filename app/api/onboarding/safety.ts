@@ -1,7 +1,7 @@
 import { canDecide } from "@/lib/admin-guard";
 import { audit } from "@/lib/audit";
 import { guard, REFUSAL } from "@/lib/aeon/guard";
-import { isLocalAppRequest, isSameOrigin } from "@/lib/request-guard";
+import { isSameOrigin } from "@/lib/request-guard";
 import { QUESTIONS } from "@/lib/onboarding/chapters";
 import { checkCrisis, CRISIS_REPLY } from "@/lib/safety";
 
@@ -10,15 +10,15 @@ import { checkCrisis, CRISIS_REPLY } from "@/lib/safety";
 // answer gets the fixed 988/911 reply and is stored nowhere.
 
 /**
- * Who may change her answers: the app's own page on her computer (any other web page
- * could otherwise POST to localhost and, say, switch Aeon to Bypass), or, on the
- * Vercel copy, someone with the admin password from the app's own page. JSON only,
- * so a plain form or text/plain request can't get through.
+ * Who may change her answers. On her computer proxy.ts already refuses any change
+ * that isn't from the app's own page (lib/request-guard.ts); onboarding also takes
+ * JSON only, so a plain form or text/plain request can't get through. On the Vercel
+ * copy (no proxy guard there) a change needs the admin password from the app's page.
  */
 export function canWrite(request: Request): boolean {
   if (!(request.headers.get("content-type") ?? "").toLowerCase().startsWith("application/json")) return false;
   if (process.env.VERCEL) return canDecide(request) && isSameOrigin(request);
-  return isLocalAppRequest(request);
+  return true;
 }
 
 /** Her own details (name, practice name, address, contact, IDs) aren't client details, so the name guard skips them. */

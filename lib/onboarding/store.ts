@@ -468,7 +468,7 @@ async function saveOne(id: string, value: unknown, all: Record<string, unknown>,
       if (!ein.ok) {
         throw new AnswerError(
           ein.reason === "ssn"
-            ? "That looks like a Social Security number. Practice-OS only stores your practice's EIN, like 12-3456789."
+            ? "That looks like a Social Security number; we only store an EIN."
             : "Please type your EIN with the dash after the first two digits, like 12-3456789.",
         );
       }
