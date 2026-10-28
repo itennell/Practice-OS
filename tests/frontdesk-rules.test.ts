@@ -62,8 +62,6 @@ describe("client text templates (word for word with docs/sms-opt-in.md, the regi
     expect(T.helpText(p)).toBe(
       "Reyes Counseling scheduling texts. For help call the practice line. In an emergency call 911; call or text 988 for the Suicide and Crisis Lifeline. Reply STOP to opt out.",
     );
-    // Registered as "Reply RESCHEDULE or CANCEL to change it."; CANCEL alone is a carrier opt-out word,
-    // so the app says R and C until the registration is updated (flagged to the orchestrator 2026-10-28).
     expect(T.bookedText(p, "Wed at 2pm", "FD-1042")).toBe(
       "Reyes Counseling: You're booked for a free 15-minute phone consult Wed at 2pm (ref FD-1042). Reply R to reschedule or C to cancel. Reply STOP to opt out.",
     );

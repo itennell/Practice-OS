@@ -180,7 +180,13 @@ describe.skipIf(!localDb)("Front Desk flow (local database only)", () => {
     expect(await db()`select 1 from practice_os.sms_opt_outs where phone = ${RILEY}`).toHaveLength(1);
     const inq = await inquiryOf(RILEY);
     expect((await offerTimes(inq.id, { purpose: "book" })).outcome).toBe("opted_out");
-    expect(sent).toEqual([{ to: RILEY, body: "Reyes Counseling: You're unsubscribed and won't get more texts. Reply START to resubscribe." }]);
+    expect(sent).toEqual([]); // the fake phone is "twilio": Advanced Opt-Out sends the registered STOP reply itself
+  });
+
+  it("on a non-Twilio phone the app sends the registered STOP reply itself", async () => {
+    const spruceLike = { ...phone, vendor: "spruce" as const };
+    await processText(text(ALEX, "STOP"), spruceLike);
+    expect(sent).toEqual([{ to: ALEX, body: "Reyes Counseling: You're unsubscribed and won't get more texts. Reply START to resubscribe." }]);
   });
 
   it("a question goes to her inbox and the caller gets one passed-on text", async () => {

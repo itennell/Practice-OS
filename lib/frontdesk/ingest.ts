@@ -120,18 +120,24 @@ export async function processText(t: InboundText, phone: PhoneAdapter): Promise<
   const reply = parseReply(t.body, offer?.slots.length ?? 3);
   const who = inquiry.contact_name ?? prettyPhone(t.from);
 
-  // STOP and START: the registered one-line replies (docs/sms-opt-in.md). Carriers allow
-  // one confirmation after STOP; Twilio may send its own instead and drop ours.
+  // STOP, START and HELP: the registered one-line replies (docs/sms-opt-in.md). On
+  // Twilio, Advanced Opt-Out sends these same texts itself, so the app stays quiet
+  // there to avoid doubles; on other phone companies the app sends them.
+  const carrierReplies = phone.vendor === "twilio";
   if (reply.kind === "stop") {
     await db()`insert into practice_os.sms_opt_outs (phone) values (${t.from}) on conflict do nothing`;
     await audit({ actor: "system", action: "sms_opt_out", subjectType: "inquiry", subjectId: inquiry.id });
-    await sendText({ to: t.from, body: stopText(await practice()), inquiryId: inquiry.id, actor: "executor", action: "stop_confirmation_sent", force: true, phone }).catch(() => {});
+    if (!carrierReplies) {
+      await sendText({ to: t.from, body: stopText(await practice()), inquiryId: inquiry.id, actor: "executor", action: "stop_confirmation_sent", force: true, phone }).catch(() => {});
+    }
     return "done";
   }
   if (reply.kind === "start") {
     await db()`delete from practice_os.sms_opt_outs where phone = ${t.from}`;
     await audit({ actor: "system", action: "sms_opt_in", subjectType: "inquiry", subjectId: inquiry.id });
-    await sendText({ to: t.from, body: startText(await practice()), inquiryId: inquiry.id, actor: "executor", action: "start_confirmation_sent", phone }).catch(() => {});
+    if (!carrierReplies) {
+      await sendText({ to: t.from, body: startText(await practice()), inquiryId: inquiry.id, actor: "executor", action: "start_confirmation_sent", phone }).catch(() => {});
+    }
     return "done";
   }
 
@@ -141,6 +147,7 @@ export async function processText(t: InboundText, phone: PhoneAdapter): Promise<
 
     switch (reply.kind) {
       case "help":
+        if (carrierReplies) return null;
         return quick(helpText(await practice()), `Send ${who} the help text`);
       case "choice": {
         if (!offer) return passToClinician(inquiry.id, `${who} texted: "${t.body.slice(0, 200)}"`);
