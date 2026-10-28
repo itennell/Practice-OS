@@ -6,3 +6,6 @@ export const GOOGLE_SCOPES = {
   calendarEvents: "https://www.googleapis.com/auth/calendar.events",
   calendarFreebusy: "https://www.googleapis.com/auth/calendar.freebusy",
 } as const;
+
+/** The only Google permissions Practice-OS ever asks for (plus "openid email" to show the account). */
+export const isAllowedGoogleScope = (scope: string) => (Object.values(GOOGLE_SCOPES) as string[]).includes(scope);

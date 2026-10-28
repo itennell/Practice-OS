@@ -136,12 +136,39 @@ describe.skipIf(!url)("Instagram Connect through the relay", () => {
 });
 
 describe.skipIf(!url)("Connect routes", () => {
-  it("work only on this computer, never through another host name", async () => {
+  const ctx = { params: Promise.resolve({ provider: "google" }) } as never;
+  const req = (path: string, headers: Record<string, string>, init: RequestInit = {}) =>
+    new Request(`http://127.0.0.1:3000${path}`, { ...init, headers: { host: "127.0.0.1:3000", ...headers } });
+  const errorOf = (res: Response) => new URL(res.headers.get("location")!).searchParams.get("error");
+
+  it("start a sign-in only from the app's own page on this computer", async () => {
     const { GET } = await import("../app/api/connect/[provider]/start/route");
-    const ctx = { params: Promise.resolve({ provider: "google" }) } as never;
-    const remote = await GET(new Request("http://practice.example/api/connect/google/start", { headers: { host: "practice.example" } }), ctx);
-    expect(new URL(remote.headers.get("location")!).searchParams.get("error")).toMatch(/your own computer/);
-    const local = await GET(new Request("http://127.0.0.1:3000/api/connect/google/start?scopes=email", { headers: { host: "127.0.0.1:3000" } }), ctx);
+    const remote = await GET(new Request("http://practice.example/api/connect/google/start", { headers: { host: "practice.example", "sec-fetch-site": "same-origin" } }), ctx);
+    expect(errorOf(remote)).toMatch(/your own computer/);
+    // Another website linking or redirecting to the start address.
+    expect(errorOf(await GET(req("/api/connect/google/start", { "sec-fetch-site": "cross-site" }), ctx))).toMatch(/your own computer/);
+    expect(errorOf(await GET(req("/api/connect/google/start", {}), ctx))).toMatch(/your own computer/);
+    const local = await GET(req("/api/connect/google/start?scopes=https://www.googleapis.com/auth/gmail.compose", { "sec-fetch-site": "same-origin" }), ctx);
     expect(local.headers.get("location")).toMatch(/^https:\/\/accounts\.google\.com\//);
+  });
+
+  it("ask Google only for Gmail drafts and the calendar", async () => {
+    const { GET } = await import("../app/api/connect/[provider]/start/route");
+    const res = await GET(req(`/api/connect/google/start?scopes=${encodeURIComponent("https://mail.google.com/")}`, { "sec-fetch-site": "same-origin" }), ctx);
+    expect(errorOf(res)).toMatch(/only asks Google/);
+    const { startConnect } = await import("../lib/connect");
+    await expect(startConnect("google", { scopes: ["https://www.googleapis.com/auth/drive"], origin: ORIGIN })).rejects.toThrow(/only asks Google/);
+  });
+
+  it("refuse a change sent by another website (form post or text/plain fetch)", async () => {
+    const { POST } = await import("../app/api/settings/muse-key/route");
+    const body = JSON.stringify({ key: "x".repeat(40) });
+    const crossSite = await POST(req("/api/settings/muse-key", { "sec-fetch-site": "cross-site", "content-type": "text/plain" }, { method: "POST", body }));
+    expect(crossSite.status).toBe(403);
+    const foreignOrigin = await POST(req("/api/settings/muse-key", { origin: "https://evil.example", "content-type": "text/plain" }, { method: "POST", body }));
+    expect(foreignOrigin.status).toBe(403);
+    const { DELETE } = await import("../app/api/connect/[provider]/route");
+    expect((await DELETE(req("/api/connect/google", { "sec-fetch-site": "same-site" }, { method: "DELETE" }), ctx)).status).toBe(403);
+    expect((await DELETE(req("/api/connect/google", { origin: "http://127.0.0.1:3000" }, { method: "DELETE" }), ctx)).status).toBe(200);
   });
 });

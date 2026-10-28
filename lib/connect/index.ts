@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { audit } from "../audit";
 import { deleteConnection, getConnection, saveConnection, type Connection } from "../connections";
+import { isAllowedGoogleScope } from "./google-scopes";
 import { emailFromIdToken, exchangeGoogleCode, GOOGLE_BASE_SCOPES, googleAuthUrl, refreshGoogle } from "./google";
 import { beginInstagram, openInstagramToken, refreshInstagram, uploadToRelay } from "./instagram";
 import { ConnectError, createConnectState, takeConnectState, type ConnectProvider } from "./state";
@@ -33,6 +34,8 @@ const unique = (xs: string[]) => [...new Set(xs)];
 export async function startConnect(provider: ConnectProvider, opts: { scopes?: string[]; origin: string }): Promise<{ authUrl: string }> {
   const redirectUri = returnUri(opts.origin, provider);
   if (provider === "google") {
+    const unknown = (opts.scopes ?? []).filter((s) => !isAllowedGoogleScope(s));
+    if (unknown.length > 0) throw new ConnectError("Practice-OS only asks Google for Gmail drafts and your calendar.");
     const existing = await getConnection("google");
     const scopes = unique([...GOOGLE_BASE_SCOPES, ...(existing?.scopes ?? []), ...(opts.scopes ?? [])]);
     const verifier = randomBytes(32).toString("base64url");
