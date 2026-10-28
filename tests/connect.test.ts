@@ -89,6 +89,32 @@ describe.skipIf(!url)("Google Connect", () => {
     vi.stubGlobal("fetch", async () => jsonRes({ error: "invalid_grant" }, 400));
     await expect(getAccessToken("google")).rejects.toBeInstanceOf(NeedsConnectError);
   });
+
+  it("treats a network hiccup during refresh as temporary, not as 'connect again'", async () => {
+    const { getAccessToken, ConnectUnavailableError } = await import("../lib/connect");
+    const { saveConnection } = await import("../lib/connections");
+    await saveConnection({ provider: "google", accountLabel: null, accessToken: "old", refreshToken: "r", scopes: [], expiresAt: new Date(Date.now() - 1), meta: {} });
+    vi.stubGlobal("fetch", async () => {
+      throw new TypeError("fetch failed");
+    });
+    await expect(getAccessToken("google")).rejects.toBeInstanceOf(ConnectUnavailableError);
+    vi.stubGlobal("fetch", async () => jsonRes({ error: "internal_failure" }, 500));
+    await expect(getAccessToken("google")).rejects.toBeInstanceOf(ConnectUnavailableError);
+  });
+
+  it("revokes the sign-in at Google on disconnect", async () => {
+    const { disconnect } = await import("../lib/connect");
+    const { saveConnection, getConnection } = await import("../lib/connections");
+    await saveConnection({ provider: "google", accountLabel: null, accessToken: "a", refreshToken: "1//refresh", scopes: [], expiresAt: null, meta: {} });
+    const calls: string[] = [];
+    vi.stubGlobal("fetch", async (input: string | URL, init?: RequestInit) => {
+      calls.push(`${input} ${init?.body}`);
+      return new Response(null, { status: 200 });
+    });
+    expect(await disconnect("google")).toMatchObject({ revoked: true });
+    expect(calls).toEqual(["https://oauth2.googleapis.com/revoke token=1%2F%2Frefresh"]);
+    expect(await getConnection("google")).toBeNull();
+  });
 });
 
 describe.skipIf(!url)("Instagram Connect through the relay", () => {
@@ -153,6 +179,48 @@ describe.skipIf(!url)("Instagram Connect through the relay", () => {
     await expect(finishConnect("instagram", new URL(res.headers.get("location")!).searchParams)).rejects.toThrow(/cancelled/);
     const [{ n }] = await sql!`select count(*)::int as n from practice_os.connections where provider = 'instagram'`;
     expect(n).toBe(0);
+  });
+});
+
+describe.skipIf(!url)("Her Muse key", () => {
+  const before = { key: process.env.MODEL_API_KEY, source: process.env.MODEL_API_KEY_SOURCE };
+  afterEach(() => {
+    if (before.key) process.env.MODEL_API_KEY = before.key;
+    else delete process.env.MODEL_API_KEY;
+    if (before.source) process.env.MODEL_API_KEY_SOURCE = before.source;
+    else delete process.env.MODEL_API_KEY_SOURCE;
+  });
+
+  it("is used at once when saved, and stops at once when removed", async () => {
+    delete process.env.MODEL_API_KEY;
+    delete process.env.MODEL_API_KEY_SOURCE;
+    const { saveMuseKey, removeMuseKey, loadMuseKey } = await import("../lib/connect/muse");
+    expect(await saveMuseKey("saved-key-1234567890abcdef")).toEqual({ inUse: true });
+    expect(process.env.MODEL_API_KEY).toBe("saved-key-1234567890abcdef");
+    await removeMuseKey();
+    expect(process.env.MODEL_API_KEY).toBeUndefined();
+    await loadMuseKey();
+    expect(process.env.MODEL_API_KEY).toBeUndefined();
+  });
+
+  it("never overrides or clears a key from .env", async () => {
+    process.env.MODEL_API_KEY = "env-key";
+    delete process.env.MODEL_API_KEY_SOURCE;
+    const { saveMuseKey, removeMuseKey } = await import("../lib/connect/muse");
+    expect(await saveMuseKey("saved-key-1234567890abcdef")).toEqual({ inUse: false });
+    expect(process.env.MODEL_API_KEY).toBe("env-key");
+    await removeMuseKey();
+    expect(process.env.MODEL_API_KEY).toBe("env-key");
+  });
+
+  it("is picked up by another process's next call when the app replaces it", async () => {
+    delete process.env.MODEL_API_KEY;
+    delete process.env.MODEL_API_KEY_SOURCE;
+    const { loadMuseKey } = await import("../lib/connect/muse");
+    const { saveConnection } = await import("../lib/connections");
+    await saveConnection({ provider: "muse", accountLabel: null, accessToken: "from-the-app", refreshToken: null, scopes: [], expiresAt: null, meta: {} });
+    await loadMuseKey();
+    expect(process.env.MODEL_API_KEY).toBe("from-the-app");
   });
 });
 
