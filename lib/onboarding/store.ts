@@ -8,6 +8,7 @@ import { answerSetup, ANSWERS, type Answer } from "../compliance/answers";
 import { updateFacts, type FactUpdate } from "../compliance/actions";
 import { STATES } from "../compliance/states";
 import { checkNpiInRegistry, loadCredentialingProfile, updateCredentialingSection } from "../credentialing/store";
+import { getConnectionStatus } from "../connect/status";
 import { db } from "../db";
 import { loadPracticeSettings, savePracticeSettings } from "../gfe/store";
 import { listPayerApplications, savePayerApplication } from "../payers/store";
@@ -102,12 +103,33 @@ function basicsFrom(c: Ctx): PracticeBasics {
   };
 }
 
-/** Another session's whole screen (the Muse key step), dropped in after a question. */
-export const EXTRA_SCREENS: { after: string; screen: Screen }[] = [];
+/** desktop-app's Muse key step (MuseKeyStep, app/onboarding/step-components.tsx), right after her name. */
+const MUSE_SCREEN: { after: string; screen: Screen } = {
+  after: "name",
+  screen: {
+    id: "muse-key",
+    chapter: "you",
+    kind: "slot",
+    ask: "Connect Aeon's brain",
+    help: "Aeon thinks with Meta's Muse, using your own key. You can do this later in Settings.",
+    aeonSays: "I need a Muse key to think. It takes about two minutes.",
+  },
+};
 
-export function screensFor(values: Record<string, unknown>, row: Pick<ProfileRow, "state" | "credential" | "practice_stage"> | null): Screen[] {
+/** Muse is ready when .env has a key (developers) or she saved one. */
+export async function museReady(): Promise<boolean> {
+  if (process.env.MODEL_API_KEY) return true;
+  return (await getConnectionStatus("muse").catch(() => null))?.connected ?? false;
+}
+
+export function screensFor(
+  values: Record<string, unknown>,
+  row: Pick<ProfileRow, "state" | "credential" | "practice_stage"> | null,
+  opts: { museReady?: boolean } = {},
+): Screen[] {
   const c = ctxFrom(values, row);
-  return flatten(c, { states: STATES, helpers: HELPER_QUESTIONS, extra: EXTRA_SCREENS, basics: basicsFrom(c) });
+  const extra = opts.museReady === false ? [MUSE_SCREEN] : [];
+  return flatten(c, { states: STATES, helpers: HELPER_QUESTIONS, extra, basics: basicsFrom(c) });
 }
 
 export type SetupItem = { id: string; title: string; status: string };
@@ -131,7 +153,7 @@ export async function loadOnboarding(sql: postgres.Sql = db()): Promise<Onboardi
          where kind = 'setup' and status in ('upcoming', 'not_yet') order by title`.catch(() => [])
     : [];
   return {
-    screens: screensFor(progress.values, row),
+    screens: screensFor(progress.values, row, { museReady: await museReady() }),
     progress,
     completed: Boolean(row?.onboarding_completed_at),
     hasProfile: Boolean(row),

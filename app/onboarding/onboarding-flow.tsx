@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "reac
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui";
 import { CHAPTERS, progressFor, type Screen, type Stage } from "@/lib/onboarding/chapters";
+import type { ConnectionStatus } from "@/components/connections/registry";
 import type { OnboardingState } from "@/lib/onboarding/store";
 import { emptyValue, Field, isAnswered, toAnswer } from "./fields";
 import { SLOT_COMPONENTS } from "./step-components";
@@ -38,12 +39,14 @@ const readDraft = () => {
 type Status = { kind: "idle" } | { kind: "saving" } | { kind: "error"; text: string } | { kind: "crisis"; text: string };
 
 /** Opens on ?q=<question> (the home page's "Still to set up" links), or where she left off. */
-export function OnboardingRoot({ initial }: { initial: OnboardingState }) {
+type Props = { initial: OnboardingState; connections: Record<string, ConnectionStatus> };
+
+export function OnboardingRoot(props: Props) {
   const q = useSearchParams().get("q")?.slice(0, 80) ?? undefined;
-  return <OnboardingFlow key={q ?? ""} initial={initial} startAt={q} />;
+  return <OnboardingFlow key={q ?? ""} {...props} startAt={q} />;
 }
 
-function OnboardingFlow({ initial, startAt }: { initial: OnboardingState; startAt?: string }) {
+function OnboardingFlow({ initial, connections, startAt }: Props & { startAt?: string }) {
   const router = useRouter();
   const [state, setState] = useState(initial);
   const [values, setValues] = useState<Record<string, unknown>>(() => ({ ...initial.saved, ...initial.progress.values }));
@@ -278,6 +281,7 @@ function OnboardingFlow({ initial, startAt }: { initial: OnboardingState; startA
               setupItems={state.setupItems}
               stage={stage}
               homeState={homeState}
+              connections={connections}
               error={status.kind === "error" ? status.text : undefined}
             />
           )}
@@ -296,7 +300,7 @@ function OnboardingFlow({ initial, startAt }: { initial: OnboardingState; startA
         </div>
 
         {/* Back, Skip, Set up later and Next: always there, pinned to the bottom on phones. */}
-        {!Slot && (
+        {(
           <div className="fixed inset-x-0 bottom-0 z-10 flex flex-wrap items-center gap-2 border-t border-[var(--hairline)] bg-[var(--color-canvas)] px-4 py-3 md:static md:mt-auto md:border-0 md:bg-transparent md:px-0 md:pt-10 dark:bg-[var(--color-dark-canvas)] md:dark:bg-transparent">
             <Button variant="quiet" onClick={back} disabled={index === 0 || busy}>
               Back
@@ -312,9 +316,11 @@ function OnboardingFlow({ initial, startAt }: { initial: OnboardingState; startA
                 </Button>
               </>
             )}
-            <Button variant="primary" onClick={next} disabled={busy || !isAnswered(screen, value)}>
-              {busy ? "Saving…" : isLast ? "Finish setup" : "Next"}
-            </Button>
+            {!Slot && (
+              <Button variant="primary" onClick={next} disabled={busy || !isAnswered(screen, value)}>
+                {busy ? "Saving…" : isLast ? "Finish setup" : "Next"}
+              </Button>
+            )}
           </div>
         )}
       </main>

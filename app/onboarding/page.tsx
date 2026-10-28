@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
 import { Suspense } from "react";
+import { CONNECTION_CARDS } from "@/components/connections/registry";
 import { LiquidEther } from "@/components/shared/liquid-ether";
+import { getConnectionStatus } from "@/lib/connect/status";
 import { loadOnboarding } from "@/lib/onboarding/store";
 import { OnboardingRoot } from "./onboarding-flow";
 
@@ -23,5 +25,6 @@ export default function Onboarding() {
 
 async function Interview() {
   await connection(); // read the database per request, never at build time
-  return <OnboardingRoot initial={await loadOnboarding()} />;
+  const [initial, statuses] = await Promise.all([loadOnboarding(), Promise.all(CONNECTION_CARDS.map((c) => getConnectionStatus(c.id)))]);
+  return <OnboardingRoot initial={initial} connections={Object.fromEntries(statuses.map((st) => [st.provider, st]))} />;
 }

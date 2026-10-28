@@ -48,9 +48,11 @@ test("A new clinician sets up the whole practice, and the home page lists what s
   freshInstall();
   await page.goto("/");
   await expect(page).toHaveURL(/\/onboarding$/);
-  await expect(page.getByText("You and your practice · question 1 of 8")).toBeVisible();
+  await expect(page.getByText("You and your practice · question 1 of 9")).toBeVisible();
 
   await step(page, /What's your name\?/, () => page.getByLabel("Your name").fill("Dana Reyes"));
+  // No Muse key here, so desktop-app's Connect Aeon step shows; she puts it off.
+  await step(page, /Connect Aeon's brain/, none, "later");
   await step(page, /What's your practice called\?/, () => page.getByLabel("Practice name").fill("Reyes Counseling PLLC"));
   await step(page, /Which state/, () => pick(page, page, "State", "Illinois"));
   await step(page, /What kind of license/, () => radio(page, /LCPC/));
@@ -138,6 +140,7 @@ test("She can stop and pick up where she left off", async ({ page }) => {
   freshInstall();
   await page.goto("/onboarding");
   await step(page, /What's your name\?/, () => page.getByLabel("Your name").fill("Dana Reyes"));
+  await step(page, /Connect Aeon's brain/, none, "skip");
   await step(page, /What's your practice called\?/, none, "skip");
   await step(page, /Which state/, () => pick(page, page, "State", "Illinois"));
   await step(page, /What kind of license/, () => radio(page, /LCPC/));
@@ -156,7 +159,7 @@ test("Keyboard only: Next is reachable and works with Enter", async ({ page }) =
   for (let i = 0; i < 12 && !(await next(page).evaluate((el) => el === document.activeElement)); i++) await page.keyboard.press("Tab");
   await expect(next(page)).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(heading(page)).toHaveText(/What's your practice called\?/);
+  await expect(heading(page)).toHaveText(/Connect Aeon's brain/);
 });
 
 test("Larger text at a narrow window: nothing scrolls sideways and axe stays clean", async ({ page }) => {

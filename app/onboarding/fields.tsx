@@ -1,7 +1,7 @@
 "use client";
 
 import { Plus } from "lucide-react";
-import { CONNECTION_CARDS } from "@/components/connections/registry";
+import { CONNECTION_CARDS, type ConnectionStatus } from "@/components/connections/registry";
 import { DateField } from "@/components/shared/date-field";
 import { SettingRadio, SettingSelect, SettingSwitch, TextField } from "@/components/shared/settings-controls";
 import { Button, chipClass, Orb } from "@/components/ui";
@@ -19,6 +19,8 @@ export type FieldProps = {
   setupItems: SetupItem[];
   stage: Stage | null;
   homeState: string | null;
+  /** Each Connect card's live status (from lib/connect/status.ts), by provider. */
+  connections: Record<string, ConnectionStatus>;
   error?: string;
 };
 
@@ -154,7 +156,7 @@ function ChipToggle({ on, onClick, children }: { on: boolean; onClick: () => voi
 
 const toggle = (list: string[], item: string) => (list.includes(item) ? list.filter((x) => x !== item) : [...list, item]);
 
-export function Field({ screen: s, value, onChange, setupItems, stage, homeState, error }: FieldProps) {
+export function Field({ screen: s, value, onChange, setupItems, stage, homeState, connections, error }: FieldProps) {
   const o = (value ?? {}) as Record<string, unknown>;
   const set = (patch: Record<string, unknown>) => onChange({ ...o, ...patch });
   // The question is the page heading; a choice group gets a short label of its own.
@@ -407,7 +409,8 @@ export function Field({ screen: s, value, onChange, setupItems, stage, homeState
     case "followups":
       return <TextField label="Your answer" value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} maxLength={400} error={error} />;
     case "connect": {
-      const cards = [...CONNECTION_CARDS].sort((a, b) => a.order - b.order);
+      // The Muse key has its own screen in chapter 1.
+      const cards = CONNECTION_CARDS.filter((c) => c.id !== "muse").sort((a, b) => a.order - b.order);
       if (cards.length === 0) {
         return <p className="text-body text-[var(--fg-muted)]">Nothing to connect yet. When your tools are ready, you can connect them in Settings.</p>;
       }
@@ -415,7 +418,7 @@ export function Field({ screen: s, value, onChange, setupItems, stage, homeState
         <ul className="flex flex-col gap-3">
           {cards.map(({ id, Card }) => (
             <li key={id}>
-              <Card status={{ provider: id, connected: false, scopes: [] }} />
+              <Card status={connections[id] ?? { provider: id, connected: false, scopes: [] }} />
             </li>
           ))}
         </ul>
