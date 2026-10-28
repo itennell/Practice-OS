@@ -6,8 +6,10 @@
 // send button that turns into Stop while Aeon is working. Dictated words drop
 // into the box for her to read first; nothing is sent on its own.
 // Adapted from React Bits Prompt Bar (MIT, reactbits.dev/c/micro/prompt-bar):
-// only the pieces the shelf keeps (no model or effort pickers, commands,
-// sources or sparks), the send-to-stop morph, lucide icons, Caseload colours.
+// only the pieces the shelf keeps (no commands, sources or sparks), the
+// send-to-stop morph, lucide icons, Caseload colours. Where React Bits puts its
+// model and effort pickers, `controls` holds ours: Aeon's mode (Manual, Auto,
+// Bypass) on the chat home.
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode, type SyntheticEvent } from "react";
 import { animate, useMotionValue, useMotionValueEvent, useReducedMotion } from "motion/react";
@@ -60,6 +62,8 @@ export type PromptBarProps = {
   onAttach?: () => void;
   /** Attachment cards above the text (use AttachmentList). */
   attachments?: ReactNode;
+  /** Pickers in the bar's bottom row, left, where React Bits keeps its model picker (e.g. the mode picker). */
+  controls?: ReactNode;
   disabled?: boolean;
   /** Most rows before the box scrolls. */
   maxRows?: number;
@@ -78,6 +82,7 @@ export function PromptBar({
   transcribe = transcribeWav,
   onAttach,
   attachments,
+  controls,
   disabled = false,
   maxRows = 6,
   className,
@@ -193,6 +198,7 @@ export function PromptBar({
             <Plus aria-hidden size={20} />
           </button>
         )}
+        {controls}
         <p
           id={statusId}
           role={dict.kind === "error" ? "alert" : "status"}
