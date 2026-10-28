@@ -27,6 +27,10 @@ import { CPT, MODIFIERS, POS } from "../superbill/codes";
 import * as superbill from "../superbill/store";
 import * as cms855i from "../payers/cms855i";
 import * as payers from "../payers/store";
+import { SPECIALTIES, type SpecialtyId } from "../referrals/nppes";
+import { draftOutreach } from "../referrals/outreach";
+import { DEFAULT_SPECIALTIES, getReferralSettings } from "../referrals/settings";
+import { findReferralSources, interleave, listSources, moveSource, STAGE_LABEL, STAGES } from "../referrals/store";
 import { guard, WITHHELD } from "./guard";
 import { forget, MEMORY_KINDS, MemoryRefused, recentChanges, remember } from "./memory";
 
@@ -570,6 +574,129 @@ export const TOOLS: AeonTool[] = [
     run: async ({ id }, ctx) => {
       const row = await forget(id, { actor: "aeon", source: ctx.by });
       return text(row ? { forgotten: true, id } : { forgotten: false, id, reason: "No active memory with that id." });
+    },
+  }),
+
+  // ---- Referrals (lib/referrals) ----------------------------------------------
+  tool({
+    name: "find_referral_sources",
+    title: "Find referral sources near a ZIP",
+    description:
+      "Searches the free federal NPI Registry for doctors and clinicians near a ZIP code who could refer clients to the " +
+      "practice: family medicine, internal medicine, OB/GYN, pediatrics, oncology and other therapists ('primary care' means " +
+      "family medicine and internal medicine). Keeps only active providers whose main specialty matches, scores each for fit " +
+      "(0-100) and adds them to the Referrals board (column Found). Returns the best matches first. Sends nothing.",
+    input: {
+      zip: z.string().regex(/^\d{5}$/, "a 5-digit ZIP").optional().describe("The ZIP code to search around. Omit to use the one she set up (her office's)."),
+      specialties: z
+        .array(z.enum(SPECIALTIES.map((s) => s.id) as [SpecialtyId, ...SpecialtyId[]]))
+        .min(1)
+        .optional()
+        .describe("Which kinds of referral sources to look for. Omit to use the ones she picked in setup."),
+      radius_miles: z.number().min(0).max(10).optional().describe("Also search ZIPs whose center is this close. Default 3."),
+      show: z.number().int().min(1).max(25).optional().describe("How many to list in the answer. Default 10."),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: true },
+    label: "Found referral sources",
+    changesData: true,
+    run: async ({ zip: askedZip, specialties: asked, radius_miles, show }) => {
+      const setup = await getReferralSettings();
+      const zip = askedZip ?? setup.searchZip;
+      if (!zip) return text({ needs: "Ask her which ZIP code to search around; she hasn't set one up yet." });
+      const specialties = asked ?? (setup.specialties.length ? setup.specialties : DEFAULT_SPECIALTIES);
+      const { zips, found, matched } = await findReferralSources({ zip, specialties, radiusMiles: radius_miles });
+      const top = interleave(found, show ?? 10).map((p, i) => ({
+        rank: i + 1,
+        id: p.id,
+        name: p.name,
+        specialty: p.specialtyLabel,
+        miles: p.distanceMiles,
+        fit_score: p.fitScore,
+        address: `${p.address}, ${p.city}, ${p.state} ${p.zip}`,
+        phone: p.phone,
+        npi: p.npi,
+      }));
+      return text({
+        searched_zips: zips,
+        matched,
+        on_board: `${found.length} best matches are on the Referrals board under Found (/referrals).`,
+        best_matches: top,
+      });
+    },
+  }),
+
+  tool({
+    name: "list_referral_sources",
+    title: "List the Referrals board",
+    description:
+      "Lists the cards on her Referrals board, best fit first, with each one's id, column (found, contacted, follow_up, " +
+      "connected, not_a_fit), specialty, miles, fit score and follow-up date. Read-only.",
+    input: {
+      stage: z.enum(STAGES).optional().describe("Only this column."),
+      limit: z.number().int().min(1).max(50).optional().describe("How many. Default 20."),
+    },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+    label: "Checked your Referrals board",
+    changesData: false,
+    run: async ({ stage, limit }) => {
+      const all = await listSources();
+      const rows = all.filter((s) => !stage || s.stage === stage).slice(0, limit ?? 20);
+      return text({
+        total_on_board: all.length,
+        cards: rows.map((s) => ({
+          id: s.id,
+          name: s.name,
+          column: STAGE_LABEL[s.stage],
+          specialty: s.specialty ?? s.taxonomy,
+          miles: s.distance_miles,
+          fit_score: s.fit_score,
+          follow_up_on: s.next_follow_up_on,
+          sample: s.is_sample,
+        })),
+      });
+    },
+  }),
+
+  tool({
+    name: "move_referral_source",
+    title: "Move a card on the Referrals board",
+    description: "Moves one referral source to another column of her Referrals board (by its id). Sends nothing.",
+    input: { id: z.string().uuid(), stage: z.enum(STAGES) },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+    label: "Moved a card on your Referrals board",
+    changesData: true,
+    run: async ({ id, stage }) => {
+      const moved = await moveSource(id, stage, "aeon");
+      return text(moved ? { moved: true, name: moved.name, column: STAGE_LABEL[stage] } : { moved: false, reason: "No card with that id." });
+    },
+  }),
+
+  // Muse writes; nothing is sent. Approving makes a Gmail draft to the test inbox.
+  tool({
+    name: "draft_outreach",
+    title: "Draft an introduction letter",
+    description:
+      "Writes a short professional introduction letter from the clinician to one referral source on her board (by its id): " +
+      "who she sees and an offer of a 15-minute call. Never offers fees, gifts or anything of value. The letter waits in her " +
+      "approvals; when she approves it, it becomes a Gmail draft in her test inbox for her to send, the card moves to " +
+      "Contacted and a follow-up is set a week out. Takes about 10 seconds.",
+    input: {
+      id: z.string().uuid().describe("The referral source's id, from find_referral_sources or list_referral_sources."),
+      note: z.string().trim().max(500).optional().describe("Anything she wants the letter to mention, in her words."),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: false },
+    label: "Drafted an introduction letter",
+    changesData: false,
+    run: async ({ id, note }, ctx) => {
+      const { approvalId, subject, letter, source } = await draftOutreach(id, { by: ctx.by, note });
+      const [row] = await db()<{ status: string }[]>`select status from practice_os.approvals where id = ${approvalId}`;
+      return {
+        content: [
+          { type: "text", text: row?.status === "pending" ? "queued for clinician approval" : `ran on its own under her mode: ${row?.status}` },
+          { type: "text", text: JSON.stringify({ approval_id: approvalId, to: source.name, subject, letter }, null, 2) },
+        ],
+        structuredContent: { status: row?.status ?? "pending", approval_id: approvalId },
+      };
     },
   }),
 ];

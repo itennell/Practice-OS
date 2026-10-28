@@ -3,6 +3,7 @@
 // in its own block. The onboarding shell shows one question per screen with Back, Skip and
 // "Set up later", runs the crisis check and the client-detail guard on every "text" answer
 // before save(), and never stores these answers itself.
+import { referralsQuestions } from "../referrals/onboarding";
 
 /** What onboarding already knows, so a block can skip or prefill a question. */
 export type PracticeBasics = {
@@ -39,4 +40,5 @@ export type HelperBlock = {
 
 export const HELPER_QUESTIONS: HelperBlock[] = [
   // One entry per helper session, e.g. referralsQuestions from lib/referrals/onboarding.ts.
+  referralsQuestions,
 ];

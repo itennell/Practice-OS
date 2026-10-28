@@ -114,6 +114,11 @@ test("A new clinician sets up the whole practice, and the home page lists what s
   await step(page, /Where is your practice right now\?/, () => radio(page, /Beginning/));
   await step(page, /Connect your tools/, none);
   await step(page, /text clients/, () => radio(page, "Yes"));
+  // Referrals' own setup question (lib/referrals/onboarding.ts); the ZIP one is skipped because she has an office.
+  await step(page, /Who would you like to hear from\?/, async () => {
+    await page.getByRole("button", { name: "Family medicine" }).click();
+    await page.getByRole("button", { name: "Oncology" }).click();
+  });
   await step(page, /How should I ask/, () => radio(page, /Ask me first/));
   await step(page, /miss a call/, () => radio(page, "No"));
 

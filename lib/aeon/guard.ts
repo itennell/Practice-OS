@@ -76,6 +76,11 @@ export async function guard(text: string, at: GuardPoint, allow?: Allowlist): Pr
 let cached: { at: number; list: Allowlist } | null = null;
 const CACHE_MS = 60_000;
 
+/** Call after changing names on the list (a Referrals search), so the next check sees them. */
+export function forgetAllowlist(): void {
+  cached = null;
+}
+
 /** From her profile, her credentialing identity and location, and her Referrals list. */
 export async function practiceAllowlist(): Promise<Allowlist> {
   if (!process.env.DATABASE_URL) return { names: [], contacts: [] };
