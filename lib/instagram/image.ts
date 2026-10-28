@@ -6,6 +6,8 @@ import { LIMITS } from "./graph";
 // 1080 x 1350, the size that fills the most of a phone's feed.
 export const POST_WIDTH = 1080;
 export const POST_HEIGHT = 1350;
+/** The relay takes at most about 4 MB per picture (desktop-app, #31), below Meta's 8 MB. */
+export const RELAY_IMAGE_BYTES = 4 * 1024 * 1024;
 
 /** Any image in, an Instagram-ready JPEG out. Metadata (EXIF, GPS) is dropped. */
 export async function toInstagramJpeg(input: Buffer): Promise<Buffer> {
@@ -17,9 +19,9 @@ export async function toInstagramJpeg(input: Buffer): Promise<Buffer> {
       .toColorspace("srgb")
       .jpeg({ quality, mozjpeg: true, chromaSubsampling: "4:4:4" })
       .toBuffer();
-    if (jpeg.length <= LIMITS.imageBytes) return jpeg;
+    if (jpeg.length <= RELAY_IMAGE_BYTES) return jpeg;
   }
-  throw new Error("The image is still over Instagram's 8 MB limit after compressing it.");
+  throw new Error("The picture is still over 4 MB after compressing it.");
 }
 
 /** What tests and the executor check before anything goes to Meta. */
