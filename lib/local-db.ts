@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
-import { appendFile, mkdir, open, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, open, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import net from "node:net";
 import path from "node:path";
@@ -156,17 +156,25 @@ export async function startLocalDatabase(dir: string = dataDir()): Promise<strin
     let config = await readJson<LocalConfig>(configFile);
 
     if (!existsSync(path.join(pgdata, "PG_VERSION"))) {
+      // First start, or a first start that crashed part way: no database has been made
+      // yet (a finished one always has PG_VERSION), so clear what's left and start over.
+      // The password is saved before initdb, and the database is built in a side folder
+      // and renamed into place last, so a crash never leaves a database nobody can open.
+      const building = `${pgdata}.init`;
+      await rm(pgdata, { recursive: true, force: true });
+      await rm(building, { recursive: true, force: true });
       config = { port: await freePort(), user: "practiceos", password: randomBytes(24).toString("base64url"), database: "practice" };
+      await writeFile(configFile, JSON.stringify(config, null, 2), { mode: 0o600 });
       const pwfile = path.join(dir, "initdb.pw");
       await writeFile(pwfile, config.password, { mode: 0o600 });
       try {
-        await run(binary("initdb"), ["-D", pgdata, "-U", config.user, `--pwfile=${pwfile}`, "--auth=scram-sha-256", "-E", "UTF8", "--locale=C"]);
+        await run(binary("initdb"), ["-D", building, "-U", config.user, `--pwfile=${pwfile}`, "--auth=scram-sha-256", "-E", "UTF8", "--locale=C"]);
       } finally {
         await rm(pwfile, { force: true });
       }
       // Only this computer can connect, and only over TCP with the password (no socket files).
-      await appendFile(path.join(pgdata, "postgresql.conf"), "\nlisten_addresses = '127.0.0.1'\nunix_socket_directories = ''\n");
-      await writeFile(configFile, JSON.stringify(config, null, 2), { mode: 0o600 });
+      await appendFile(path.join(building, "postgresql.conf"), "\nlisten_addresses = '127.0.0.1'\nunix_socket_directories = ''\n");
+      await rename(building, pgdata);
     }
     if (!config) throw new Error(`${configFile} is missing, so the built-in database's password is unknown.`);
 

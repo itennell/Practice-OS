@@ -3,7 +3,7 @@
 // `npm install` brings in through embedded-postgres.
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdtemp, readdir, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import postgres from "postgres";
@@ -70,6 +70,19 @@ describe("built-in database", () => {
     const dead = spawnSync(process.execPath, ["-e", ""]).pid;
     await writeFile(lock, String(dead));
     expect(await startLocalDatabase(dir)).toBe(url);
+  });
+
+  it("recovers from a first start that crashed part way through initdb", async () => {
+    const dir = await freshDir();
+    // What a crash leaves behind: half-built folders, and no password file.
+    await mkdir(path.join(dir, "postgres.init"), { recursive: true });
+    await writeFile(path.join(dir, "postgres.init", "postgresql.conf"), "");
+    await mkdir(path.join(dir, "postgres"), { recursive: true });
+    await writeFile(path.join(dir, "postgres", "global"), "");
+    const url = await startLocalDatabase(dir);
+    expect(await query(url, async (sql) => (await sql`select 1 as ok`)[0].ok)).toBe(1);
+    expect(existsSync(path.join(dir, "postgres.init"))).toBe(false);
+    expect((await stat(path.join(dir, "local-db.json"))).mode & 0o077).toBe(0);
   });
 
   it("runs every migration on plain Postgres", async () => {
