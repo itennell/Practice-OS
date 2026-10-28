@@ -12,6 +12,8 @@ export async function register() {
 
   // Front Desk (lib/frontdesk/poller.ts): check her phone company every minute
   // while the app is open. Off on Vercel and when FRONT_DESK_POLL=off.
-  const { startFrontDeskPoller } = await import("./lib/frontdesk/poller");
-  startFrontDeskPoller();
+  if (!process.env.VERCEL) {
+    const { startFrontDeskPoller } = await import("./lib/frontdesk/poller");
+    startFrontDeskPoller(); // starts a timer and returns; never awaited
+  }
 }

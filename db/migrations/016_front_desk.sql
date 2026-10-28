@@ -7,7 +7,9 @@
 -- 4. consult_offers: the times a caller was offered, so a reply of "2" means one slot.
 -- 5. front_desk_sync: where each phone stream was last read, and its last error.
 -- 6. sms_opt_outs: numbers that texted STOP; nothing is sent to them again.
--- 7. settings: her calendar choice and two more Front Desk rules, both on.
+-- 7. settings: her calendar choice, consult length (Google; Cal.com uses its
+--    event type), the voicemail greeting she records in her phone app, and two
+--    more Front Desk rules, both on.
 
 alter table practice_os.approvals drop constraint approvals_kind_check;
 alter table practice_os.approvals add constraint approvals_kind_check check (kind in (
@@ -70,7 +72,9 @@ create table practice_os.sms_opt_outs (
 );
 
 alter table practice_os.settings
-  add column front_desk_calendar text check (front_desk_calendar in ('calcom', 'google'));
+  add column front_desk_calendar text check (front_desk_calendar in ('calcom', 'google')),
+  add column front_desk_consult_minutes int not null default 15 check (front_desk_consult_minutes between 10 and 60),
+  add column front_desk_greeting text check (char_length(front_desk_greeting) <= 500);
 update practice_os.settings
   set front_desk_rules = front_desk_rules || '{"book_by_text": true, "send_reminders": true}'::jsonb;
 alter table practice_os.settings alter column front_desk_rules

@@ -6,6 +6,16 @@ import type { PhoneAdapter } from "./phone/types";
 import { addAlert, sendText } from "./store";
 import { crisisAlertText } from "./templates";
 
+/**
+ * Her own verified cell for urgent alerts: settings.alert_phone (set during
+ * onboarding, migration 013), with CLINICIAN_ALERT_PHONE as the developer fallback.
+ * Read through to_jsonb so it works before 013 has run.
+ */
+export async function alertPhone(): Promise<string | null> {
+  const [row] = await db()`select to_jsonb(s) ->> 'alert_phone' as phone from practice_os.settings s limit 1`.catch(() => []);
+  return toE164(row?.phone) ?? toE164(process.env.CLINICIAN_ALERT_PHONE);
+}
+
 // The one path that skips approvals (AGENTS.md > Approvals): the fixed crisis
 // reply to the caller and an urgent alert to the clinician's own verified phone
 // (CLINICIAN_ALERT_PHONE), both written to audit_log. No model sees the words.
@@ -39,7 +49,7 @@ export async function handleCrisis(input: {
   }
 
   let alerted = false;
-  const clinician = toE164(process.env.CLINICIAN_ALERT_PHONE);
+  const clinician = await alertPhone();
   if (clinician) {
     try {
       await sendText({ to: clinician, body: crisisAlertText(input.channel, input.from), inquiryId: null, actor: "safety", action: "crisis_alert_sent", force: true, phone: input.phone });
@@ -48,7 +58,7 @@ export async function handleCrisis(input: {
       await audit({ actor: "safety", action: "crisis_alert_failed", subjectType: "inquiry", subjectId: input.inquiryId, details: { error: String(e) } });
     }
   } else {
-    await audit({ actor: "safety", action: "crisis_alert_failed", subjectType: "inquiry", subjectId: input.inquiryId, details: { error: "CLINICIAN_ALERT_PHONE is not set" } });
+    await audit({ actor: "safety", action: "crisis_alert_failed", subjectType: "inquiry", subjectId: input.inquiryId, details: { error: "no alert phone (settings.alert_phone or CLINICIAN_ALERT_PHONE)" } });
   }
   return { replied, alerted };
 }

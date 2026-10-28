@@ -37,7 +37,7 @@ type SpruceItem = {
 
 type Scan = { voicemails: Voicemail[]; texts: InboundText[] };
 
-export function spruceAdapter(config: SpruceConfig, fetchImpl: typeof fetch = fetch): PhoneAdapter {
+export function spruceAdapter(config: SpruceConfig, fetchImpl: typeof fetch = fetch): PhoneAdapter & { lineId(): Promise<string | undefined> } {
   async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
     const res = await fetchImpl(`${SPRUCE_API}${path}`, {
       ...init,
@@ -139,6 +139,9 @@ export function spruceAdapter(config: SpruceConfig, fetchImpl: typeof fetch = fe
         return { ok: false, fix: e instanceof PhoneError ? e.fix : "Couldn't reach Spruce. Check your internet, then try again." };
       }
     },
+
+    /** The phone line saved as meta.lineId on the 'phone' connection. */
+    lineId: async () => (await phoneEndpoint())?.id,
 
     listVoicemails: async (since) => (await scan(since)).voicemails,
     listInboundTexts: async (since) => (await scan(since)).texts,

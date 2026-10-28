@@ -12,15 +12,16 @@ export { GOOGLE_CALENDAR_SCOPES };
 // access token; meta names her consult event type.
 export type CalcomMeta = { eventTypeId: number; eventTypeLabel?: string };
 
-export async function calendarSettings(): Promise<{ provider: CalendarProvider | null; timeZone: string; hours: Hours }> {
+export async function calendarSettings(): Promise<{ provider: CalendarProvider | null; timeZone: string; hours: Hours; consultMinutes: number }> {
   const [row] = await db()`
-    select s.front_desk_calendar, s.timezone, p.office_hours
+    select s.front_desk_calendar, s.timezone, s.front_desk_consult_minutes, p.office_hours
     from practice_os.settings s left join practice_os.clinician_profile p on true limit 1`.catch(() => []);
   const weekdays = Array.isArray(row?.office_hours?.weekdays) ? (row.office_hours.weekdays as number[]) : DEFAULT_HOURS.weekdays;
   return {
     provider: row?.front_desk_calendar === "calcom" || row?.front_desk_calendar === "google" ? row.front_desk_calendar : null,
     timeZone: typeof row?.timezone === "string" ? row.timezone : "America/Chicago",
     hours: { ...DEFAULT_HOURS, weekdays },
+    consultMinutes: typeof row?.front_desk_consult_minutes === "number" ? row.front_desk_consult_minutes : 15,
   };
 }
 
@@ -34,7 +35,7 @@ async function googleToken(): Promise<string> {
 /** The calendar she picked, or null when none is connected. */
 export async function getCalendarAdapter(): Promise<CalendarAdapter | null> {
   const s = await calendarSettings();
-  if (s.provider === "google") return googleAdapter({ getToken: googleToken, timeZone: s.timeZone, hours: s.hours });
+  if (s.provider === "google") return googleAdapter({ getToken: googleToken, timeZone: s.timeZone, hours: s.hours, consultMinutes: s.consultMinutes });
   if (s.provider === "calcom") {
     const conn = await getConnection("calcom").catch(() => null);
     const meta = conn?.meta as Partial<CalcomMeta> | undefined;

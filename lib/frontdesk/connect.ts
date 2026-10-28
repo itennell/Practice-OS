@@ -25,7 +25,8 @@ export async function connectSpruce(token: string): Promise<CheckResult> {
   if (clean.length < 10) return { ok: false, fix: "That looks too short. Copy the whole token from Spruce > Settings > API Access." };
   const check = await spruceAdapter({ token: clean }).check();
   if (!check.ok) return check;
-  const meta: PhoneMeta = { vendor: "spruce", lineLabel: check.label };
+  const lineId = await spruceAdapter({ token: clean }).lineId().catch(() => undefined);
+  const meta: PhoneMeta = { vendor: "spruce", lineId, lineLabel: check.label };
   try {
     await saveConnection({ provider: PHONE_PROVIDER, accountLabel: check.label, accessToken: clean, refreshToken: null, scopes: [], expiresAt: null, meta });
   } catch {
