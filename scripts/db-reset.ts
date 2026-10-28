@@ -13,6 +13,7 @@ export const DEMO_TABLES = [
   "clinician_profile",
   "approvals",
   "good_faith_estimates",
+  "superbills",
   "credentialing_profile",
   "payer_applications",
   "obligations",

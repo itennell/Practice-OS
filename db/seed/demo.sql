@@ -194,5 +194,16 @@ insert into practice_os.good_faith_estimates
 -- Real estimates continue after the sample numbers.
 select setval('practice_os.gfe_number_seq', greatest((select last_value from practice_os.gfe_number_seq), 2));
 
+-- [Sample] superbill (migration 011): four 53-minute video sessions from the client's
+-- home in October at $175, paid in full. No client details: the PDF leaves them blank.
+insert into practice_os.superbills (id, reference, lines, total_cents, paid_cents, created_by, is_sample) values
+  ('00000000-0000-4000-8000-000000000b01', 'SB-2026-0001',
+   '[{"date_of_service": "2026-10-05", "cpt": "90837", "modifier": "95", "units": 1, "cents": 17500, "pos": "10", "dx_pointers": ["A"]},
+     {"date_of_service": "2026-10-12", "cpt": "90837", "modifier": "95", "units": 1, "cents": 17500, "pos": "10", "dx_pointers": ["A"]},
+     {"date_of_service": "2026-10-19", "cpt": "90837", "modifier": "95", "units": 1, "cents": 17500, "pos": "10", "dx_pointers": ["A"]},
+     {"date_of_service": "2026-10-26", "cpt": "90837", "modifier": "95", "units": 1, "cents": 17500, "pos": "10", "dx_pointers": ["A"]}]'::jsonb,
+   70000, 70000, 'aeon:admin', true);
+select setval('practice_os.superbill_number_seq', greatest((select last_value from practice_os.superbill_number_seq), 1));
+
 insert into practice_os.audit_log (actor, action, details)
 values ('system', 'demo_data_seeded', '{"practice": "Reyes Counseling PLLC (fictional demo practice)"}'::jsonb);
