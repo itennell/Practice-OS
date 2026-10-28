@@ -97,7 +97,7 @@ describe("post images", () => {
   const jpegInfo = async (body: Uint8Array) => ({ format: "jpeg", width: 1080, height: 1350, jpeg: body });
   function fakeBlobs(existing: { url: string; uploadedAt: Date }[] = []) {
     const deleted: string[] = [];
-    const put = vi.fn(async (pathname: string) => ({ url: `https://blob.example/${pathname}` }));
+    const put = vi.fn<Blobs["put"]>(async (pathname) => ({ url: `https://blob.example/${pathname}` }));
     const live = [...existing];
     const blobs: Blobs = {
       put: async (pathname, body, contentType) => {
