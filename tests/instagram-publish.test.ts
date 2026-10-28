@@ -72,10 +72,14 @@ describe("Graph client", () => {
 async function deps(replies: Array<[number, unknown]>) {
   const { impl, calls } = fakeFetch(replies);
   const saved: PublishProgress[] = [];
-  const relay = { uploadJpeg: vi.fn(async () => ({ url: "https://relay.example/m/img1.jpg", expiresAt: "" })) };
+  const relay = {
+    uploadJpeg: vi.fn(async () => ({ url: "https://relay.example/m/img1.jpg", expiresAt: "" })),
+    deleteImage: vi.fn(async () => undefined),
+  };
   const d: PublishDeps = {
     graph: new InstagramGraph("T", impl),
     uploadImage: relay.uploadJpeg,
+    deleteImage: relay.deleteImage,
     igUserId: "17841400000000001",
     save: async (p) => void saved.push({ ...p }),
     sleep: async () => undefined,
@@ -90,7 +94,7 @@ describe("publishing", async () => {
   const input = { jpeg, caption: "How to book a first session. Dana Reyes, LCPC (fictional demo practice)", altText: "Dana smiling in her office", aiGenerated: true };
 
   it("hosts the JPEG, makes a container, waits, publishes and reads the link", async () => {
-    const { d, calls, saved } = await deps([
+    const { d, calls, saved, relay } = await deps([
       [200, fx("publishing_limit")],
       [200, fx("container_create")],
       [200, fx("container_in_progress")],
@@ -109,6 +113,8 @@ describe("publishing", async () => {
     expect(calls[4].body?.get("creation_id")).toBe("17889455560051444");
     // The container id is saved before publishing, so a retry cannot post twice.
     expect(saved[0]).toEqual({ containerId: "17889455560051444", mediaId: null, permalink: null });
+    // The picture comes off the relay as soon as Meta has it (FINISHED), before publishing.
+    expect(relay.deleteImage).toHaveBeenCalledWith("https://relay.example/m/img1.jpg");
   });
 
   it("stops at a saved media id without calling Instagram", async () => {

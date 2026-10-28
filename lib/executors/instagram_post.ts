@@ -3,7 +3,7 @@ import { db } from "../db";
 import { instagramAccount } from "../instagram/account";
 import { InstagramGraph } from "../instagram/graph";
 import { publishImagePost, publishProblems, type PublishProgress } from "../instagram/publish";
-import { uploadPostImage } from "../instagram/relay";
+import { deletePostImage, uploadPostImage } from "../instagram/relay";
 import type { Executor } from "./types";
 
 // She approved a post: publish it to her Instagram. The approval's payload names
@@ -67,7 +67,7 @@ export const instagramPost: Executor = async (approval, { dryRun }) => {
     const result = await publishImagePost(
       input,
       { containerId: post.ig_container_id, mediaId: post.ig_media_id, permalink: post.ig_permalink },
-      { graph: new InstagramGraph(account.token), uploadImage: uploadPostImage, igUserId: account.igUserId, save },
+      { graph: new InstagramGraph(account.token), uploadImage: uploadPostImage, deleteImage: deletePostImage, igUserId: account.igUserId, save },
     );
     await audit({
       actor: "executor",

@@ -10,12 +10,11 @@ import { useEffect, useState } from "react";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { StatusPill } from "@/components/shared/status-mark";
 import { notify } from "@/components/shared/toaster";
-import { Button, ButtonLink } from "@/components/ui";
+import { Button } from "@/components/ui";
 import type { LiveCheck } from "@/lib/instagram/account";
 import { ConnectionCardFrame } from "./card-frame";
+import { ConnectButton } from "./connect-button";
 import type { ConnectionStatus } from "./registry";
-
-const CONNECT_HREF = "/api/connect/instagram/start";
 
 type Check = LiveCheck | { state: "checking" };
 
@@ -38,7 +37,8 @@ export function InstagramCard({ status }: { status: ConnectionStatus }) {
   const disconnect = async () => {
     const res = await fetch("/api/connect/instagram", { method: "DELETE" }).catch(() => null);
     if (!res?.ok) throw new Error("Couldn't disconnect Instagram.");
-    notify.success("Instagram disconnected.");
+    const { note } = (await res.json().catch(() => ({}))) as { note?: string };
+    notify.success(note ? `Instagram disconnected. ${note}` : "Instagram disconnected.");
     router.refresh();
   };
 
@@ -65,9 +65,9 @@ export function InstagramCard({ status }: { status: ConnectionStatus }) {
         )}
       </div>
       {!connected && check.state !== "checking" && (
-        <ButtonLink variant="accent" href={CONNECT_HREF}>
+        <ConnectButton provider="instagram" variant="accent">
           {check.state === "not_connected" ? "Connect Instagram" : "Connect again"}
-        </ButtonLink>
+        </ConnectButton>
       )}
       {status.connected && (
         <ConfirmDialog

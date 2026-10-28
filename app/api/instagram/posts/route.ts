@@ -1,6 +1,7 @@
 import { connection } from "next/server";
 import { z } from "zod";
 import { canDecide } from "@/lib/admin-guard";
+import { isSameOrigin } from "@/lib/connect/local-only";
 import { listPosts, requestPost } from "@/lib/instagram/store";
 
 export async function GET() {
@@ -19,7 +20,9 @@ const body = z
 export const maxDuration = 120;
 
 export async function POST(request: Request) {
-  if (!canDecide(request)) return Response.json({ error: "Not allowed to change this here." }, { status: 403 });
+  if (!canDecide(request) || !isSameOrigin(request) || !request.headers.get("content-type")?.includes("application/json")) {
+    return Response.json({ error: "Not allowed to change this here." }, { status: 403 });
+  }
   const parsed = body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "Tell Aeon what the post should be about." }, { status: 400 });
   try {

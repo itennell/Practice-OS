@@ -14,6 +14,8 @@ export type PublishDeps = {
   graph: Pick<InstagramGraph, "createImageContainer" | "containerStatus" | "publish" | "permalink" | "publishingLimit">;
   /** lib/connect's uploadPostImage: the relay keeps it public for 1 hour, then deletes it. */
   uploadImage: (jpeg: Buffer) => Promise<HostedImage>;
+  /** lib/connect's deletePostImage: called once the container is FINISHED, so the picture stops being public. */
+  deleteImage: (url: string) => Promise<void>;
   igUserId: string;
   /** Persists each id the moment Meta returns it. */
   save: (progress: PublishProgress) => Promise<void>;
@@ -56,6 +58,7 @@ export async function publishImagePost(input: PublishInput, prior: PublishProgre
     }
   }
   const resumed = progress.containerId !== null;
+  let hostedUrl: string | null = null;
 
   if (!progress.containerId) {
     const problems = await publishProblems(input);
@@ -65,6 +68,7 @@ export async function publishImagePost(input: PublishInput, prior: PublishProgre
       throw new Error(`Instagram's limit of ${quota.total} posts a day is used up. Try again tomorrow.`);
     }
     const image = await deps.uploadImage(input.jpeg);
+    hostedUrl = image.url;
     const container = await deps.graph.createImageContainer(deps.igUserId, {
       imageUrl: image.url,
       caption: input.caption,
@@ -91,6 +95,8 @@ export async function publishImagePost(input: PublishInput, prior: PublishProgre
       if (status === "PUBLISHED") break;
     }
 
+    // Meta has fetched the picture; take it off the relay now (best effort: it expires within the hour anyway).
+    if (hostedUrl) await deps.deleteImage(hostedUrl).catch(() => undefined);
     if (status !== "PUBLISHED") {
       const media = await deps.graph.publish(deps.igUserId, progress.containerId!);
       progress.mediaId = media.id;

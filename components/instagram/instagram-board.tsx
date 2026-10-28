@@ -124,7 +124,7 @@ export function InstagramBoard({
     try {
       const res =
         kind === "plan"
-          ? await fetch("/api/instagram/plan", { method: "POST" })
+          ? await fetch("/api/instagram/plan", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })
           : await fetch("/api/instagram/posts", {
               method: "POST",
               headers: { "content-type": "application/json" },
