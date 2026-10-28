@@ -8,7 +8,7 @@ import { money } from "../gfe/build";
 import { loadPracticeSettings, type Fee } from "../gfe/store";
 import { CPT, CPT_CODES, DX_POINTERS, MODIFIER_CODES, MULTI_UNIT, POS_CODES, type CptCode, type DxPointer, type Modifier, type PosCode } from "./codes";
 
-// Saved superbills (migration 010). A row holds only the practice side: dates,
+// Saved superbills (migration 011). A row holds only the practice side: dates,
 // codes, units, fees, place of service, diagnosis pointer letters and what was
 // paid. Every input is a date, a number or a value from a fixed list, and the
 // schemas are strict, so a client's name or diagnosis has nowhere to go. The

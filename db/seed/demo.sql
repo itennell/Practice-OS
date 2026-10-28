@@ -194,7 +194,7 @@ insert into practice_os.good_faith_estimates
 -- Real estimates continue after the sample numbers.
 select setval('practice_os.gfe_number_seq', greatest((select last_value from practice_os.gfe_number_seq), 2));
 
--- [Sample] superbill (migration 010): four 53-minute video sessions from the client's
+-- [Sample] superbill (migration 011): four 53-minute video sessions from the client's
 -- home in October at $175, paid in full. No client details: the PDF leaves them blank.
 insert into practice_os.superbills (id, reference, lines, total_cents, paid_cents, created_by, is_sample) values
   ('00000000-0000-4000-8000-000000000b01', 'SB-2026-0001',
