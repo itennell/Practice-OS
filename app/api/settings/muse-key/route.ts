@@ -6,6 +6,7 @@ import { isLocalAppRequest } from "@/lib/connect/local-only";
 // Her own Meta Muse key: checked with one tiny call, then kept encrypted.
 export async function POST(request: Request) {
   if (!canDecide(request) || !isLocalAppRequest(request)) return Response.json({ error: "Not allowed to change this here." }, { status: 403 });
+  if (!request.headers.get("content-type")?.startsWith("application/json")) return Response.json({ error: "Send JSON." }, { status: 415 });
   const parsed = z.object({ key: z.string().trim().min(20).max(400) }).safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "Paste the whole key from Meta's key page." }, { status: 400 });
   const check = await checkMuseKey(parsed.data.key);
