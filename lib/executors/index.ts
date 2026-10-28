@@ -1,3 +1,4 @@
+import { aeonAction } from "./aeon_action";
 import { gfeIssue } from "./gfe_issue";
 import { stateRules } from "./state_rules";
 import { testNote } from "./test_note";
@@ -8,6 +9,7 @@ export const executors: Partial<Record<string, Executor>> = {
   test_note: testNote,
   state_rules: stateRules,
   gfe_issue: gfeIssue,
+  aeon_action: aeonAction,
 };
 
 // The payload field the clinician may edit before approving, per kind.

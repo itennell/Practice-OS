@@ -6,7 +6,8 @@
 // through the sensitive-info guard before any model or MCP client sees it.
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { APPROVAL_KINDS } from "../approval-kinds";
+import { APPROVAL_KINDS, type ApprovalKind } from "../approval-kinds";
+import { withOrigin, type ApprovalMode } from "../approval-policy";
 import { queueApproval } from "../approvals";
 import { ANSWERS } from "../compliance/answers";
 import * as actions from "../compliance/actions";
@@ -15,6 +16,7 @@ import { recheckRules } from "../compliance/recheck";
 import { TOPICS } from "../compliance/research";
 import * as credActions from "../credentialing/actions";
 import * as cred from "../credentialing/store";
+import { db } from "../db";
 import { isDryRun } from "../env";
 import { money } from "../gfe/build";
 import * as gfe from "../gfe/store";
@@ -33,7 +35,17 @@ export type ToolContext = {
   by: string;
   /** The Vercel demo copy without ADMIN_PASSWORD: tools that change data refuse. */
   viewOnly?: boolean;
+  /** How much Aeon may do on its own (lib/approval-policy.ts). Missing: tools run and nothing is auto-approved, as before modes. */
+  mode?: ApprovalMode;
+  /** She already approved this exact call (the aeon_action executor). */
+  approved?: boolean;
 };
+
+/** aeon_action is queued only by runTool itself in Manual mode, never by an agent. */
+const QUEUEABLE_KINDS = APPROVAL_KINDS.filter((k) => k !== "aeon_action") as [Exclude<ApprovalKind, "aeon_action">, ...Exclude<ApprovalKind, "aeon_action">[]];
+
+/** Saving or forgetting a memory never waits for her tap, in any mode. */
+const ALWAYS_RUNS = new Set(["remember", "forget"]);
 
 export type ToolResult = {
   content: { type: "text"; text: string }[];
@@ -103,26 +115,29 @@ export const TOOLS: AeonTool[] = [
     title: "Queue for clinician approval",
     description:
       "Adds a draft action (a letter, post, text reply or booking) to the clinician's approvals inbox as pending. " +
-      "Nothing is sent, posted or booked until she approves it in Practice-OS.",
+      "Nothing is sent, posted or booked until she approves it in Practice-OS, unless her mode lets that kind run on its own " +
+      "(Auto: routine bookings; never anything handed to a client). The result says whether it is pending or already done.",
     input: {
-      kind: z.enum(APPROVAL_KINDS).describe("What kind of action this is."),
+      kind: z.enum(QUEUEABLE_KINDS).describe("What kind of action this is."),
       title: z.string().trim().min(1).max(200).describe("A short line the clinician sees in her inbox."),
       preview: jsonObject.optional().describe("What the clinician sees before approving, e.g. { body: '...' }."),
       payload: jsonObject.optional().describe("What the executor needs to carry it out after approval."),
     },
-    output: { status: z.literal("pending"), approval_id: z.string().uuid() },
+    output: { status: z.enum(["pending", "done", "failed"]), approval_id: z.string().uuid() },
     annotations: { destructiveHint: false, openWorldHint: false, idempotentHint: false },
     label: "Put a draft in your approvals",
     changesData: false,
     run: async ({ kind, title, preview, payload }, ctx) => {
       const id = await queueApproval({ kind, title, preview, payload, createdBy: ctx.by });
+      const [row] = await db()<{ status: string }[]>`select status from practice_os.approvals where id = ${id}`;
+      const status = row?.status === "done" || row?.status === "failed" ? row.status : "pending";
       return {
         // Second text block too: some clients (Muse) read only text, not structuredContent.
         content: [
-          { type: "text", text: "queued for clinician approval" },
+          { type: "text", text: status === "pending" ? "queued for clinician approval" : `ran on its own under her mode: ${status}` },
           { type: "text", text: `approval_id: ${id}` },
         ],
-        structuredContent: { status: "pending" as const, approval_id: id },
+        structuredContent: { status: status as "pending" | "done" | "failed", approval_id: id },
       };
     },
   }),
@@ -588,7 +603,20 @@ export async function runTool(name: string, args: unknown, ctx: ToolContext): Pr
     const problems = parsed.error.issues.map((i) => `${i.path.join(".") || "input"}: ${i.message}`).join("; ");
     return { content: [{ type: "text", text: `Invalid input for ${name}: ${problems}` }], isError: true };
   }
-  return guardResult(await tool.run(parsed.data as never, ctx));
+  const mode = ctx.mode;
+  // Manual: a change to her records waits in the ask bar as one aeon_action approval.
+  if (mode === "manual" && tool.changesData && !ctx.approved && !ALWAYS_RUNS.has(tool.name)) {
+    const approvalId = await queueApproval({
+      kind: "aeon_action",
+      title: tool.title,
+      preview: { body: `${tool.label}. Aeon will run this once you approve it.`, tool: tool.name, args: parsed.data },
+      payload: { tool: tool.name, args: parsed.data },
+      createdBy: ctx.by,
+    });
+    return text({ waiting_for_her: true, approval_id: approvalId, next: "You're in Manual mode: tell her it's waiting for her OK in the bar above the chat box." });
+  }
+  const run = () => tool.run(parsed.data as never, ctx);
+  return guardResult(await (mode ? withOrigin({ mode }, run) : run()));
 }
 
 /** The tool list in Chat Completions shape (cookbook 03_tool_calling.ipynb). */

@@ -11,6 +11,8 @@ loadEnv(path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."));
 // Imported after loadEnv so DATABASE_URL is set before the first query.
 // Every tool is defined once in lib/aeon/tools.ts, shared with Aeon's chat.
 const { TOOLS, runTool } = await import("../lib/aeon/tools");
+const { capForMcp } = await import("../lib/approval-policy");
+const { loadApprovalSettings } = await import("../lib/approval-settings");
 const { listMemories, memoryMarkdown } = await import("../lib/aeon/memory");
 
 const server = new McpServer({ name: "practice-os", version: "0.1.0" });
@@ -32,7 +34,12 @@ for (const tool of TOOLS) {
       ...(tool.output ? { outputSchema: tool.output } : {}),
       annotations: tool.annotations,
     },
-    (args: unknown) => runTool(tool.name, args, { by: createdBy() }),
+    // Outside agents follow the default mode from Settings, never above Auto.
+    // With no database yet (a fresh install), tools run as they always have.
+    async (args: unknown) => {
+      const mode = await loadApprovalSettings().then((s) => capForMcp(s.mode), () => undefined);
+      return runTool(tool.name, args, { by: createdBy(), mode });
+    },
   );
 }
 

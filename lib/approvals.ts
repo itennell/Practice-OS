@@ -3,13 +3,14 @@ import { db } from "./db";
 import { isDryRun } from "./env";
 import { editableField, executors } from "./executors";
 import type { ApprovalKind } from "./approval-kinds";
+import { currentOrigin, shouldAutoRun } from "./approval-policy";
 import type { ApprovalRow } from "./executors/types";
 
 export type { ApprovalRow };
 
 export type ApprovalView = Pick<
   ApprovalRow,
-  "id" | "kind" | "title" | "preview" | "status" | "created_by" | "error" | "result" | "is_sample"
+  "id" | "kind" | "title" | "preview" | "status" | "created_by" | "decided_by" | "error" | "result" | "is_sample"
 > & {
   created_at: string;
   decided_at: string | null;
@@ -26,6 +27,7 @@ export function toView(row: ApprovalRow): ApprovalView {
     preview: row.preview,
     status: row.status,
     created_by: row.created_by,
+    decided_by: row.decided_by,
     error: row.error,
     result: row.result,
     is_sample: row.is_sample,
@@ -72,7 +74,7 @@ async function getRow(id: string) {
  * Claims a pending approval atomically, runs its executor and records the
  * outcome. `edit` replaces the one editable payload field before running.
  */
-export async function approve(id: string, opts: { by: string; edit?: string }): Promise<ApproveResult> {
+export async function approve(id: string, opts: { by: string; edit?: string; auto?: boolean }): Promise<ApproveResult> {
   const before = await getRow(id);
   if (!before) return { ok: false, reason: "not_found" };
 
@@ -95,8 +97,8 @@ export async function approve(id: string, opts: { by: string; edit?: string }): 
   if (!row) return { ok: false, reason: "not_pending", approval: toView((await getRow(id))!) };
 
   await audit({
-    actor: "clinician",
-    action: editedPayload ? "approval_edited_and_approved" : "approval_approved",
+    actor: opts.auto ? "aeon" : "clinician",
+    action: opts.auto ? "approval_auto_run" : editedPayload ? "approval_edited_and_approved" : "approval_approved",
     approvalId: row.id,
     subjectType: row.kind,
     details: editedPayload ? { before: before.payload, after: editedPayload, by: opts.by } : { by: opts.by },
@@ -137,7 +139,9 @@ export async function decline(id: string, opts: { by: string }): Promise<Approve
 
 /**
  * The only way agents and tools add work (AGENTS.md > Approvals): one INSERT
- * with status 'pending' and an audit line. Never runs an executor.
+ * with status 'pending' and an audit line. It runs the executor right away only
+ * when the mode or helper rule it was queued under allows that kind
+ * (lib/approval-policy.ts); decided_by then says "auto:<mode>" or "auto:front_desk".
  */
 export async function queueApproval(input: {
   kind: ApprovalKind;
@@ -158,5 +162,9 @@ export async function queueApproval(input: {
     subjectType: input.kind,
     details: { created_by: input.createdBy, title: input.title },
   });
+  const origin = currentOrigin();
+  if (shouldAutoRun(input.kind, origin)) {
+    await approve(row.id, { by: `auto:${origin && "mode" in origin ? origin.mode : "front_desk"}`, auto: true });
+  }
   return row.id;
 }

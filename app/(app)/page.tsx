@@ -5,6 +5,7 @@ import { AeonChat, type ChatEntry } from "@/components/aeon-chat";
 import { GlassCard } from "@/components/ui";
 import { getConversation, listConversations } from "@/lib/aeon/chat";
 import { listApprovals } from "@/lib/approvals";
+import { loadApprovalSettings } from "@/lib/approval-settings";
 import { morningBrief, type BriefItem } from "@/lib/compliance/brief";
 import { getProfile } from "@/lib/profile";
 
@@ -22,10 +23,11 @@ async function Chat({ searchParams }: { searchParams: PageProps<"/">["searchPara
   await connection(); // read the database per request, never at build time
   const { c } = await searchParams;
   const id = typeof c === "string" && /^[0-9a-f-]{36}$/i.test(c) ? c : null;
-  const [profile, conversations, found] = await Promise.all([
+  const [profile, conversations, found, settings] = await Promise.all([
     getProfile(),
     listConversations(),
     id ? getConversation(id) : null,
+    loadApprovalSettings(),
   ]);
   const messages: ChatEntry[] = (found?.messages ?? []).map((m) => ({
     key: String(m.id),
@@ -42,6 +44,9 @@ async function Chat({ searchParams }: { searchParams: PageProps<"/">["searchPara
       conversations={conversations.map((x) => ({ id: x.id, title: x.title, updated_at: x.updated_at.toISOString() }))}
       firstName={profile?.full_name.split(" ")[0] ?? null}
       start={<StartCards />}
+      mode={found?.conversation.approval_mode ?? settings.mode}
+      // The Vercel demo copy is view only: the pill shows the mode but can't change it.
+      modeReadOnly={Boolean(process.env.VERCEL)}
     />
   );
 }

@@ -62,7 +62,7 @@ test("A saved chat shows what Aeon checked and the approval card, the same row a
   await page.goto(`/?c=${id}`);
   const log = page.getByRole("log", { name: "Conversation" });
   await expect(log.getByText(/Draft a Good Faith Estimate/).first()).toBeVisible();
-  await expect(log.getByText(/Drafted a Good Faith Estimate · \d/).first()).toBeVisible();
+  await expect(log.getByText(/Drafted a Good Faith Estimate · <?\d/).first()).toBeVisible();
   // The approval card is the innermost list item holding the estimate's heading.
   const card = log.getByRole("listitem").filter({ has: page.getByRole("heading", { name: /GFE-2026-\d{4}/ }) }).last();
   await expect(card.getByText("Waiting for you", { exact: true })).toBeVisible();

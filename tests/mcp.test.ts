@@ -11,15 +11,21 @@ const url = process.env.DATABASE_URL;
 const sql = url ? postgres(url, { max: 1, prepare: false, onnotice: () => {} }) : null;
 const client = new Client({ name: "Vitest MCP", version: "0.0.0" });
 const created: string[] = [];
+let savedMode: string | null = null;
 
 beforeAll(async () => {
   if (!sql) return;
+  // These tests expect tools to run as they do in Auto (the default); put back whatever was set after.
+  const [s] = await sql`select approval_mode from practice_os.settings limit 1`.catch(() => [] as { approval_mode?: string }[]);
+  savedMode = s?.approval_mode ?? null;
+  if (savedMode) await sql`update practice_os.settings set approval_mode = 'auto'`;
   await client.connect(new StdioClientTransport({ command: "npx", args: ["tsx", "mcp/server.ts"], stderr: "pipe" }));
 });
 
 afterAll(async () => {
   if (!sql) return;
   if (created.length) await sql`delete from practice_os.approvals where id in ${sql(created)}`;
+  if (savedMode) await sql`update practice_os.settings set approval_mode = ${savedMode}`;
   await client.close();
   await sql.end({ timeout: 5 });
 });
@@ -28,7 +34,7 @@ describe.skipIf(!sql)("queue_approval", () => {
   it("queues one pending approval, tagged with the client, and audits it", async () => {
     const result = await client.callTool({
       name: "queue_approval",
-      arguments: { kind: "test_note", title: "[Sample] Queued over MCP", payload: { note: "[Sample] from vitest" } },
+      arguments: { kind: "referral_letter", title: "[Sample] Queued over MCP", payload: { note: "[Sample] from vitest" } },
     });
     expect(result.isError).toBeFalsy();
     const { approval_id: id, status } = result.structuredContent as { approval_id: string; status: string };
@@ -40,7 +46,7 @@ describe.skipIf(!sql)("queue_approval", () => {
     expect(status).toBe("pending");
 
     const [row] = await sql!`select status, created_by, kind, payload from practice_os.approvals where id = ${id}`;
-    expect(row).toMatchObject({ status: "pending", created_by: "mcp:vitest-mcp", kind: "test_note" });
+    expect(row).toMatchObject({ status: "pending", created_by: "mcp:vitest-mcp", kind: "referral_letter" });
     const audit = await sql!`select action from practice_os.audit_log where approval_id = ${id}`;
     expect(audit.map((a) => a.action)).toEqual(["approval_queued"]);
   });
@@ -55,7 +61,7 @@ describe.skipIf(!sql)("queue_approval", () => {
   it("ignores an attempt to set the status: the row is still pending", async () => {
     const result = await client.callTool({
       name: "queue_approval",
-      arguments: { kind: "test_note", title: "[Sample] Tries to skip approval", status: "done" },
+      arguments: { kind: "referral_letter", title: "[Sample] Tries to skip approval", status: "done" },
     });
     const { approval_id: id } = result.structuredContent as { approval_id: string };
     created.push(id);
