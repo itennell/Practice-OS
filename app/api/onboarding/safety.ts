@@ -1,7 +1,7 @@
 import { canDecide } from "@/lib/admin-guard";
 import { audit } from "@/lib/audit";
 import { guard, REFUSAL } from "@/lib/aeon/guard";
-import { isLocalAppRequest, isSameOrigin } from "@/lib/connect/local-only";
+import { isLocalAppRequest, isSameOrigin } from "@/lib/request-guard";
 import { QUESTIONS } from "@/lib/onboarding/chapters";
 import { checkCrisis, CRISIS_REPLY } from "@/lib/safety";
 
