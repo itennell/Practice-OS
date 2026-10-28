@@ -29,11 +29,11 @@ test("Front Desk shows sample callers, filters, Up next and both Connect cards",
   await expect(page.getByRole("link", { name: "Booked" })).toHaveAttribute("aria-current", "page");
   await expect(page.getByText("[Sample] Riley Example")).toHaveCount(0);
 
-  const phone = page.getByRole("region", { name: "Your practice phone" });
+  const phone = page.getByRole("region", { name: "Practice phone" });
   await expect(phone.getByText("Spruce Health")).toBeVisible();
   await expect(phone.getByRole("button", { name: "Copy the message" })).toBeVisible();
   await expect(phone.getByRole("button", { name: "Connect" })).toBeDisabled();
-  const cal = page.getByRole("region", { name: "Your consult calendar" });
+  const cal = page.getByRole("region", { name: "Consult calendar" });
   await expect(cal.getByRole("radio", { name: /Cal\.com/ })).toBeChecked();
   await expect(cal.getByLabel("Cal.com API key")).toBeVisible();
 
@@ -45,7 +45,7 @@ test("Front Desk shows sample callers, filters, Up next and both Connect cards",
 
 test("a bad Spruce token gets a plain fix, read out as an alert", async ({ page }) => {
   await page.goto("/front-desk");
-  const phone = page.getByRole("region", { name: "Your practice phone" });
+  const phone = page.getByRole("region", { name: "Practice phone" });
   await phone.getByLabel("Spruce token").fill("short");
   await phone.getByRole("button", { name: "Connect" }).click();
   await expect(phone.getByText(/too short/)).toBeVisible();
@@ -67,5 +67,18 @@ test("works at 200% text with no sideways scrolling", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Front Desk", level: 1 })).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
+  expect(await axe(page)).toEqual([]);
+});
+
+test("Settings › Connections lists the phone and Cal.com cards after Google", async ({ page }) => {
+  await page.goto("/settings/connections");
+  await expect(page.getByRole("region", { name: "Cal.com" })).toBeVisible();
+  const titles = await page.getByRole("heading", { level: 2 }).allInnerTexts();
+  const at = (t: string) => titles.indexOf(t);
+  expect(at("Google")).toBeGreaterThanOrEqual(0);
+  expect(at("Practice phone")).toBeGreaterThan(at("Google"));
+  expect(at("Cal.com")).toBeGreaterThan(at("Practice phone"));
+  await expect(page.getByRole("region", { name: "Practice phone" }).getByLabel("Spruce token")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Cal.com" }).getByLabel("Cal.com API key")).toBeVisible();
   expect(await axe(page)).toEqual([]);
 });

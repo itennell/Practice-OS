@@ -1,6 +1,8 @@
 "use client";
 
-import { CalendarCheck } from "lucide-react";
+import { CalendarCheck, CalendarDays } from "lucide-react";
+import { ConnectionCardFrame } from "@/components/connections/card-frame";
+import type { ConnectionStatus } from "@/components/connections/registry";
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { SettingSelect, TextField } from "@/components/shared/settings-controls";
@@ -122,5 +124,22 @@ export function CalcomCard({ initial, onConnected }: { initial: CalcomCardStatus
         </li>
       )}
     </ol>
+  );
+}
+
+/** Settings › Connections entry (components/connections/registry.ts). Connecting makes Cal.com her consult calendar. */
+export function CalcomConnectionCard({ status }: { status: ConnectionStatus }) {
+  return (
+    <ConnectionCardFrame
+      icon={<CalendarDays className="size-5" />}
+      title="Cal.com"
+      description="Front Desk offers callers your open consult times from Cal.com and books the one they pick. Only a reference number goes on the booking."
+      connected={status.connected}
+      accountLabel={status.accountLabel?.replace(/^Connected: /, "")}
+    >
+      <div className="basis-full">
+        <CalcomCard initial={{ connected: status.connected, label: status.accountLabel }} />
+      </div>
+    </ConnectionCardFrame>
   );
 }

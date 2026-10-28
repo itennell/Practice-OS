@@ -119,6 +119,11 @@ test("A new clinician sets up the whole practice, and the home page lists what s
     await page.getByRole("button", { name: "Family medicine" }).click();
     await page.getByRole("button", { name: "Oncology" }).click();
   });
+  // Front Desk's own setup questions (lib/frontdesk/onboarding.ts).
+  await step(page, /Which calendar should Front Desk book/, () => radio(page, "Google Calendar"));
+  await step(page, /How long is your free phone consult\?/, () => page.getByLabel("Number (minutes)").fill("20"));
+  // Skipping the greeting keeps the suggested one, shown on the Front Desk page.
+  await step(page, /voicemail greeting/, none, "skip");
   await step(page, /How should I ask/, () => radio(page, /Ask me first/));
   await step(page, /miss a call/, () => radio(page, "No"));
 

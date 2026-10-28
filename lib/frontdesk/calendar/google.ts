@@ -1,3 +1,4 @@
+import { GOOGLE_SCOPES } from "../../connect/google-scopes";
 import { candidateSlots, DEFAULT_HOURS, overlaps, type Hours } from "./slots";
 import { CalendarError, type CalendarAdapter, type CheckResult, type Slot } from "./types";
 
@@ -7,10 +8,7 @@ import { CalendarError, type CalendarAdapter, type CheckResult, type Slot } from
 // so open times are her office hours minus what freeBusy says is taken.
 
 export const GOOGLE_CALENDAR_API = "https://www.googleapis.com/calendar/v3";
-export const GOOGLE_CALENDAR_SCOPES = [
-  "https://www.googleapis.com/auth/calendar.events",
-  "https://www.googleapis.com/auth/calendar.freebusy",
-];
+export const GOOGLE_CALENDAR_SCOPES: string[] = [GOOGLE_SCOPES.calendarEvents, GOOGLE_SCOPES.calendarFreebusy];
 
 export type GoogleConfig = { getToken: () => Promise<string>; timeZone: string; hours?: Hours; consultMinutes?: number };
 

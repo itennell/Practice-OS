@@ -1,6 +1,8 @@
 "use client";
 
 import { Copy, Phone } from "lucide-react";
+import { ConnectionCardFrame } from "@/components/connections/card-frame";
+import type { ConnectionStatus } from "@/components/connections/registry";
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { TextField } from "@/components/shared/settings-controls";
@@ -58,83 +60,83 @@ export function PhoneCard({ initial }: { initial: PhoneCardStatus }) {
     }
   };
 
+  const label = status.label?.replace(/^Connected: /, "");
   return (
-    <section aria-labelledby="phone-card-title" className="tile flex flex-col gap-4 p-5 md:p-6">
-      <header className="flex items-center gap-3">
-        <span aria-hidden className="orb-front-desk inline-block size-8 shrink-0" />
-        <h2 id="phone-card-title" className="text-section">
-          Your practice phone
-        </h2>
-      </header>
-
-      {status.connected ? (
-        <div className="flex flex-col gap-3">
-          <p className="flex items-center gap-2 font-medium">
-            <Phone aria-hidden size={18} className="text-[var(--status-done-fg)]" />
-            {status.label ?? "Connected"}
-          </p>
-          {status.fix && (
-            <p role="alert" className="text-[var(--danger-fg)]">
-              {status.fix}
-            </p>
-          )}
-          {status.devLine ? (
-            <p className="text-small text-[var(--fg-muted)]">This is the developer test line from .env, not a clinician&apos;s account.</p>
-          ) : (
-            <ConfirmDialog
-              trigger={<Button variant="quiet" className="self-start">Disconnect</Button>}
-              title="Disconnect your phone?"
-              description="Front Desk will stop reading your voicemails and texts until you connect again. Your phone number and Spruce account are not changed."
-              confirmLabel="Disconnect phone"
-              onConfirm={disconnect}
-            />
-          )}
-        </div>
-      ) : (
-        <>
-          <p className="max-w-[60ch] text-[var(--fg-muted)]">
-            Front Desk reads your voicemails and texts from your own phone company and texts callers your open consult times.
-          </p>
-          <div className="flex flex-wrap gap-2" aria-label="Phone company">
-            <Chip on>Spruce Health</Chip>
-            <Chip>Quo (coming later)</Chip>
-          </div>
-          <ol className="flex list-none flex-col gap-4">
-            <li className="flex flex-col gap-2">
-              <p>
-                <span className="font-semibold">1.</span> In the Spruce app, open <span className="font-medium">Help</span> and send Spruce this message. You only do this once.
+    <ConnectionCardFrame
+      icon={<Phone className="size-5" />}
+      title="Practice phone"
+      description="Front Desk reads your voicemails and texts from your own phone company and texts callers your open consult times."
+      connected={status.connected}
+      accountLabel={label}
+    >
+      <div className="flex basis-full flex-col gap-4">
+        {status.connected ? (
+          <div className="flex flex-col gap-3">
+            {status.fix && (
+              <p role="alert" className="text-[var(--danger-fg)]">
+                {status.fix}
               </p>
-              <blockquote className="max-w-[60ch] rounded-[16px] border border-border bg-[var(--chip-off-bg)] p-4 text-small">{SPRUCE_SUPPORT_MESSAGE}</blockquote>
-              <Button variant="quiet" className="self-start" onClick={copy}>
-                <Copy aria-hidden size={18} /> Copy the message
-              </Button>
-            </li>
-            <li>
-              <p>
-                <span className="font-semibold">2.</span> When Spruce writes back that it&apos;s on, go to <span className="font-medium">Settings, then API Access</span> in Spruce and press{" "}
-                <span className="font-medium">Create token</span>.
-              </p>
-            </li>
-            <li className="flex flex-col gap-2">
-              <p>
-                <span className="font-semibold">3.</span> Paste the token here and press Connect. Practice-OS checks it right away.
-              </p>
-              <TextField
-                label="Spruce token"
-                type="password"
-                autoComplete="off"
-                spellCheck={false}
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                error={error}
+            )}
+            {status.devLine ? (
+              <p className="text-small text-[var(--fg-muted)]">This is the developer test line from .env, not a clinician&apos;s account.</p>
+            ) : (
+              <ConfirmDialog
+                trigger={<Button variant="quiet" className="self-start">Disconnect</Button>}
+                title="Disconnect your phone?"
+                description="Front Desk will stop reading your voicemails and texts until you connect again. Your phone number and Spruce account are not changed."
+                confirmLabel="Disconnect phone"
+                onConfirm={disconnect}
               />
-              <Button variant="primary" className="self-start" disabled={busy || token.trim().length === 0} onClick={connect}>
-                {busy ? "Checking…" : "Connect"}
-              </Button>
-            </li>
-          </ol>
-        </>
-      )}
-    </section>
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-wrap gap-2" aria-label="Phone company">
+              <Chip on>Spruce Health</Chip>
+              <Chip>Quo (coming later)</Chip>
+            </div>
+            <ol className="flex list-none flex-col gap-4">
+              <li className="flex flex-col gap-2">
+                <p>
+                  <span className="font-semibold">1.</span> In the Spruce app, open <span className="font-medium">Help</span> and send Spruce this message. You only do this once.
+                </p>
+                <blockquote className="max-w-[60ch] rounded-[16px] border border-border bg-[var(--chip-off-bg)] p-4 text-small">{SPRUCE_SUPPORT_MESSAGE}</blockquote>
+                <Button variant="quiet" className="self-start" onClick={copy}>
+                  <Copy aria-hidden size={18} /> Copy the message
+                </Button>
+              </li>
+              <li>
+                <p>
+                  <span className="font-semibold">2.</span> When Spruce writes back that it&apos;s on, go to <span className="font-medium">Settings, then API Access</span> in Spruce and press{" "}
+                  <span className="font-medium">Create token</span>.
+                </p>
+              </li>
+              <li className="flex flex-col gap-2">
+                <p>
+                  <span className="font-semibold">3.</span> Paste the token here and press Connect. Practice-OS checks it right away.
+                </p>
+                <TextField
+                  label="Spruce token"
+                  type="password"
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={token}
+                  onChange={(e) => setToken(e.target.value)}
+                  error={error}
+                />
+                <Button variant="primary" className="self-start" disabled={busy || token.trim().length === 0} onClick={connect}>
+                  {busy ? "Checking…" : "Connect"}
+                </Button>
+              </li>
+            </ol>
+          </>
+        )}
+      </div>
+    </ConnectionCardFrame>
   );
+}
+
+/** Settings › Connections entry (components/connections/registry.ts). */
+export function PhoneConnectionCard({ status }: { status: ConnectionStatus }) {
+  return <PhoneCard initial={{ connected: status.connected, label: status.accountLabel }} />;
 }

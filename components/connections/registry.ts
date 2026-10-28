@@ -1,6 +1,8 @@
 import type { ComponentType } from "react";
 import { GoogleCard } from "./google-card";
 import { MuseCard } from "./muse-card";
+import { CalcomConnectionCard } from "./calcom-card";
+import { PhoneConnectionCard } from "./phone-card";
 
 /** One row per provider; lib/connect getConnectionStatus() fills it (until then: { provider, connected: false, scopes: [] }). */
 export type ConnectionStatus = {
@@ -21,4 +23,7 @@ export type ConnectionCard = {
 export const CONNECTION_CARDS: ConnectionCard[] = [
   { id: "muse", order: 0, Card: MuseCard },
   { id: "google", order: 20, Card: GoogleCard },
+  // Front Desk
+  { id: "phone", order: 40, Card: PhoneConnectionCard },
+  { id: "calcom", order: 50, Card: CalcomConnectionCard },
 ];

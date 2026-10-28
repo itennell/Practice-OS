@@ -10,7 +10,7 @@ export { prettyPhone, toE164 } from "./numbers";
 // the token is encrypted by lib/connections.ts; meta names her phone company.
 // lineId is the Spruce internal endpoint (phone line) to read and send from.
 export type PhoneMeta = { vendor: PhoneVendor; lineId?: string; lineLabel?: string };
-export const PHONE_PROVIDER = "phone" as string as Provider;
+export const PHONE_PROVIDER: Provider = "phone";
 
 /** Her phone company, or null when nothing is connected. Isaiah's dev Twilio line wins when switched on. */
 export async function getPhoneAdapter(): Promise<PhoneAdapter | null> {

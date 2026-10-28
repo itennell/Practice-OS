@@ -1,3 +1,4 @@
+import { getAccessToken, NeedsConnectError } from "../../connect";
 import { getConnection } from "../../connections";
 import { db } from "../../db";
 import { calcomAdapter } from "./calcom";
@@ -25,11 +26,16 @@ export async function calendarSettings(): Promise<{ provider: CalendarProvider |
   };
 }
 
-// desktop-app's lib/connect owns the Google sign-in and refresh. Until that
-// lands on main this throws a plain fix; the import replaces it at rebase.
+// The app's shared Google sign-in (lib/connect) owns the token and its refresh.
 async function googleToken(): Promise<string> {
-  void GOOGLE_CALENDAR_SCOPES;
-  throw new CalendarError("Google sign-in not installed", "Google Calendar arrives with the desktop app update. Use Cal.com for now.");
+  try {
+    return await getAccessToken("google", GOOGLE_CALENDAR_SCOPES);
+  } catch (e) {
+    if (e instanceof NeedsConnectError) {
+      throw new CalendarError("Google calendar not connected", "Press Connect Google Calendar on the Front Desk page and allow calendar access.");
+    }
+    throw new CalendarError(String(e), "Couldn't reach Google just now. Try again in a minute.");
+  }
 }
 
 /** The calendar she picked, or null when none is connected. */
