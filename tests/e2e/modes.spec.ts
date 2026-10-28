@@ -66,8 +66,10 @@ test("The ask bar fits the chat column beside the sidebar: its words never squee
   await expect(question).toBeVisible();
   const box = (await question.boundingBox())!;
   const column = (await bar.boundingBox())!;
-  // The question spans most of the bar (buttons go below it), at most two lines.
-  expect(box.width).toBeGreaterThan(column.width * 0.6);
+  // Narrow bar: the question spans most of it and the buttons go below. Wide enough
+  // (no chat list beside it since the dark menu): question and buttons share a row.
+  // Either way it stays readable, never a column of single words, and at most two lines.
+  expect(box.width).toBeGreaterThan(Math.min(column.width * 0.6, 280));
   expect(box.height).toBeLessThan(60);
   await page.screenshot({ path: `test/screens/modes-chat-narrow-${test.info().project.name}.png`, fullPage: true });
 });

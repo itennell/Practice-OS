@@ -146,6 +146,16 @@ export const PAIRS: Pair[] = [
   })),
 ];
 
+PAIRS.push(
+  { fg: "--menu-fg", on: ["--menu-bg"], min: AA_TEXT, label: "chat menu text" },
+  { fg: "--menu-muted", on: ["--menu-bg"], min: AA_TEXT, label: "chat menu muted text" },
+  { fg: "--menu-fg", on: ["--menu-bg", "--menu-active"], min: AA_TEXT, label: "chat menu current link" },
+  { fg: "--menu-muted", on: ["--menu-bg", "--menu-hover"], min: AA_TEXT, label: "chat menu muted text, hovered" },
+  { fg: "--menu-fg", on: ["--menu-bg", "--menu-badge"], min: AA_TEXT, label: "chat menu count badge" },
+  { fg: "--menu-focus", on: ["--menu-bg"], min: AA_NON_TEXT, label: "focus ring in the chat menu" },
+  { fg: "--menu-muted", on: ["--menu-bg"], min: AA_NON_TEXT, label: "chat menu search box outline" },
+);
+
 export type Result = Pair & { theme: Theme; ratio: number; pass: boolean };
 
 export function checkAll(css: string): Result[] {

@@ -48,7 +48,7 @@ Every UI piece Isaiah picked for Practice-OS, where it goes, and how to build it
 | UI-002 | Animated orb agent | SHL | Aeon orb | must | built | Design board p.8 | `components/ui.tsx` (`Orb`) |
 | UI-003 | Chip selectors | ONB | Who you help | must | approved | Design board p.8 |  |
 | UI-004 | Pill buttons | GLB | Buttons and chips | must | built | Design board p.8 | `components/ui.tsx` (`Button`, `ButtonLink`, `Chip`, `ChipLink`) |
-| UI-005 | Dark chat menu (ChatGPT style) | CHT | Conversation list | must | approved | Design board p.8 |  |
+| UI-005 | Dark chat menu (ChatGPT style) | CHT | Conversation list | must | built | Design board p.8 | `components/sidebar.tsx` (`Sidebar`) |
 | UI-006 | Chat bubbles with cut corners | CHT | Aeon bubble | must | approved | Design board p.7 |  |
 | UI-007 | Plugins page for connections | SET | Connections | nice | collected | Design board p.8 |  |
 | UI-008 | Agent profile page | Settings | Settings → Aeon | nice | built (Aeon only) | Design board p.8; Isaiah screenshot 2026-10-28 | `components/aeon-files.tsx` |
@@ -105,7 +105,7 @@ Big rounded primary actions, dark on light (54px), with the purple accent pill (
 
 ### UI-005 Dark chat menu (ChatGPT style)
 
-**CHT · Conversation list** · must · approved · Design board p.8
+**CHT · Conversation list** · must · built · Design board p.8
 
 A dark side menu for talking to Aeon: search, navigation, pinned and recent chats, and a New chat button.
 

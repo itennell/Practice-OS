@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/api/chat": ["./aeon/SOUL.md"],
     "/api/conversations": ["./aeon/SOUL.md"],
+    "/api/menu": ["./aeon/SOUL.md"],
     "/api/cron/reflect": ["./aeon/SOUL.md"],
     "/settings": ["./aeon/SOUL.md"],
   },
