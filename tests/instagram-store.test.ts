@@ -125,3 +125,13 @@ describe.skipIf(!hasDb)("onboarding answers", () => {
     expect(await loadInstagramPrefs()).toEqual(DEFAULT_PREFS);
   });
 });
+
+describe.skipIf(!hasDb)("onboarding saves one question at a time", () => {
+  it("keeps the topics when only the posts-a-week answer arrives", async () => {
+    const { instagramQuestions, loadInstagramPrefs, saveInstagramPrefs, DEFAULT_PREFS } = await import("../lib/instagram/onboarding");
+    await instagramQuestions.save({ topics: ["how_to_book"] });
+    await instagramQuestions.save({ posts_per_week: "1" });
+    expect(await loadInstagramPrefs()).toEqual({ topics: ["how_to_book"], postsPerWeek: 1 });
+    await saveInstagramPrefs(DEFAULT_PREFS);
+  });
+});

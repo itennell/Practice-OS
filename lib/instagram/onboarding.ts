@@ -37,8 +37,10 @@ export const instagramQuestions = {
     const p = await loadInstagramPrefs();
     return { topics: p.topics, posts_per_week: String(p.postsPerWeek) };
   },
+  /** Onboarding saves one question at a time, so the other answer is kept. */
   async save(answers: Record<string, unknown>): Promise<void> {
-    await saveInstagramPrefs(parsePrefs(answers));
+    const now = await loadInstagramPrefs();
+    await saveInstagramPrefs(parsePrefs({ topics: now.topics, posts_per_week: String(now.postsPerWeek), ...answers }));
   },
 };
 

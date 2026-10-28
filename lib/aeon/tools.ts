@@ -27,11 +27,11 @@ import { CPT, MODIFIERS, POS } from "../superbill/codes";
 import * as superbill from "../superbill/store";
 import * as cms855i from "../payers/cms855i";
 import * as payers from "../payers/store";
+import * as instagram from "../instagram/store";
 import { SPECIALTIES, type SpecialtyId } from "../referrals/nppes";
 import { draftOutreach } from "../referrals/outreach";
 import { DEFAULT_SPECIALTIES, getReferralSettings } from "../referrals/settings";
 import { findReferralSources, interleave, listSources, moveSource, STAGE_LABEL, STAGES } from "../referrals/store";
-import * as instagram from "../instagram/store";
 import { guard, WITHHELD } from "./guard";
 import { forget, MEMORY_KINDS, MemoryRefused, recentChanges, remember } from "./memory";
 
@@ -622,6 +622,85 @@ export const TOOLS: AeonTool[] = [
         matched,
         on_board: `${found.length} best matches are on the Referrals board under Found (/referrals).`,
         best_matches: top,
+      });
+    },
+  }),
+
+  tool({
+    name: "list_referral_sources",
+    title: "List the Referrals board",
+    description:
+      "Lists the cards on her Referrals board, best fit first, with each one's id, column (found, contacted, follow_up, " +
+      "connected, not_a_fit), specialty, miles, fit score and follow-up date. Read-only.",
+    input: {
+      stage: z.enum(STAGES).optional().describe("Only this column."),
+      limit: z.number().int().min(1).max(50).optional().describe("How many. Default 20."),
+    },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+    label: "Checked your Referrals board",
+    changesData: false,
+    run: async ({ stage, limit }) => {
+      const all = await listSources();
+      const rows = all.filter((s) => !stage || s.stage === stage).slice(0, limit ?? 20);
+      return text({
+        total_on_board: all.length,
+        cards: rows.map((s) => ({
+          id: s.id,
+          name: s.name,
+          column: STAGE_LABEL[s.stage],
+          specialty: s.specialty ?? s.taxonomy,
+          miles: s.distance_miles,
+          fit_score: s.fit_score,
+          follow_up_on: s.next_follow_up_on,
+          sample: s.is_sample,
+        })),
+      });
+    },
+  }),
+
+  tool({
+    name: "move_referral_source",
+    title: "Move a card on the Referrals board",
+    description: "Moves one referral source to another column of her Referrals board (by its id). Sends nothing.",
+    input: { id: z.string().uuid(), stage: z.enum(STAGES) },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+    label: "Moved a card on your Referrals board",
+    changesData: true,
+    run: async ({ id, stage }) => {
+      const moved = await moveSource(id, stage, "aeon");
+      return text(moved ? { moved: true, name: moved.name, column: STAGE_LABEL[stage] } : { moved: false, reason: "No card with that id." });
+    },
+  }),
+
+  // Muse writes; nothing is sent. Approving makes a Gmail draft to the test inbox.
+  tool({
+    name: "draft_outreach",
+    title: "Draft an introduction letter",
+    description:
+      "Writes a short professional introduction letter from the clinician to one referral source on her board (by its id): " +
+      "who she sees and an offer of a 15-minute call. Never offers fees, gifts or anything of value. The letter waits in her " +
+      "approvals; when she approves it, it becomes a Gmail draft in her test inbox for her to send, the card moves to " +
+      "Contacted and a follow-up is set a week out. Takes about 10 seconds.",
+    input: {
+      id: z.string().uuid().describe("The referral source's id, from find_referral_sources or list_referral_sources."),
+      note: z.string().trim().max(500).optional().describe("Anything she wants the letter to mention, in her words."),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: false },
+    label: "Drafted an introduction letter",
+    changesData: false,
+    run: async ({ id, note }, ctx) => {
+      const { approvalId, subject, letter, source } = await draftOutreach(id, { by: ctx.by, note });
+      const [row] = await db()<{ status: string }[]>`select status from practice_os.approvals where id = ${approvalId}`;
+      return {
+        content: [
+          { type: "text", text: row?.status === "pending" ? "queued for clinician approval" : `ran on its own under her mode: ${row?.status}` },
+          { type: "text", text: JSON.stringify({ approval_id: approvalId, to: source.name, subject, letter }, null, 2) },
+        ],
+        structuredContent: { status: row?.status ?? "pending", approval_id: approvalId },
+      };
+    },
+  }),
+
   // ---- Instagram (Instagram session) ---------------------------------------------------------
   tool({
     name: "plan_instagram_week",
@@ -669,32 +748,6 @@ export const TOOLS: AeonTool[] = [
   }),
 
   tool({
-    name: "list_referral_sources",
-    title: "List the Referrals board",
-    description:
-      "Lists the cards on her Referrals board, best fit first, with each one's id, column (found, contacted, follow_up, " +
-      "connected, not_a_fit), specialty, miles, fit score and follow-up date. Read-only.",
-    input: {
-      stage: z.enum(STAGES).optional().describe("Only this column."),
-      limit: z.number().int().min(1).max(50).optional().describe("How many. Default 20."),
-    },
-    annotations: { readOnlyHint: true, openWorldHint: false },
-    label: "Checked your Referrals board",
-    changesData: false,
-    run: async ({ stage, limit }) => {
-      const all = await listSources();
-      const rows = all.filter((s) => !stage || s.stage === stage).slice(0, limit ?? 20);
-      return text({
-        total_on_board: all.length,
-        cards: rows.map((s) => ({
-          id: s.id,
-          name: s.name,
-          column: STAGE_LABEL[s.stage],
-          specialty: s.specialty ?? s.taxonomy,
-          miles: s.distance_miles,
-          fit_score: s.fit_score,
-          follow_up_on: s.next_follow_up_on,
-          sample: s.is_sample,
     name: "list_instagram_posts",
     title: "Instagram posts",
     description: "Lists her recent Instagram posts with their status: waiting for her, blocked (and why), posted (with the link) or failed.",
@@ -714,49 +767,6 @@ export const TOOLS: AeonTool[] = [
           link: p.permalink,
         })),
       });
-    },
-  }),
-
-  tool({
-    name: "move_referral_source",
-    title: "Move a card on the Referrals board",
-    description: "Moves one referral source to another column of her Referrals board (by its id). Sends nothing.",
-    input: { id: z.string().uuid(), stage: z.enum(STAGES) },
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
-    label: "Moved a card on your Referrals board",
-    changesData: true,
-    run: async ({ id, stage }) => {
-      const moved = await moveSource(id, stage, "aeon");
-      return text(moved ? { moved: true, name: moved.name, column: STAGE_LABEL[stage] } : { moved: false, reason: "No card with that id." });
-    },
-  }),
-
-  // Muse writes; nothing is sent. Approving makes a Gmail draft to the test inbox.
-  tool({
-    name: "draft_outreach",
-    title: "Draft an introduction letter",
-    description:
-      "Writes a short professional introduction letter from the clinician to one referral source on her board (by its id): " +
-      "who she sees and an offer of a 15-minute call. Never offers fees, gifts or anything of value. The letter waits in her " +
-      "approvals; when she approves it, it becomes a Gmail draft in her test inbox for her to send, the card moves to " +
-      "Contacted and a follow-up is set a week out. Takes about 10 seconds.",
-    input: {
-      id: z.string().uuid().describe("The referral source's id, from find_referral_sources or list_referral_sources."),
-      note: z.string().trim().max(500).optional().describe("Anything she wants the letter to mention, in her words."),
-    },
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: false },
-    label: "Drafted an introduction letter",
-    changesData: false,
-    run: async ({ id, note }, ctx) => {
-      const { approvalId, subject, letter, source } = await draftOutreach(id, { by: ctx.by, note });
-      const [row] = await db()<{ status: string }[]>`select status from practice_os.approvals where id = ${approvalId}`;
-      return {
-        content: [
-          { type: "text", text: row?.status === "pending" ? "queued for clinician approval" : `ran on its own under her mode: ${row?.status}` },
-          { type: "text", text: JSON.stringify({ approval_id: approvalId, to: source.name, subject, letter }, null, 2) },
-        ],
-        structuredContent: { status: row?.status ?? "pending", approval_id: approvalId },
-      };
     },
   }),
 ];
