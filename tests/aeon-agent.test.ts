@@ -16,7 +16,7 @@ const ready = Boolean(process.env.DATABASE_URL) && existsSync(path.join(modelCac
 
 const { sendMessage } = await import("../lib/aeon/chat");
 const { respond } = await import("../lib/aeon/agent");
-const { remember } = await import("../lib/aeon/memory");
+const { MemoryRefused, remember } = await import("../lib/aeon/memory");
 const { TOOLS, runTool, guardResult } = await import("../lib/aeon/tools");
 const { CRISIS_REPLY } = await import("../lib/safety");
 const { REFUSAL } = await import("../lib/aeon/guard");
@@ -71,7 +71,17 @@ describe.skipIf(!ready)("golden conversations (replayed)", () => {
     ) as Recorded;
     const { chat, requests } = replay(recorded);
     const seeded: string[] = [];
-    for (const m of scenario.seedMemories ?? []) seeded.push((await remember(m, { actor: "clinician", source: "test:replay" })).memory.id);
+    for (const m of scenario.seedMemories ?? []) {
+      // The memory screens now refuse an injected note on save, so the old-note case
+      // (saved before the screens existed) is seeded straight into the table.
+      const saved = await remember(m, { actor: "clinician", source: "test:replay" }).catch(async (err) => {
+        if (!(err instanceof MemoryRefused)) throw err;
+        const [row] = await db()<{ id: string }[]>`
+          insert into practice_os.memories (kind, text, source) values (${m.kind}, ${m.text}, 'test:replay') returning id`;
+        return { memory: row };
+      });
+      seeded.push(saved.memory.id);
+    }
 
     const used: string[] = [];
     let last = "";
