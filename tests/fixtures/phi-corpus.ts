@@ -144,3 +144,23 @@ export const PHI_CASES: PhiCase[] = [
   { text: "[Sample] Prefers Tuesday consults", expect: "pass", note: "demo label" },
   { text: "My anxiety about taxes is real, what's due?", expect: "pass", note: "her own feeling, no person ref" },
 ];
+
+/**
+ * Characters glued onto the end of a client name ("Kevin Ortiz7x"). Each must
+ * still be refused: letters, digits, punctuation, other scripts, invisible
+ * characters (zero-width, joiners, direction marks, soft hyphen, BOM), stray
+ * combining marks, odd spaces, emoji and fullwidth forms. Invisible ones are
+ * escapes so they show in review. CI once let a random test tag through.
+ */
+export const GLUED_SUFFIXES: string[] = [
+  ..."abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+  ..."!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~",
+  "é", "ñ", "ß", "ø", "ł", "ğ", "Ж", "λ", "中", "あ", "한", "ع", "א",
+  "\u200b", "\u200c", "\u200d", "\u2060", "\ufeff", "\u00ad", "\u200e", "\u202e",
+  "\u0301", "\u0308", "\u0327", "\u00a0", "\u2009",
+  "\u{1f600}", "\u{1f44d}\u{1f3fd}", "❤️", "\u{1f1fa}\u{1f1f8}", "™", "®", "°", "§", "€", "ｘ", "１",
+];
+
+/** Each suffix once, three times over, and followed by letters and digits the way a test tag is glued on. */
+export const gluedNames = (name: string): string[] =>
+  GLUED_SUFFIXES.flatMap((s) => [`${name}${s}`, `${name}${s}${s}${s}`, `${name}${s}t9q2`]);

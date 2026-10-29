@@ -49,23 +49,37 @@ export function isAllowedPerson(name: string, text: string, allow: Allowlist): b
 // ID numbers and "client <name>" withhold one; other names are blanked below.
 const TOOL_RESULT_RULES: readonly PhiKind[] = ["identifier", "client_name"];
 
+/**
+ * The text both layers read: look-alike letters folded (NFKC: fullwidth "Ｋｅｖｉｎ"
+ * is "Kevin"), accents and stray combining marks dropped, and invisible
+ * characters (zero-width spaces, joiners, direction marks) removed, so they
+ * can't split or hide a name. Used for checking only; what is saved is unchanged.
+ */
+export function normalizeForCheck(text: string): string {
+  return text.normalize("NFKD").replace(/[\p{M}\p{Cf}]/gu, "").normalize("NFKC");
+}
+
 export async function guard(text: string, at: GuardPoint, allow?: Allowlist): Promise<GuardResult> {
   const list = allow ?? (await practiceAllowlist());
-  const rules = at === "tool_result" ? checkIdentity(text, list, TOOL_RESULT_RULES) : checkIdentity(text, list);
+  const plain = normalizeForCheck(text);
+  const rules = at === "tool_result" ? checkIdentity(plain, list, TOOL_RESULT_RULES) : checkIdentity(plain, list);
   if (!rules.ok) return { ok: false, kind: rules.kind };
 
   let names: string[];
   try {
-    names = await findNames(text);
+    names = await findNames(plain);
   } catch (err) {
     console.error(`[guard] name-finder unavailable: ${err instanceof Error ? err.message : String(err)}`);
     return { ok: false, kind: "unavailable" };
   }
-  const strangers = names.filter((n) => !isAllowedPerson(n, text, list));
+  const strangers = names.filter((n) => !isAllowedPerson(n, plain, list));
   if (strangers.length === 0) return { ok: true, text };
   // A tool result keeps its business content with the names blanked out;
   // anything she typed or Aeon would save or say is refused outright.
   if (at !== "tool_result") return { ok: false, kind: "client_name" };
+  // A name written differently in the original (hidden characters) can't be blanked: withhold it all.
+  const lower = text.toLowerCase();
+  if (strangers.some((n) => !lower.includes(n.toLowerCase()))) return { ok: false, kind: "client_name" };
   let redacted = text;
   for (const n of strangers) redacted = redacted.replace(new RegExp(escape(n), "gi"), NAME_WITHHELD);
   return { ok: true, text: redacted };
