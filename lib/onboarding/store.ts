@@ -27,7 +27,7 @@ import {
   type Screen,
   type Stage,
 } from "./chapters";
-import { HELPER_QUESTIONS, type PracticeBasics } from "./helper-questions";
+import { HELPER_QUESTIONS, type HelperBlock, type PracticeBasics } from "./helper-questions";
 
 // Saving the interview. Every answer goes to the table and writer that already own
 // it; onboarding_answers.progress only remembers where she is, what she typed (to
@@ -144,6 +144,25 @@ export type OnboardingState = {
   setupItems: SetupItem[];
 };
 
+/**
+ * Each helper's own saved answers and defaults (HelperBlock.load, server side), keyed
+ * like its screens ("referrals:specialties"), so she sees them when she comes back.
+ * A helper that can't load leaves its screens empty rather than breaking onboarding.
+ */
+export async function helperPrefill(blocks: HelperBlock[], basics: PracticeBasics): Promise<Record<string, unknown>> {
+  const out: Record<string, unknown> = {};
+  await Promise.all(
+    blocks.map(async (block) => {
+      const loaded = await block.load(basics).catch((err) => {
+        console.error(`[onboarding] ${block.helper} load: ${err instanceof Error ? err.message : String(err)}`);
+        return {} as Record<string, unknown>;
+      });
+      for (const q of block.questions) if (loaded[q.id] !== undefined && loaded[q.id] !== null) out[`${block.helper}:${q.id}`] = loaded[q.id];
+    }),
+  );
+  return out;
+}
+
 export async function loadOnboarding(sql: postgres.Sql = db()): Promise<OnboardingState> {
   const row = await loadProfileRow(sql);
   const progress = progressOf(row);
@@ -158,7 +177,9 @@ export async function loadOnboarding(sql: postgres.Sql = db()): Promise<Onboardi
     progress: { ...progress, values },
     completed: Boolean(row?.onboarding_completed_at),
     hasProfile: Boolean(row),
-    saved: row ? await savedValues(row, sql) : {},
+    saved: row
+      ? { ...(await helperPrefill(HELPER_QUESTIONS, basicsFrom(ctxFrom(progress.values, row)))), ...(await savedValues(row, sql)) }
+      : {},
     setupItems: setupItems.map((s) => ({ id: s.id, title: s.title, status: s.status })),
   };
 }

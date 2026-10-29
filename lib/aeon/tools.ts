@@ -27,6 +27,7 @@ import { CPT, MODIFIERS, POS } from "../superbill/codes";
 import * as superbill from "../superbill/store";
 import * as cms855i from "../payers/cms855i";
 import * as payers from "../payers/store";
+import * as instagram from "../instagram/store";
 import { SPECIALTIES, type SpecialtyId } from "../referrals/nppes";
 import { draftOutreach } from "../referrals/outreach";
 import { DEFAULT_SPECIALTIES, getReferralSettings } from "../referrals/settings";
@@ -697,6 +698,75 @@ export const TOOLS: AeonTool[] = [
         ],
         structuredContent: { status: row?.status ?? "pending", approval_id: approvalId },
       };
+    },
+  }),
+
+  // ---- Instagram (Instagram session) ---------------------------------------------------------
+  tool({
+    name: "plan_instagram_week",
+    title: "Plan this week's Instagram posts",
+    description:
+      "Writes five Instagram posts about practice logistics, one each for: your first session, fees and superbills, how to book, " +
+      "meet the clinician, office and telehealth. Each is checked for safety (no client stories, testimonials, promises, advice or self-harm), " +
+      "gets a picture of her, and waits on the Instagram page for her approval. Takes a few minutes.",
+    input: {},
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: false },
+    label: "Planned this week's posts",
+    changesData: false,
+    run: async (_input, ctx) => {
+      const r = await instagram.planWeek(ctx.by);
+      return text({ week_of: r.week, waiting_for_approval: r.saved.length - r.blocked, blocked: r.blocked, see: "/instagram" });
+    },
+  }),
+
+  tool({
+    name: "draft_instagram_post",
+    title: "Draft one Instagram post",
+    description:
+      "Writes one Instagram post she asked for, in her words, then checks it and makes its picture; it waits for her approval. " +
+      "Posts cover practice logistics only. If she asks about a client, a review or anything clinical, Aeon writes a logistics post instead and says why; " +
+      "suicide or self-harm topics are refused. Pass her request as she said it.",
+    input: {
+      request: z.string().trim().min(3).max(600),
+      pillar: z.enum(["first_session", "fees_superbills", "how_to_book", "meet_the_clinician", "office_telehealth"]).optional(),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: false },
+    label: "Drafted an Instagram post",
+    changesData: false,
+    run: async ({ request, pillar }, ctx) => {
+      const r = await instagram.requestPost(ctx.by, request, pillar ?? null);
+      if (r.outcome === "blocked") return text({ written: false, why: r.why });
+      return text({
+        written: r.outcome !== "blocked_after_rewrite",
+        headline: r.headline,
+        approval_id: r.post.approvalId,
+        changed_from_her_request: r.outcome === "rewritten",
+        why: r.why,
+        see: "/instagram",
+      });
+    },
+  }),
+
+  tool({
+    name: "list_instagram_posts",
+    title: "Instagram posts",
+    description: "Lists her recent Instagram posts with their status: waiting for her, blocked (and why), posted (with the link) or failed.",
+    input: { limit: z.number().int().min(1).max(30).default(10) },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+    label: "Checked your Instagram posts",
+    changesData: false,
+    run: async ({ limit }) => {
+      const posts = await instagram.listPosts({ limit });
+      return text({
+        posts: posts.map((p) => ({
+          headline: p.headline,
+          pillar: p.pillar,
+          status: p.status,
+          why_blocked: p.blockedReason,
+          why_failed: p.failedReason,
+          link: p.permalink,
+        })),
+      });
     },
   }),
 

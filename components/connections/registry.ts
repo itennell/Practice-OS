@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
 import { GoogleCard } from "./google-card";
+import { InstagramCard } from "./instagram-card";
 import { MuseCard } from "./muse-card";
 import { CalcomConnectionCard } from "./calcom-card";
 import { PhoneConnectionCard } from "./phone-card";
@@ -23,6 +24,7 @@ export type ConnectionCard = {
 export const CONNECTION_CARDS: ConnectionCard[] = [
   { id: "muse", order: 0, Card: MuseCard },
   { id: "google", order: 20, Card: GoogleCard },
+  { id: "instagram", order: 30, Card: InstagramCard },
   // Front Desk
   { id: "phone", order: 40, Card: PhoneConnectionCard },
   { id: "calcom", order: 50, Card: CalcomConnectionCard },

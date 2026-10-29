@@ -19,6 +19,20 @@ function freshInstall() {
 }
 
 async function seriousViolations(page: Page) {
+  // Let colour transitions (a chip just tapped) finish, so axe reads the settled colours.
+  // Endless animations (Aeon breathing, Liquid Ether) never finish, so they're left out.
+  // Only running ones (a paused animation never finishes), and never longer than 1.5s.
+  await page.evaluate(() =>
+    Promise.race([
+      Promise.all(
+        document
+          .getAnimations()
+          .filter((a) => a.playState === "running" && Number.isFinite(Number(a.effect?.getComputedTiming().endTime)))
+          .map((a) => a.finished.catch(() => undefined)),
+      ),
+      new Promise((done) => setTimeout(done, 1500)),
+    ]),
+  );
   const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
   return results.violations
     .filter((v) => v.impact === "serious" || v.impact === "critical")
@@ -116,9 +130,16 @@ test("A new clinician sets up the whole practice, and the home page lists what s
   await step(page, /text clients/, () => radio(page, "Yes"));
   // Referrals' own setup question (lib/referrals/onboarding.ts); the ZIP one is skipped because she has an office.
   await step(page, /Who would you like to hear from\?/, async () => {
-    await page.getByRole("button", { name: "Family medicine" }).click();
+    // Referrals' load() prefills its defaults; she adds one more.
+    await expect(page.getByRole("button", { name: "Family medicine" })).toHaveAttribute("aria-pressed", "true");
     await page.getByRole("button", { name: "Oncology" }).click();
+    await expect(page.getByRole("button", { name: "Oncology" })).toHaveAttribute("aria-pressed", "true");
   });
+  // Instagram's own setup questions (lib/instagram/onboarding.ts): all five topics start picked.
+  await step(page, /What should your Instagram posts be about\?/, () =>
+    page.getByRole("button", { name: "Office and telehealth", pressed: true }).click(),
+  );
+  await step(page, /How many posts should Aeon plan each week\?/, () => radio(page, "3 a week"));
   // Front Desk's own setup questions (lib/frontdesk/onboarding.ts).
   await step(page, /Which calendar should Front Desk book/, () => radio(page, "Google Calendar"));
   await step(page, /How long is your free phone consult\?/, () => page.getByLabel("Number (minutes)").fill("20"));
