@@ -1,14 +1,17 @@
 import { toE164, prettyPhone } from "./numbers";
 import { PhoneError, type CheckResult, type InboundText, type PhoneAdapter, type Voicemail } from "./types";
 
-// Developer-only adapter for Isaiah's own demo line (FRONT_DESK_DEV_TWILIO=true).
-// Never offered to clinicians: Practice-OS doesn't own or manage their numbers.
-// The greeting and recording come from a TwiML Bin on the number (Twilio-hosted),
-// so nothing here needs a public URL; new recordings and texts are found by listing.
+// Twilio, on her own Twilio account (Settings › Connections › Practice phone),
+// or Isaiah's developer demo line (FRONT_DESK_DEV_TWILIO=true). Practice-OS
+// never owns her number. The greeting and recording are TwiML hosted by Twilio
+// (a TwiML Bin on the demo line, Twilio's echo Twimlet on hers, set by
+// setVoicemail below), so nothing here needs a public URL; new recordings and
+// texts are found by listing. Changing her number's call setting is her
+// choice: the card asks first, keeps the old setting, and can put it back.
 
 const API = "https://api.twilio.com/2010-04-01";
 
-export type TwilioConfig = { accountSid: string; authToken: string; phoneNumber: string };
+export type TwilioConfig = { accountSid: string; authToken: string; phoneNumber: string; /** Isaiah's demo line from .env. */ developer?: boolean };
 
 type TwilioRecording = { sid: string; call_sid: string; date_created: string; status: string; duration: string };
 type TwilioCall = { sid: string; from: string; to: string };
@@ -29,7 +32,10 @@ export function twilioAdapter(config: TwilioConfig, fetchImpl: typeof fetch = fe
       headers: { Authorization: auth, ...(init.headers ?? {}) },
       signal: AbortSignal.timeout(20_000),
     });
-    if (res.status === 401) throw new PhoneError("Twilio refused the keys", "Check TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN in .env.", 401);
+    if (res.status === 401) {
+      const fix = config.developer ? "Check TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN in .env." : "Twilio didn't accept those keys. Copy the Account SID and Auth Token again from the Twilio Console home page.";
+      throw new PhoneError("Twilio refused the keys", fix, 401);
+    }
     if (!res.ok) throw new PhoneError(`Twilio answered HTTP ${res.status}`, "Twilio didn't answer. Try again in a minute.", res.status);
     return (await res.json()) as T;
   }
@@ -42,9 +48,9 @@ export function twilioAdapter(config: TwilioConfig, fetchImpl: typeof fetch = fe
         const q = new URLSearchParams({ PhoneNumber: config.phoneNumber });
         const out = await call<{ incoming_phone_numbers: unknown[] }>(`/IncomingPhoneNumbers.json?${q}`);
         if (out.incoming_phone_numbers.length === 0) {
-          return { ok: false, fix: "TWILIO_PHONE_NUMBER isn't a number on this Twilio account." };
+          return { ok: false, fix: config.developer ? "TWILIO_PHONE_NUMBER isn't a number on this Twilio account." : "That number is no longer on your Twilio account. Connect again and pick your number." };
         }
-        return { ok: true, label: `Connected: ${prettyPhone(config.phoneNumber)} (Twilio, developer line)` };
+        return { ok: true, label: `Connected: ${prettyPhone(config.phoneNumber)} (Twilio${config.developer ? ", developer line" : ""})` };
       } catch (e) {
         return { ok: false, fix: e instanceof PhoneError ? e.fix : "Couldn't reach Twilio." };
       }
@@ -106,5 +112,70 @@ export function twilioFromEnv(env: NodeJS.ProcessEnv = process.env): TwilioConfi
   const authToken = env.TWILIO_AUTH_TOKEN;
   const phoneNumber = toE164(env.TWILIO_PHONE_NUMBER);
   if (!accountSid || !authToken || !phoneNumber) return null;
-  return { accountSid, authToken, phoneNumber };
+  return { accountSid, authToken, phoneNumber, developer: true };
+}
+
+export type TwilioNumber = { sid: string; phoneNumber: string; label: string; tollFree: boolean };
+/** Where Twilio sends calls to a number: what setVoiceUrl changes and Undo restores. */
+export type VoiceSetting = { voiceUrl: string | null; voiceMethod: string | null };
+
+/** Her Twilio numbers. Throws PhoneError (with a plain fix) when the keys don't work. */
+export async function listTwilioNumbers(accountSid: string, authToken: string, fetchImpl: typeof fetch = fetch): Promise<TwilioNumber[]> {
+  const auth = `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString("base64")}`;
+  let res: Response;
+  try {
+    res = await fetchImpl(`${API}/Accounts/${accountSid}/IncomingPhoneNumbers.json?PageSize=50`, { headers: { Authorization: auth }, signal: AbortSignal.timeout(20_000) });
+  } catch {
+    throw new PhoneError("Twilio unreachable", "Couldn't reach Twilio. Check your internet and try again.");
+  }
+  if (res.status === 401 || res.status === 404) {
+    throw new PhoneError("Twilio refused the keys", "Twilio didn't accept those keys. Copy the Account SID and Auth Token again from the Twilio Console home page.", res.status);
+  }
+  if (!res.ok) throw new PhoneError(`Twilio answered HTTP ${res.status}`, "Twilio didn't answer. Try again in a minute.", res.status);
+  const out = (await res.json()) as { incoming_phone_numbers: { sid: string; phone_number: string }[] };
+  return out.incoming_phone_numbers.map((n) => ({
+    sid: n.sid,
+    phoneNumber: n.phone_number,
+    label: prettyPhone(n.phone_number),
+    tollFree: isTollFree(n.phone_number),
+  }));
+}
+
+export const isTollFree = (e164: string) => /^\+18(00|33|44|55|66|77|88)/.test(e164);
+
+const ECHO = "https://twimlets.com/echo";
+const xml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+/**
+ * The page Twilio reads when someone calls her number: her greeting, then a
+ * recording of up to two minutes. Hosted by Twilio's echo Twimlet, so her
+ * computer needs no public address. After the recording Twilio hangs up
+ * (without an action Twilio would ask the same page again and loop).
+ */
+export function voicemailUrl(greeting: string): string {
+  const hangup = `${ECHO}?${new URLSearchParams({ Twiml: "<Response><Hangup/></Response>" })}`;
+  const twiml = `<Response><Say>${xml(greeting)}</Say><Record maxLength="120" playBeep="true" trim="trim-silence" action="${xml(hangup)}"/></Response>`;
+  return `${ECHO}?${new URLSearchParams({ Twiml: twiml })}`;
+}
+
+const numberUrl = (config: TwilioConfig, numberSid: string) => `${API}/Accounts/${config.accountSid}/IncomingPhoneNumbers/${numberSid}.json`;
+const basic = (config: TwilioConfig) => `Basic ${Buffer.from(`${config.accountSid}:${config.authToken}`).toString("base64")}`;
+
+/** Her number's current call setting, read before anything changes it. */
+export async function getVoiceSetting(config: TwilioConfig, numberSid: string, fetchImpl: typeof fetch = fetch): Promise<VoiceSetting> {
+  const res = await fetchImpl(numberUrl(config, numberSid), { headers: { Authorization: basic(config) }, signal: AbortSignal.timeout(20_000) }).catch(() => null);
+  if (!res?.ok) throw new PhoneError(`Twilio number read failed (${res?.status ?? "network"})`, "Couldn't reach your Twilio number. Try again in a minute.", res?.status ?? null);
+  const n = (await res.json()) as { voice_url?: string | null; voice_method?: string | null };
+  return { voiceUrl: n.voice_url || null, voiceMethod: n.voice_method || null };
+}
+
+/** Sets where Twilio sends calls to her number (an empty url clears it). */
+export async function setVoiceSetting(config: TwilioConfig, numberSid: string, v: VoiceSetting, fetchImpl: typeof fetch = fetch): Promise<void> {
+  const res = await fetchImpl(numberUrl(config, numberSid), {
+    method: "POST",
+    headers: { Authorization: basic(config), "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ VoiceUrl: v.voiceUrl ?? "", VoiceMethod: v.voiceMethod ?? "POST" }),
+    signal: AbortSignal.timeout(20_000),
+  }).catch(() => null);
+  if (!res?.ok) throw new PhoneError(`Twilio number update failed (${res?.status ?? "network"})`, "Couldn't change your number's call setting. Try again in a minute.", res?.status ?? null);
 }

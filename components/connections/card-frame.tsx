@@ -12,6 +12,7 @@ export function ConnectionCardFrame({
   description,
   connected,
   accountLabel,
+  statusText = "Not connected",
   children,
 }: {
   icon: ReactNode;
@@ -20,6 +21,8 @@ export function ConnectionCardFrame({
   connected: boolean;
   /** "dana@example.com", "@practiceos_", "Key ending 4f2a". */
   accountLabel?: string;
+  /** What shows instead of "Not connected" (a card that needs no connection says so). */
+  statusText?: string;
   /** Buttons and anything else the card needs. */
   children?: ReactNode;
 }) {
@@ -41,7 +44,7 @@ export function ConnectionCardFrame({
           {connected ? (
             <StatusPill status="done">{accountLabel ? `Connected · ${accountLabel}` : "Connected"}</StatusPill>
           ) : (
-            <span className="text-small text-[var(--fg-muted)]">Not connected</span>
+            <span className="text-small text-[var(--fg-muted)]">{statusText}</span>
           )}
         </div>
       </div>
