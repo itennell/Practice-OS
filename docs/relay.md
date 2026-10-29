@@ -37,5 +37,10 @@ computer (a Desktop-app client with PKCE).
 
 In the Meta app, the valid OAuth redirect URI is `<RELAY_URL>/api/connect/instagram/callback`.
 
+`GET /api/health` reports each setting as yes/no, never a value. `ready` means
+sign-in can work (the first four settings); `images` means post images can be
+hosted (`BLOB_READ_WRITE_TOKEN` and `CRON_SECRET`). The app checks `ready` before
+offering Connect Instagram; without image hosting, uploads get a plain 503.
+
 The app needs only `RELAY_URL` in its `.env`. Code lives in `relay/lib/handlers.ts`;
 `tests/relay.test.ts` runs it without the network.

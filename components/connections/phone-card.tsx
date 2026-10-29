@@ -8,12 +8,14 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { TextField } from "@/components/shared/settings-controls";
 import { notify } from "@/components/shared/toaster";
 import { Button, Chip } from "@/components/ui";
+import { phoneCardView, type PhoneCardStatus } from "@/lib/frontdesk/phone/card-view";
 
 // Phone Connect card (Front Desk). She brings her own phone company; Practice-OS
 // never owns her number. Spruce needs one email to its Support, then one pasted
-// token with a live check. Isaiah's developer Twilio line is never offered here.
+// token with a live check. When Isaiah's developer Twilio line is on (the demo),
+// the card shows that line as connected instead and offers no setup.
 
-export type PhoneCardStatus = { connected: boolean; label?: string; fix?: string; devLine?: boolean };
+export type { PhoneCardStatus };
 
 export const SPRUCE_SUPPORT_MESSAGE =
   "Hi, please turn on API access for my Spruce account. I use Practice-OS, an open-source front-desk helper, " +
@@ -60,26 +62,25 @@ export function PhoneCard({ initial }: { initial: PhoneCardStatus }) {
     }
   };
 
-  const label = status.label?.replace(/^Connected: /, "");
+  const view = phoneCardView(status);
   return (
     <ConnectionCardFrame
       icon={<Phone className="size-5" />}
       title="Practice phone"
-      description="Front Desk reads your voicemails and texts from your own phone company and texts callers your open consult times."
-      connected={status.connected}
-      accountLabel={label}
+      description={view.description}
+      connected={view.connected}
+      accountLabel={view.accountLabel}
     >
       <div className="flex basis-full flex-col gap-4">
-        {status.connected ? (
+        {view.connected ? (
           <div className="flex flex-col gap-3">
-            {status.fix && (
+            {view.fix && (
               <p role="alert" className="text-[var(--danger-fg)]">
-                {status.fix}
+                {view.fix}
               </p>
             )}
-            {status.devLine ? (
-              <p className="text-small text-[var(--fg-muted)]">This is the developer test line from .env, not a clinician&apos;s account.</p>
-            ) : (
+            {view.note && <p className="max-w-[60ch] text-small text-[var(--fg-muted)]">{view.note}</p>}
+            {view.canDisconnect && (
               <ConfirmDialog
                 trigger={<Button variant="quiet" className="self-start">Disconnect</Button>}
                 title="Disconnect your phone?"
@@ -89,7 +90,7 @@ export function PhoneCard({ initial }: { initial: PhoneCardStatus }) {
               />
             )}
           </div>
-        ) : (
+        ) : view.showSpruceSetup && (
           <>
             <div className="flex flex-wrap gap-2" aria-label="Phone company">
               <Chip on>Spruce Health</Chip>
@@ -138,5 +139,5 @@ export function PhoneCard({ initial }: { initial: PhoneCardStatus }) {
 
 /** Settings › Connections entry (components/connections/registry.ts). */
 export function PhoneConnectionCard({ status }: { status: ConnectionStatus }) {
-  return <PhoneCard initial={{ connected: status.connected, label: status.accountLabel }} />;
+  return <PhoneCard initial={{ connected: status.connected, label: status.accountLabel, ...status.phone }} />;
 }

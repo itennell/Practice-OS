@@ -1,3 +1,5 @@
+import { relayHealth } from "../lib/health";
+
 export function GET() {
-  return Response.json({ ok: true, service: "practice-os-relay" });
+  return Response.json(relayHealth(process.env), { headers: { "cache-control": "no-store" } });
 }

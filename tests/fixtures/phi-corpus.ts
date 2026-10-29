@@ -162,6 +162,10 @@ export const PHI_CASES: PhiCase[] = [
   { text: "Open Meta Business Suite, then Account Center, and choose Switch to Professional Account.", expect: "pass", note: "Meta screens" },
   { text: "Press Connect Cal, then open Front Desk Settings.", expect: "pass", note: "app screens" },
   { text: "Go to Settings, then Connections, and press Connect Gmail.", expect: "pass", note: "app screens" },
+  // ---- who she helps (Oct 29: the "Couples" chip was read as a person)
+  { text: "Couples", expect: "pass", note: "onboarding chip" },
+  { text: "Couples going through big changes", expect: "pass", note: "audience word first" },
+  { text: "[Sample] Adults in Chicago going through work stress and life transitions", expect: "pass", note: "demo who-I-help" },
 ];
 
 /**
