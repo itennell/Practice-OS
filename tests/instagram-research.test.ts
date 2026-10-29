@@ -42,6 +42,8 @@ function stubChat(angles: unknown[], summary = "Therapists keep these posts plai
 const good = [
   { title: "What a first session for anxiety looks like", hook: "Curious what happens first?", format: "carousel", why: "Step posts answer the first question.", pillar: "first_session", source_numbers: [1, 2] },
   { title: "What a session costs", hook: "Here's what it costs.", format: "single picture", why: "Plain prices help people book.", pillar: "fees_superbills", source_numbers: [3, 99] },
+  { title: "Superbills for out-of-network", hook: "Out-of-network? You may still get 50-80% back", format: "carousel", why: "Numbers grab.", pillar: "fees_superbills", source_numbers: [1] },
+  { title: "Meet your clinician", hook: "Hi, I'm [Name, License]", format: "carousel", why: "Faces help.", pillar: "meet_the_clinician", source_numbers: [1] },
   { title: "Ways to cope with your anxiety", hook: "Try box breathing tonight.", format: "reel", why: "Tips get saves.", pillar: "first_session", source_numbers: [1] },
 ];
 
@@ -55,7 +57,7 @@ describe("links", () => {
     expect(usableLink("https://www.psychologytoday.com/us/blog/x")).toBe(true);
   });
 
-  it("an angle keeps only numbers that point at a real source, and the advice angle is dropped", () => {
+  it("an angle keeps only numbers that point at a real source; advice, invented numbers and placeholders are dropped", () => {
     const numbered = [
       { url: "https://a.example/1", title: "1" },
       { url: "https://b.example/2", title: "2" },

@@ -45,6 +45,7 @@ const RULES =
   "Only practice logistics: what a first session is like, fees and superbills, insurance, how to book, who the clinician is, the office and telehealth. " +
   "Never mental health advice, coping tips, symptoms or techniques; never client stories or testimonials. " +
   "Do not search, open or cite instagram.com, facebook.com or threads.net pages; use articles, guides and blogs about therapist marketing instead. " +
+  "Never invent numbers, percentages, prices or insurance pay-back amounts, and never use placeholders like [Name]. " +
   "Answer in at most 4 short lines.";
 
 /** The three helpers' questions. Each is one small search, run in parallel. */
@@ -100,6 +101,8 @@ export function checkAngles(raw: RawAngle[], numbered: ResearchLink[]): Research
     const text = `${a.title}\n${a.hook}\n${a.why}`;
     const found = codeCritic(text, { licenseLine: "", feesCents: [] }).findings.filter((f) => !["license_line", "invented_fee", "caption_limits"].includes(f.rule));
     if (found.length) continue;
+    // Numbers she didn't give (a % back, a price) and template placeholders never reach her post.
+    if (/%|\$\s?\d|\[[^\]]*\]|\{[^}]*\}/.test(`${a.title}\n${a.hook}`)) continue;
     const sources = [...new Set(a.source_numbers)]
       .map((n) => numbered[n - 1]?.url)
       .filter((u): u is string => Boolean(u && usableLink(u)))
