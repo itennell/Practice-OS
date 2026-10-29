@@ -114,7 +114,7 @@ test("Maya posts weekly: she has an Instagram, goes straight to her post answers
   // Aeon writes, she posts: nothing to connect, so nothing about Instagram is left to set up.
   await expect(page.getByRole("region", { name: "Still to set up" }).getByText(/Instagram/)).toHaveCount(0); // the card may not show at all
   expect(await menuHidden(page)).toEqual([]);
-  if (wide()) await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Instagram" })).toBeVisible();
+  if (wide()) await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Media" })).toBeVisible();
   const saved = await page.evaluate(() => fetch("/api/onboarding").then((r) => r.json()));
   expect(saved.saved).toMatchObject({ "instagram:posts_per_week": "1", "instagram:never_show": ["family"], "instagram:style": { pick: "warm" } });
 });

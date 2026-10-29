@@ -69,8 +69,11 @@ describe.skipIf(!hasDb)("instagram_post executor (no publishing)", () => {
     // Retry draws the picture again and queues a fresh approval; a second retry while it waits is refused.
     process.env.PLAYWRIGHT_IMAGE_STANDIN = "1";
     try {
-      const again = await retryPost("test", postId);
-      expect(again.ok).toBe(true);
+      // Two Retries at once: exactly one claims the post and queues an approval.
+      const both = await Promise.all([retryPost("test", postId), retryPost("test", postId)]);
+      expect(both.filter((x) => x.ok)).toHaveLength(1);
+      expect(both.find((x) => !x.ok)).toMatchObject({ ok: false, status: 409 });
+      const again = both.find((x) => x.ok)!;
       if (!again.ok) return;
       made.push(again.approvalId);
       const [after] = await db()<{ status: string; failed_reason: string | null; has_image: boolean; approval_id: string }[]>`
@@ -87,6 +90,14 @@ describe.skipIf(!hasDb)("instagram_post executor (no publishing)", () => {
       if (sent.ok) made.push(sent.approvalId);
       const [row] = await db()<{ status: string; same: boolean }[]>`select status, image_jpeg = ${jpeg} as same from practice_os.posts where id = ${d.id}`;
       expect(row).toEqual({ status: "pending_approval", same: true });
+      // A declined post is never retried.
+      const [r] = await db()<{ id: string }[]>`
+        insert into practice_os.approvals (kind, title, payload, status, created_by, decided_at, decided_by) values ('instagram_post', 'declined one', '{}', 'rejected', 'test', now(), 'test') returning id`;
+      made.push(r.id);
+      const [q] = await db()<{ id: string }[]>`
+        insert into practice_os.posts (topic, caption, headline, status, approval_id, is_sample)
+        values ('how_to_book', 'Book.', 'Declined', 'pending_approval', ${r.id}, true) returning id`;
+      expect(await retryPost("test", q.id)).toMatchObject({ ok: false, status: 409 });
     } finally {
       delete process.env.PLAYWRIGHT_IMAGE_STANDIN;
     }

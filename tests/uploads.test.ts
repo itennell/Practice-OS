@@ -2,6 +2,7 @@
 // client-record refusal, the plain-code check of Muse's proposal, and on the
 // demo practice: a payer contract that becomes a deadline only after approval,
 // an intake form refused before any model call, and a crisis line.
+import { randomUUID } from "node:crypto";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -249,29 +250,37 @@ describe.skipIf(!hasDb)("adding files on the demo practice", async () => {
 
   it("adds a new payer as preparing, and counts a CE certificate once", async () => {
     const sql = db();
+    // Its own payer and certificate each run, so rows left by an earlier run on a reused
+    // database (a payer, an already-counted certificate) can't change the result.
+    const tag = randomUUID().slice(0, 8);
+    const payer = `Sunrise Health ${tag} [Sample]`;
+    const certificate = `Certificate CE-${tag}`;
     const facts = [
       { target: "payer_effective_on", label: "Starts", date: "2027-01-01", number: null, quote: "Effective date: January 1, 2027.", ref: null },
-      { target: "ce_hours", label: "Ethics CE", date: null, number: 3, quote: "3 contact hours", ref: "Certificate CE-1234" },
+      { target: "ce_hours", label: "Ethics CE", date: null, number: 3, quote: "3 contact hours", ref: certificate },
     ];
     const run = async () => {
-      const kept = await fileUpload(bytes(`${CONTRACT}\n3 contact hours Certificate CE-1234 ${Math.random()}`), {
+      const kept = await fileUpload(bytes(`${CONTRACT}\n3 contact hours ${certificate} ${Math.random()}`), {
         by: "test:uploads",
-        chat: (async () => ({ choices: [{ message: { content: JSON.stringify({ kind: "payer_contract", title: "Sunrise agreement", summary: "", payer: "Sunrise Health [Sample]", facts }) } }] })) as never,
+        chat: (async () => ({ choices: [{ message: { content: JSON.stringify({ kind: "payer_contract", title: "Sunrise agreement", summary: "", payer, facts }) } }] })) as never,
       });
       if (!kept.ok || !kept.approvalId) throw new Error("not queued");
       const [approval] = await sql`select * from practice_os.approvals where id = ${kept.approvalId}`;
       return fileDocument(approval as never, { dryRun: true });
     };
     const before = Number((await sql`select ce_hours_done from practice_os.compliance_facts limit 1`)[0].ce_hours_done);
-    await run();
-    const second = await run();
-    expect(second).toMatchObject({ already_counted: ["ce_hours:Certificate CE-1234"] });
-    const after = Number((await sql`select ce_hours_done from practice_os.compliance_facts limit 1`)[0].ce_hours_done);
-    expect(after - before).toBe(3);
-    const [payer] = await sql`select status, approved_on from practice_os.payer_applications where payer = 'Sunrise Health [Sample]'`;
-    expect(payer).toMatchObject({ status: "preparing", approved_on: null });
-    await sql`delete from practice_os.payer_applications where payer = 'Sunrise Health [Sample]'`;
-    await sql`update practice_os.compliance_facts set ce_hours_done = ${before}`;
+    try {
+      await run();
+      const second = await run();
+      expect(second).toMatchObject({ already_counted: [`ce_hours:${certificate}`] });
+      const after = Number((await sql`select ce_hours_done from practice_os.compliance_facts limit 1`)[0].ce_hours_done);
+      expect(after - before).toBe(3);
+      const [row] = await sql`select status, approved_on from practice_os.payer_applications where payer = ${payer}`;
+      expect(row).toMatchObject({ status: "preparing", approved_on: null });
+    } finally {
+      await sql`delete from practice_os.payer_applications where payer = ${payer}`;
+      await sql`update practice_os.compliance_facts set ce_hours_done = ${before}`;
+    }
   });
 
   it("runs file_upload only over MCP, and only on files in the inbox", async () => {
