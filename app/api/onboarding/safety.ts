@@ -3,6 +3,8 @@ import { audit } from "@/lib/audit";
 import { guard, REFUSAL } from "@/lib/aeon/guard";
 import { isSameOrigin } from "@/lib/request-guard";
 import { QUESTIONS } from "@/lib/onboarding/chapters";
+import { HELPER_QUESTIONS } from "@/lib/onboarding/helper-questions";
+import { STYLES } from "@/lib/instagram/style";
 import { checkCrisis, CRISIS_REPLY } from "@/lib/safety";
 
 // Every onboarding answer goes through the crisis check and, for anything she writes
@@ -22,7 +24,7 @@ export function canWrite(request: Request): boolean {
 }
 
 /** Her own details (name, practice name, address, contact, IDs) aren't client details, so the name guard skips them. */
-const OWN_DETAILS = new Set(["name", "practice_name", "contact", "office", "alert_phone", "npi", "ein", "malpractice", "payers", "state", "license"]);
+const OWN_DETAILS = new Set(["name", "practice_name", "contact", "office", "alert_phone", "npi", "ein", "malpractice", "payers", "state", "license", "website_url"]);
 
 function strings(v: unknown): string[] {
   if (typeof v === "string") return [v];
@@ -41,9 +43,17 @@ function chipsValid(id: string, v: unknown): boolean {
   return ok(o.chips ?? [], q.options) && ok(o.work ?? [], q.workOptions);
 }
 
+/** The fixed answers a screen offers (chips, choices, a style pick); only typed text goes to the name guard. */
 function chipValues(id: string): Set<string> {
+  const [helper, qid] = id.split(":");
+  if (qid) {
+    const q = HELPER_QUESTIONS.find((b) => b.helper === helper)?.questions.find((x) => x.id === qid);
+    if (!q) return new Set();
+    if (q.kind === "style") return new Set(STYLES.map((s) => s.id));
+    return new Set("options" in q ? q.options.map((x) => x.value) : []);
+  }
   const q = QUESTIONS.find((x) => x.id === id);
-  if (!q || q.kind !== "who") return new Set();
+  if (!q) return new Set();
   return new Set([...(q.options ?? []), ...(q.workOptions ?? [])].map((x) => x.value));
 }
 

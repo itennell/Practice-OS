@@ -1,4 +1,6 @@
-// The instagram_post executor in DRY_RUN, through the real approve() path.
+// The instagram_post executor through the real approve() path. Publishing is cut for
+// now: approving marks the post ready for her to post herself, with or without DRY_RUN,
+// and never calls Instagram or the relay.
 // Database tests: run only when DATABASE_URL is set (a throwaway local Postgres).
 import { readFileSync } from "node:fs";
 import { afterAll, describe, expect, it, vi } from "vitest";
@@ -31,21 +33,24 @@ afterAll(async () => {
   await closeDb();
 });
 
-describe.skipIf(!hasDb)("instagram_post executor (DRY_RUN)", () => {
-  it("checks the post and logs it without calling Instagram or the relay", async () => {
-    process.env.DRY_RUN = "true";
+describe.skipIf(!hasDb)("instagram_post executor (no publishing)", () => {
+  it.each([["true"], ["false"]])("DRY_RUN=%s: marks the post ready, audits it, and never calls Instagram or the relay", async (dry) => {
+    process.env.DRY_RUN = dry;
     const fetchSpy = vi.spyOn(globalThis, "fetch");
-    const { approvalId } = await draftPost();
+    const { approvalId, postId } = await draftPost();
     const r = await approve(approvalId, { by: "test" });
     expect(r.ok && r.approval.status).toBe("done");
-    expect(r.ok && r.approval.result).toMatchObject({ dryRun: true, would_publish: true });
+    expect(r.ok && r.approval.result).toMatchObject({ ready: true, posted: false, ...(dry === "true" ? { dryRun: true } : {}) });
     expect(fetchSpy).not.toHaveBeenCalled();
-    const [log] = await db()`select action from practice_os.audit_log where approval_id = ${approvalId} and action = 'instagram_post_dry_run'`;
-    expect(log).toBeTruthy();
+    const [post] = await db()`select status, ig_media_id from practice_os.posts where id = ${postId}`;
+    expect(post).toEqual({ status: "ready", ig_media_id: null });
+    const [log] = await db()`select details from practice_os.audit_log where approval_id = ${approvalId} and action = 'instagram_post_ready'`;
+    expect(log.details).toMatchObject({ published: false, dry_run: dry === "true" });
     fetchSpy.mockRestore();
+    process.env.DRY_RUN = "true";
   });
 
-  it("never publishes a post the safety check blocked", async () => {
+  it("never marks ready a post the safety check blocked", async () => {
     const { approvalId } = await draftPost({ blocked: true });
     const r = await approve(approvalId, { by: "test" });
     expect(r.ok && r.approval.status).toBe("failed");
@@ -55,6 +60,6 @@ describe.skipIf(!hasDb)("instagram_post executor (DRY_RUN)", () => {
   it("fails clearly when the image is missing", async () => {
     const { approvalId } = await draftPost({ image: false });
     const r = await approve(approvalId, { by: "test" });
-    expect(r.ok && r.approval.error).toMatch(/no finished image/);
+    expect(r.ok && r.approval.error).toMatch(/no finished picture/);
   });
 });

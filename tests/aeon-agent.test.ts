@@ -12,6 +12,8 @@ import { NER_MODEL, modelCacheDir } from "../lib/aeon/phi-classifier";
 import { SCENARIOS } from "./fixtures/aeon-scenarios";
 
 loadEnv();
+// Instagram drafts get a plain stand-in picture: no image models in a replay.
+process.env.PLAYWRIGHT_IMAGE_STANDIN = "1";
 const ready = Boolean(process.env.DATABASE_URL) && existsSync(path.join(modelCacheDir(), NER_MODEL));
 
 const { sendMessage } = await import("../lib/aeon/chat");
@@ -53,12 +55,14 @@ afterAll(async () => {
   if (!ready) return;
   const sql = db();
   if (conversations.length) await sql`delete from practice_os.conversations where id in ${sql(conversations)}`;
+  await sql`delete from practice_os.posts where created_at >= ${startedAt} and status = 'idea'`;
   await sql`delete from practice_os.memories where created_at >= ${startedAt} and (source like 'chat:%' or source = 'test:replay')`;
   const approvals = await sql<{ id: string }[]>`
     select id from practice_os.approvals where created_at >= ${startedAt} and created_by like 'chat:%'`;
   if (approvals.length) {
     const ids = approvals.map((a) => a.id);
     await sql`delete from practice_os.good_faith_estimates where approval_id in ${sql(ids)}`;
+    await sql`delete from practice_os.posts where approval_id in ${sql(ids)}`;
     await sql`delete from practice_os.approvals where id in ${sql(ids)}`;
   }
   await closeDb();
@@ -105,8 +109,9 @@ describe.skipIf(!ready)("golden conversations (replayed)", () => {
     expect(last).toBe(recorded.replies.at(-1)!.text);
     expect(last).toMatch(scenario.expectReply);
 
-    // Every call offers the whole shared tool list (less the MCP-only ones) and starts with SOUL.md.
-    for (const r of requests) {
+    // Every chat call offers the whole shared tool list (less the MCP-only ones) and starts with SOUL.md.
+    // Calls made inside a tool (Instagram ideas and drafts) carry no tools and are replayed too.
+    for (const r of requests.filter((x) => x.tools)) {
       expect((r.tools ?? []).map((t) => (t as { function: { name: string } }).function.name)).toEqual(TOOLS.filter((t) => !t.mcpOnly).map((t) => t.name));
       expect(r.messages[0]).toMatchObject({ role: "system" });
       expect(String(r.messages[0].content)).toMatch(/# Aeon/);

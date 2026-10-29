@@ -3,8 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/check-install.mjs",
     "dev": "next dev -H 127.0.0.1",
+    "prebuild": "node scripts/check-install.mjs",
     "build": "next build",
+    "prestart": "node scripts/check-install.mjs",
     "start": "next start -H 127.0.0.1",
     "lint": "eslint",
     "test": "vitest run",
@@ -17,7 +20,9 @@
     "research": "tsx scripts/research.ts",
     "models:download": "tsx scripts/download-models.ts",
     "aeon:record": "tsx scripts/record-aeon-fixture.ts",
-    "eval:documents": "tsx scripts/eval-documents.ts"
+    "eval:documents": "tsx scripts/eval-documents.ts",
+    "eval:instagram": "tsx scripts/eval-instagram.ts",
+    "doctor": "tsx scripts/doctor.ts"
   },
   "dependencies": {
     "@base-ui/react": "1.9.0",

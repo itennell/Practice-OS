@@ -37,17 +37,26 @@ export function toView(row: ApprovalRow): ApprovalView {
   };
 }
 
+/**
+ * Instagram posts stay out of her lists and counts once she said Instagram isn't for
+ * her (onboarding's marketing interview): nothing about Instagram nags her after that.
+ */
+export const visibleKind = () =>
+  db()`not (kind = 'instagram_post' and exists (
+         select 1 from practice_os.clinician_profile where onboarding_answers -> 'instagram' ->> 'account' = 'no'))`;
+
 /** Pending first, then the most recent decisions. */
 export async function listApprovals(opts: { includeDecided?: boolean; limit?: number } = {}) {
   const limit = opts.limit ?? 50;
   const rows = opts.includeDecided
     ? await db()<ApprovalRow[]>`
         select * from practice_os.approvals
+        where ${visibleKind()}
         order by (status = 'pending') desc, (status = 'running') desc, coalesce(decided_at, created_at) desc
         limit ${limit}`
     : await db()<ApprovalRow[]>`
         select * from practice_os.approvals
-        where status in ('pending', 'running') or decided_at > now() - interval '1 day'
+        where (status in ('pending', 'running') or decided_at > now() - interval '1 day') and ${visibleKind()}
         order by (status = 'pending') desc, (status = 'running') desc, coalesce(decided_at, created_at) desc
         limit ${limit}`;
   return rows.map(toView);
