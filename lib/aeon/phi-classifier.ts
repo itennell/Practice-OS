@@ -142,9 +142,12 @@ const APP_WORDS = new Set(
     "Settings Connections Connection Connect Disconnect Link Unlink Account Accounts Profile Professional Business " +
     "Creator Suite App Apps Page Pages Tab Button Menu Home Admin Approvals Approval Referrals Referral Front Desk " +
     "Memory Chat Inbox Post Posts Draft Drafts Login Sign Setup Dashboard Developer Developers Tools Center Help " +
-    "Support Key Token API Form Forms Estimate Superbill Superbills Deadline Deadlines Credentialing Insurance"
+    "Support Key Token API Form Forms Estimate Superbill Superbills Deadline Deadlines Credentialing Insurance " +
+    // The Instagram coach's idea labels ("Hook: Hi from Dana").
+    "Hook Hooks Points Caption Captions Hashtag Hashtags Picture Reel Reels Idea Ideas"
   ).split(" "),
 );
+const GREETINGS = new Set(["Hi", "Hello", "Hey"]);
 // Words for who a practice serves. On its own the name model reads "Couples"
 // at the start of a sentence as a person (it finds "Coup", which grows back to
 // "Couples" as written); a one-word hit from this list isn't one.
@@ -172,7 +175,19 @@ export async function findNames(text: string): Promise<string[]> {
     const read = slice.replace(GLUED_TAIL, (m) => " ".repeat(m.length));
     for (const e of await people(read)) {
       // Fails closed: a name the model is sure of still counts when it can't be found as written.
-      const name = located(e.text, slice) ?? e.text;
+      // When it glued an app label to the next word across punctuation ("Hook: Hi" read as
+      // "Hook Hi"), the label is dropped and the rest checked on its own; a greeting isn't a name.
+      let text = e.text;
+      let found = located(text, slice);
+      if (!found) {
+        const rest = text.split(/\s+/).filter((w) => !APP_WORDS.has(w)).join(" ");
+        if (rest !== text) {
+          if (!rest || GREETINGS.has(rest)) continue;
+          text = rest;
+          found = located(rest, slice);
+        }
+      }
+      const name = found ?? text;
       if (!AUDIENCE_WORDS.has(name)) names.push(name);
     }
 

@@ -123,6 +123,14 @@ describe.skipIf(!haveModel)("guard with the local name-finder", () => {
     }
   });
 
+  it("an app label glued to the next word isn't a name, but a client name after a label still is", async () => {
+    // Instagram ideas in a reply: the name model reads "Hook: Hi" as one person, "Hook Hi".
+    const idea = "**1. Meet the clinician**\nHook: Hi from Dana Reyes in Lincoln Park!\nCall to action: Tap the link in our bio.";
+    expect(await guard(idea, "reply", ALLOWED)).toEqual({ ok: true, text: idea });
+    expect((await guard("Memory: Kevin Ortiz cancelled again", "memory", ALLOWED)).ok).toBe(false);
+    expect((await guard("Post: Kevin Ortiz cancelled again", "memory", ALLOWED)).ok).toBe(false);
+  });
+
   it("blanks strangers' names in a tool result instead of dropping it", async () => {
     const result = await guard('{"note":"Kevin Ortiz asked about fees","fee":175}', "tool_result", ALLOWED);
     expect(result).toEqual({ ok: true, text: '{"note":"[name withheld] asked about fees","fee":175}' });

@@ -115,7 +115,7 @@ export async function listPosts(opts: { week?: string; limit?: number } = {}): P
     select p.id, p.topic, p.headline, p.caption, p.alt_text, p.status, p.blocked_reason, p.failed_reason, p.approval_id,
            a.status as approval_status, p.ig_permalink, p.image_jpeg is not null as has_image, p.week_of, p.created_at
       from practice_os.posts p left join practice_os.approvals a on a.id = p.approval_id
-     where ${opts.week ? db()`p.week_of = ${opts.week}` : db()`true`}
+     where p.status <> 'idea' and ${opts.week ? db()`p.week_of = ${opts.week}` : db()`true`}
      order by p.created_at desc
      limit ${opts.limit ?? 50}`;
   return rows.map((r) => ({

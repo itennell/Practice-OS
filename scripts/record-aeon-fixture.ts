@@ -48,12 +48,14 @@ for (const scenario of SCENARIOS.filter((s) => only.length === 0 || only.include
     // Undo what the run made: its conversations, memories, approvals and estimates.
     const sql = db();
     if (conversations.length) await sql`delete from practice_os.conversations where id in ${sql(conversations)}`;
+    await sql`delete from practice_os.posts where created_at >= ${startedAt} and status = 'idea'`;
     await sql`delete from practice_os.memories where created_at >= ${startedAt} and (source like 'chat:%' or source = 'test:record')`;
     const approvals = await sql<{ id: string }[]>`
       select id from practice_os.approvals where created_at >= ${startedAt} and created_by like 'chat:%'`;
     if (approvals.length) {
       const ids = approvals.map((a) => a.id);
       await sql`delete from practice_os.good_faith_estimates where approval_id in ${sql(ids)}`;
+      await sql`delete from practice_os.posts where approval_id in ${sql(ids)}`;
       await sql`delete from practice_os.approvals where id in ${sql(ids)}`;
     }
     if (seeded.length) await sql`delete from practice_os.memories where id in ${sql(seeded)}`;

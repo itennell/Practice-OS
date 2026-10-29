@@ -1,0 +1,427 @@
+{
+  "scenario": "content-coach",
+  "recordedAt": "2026-10-29T16:03:30.482Z",
+  "calls": [
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "find_documents",
+        "open_document",
+        "create_document",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "draft_superbill",
+        "make_release_form",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "fill_payer_form",
+        "list_payer_applications",
+        "update_payer_application",
+        "remember",
+        "recent_memory_changes",
+        "forget",
+        "find_referral_sources",
+        "list_referral_sources",
+        "move_referral_source",
+        "draft_outreach",
+        "plan_instagram_week",
+        "draft_instagram_post",
+        "list_instagram_posts",
+        "instagram_account_steps",
+        "post_ideas",
+        "weekly_plan",
+        "draft_post",
+        "front_desk_status",
+        "front_desk_check_now",
+        "offer_consult_times"
+      ],
+      "lastRole": "user",
+      "response": {
+        "id": "chatcmpl-01a18866-f8c8-7270-ba64-f52da1eb5edd",
+        "choices": [
+          {
+            "finish_reason": "tool_calls",
+            "index": 0,
+            "message": {
+              "content": "Got it — pulling 3 ideas for this week.",
+              "refusal": null,
+              "tool_calls": [
+                {
+                  "id": "call_c458cacf-403c-4e9e-b953-6c068d49d4d2",
+                  "type": "function",
+                  "function": {
+                    "name": "post_ideas",
+                    "arguments": "{\"count\":3}"
+                  }
+                }
+              ],
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793289812,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 129,
+          "prompt_tokens": 11091,
+          "total_tokens": 11220,
+          "completion_tokens_details": {
+            "reasoning_tokens": 58
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 10993
+          }
+        }
+      }
+    },
+    {
+      "tools": [],
+      "lastRole": "user",
+      "response": {
+        "id": "chatcmpl-01a18867-239a-76cc-8c93-7ba63d67a2c0",
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "index": 0,
+            "message": {
+              "content": "{\"ideas\": [{\"call_to_action\": \"Tap the booking link in our bio to set up a hello call.\", \"hook\": \"Hi, I'm Dana Reyes. Let me say hello!\", \"picture\": \"A bright photo of a clean office waiting chair by a window with a small plant.\", \"points\": [\"I am a Licensed Clinical Professional Counselor in Chicago.\", \"I see clients at Reyes Counseling PLLC in Lincoln Park.\", \"I meet with adults for one on one planned visits.\"], \"topic\": \"meet_the_clinician\"}, {\"call_to_action\": \"Use the link in our bio to pick office or video time.\", \"hook\": \"Come by our office or meet from home.\", \"picture\": \"A cozy office room with two chairs and a window showing green trees outside.\", \"points\": [\"Our office is in Lincoln Park in Chicago near bus stops.\", \"You can also meet by video from home in Illinois.\", \"You pick office or video when you book your time.\"], \"topic\": \"office_telehealth\"}, {\"call_to_action\": \"Tap the bio link now to book your free 15 minute call.\", \"hook\": \"Booking is easy and takes just two steps.\", \"picture\": \"A warm desk setup with a small plant and a cup of tea in soft light.\", \"points\": [\"First you have a free 15 minute phone call with Dana.\", \"Then you pick a session time that works for you.\", \"The booking link is in our bio and on our site.\"], \"topic\": \"how_to_book\"}]}",
+              "refusal": null,
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793289823,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 3038,
+          "prompt_tokens": 331,
+          "total_tokens": 3369,
+          "completion_tokens_details": {
+            "reasoning_tokens": 2712
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        }
+      }
+    },
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "find_documents",
+        "open_document",
+        "create_document",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "draft_superbill",
+        "make_release_form",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "fill_payer_form",
+        "list_payer_applications",
+        "update_payer_application",
+        "remember",
+        "recent_memory_changes",
+        "forget",
+        "find_referral_sources",
+        "list_referral_sources",
+        "move_referral_source",
+        "draft_outreach",
+        "plan_instagram_week",
+        "draft_instagram_post",
+        "list_instagram_posts",
+        "instagram_account_steps",
+        "post_ideas",
+        "weekly_plan",
+        "draft_post",
+        "front_desk_status",
+        "front_desk_check_now",
+        "offer_consult_times"
+      ],
+      "lastRole": "tool",
+      "response": {
+        "id": "chatcmpl-01a18867-2ecb-714b-8b09-90a801d38dcb",
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "index": 0,
+            "message": {
+              "content": "Here are 3 ideas for this week. I pulled them from your saved answers.\n\nNote: these use your [Sample] demo practice, so they are fictional.\n\n**1. Meet the clinician**\nHook: [Sample] Hi, I'm Dana Reyes. Let me say hello!\nPoints: Licensed Clinical Professional Counselor in Chicago. See clients at Reyes Counseling PLLC in Lincoln Park. Meet with adults for one on one planned visits.\nCall to action: Tap the booking link in our bio to set up a hello call.\nPicture: Bright photo of a clean office waiting chair by a window with a small plant.\n\n**2. Office and telehealth**\nHook: [Sample] Come by our office or meet from home.\nPoints: Office in Lincoln Park near bus stops. Also meet by video from home in Illinois. You pick office or video when you book.\nCall to action: Use the link in our bio to pick office or video time.\nPicture: Cozy office room with two chairs and a window showing green trees outside.\n\n**3. How to book**\nHook: [Sample] Booking is easy and takes just two steps.\nPoints: First a free 15 minute phone call with Dana. Then pick a session time. Booking link is in bio and on site.\nCall to action: Tap the bio link now to book your free 15 minute call.\nPicture: Warm desk setup with a small plant and a cup of tea in soft light.\n\nWhich one do you want me to write? Reply with 1, 2, or 3.",
+              "refusal": null,
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793289825,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 785,
+          "prompt_tokens": 11615,
+          "total_tokens": 12400,
+          "completion_tokens_details": {
+            "reasoning_tokens": 463
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 10993
+          }
+        }
+      }
+    },
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "find_documents",
+        "open_document",
+        "create_document",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "draft_superbill",
+        "make_release_form",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "fill_payer_form",
+        "list_payer_applications",
+        "update_payer_application",
+        "remember",
+        "recent_memory_changes",
+        "forget",
+        "find_referral_sources",
+        "list_referral_sources",
+        "move_referral_source",
+        "draft_outreach",
+        "plan_instagram_week",
+        "draft_instagram_post",
+        "list_instagram_posts",
+        "instagram_account_steps",
+        "post_ideas",
+        "weekly_plan",
+        "draft_post",
+        "front_desk_status",
+        "front_desk_check_now",
+        "offer_consult_times"
+      ],
+      "lastRole": "user",
+      "response": {
+        "id": "chatcmpl-01a18867-3825-7030-b6a0-786b9333da68",
+        "choices": [
+          {
+            "finish_reason": "tool_calls",
+            "index": 0,
+            "message": {
+              "content": "Got it — writing up that second idea now.",
+              "refusal": null,
+              "tool_calls": [
+                {
+                  "id": "call_005b18b2-5ada-44c4-a93f-84635ccbfa38",
+                  "type": "function",
+                  "function": {
+                    "name": "draft_post",
+                    "arguments": "{\"idea\":2}"
+                  }
+                }
+              ],
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793289828,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 530,
+          "prompt_tokens": 11418,
+          "total_tokens": 11948,
+          "completion_tokens_details": {
+            "reasoning_tokens": 460
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 10993
+          }
+        }
+      }
+    },
+    {
+      "tools": [],
+      "lastRole": "user",
+      "response": {
+        "id": "chatcmpl-01a18867-4dd4-770b-88ed-25a9369b74fc",
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "index": 0,
+            "message": {
+              "content": "{\"posts\": [{\"alt_text\": \"The clinician smiles in the lower right with a calm illustrated background and the headline in large dark letters.\", \"body\": \"Come by our office or meet from home. You can pick what works best for you.\\n\\nOur office is in Lincoln Park in Chicago. It is near bus stops. It is easy to get to.\\n\\nYou can also meet by video from home in Illinois. You just need a quiet spot and a phone or computer.\\n\\nYou pick office or video when you book your time. Both are easy to set up.\\n\\nUse the link in our bio to pick office or video time. We are happy to see you!\\n\\n#LincolnParkChicago #TelehealthIllinois\", \"headline\": \"Come By Office or Meet From Home\", \"pillar\": \"office_telehealth\"}]}",
+              "refusal": null,
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793289833,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 1854,
+          "prompt_tokens": 485,
+          "total_tokens": 2339,
+          "completion_tokens_details": {
+            "reasoning_tokens": 1669
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        }
+      }
+    },
+    {
+      "tools": [],
+      "lastRole": "user",
+      "response": {
+        "id": "chatcmpl-01a18867-59b5-733d-ba2e-114aee4ff9b5",
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "index": 0,
+            "message": {
+              "content": "{\"breaks\":[]}",
+              "refusal": null,
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793289836,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 644,
+          "prompt_tokens": 416,
+          "total_tokens": 1060,
+          "completion_tokens_details": {
+            "reasoning_tokens": 630
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        }
+      }
+    },
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "find_documents",
+        "open_document",
+        "create_document",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "draft_superbill",
+        "make_release_form",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "fill_payer_form",
+        "list_payer_applications",
+        "update_payer_application",
+        "remember",
+        "recent_memory_changes",
+        "forget",
+        "find_referral_sources",
+        "list_referral_sources",
+        "move_referral_source",
+        "draft_outreach",
+        "plan_instagram_week",
+        "draft_instagram_post",
+        "list_instagram_posts",
+        "instagram_account_steps",
+        "post_ideas",
+        "weekly_plan",
+        "draft_post",
+        "front_desk_status",
+        "front_desk_check_now",
+        "offer_consult_times"
+      ],
+      "lastRole": "tool",
+      "response": {
+        "id": "chatcmpl-01a18867-668e-7036-9ed1-39502145fa54",
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "index": 0,
+            "message": {
+              "content": "Done. Your second post is drafted.\n\nIt is waiting for your approval. Open Approvals to review it and approve it.\n\nNothing posts until you approve.",
+              "refusal": null,
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793289840,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 709,
+          "prompt_tokens": 11599,
+          "total_tokens": 12308,
+          "completion_tokens_details": {
+            "reasoning_tokens": 669
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 11377
+          }
+        }
+      }
+    }
+  ],
+  "replies": [
+    {
+      "text": "Here are 3 ideas for this week. I pulled them from your saved answers.\n\nNote: these use your [Sample] demo practice, so they are fictional.\n\n**1. Meet the clinician**\nHook: [Sample] Hi, I'm Dana Reyes. Let me say hello!\nPoints: Licensed Clinical Professional Counselor in Chicago. See clients at Reyes Counseling PLLC in Lincoln Park. Meet with adults for one on one planned visits.\nCall to action: Tap the booking link in our bio to set up a hello call.\nPicture: Bright photo of a clean office waiting chair by a window with a small plant.\n\n**2. Office and telehealth**\nHook: [Sample] Come by our office or meet from home.\nPoints: Office in Lincoln Park near bus stops. Also meet by video from home in Illinois. You pick office or video when you book.\nCall to action: Use the link in our bio to pick office or video time.\nPicture: Cozy office room with two chairs and a window showing green trees outside.\n\n**3. How to book**\nHook: [Sample] Booking is easy and takes just two steps.\nPoints: First a free 15 minute phone call with Dana. Then pick a session time. Booking link is in bio and on site.\nCall to action: Tap the bio link now to book your free 15 minute call.\nPicture: Warm desk setup with a small plant and a cup of tea in soft light.\n\nWhich one do you want me to write? Reply with 1, 2, or 3.",
+      "tools": [
+        "post_ideas"
+      ]
+    },
+    {
+      "text": "Done. Your second post is drafted.\n\nIt is waiting for your approval. Open Approvals to review it and approve it.\n\nNothing posts until you approve.",
+      "tools": [
+        "draft_post"
+      ]
+    }
+  ]
+}

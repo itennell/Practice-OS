@@ -17,7 +17,8 @@
     "research": "tsx scripts/research.ts",
     "models:download": "tsx scripts/download-models.ts",
     "aeon:record": "tsx scripts/record-aeon-fixture.ts",
-    "eval:documents": "tsx scripts/eval-documents.ts"
+    "eval:documents": "tsx scripts/eval-documents.ts",
+    "eval:instagram": "tsx scripts/eval-instagram.ts"
   },
   "dependencies": {
     "@base-ui/react": "1.9.0",
