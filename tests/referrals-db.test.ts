@@ -10,7 +10,7 @@ const hasDb = Boolean(process.env.DATABASE_URL);
 const { approve } = await import("../lib/approvals");
 const { closeDb, db } = await import("../lib/db");
 const { draftOutreach } = await import("../lib/referrals/outreach");
-const { getSource, moveDueFollowUps } = await import("../lib/referrals/store");
+const { addToBoard, getSource, latestLetters, moveDueFollowUps, rescoreOldCards } = await import("../lib/referrals/store");
 const { practiceToday } = await import("../lib/compliance/store");
 const { getReferralSettings, saveReferralSettings } = await import("../lib/referrals/settings");
 const { referralsQuestions } = await import("../lib/referrals/onboarding");
@@ -76,15 +76,16 @@ describe.skipIf(!hasDb)("referral letters", () => {
     expect((await getSource(sourceId))!.stage).toBe("found");
   });
 
-  it("DRY_RUN: approving shows the draft to the test inbox, moves the card and sets a follow-up 7 days out", async () => {
+  it("approving sends nothing: it keeps the letter to copy, moves the card and sets a follow-up 7 days out", async () => {
     process.env.DRY_RUN = "true";
     const sourceId = await makeSource();
     const id = await draft(sourceId);
     const res = await approve(id, { by: "test" });
     expect(res.ok && res.approval.status).toBe("done");
     const result = res.ok ? (res.approval.result as Record<string, unknown>) : {};
-    expect(result).toMatchObject({ dry_run: true, gmail_draft_id: null, moved_to: "contacted" });
-    expect(result.draft).toEqual({ to: "test-inbox@example.com", subject: "Introduction from Reyes Counseling", body: LETTER });
+    expect(result).toMatchObject({ dry_run: true, moved_to: "contacted" });
+    expect(result.letter).toEqual({ subject: "Introduction from Reyes Counseling", body: LETTER });
+    expect(result).not.toHaveProperty("gmail_draft_id");
 
     const today = await practiceToday();
     const due = new Date(`${today}T12:00:00Z`);
@@ -93,7 +94,7 @@ describe.skipIf(!hasDb)("referral letters", () => {
     expect(card.stage).toBe("contacted");
     expect(card.next_follow_up_on).toBe(due.toISOString().slice(0, 10));
     const actions = (await db()`select action from practice_os.audit_log where approval_id = ${id} order by id`).map((r) => r.action);
-    expect(actions).toEqual(["approval_queued", "approval_approved", "referral_letter_dry_run", "approval_done"]);
+    expect(actions).toEqual(["approval_queued", "approval_approved", "referral_letter_approved", "approval_done"]);
   });
 
   it("refuses an edit that offers something of value, and leaves the card where it was", async () => {
@@ -106,14 +107,15 @@ describe.skipIf(!hasDb)("referral letters", () => {
     expect((await getSource(sourceId))!.stage).toBe("found");
   });
 
-  it("for real (DRY_RUN=false) without Google connected: fails with the Connect step, nothing moves", async () => {
+  it("for real (DRY_RUN=false) it still needs no Google: no Gmail call, the card moves", async () => {
     process.env.DRY_RUN = "false";
     const sourceId = await makeSource();
     const id = await draft(sourceId);
     const res = await approve(id, { by: "test" });
-    expect(res.ok && res.approval.status).toBe("failed");
-    expect(res.ok && res.approval.error).toMatch(/Connect Google first/);
-    expect((await getSource(sourceId))!.stage).toBe("found");
+    expect(res.ok && res.approval.status).toBe("done");
+    expect((await getSource(sourceId))!.stage).toBe("contacted");
+    const letters = await latestLetters();
+    expect(letters[sourceId]).toMatchObject({ approvalId: id, status: "done", subject: "Introduction from Reyes Counseling", letter: LETTER });
   });
 
   it("moves a Contacted card to Follow up once its day comes", async () => {
@@ -121,6 +123,45 @@ describe.skipIf(!hasDb)("referral letters", () => {
     await db()`update practice_os.referral_sources set stage = 'contacted', next_follow_up_on = current_date - 1 where id = ${sourceId}`;
     expect(await moveDueFollowUps()).toBeGreaterThanOrEqual(1);
     expect((await getSource(sourceId))!.stage).toBe("follow_up");
+  });
+});
+
+describe.skipIf(!hasDb)("Add to board", () => {
+  it("saves each NPI once, as soon as it is found, and keeps going when one lookup fails", async () => {
+    const base = Date.now() % 1e8;
+    const ok1 = `18${String(base).padStart(8, "0")}`;
+    const ok2 = `18${String(base + 1).padStart(8, "0")}`;
+    const bad = `18${String(base + 2).padStart(8, "0")}`;
+    let lookups = 0;
+    const lookup = async (npi: string) => {
+      lookups++;
+      if (npi === bad) throw new Error("NPPES timed out");
+      return {
+        npi, name: `[Sample] Test ${npi}`, organization: null, practiceName: null, npiType: "individual" as const, credential: "MD",
+        taxonomy: "207Q00000X", taxonomyLabel: "Family Medicine", specialty: "family_medicine" as const, specialtyLabel: "Family medicine",
+        address: "100 W Example St", city: "Chicago", state: "IL", zip: "60614", phone: null, fax: null, official: null, lastUpdated: null,
+      };
+    };
+    const { added, missing } = await addToBoard(
+      [{ npi: ok1, distanceMiles: 0.5 }, { npi: ok1, distanceMiles: 0.5 }, { npi: bad, distanceMiles: 1 }, { npi: ok2, distanceMiles: 2 }],
+      db(),
+      lookup,
+    );
+    for (const a of added) sources.push(a.id!);
+    expect(lookups).toBe(3);
+    expect(added.map((a) => a.npi)).toEqual([ok1, ok2]);
+    expect(missing).toEqual([bad]);
+  });
+});
+
+describe.skipIf(!hasDb)("score versions", () => {
+  it("scores cards from an older formula again and marks them current", async () => {
+    const id = await makeSource();
+    await db()`update practice_os.referral_sources set score_version = 1, fit_score = 3 where id = ${id}`;
+    await rescoreOldCards(db(), async () => null, 500);
+    const card = (await getSource(id))!;
+    expect(card.score_version).toBe(2);
+    expect(card.fit_score).toBeGreaterThan(3);
   });
 });
 

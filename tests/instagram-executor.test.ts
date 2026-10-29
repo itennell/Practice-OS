@@ -7,6 +7,7 @@ import { afterAll, describe, expect, it, vi } from "vitest";
 import { approve } from "../lib/approvals";
 import { closeDb, db } from "../lib/db";
 import { toInstagramJpeg } from "../lib/instagram/image";
+import { retryPost } from "../lib/instagram/store";
 
 const hasDb = Boolean(process.env.DATABASE_URL);
 const made: string[] = [];
@@ -58,8 +59,26 @@ describe.skipIf(!hasDb)("instagram_post executor (no publishing)", () => {
   });
 
   it("fails clearly when the image is missing", async () => {
-    const { approvalId } = await draftPost({ image: false });
+    const { approvalId, postId } = await draftPost({ image: false });
     const r = await approve(approvalId, { by: "test" });
-    expect(r.ok && r.approval.error).toMatch(/no finished picture/);
+    expect(r.ok && r.approval.error).toBe("Aeon couldn't finish the picture. Try again.");
+    // The post stays on her board with the same words, so the card can offer Retry.
+    const [post] = await db()<{ status: string; failed_reason: string }[]>`select status, failed_reason from practice_os.posts where id = ${postId}`;
+    expect(post).toEqual({ status: "failed", failed_reason: "Aeon couldn't finish the picture. Try again." });
+
+    // Retry draws the picture again and queues a fresh approval; a second retry while it waits is refused.
+    process.env.PLAYWRIGHT_IMAGE_STANDIN = "1";
+    try {
+      const again = await retryPost("test", postId);
+      expect(again.ok).toBe(true);
+      if (!again.ok) return;
+      made.push(again.approvalId);
+      const [after] = await db()<{ status: string; failed_reason: string | null; has_image: boolean; approval_id: string }[]>`
+        select status, failed_reason, image_jpeg is not null as has_image, approval_id from practice_os.posts where id = ${postId}`;
+      expect(after).toEqual({ status: "pending_approval", failed_reason: null, has_image: true, approval_id: again.approvalId });
+      expect(await retryPost("test", postId)).toMatchObject({ ok: false, status: 409 });
+    } finally {
+      delete process.env.PLAYWRIGHT_IMAGE_STANDIN;
+    }
   });
 });

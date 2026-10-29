@@ -7,10 +7,11 @@ import type { Research, ResearchAngle } from "@/lib/instagram/research";
 import type { PostView } from "@/lib/instagram/store";
 import { Slider } from "../shared/slider";
 import { TextField } from "../shared/settings-controls";
-import { StatusPill, type Status } from "../shared/status-mark";
+import { StatusPill } from "../shared/status-mark";
 import { ThoughtLine } from "../shared/thought-line";
 import { Button, ButtonLink, GlassCard } from "../ui";
 import { PostPreview, type PreviewProfile } from "./post-preview";
+import { postState, STATE } from "./post-state";
 import { ReelEditor } from "./reel-editor";
 
 const PILLAR_LABEL: Record<PostView["pillar"], string> = {
@@ -21,16 +22,6 @@ const PILLAR_LABEL: Record<PostView["pillar"], string> = {
   office_telehealth: "Office and telehealth",
   other: "Other",
 };
-
-function postStatus(p: PostView): { status: Status; label: string } {
-  if (p.status === "ready" || (p.approvalStatus === "done" && p.status !== "published")) return { status: "done", label: "Ready to post" };
-  if (p.status === "published") return { status: "done", label: "Posted" };
-  if (p.status === "blocked") return { status: "declined", label: "Blocked" };
-  if (p.status === "failed" || p.approvalStatus === "failed") return { status: "failed", label: "Didn't work" };
-  if (p.approvalStatus === "running") return { status: "running", label: "Working…" };
-  if (p.approvalStatus === "rejected") return { status: "declined", label: "Declined" };
-  return { status: "pending", label: "Waiting for you" };
-}
 
 /** How to post it herself: Aeon writes, she posts (publishing is cut for now). */
 const POST_STEPS = [
@@ -128,8 +119,43 @@ function Decide({ post, onDone }: { post: PostView; onDone: () => void }) {
   );
 }
 
+function Retry({ post, onDone }: { post: PostView; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  async function retry() {
+    setBusy(true);
+    setProblem(null);
+    try {
+      const res = await fetch(`/api/instagram/posts/${post.id}/retry`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) setProblem(data.error ?? "Aeon couldn't finish the picture. Try again.");
+    } catch {
+      setProblem("Couldn't reach Practice-OS. Check that the app is running, then try again.");
+    } finally {
+      setBusy(false);
+      onDone();
+    }
+  }
+  return (
+    <div className="flex flex-col gap-2 border-t border-[var(--hairline)] p-4">
+      <p className="font-medium" style={{ color: "var(--danger-fg)" }}>
+        {post.failedReason ?? "Aeon couldn't finish this post. Try again."}
+      </p>
+      <Button variant="accent" className="w-full" disabled={busy} onClick={retry}>
+        {busy ? "Trying again…" : "Retry"}
+      </Button>
+      {problem && (
+        <p role="alert" className="text-small font-medium" style={{ color: "var(--danger-fg)" }}>
+          {problem}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function PostCard({ post, profile, onChange }: { post: PostView; profile: PreviewProfile; onChange: () => void }) {
-  const s = postStatus(post);
+  const state = postState(post);
+  const s = STATE[state];
   const headingId = `post-${post.id}`;
   return (
     <li aria-labelledby={`${headingId}-t`} className="flex min-w-0 flex-col gap-2">
@@ -155,12 +181,8 @@ function PostCard({ post, profile, onChange }: { post: PostView; profile: Previe
           caption={post.caption}
           headingId={headingId}
         >
-          {post.failedReason && post.status === "failed" && (
-            <p className="border-t border-[var(--hairline)] p-4 font-medium" style={{ color: "var(--danger-fg)" }}>
-              {post.failedReason}
-            </p>
-          )}
-          {post.approvalId && post.approvalStatus === "pending" && <Decide post={post} onDone={onChange} />}
+          {state === "retry" && <Retry post={post} onDone={onChange} />}
+          {state === "waiting" && <Decide post={post} onDone={onChange} />}
           {post.status === "ready" && <ReadyToPost post={post} />}
         </PostPreview>
       )}
@@ -329,8 +351,8 @@ export function InstagramBoard({ initialPosts, profile }: { initialPosts: PostVi
     }
   }
 
-  const ready = initialPosts.filter((p) => p.status === "ready").length;
-  const waiting = initialPosts.filter((p) => p.approvalStatus === "pending").length;
+  const ready = initialPosts.filter((p) => postState(p) === "ready").length;
+  const waiting = initialPosts.filter((p) => postState(p) === "waiting").length;
   const canAsk = working === null && ask.trim().length >= 3;
 
   return (
