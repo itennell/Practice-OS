@@ -13,6 +13,8 @@ import { STATUS_LABEL, listPayerApplications, type PayerApplication } from "../p
 import { getReleaseDraft } from "../release/drafts";
 import type { ReleaseFields } from "../release/fields";
 import { getSuperbill, listSuperbills, summarize, type SuperbillRow } from "../superbill/store";
+import { DOC_KIND_LABEL } from "../uploads/classify";
+import { listStoredDocuments, getStoredDocument, type StoredDocument } from "../uploads/store";
 import { DOCUMENT_KINDS, KIND_LABEL, type DocumentCard, type DocumentKind } from "./card";
 
 // The document index: every kind of paperwork Admin holds or can make, read from its
@@ -245,16 +247,36 @@ export function guideCard(g: Guide): DocumentCard {
   });
 }
 
+/** A document she added in the chat, kept on her computer (lib/uploads). */
+export function uploadedCard(d: Pick<StoredDocument, "id" | "kind" | "title" | "mime" | "summary" | "payer" | "status" | "approval_id" | "is_sample" | "created_at">): DocumentCard {
+  const added = new Date(d.created_at).toISOString().slice(0, 10);
+  return card({
+    id: `uploaded:${d.id}`,
+    kind: "uploaded",
+    title: d.title,
+    subtitle: `${DOC_KIND_LABEL[d.kind]} · added ${niceDate(added)}`,
+    status: d.status === "filed" ? "Filed" : d.approval_id ? "Waiting for you" : "Kept",
+    payer: d.payer,
+    topics: words(d.title, DOC_KIND_LABEL[d.kind], d.kind.replace(/_/g, " "), d.payer, d.summary, "uploaded added my file"),
+    open: `/api/documents/${d.id}/file`,
+    pdf: d.mime === "application/pdf" ? `/api/documents/${d.id}/file?download=1` : null,
+    needs_her: d.status !== "filed" && d.approval_id ? "Approve what it adds to your records." : null,
+    held_elsewhere: "Practice-OS on this computer",
+    is_sample: d.is_sample,
+  });
+}
+
 /** Every document Practice-OS holds or can make, built from the live rows. */
 export async function allDocuments(): Promise<DocumentCard[]> {
   const today = await practiceToday();
-  const [deadlines, estimates, bills, apps, profile, caqh] = await Promise.all([
+  const [deadlines, estimates, bills, apps, profile, caqh, uploads] = await Promise.all([
     deadlinesView(365),
     listEstimates(20),
     listSuperbills(20).catch(() => []),
     listPayerApplications(),
     loadCredentialingProfile(),
     caqhCard(),
+    listStoredDocuments(30),
   ]);
   return [
     ...deadlines.due.map((o) => deadlineCard(o, today)),
@@ -266,6 +288,7 @@ export async function allDocuments(): Promise<DocumentCard[]> {
     ...bills.map(superbillCard),
     ...releaseTemplateCards(profile?.isSample ?? false),
     ...allGuides().map(guideCard),
+    ...uploads.map(uploadedCard),
   ];
 }
 
@@ -281,6 +304,7 @@ const KIND_WORDS: Record<DocumentKind, string[]> = {
   credential_doc: ["document", "documents", "caqh", "malpractice", "w9", "license", "cv", "diploma", "credentialing"],
   caqh_checklist: ["caqh", "attest", "reattest", "attestation", "checklist"],
   guide: ["how", "guide", "steps"],
+  uploaded: ["uploaded", "added", "contract", "letter", "certificate", "w9", "malpractice", "fee", "schedule"],
 };
 
 export type FindQuery = { query?: string; kind?: DocumentKind; payer?: string; due_within_days?: number };
@@ -363,6 +387,10 @@ export async function openDocument(id: string): Promise<DocumentCard | null> {
       }
       const profile = await loadCredentialingProfile();
       return releaseTemplateCards(profile?.isSample ?? false).find((c) => c.id === id) ?? null;
+    }
+    case "uploaded": {
+      const d = UUID.test(key) ? await getStoredDocument(key) : null;
+      return d ? uploadedCard(d) : null;
     }
     case "guide": {
       const g = /^[a-z0-9-]+$/.test(key) ? getGuide(key) : null;

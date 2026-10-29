@@ -29,6 +29,8 @@ export const KIND_POLICY: Record<ApprovalKind, { helper: Helper; tier: Tier }> =
   referral_letter: { helper: "referrals", tier: "sensitive" },
   gfe_issue: { helper: "admin", tier: "clinician_only" },
   text_consult_options: { helper: "front_desk", tier: "sensitive" },
+  // What an uploaded document says changes her records only when she taps Approve, in every mode.
+  file_document: { helper: "admin", tier: "clinician_only" },
 };
 
 // text_missed_callers: a missed caller gets a text with open consult times.

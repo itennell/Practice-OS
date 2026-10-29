@@ -11,6 +11,7 @@
 import { ShieldAlert } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { Attachment, AttachmentList } from "@/components/shared/attachment";
 import { PromptBar } from "@/components/shared/prompt-bar";
 import { ThoughtLine } from "@/components/shared/thought-line";
 import { notify } from "@/components/shared/toaster";
@@ -148,6 +149,9 @@ export function AeonChat({
   const [mode, setMode] = useState<ApprovalMode>(initialMode);
   const [asked, setAsked] = useState(0);
   const [modeNote, setModeNote] = useState("");
+  // A file she is adding: shown on the box while it is read, then gone.
+  const [adding, setAdding] = useState<{ name: string; kind: "pdf" | "image" | "file" } | null>(null);
+  const picker = useRef<HTMLInputElement>(null);
   const abort = useRef<AbortController | null>(null);
   const end = useRef<HTMLDivElement>(null);
 
@@ -214,6 +218,47 @@ export function AeonChat({
     }
   }
 
+  // A file from the + button (lib/uploads/file.ts does every check before any model call).
+  // Only on her own computer; the view-only demo copy has no + button.
+  async function addFile(file: File) {
+    setAdding({ name: file.name, kind: file.type === "application/pdf" ? "pdf" : file.type.startsWith("image/") ? "image" : "file" });
+    setBusy(true);
+    try {
+      const form = new FormData();
+      form.set("file", file);
+      if (conversationId) form.set("conversationId", conversationId);
+      const res = await fetch("/api/chat/upload", { method: "POST", body: form });
+      const data = (await res.json().catch(() => ({}))) as {
+        conversationId?: string | null;
+        reply?: { kind: "answer"; text: string; steps: ChatStep[]; approvalIds: string[] } | { kind: "file_refused"; reason: string; text: string };
+        error?: string;
+      };
+      if (!res.ok || !data.reply) throw new Error(data.error ?? "Aeon couldn't read that file just now. Try again in a minute.");
+      const reply = data.reply;
+      if (reply.kind === "file_refused") {
+        // Not kept and not saved in the chat: her file never became part of it.
+        setMessages((m) => [...m, { key: nextKey(), role: "aeon", content: reply.text, guard: reply.reason === "crisis" ? "crisis" : reply.reason === "unreadable" ? undefined : "refused" }]);
+        return;
+      }
+      setMessages((m) => [
+        ...m,
+        { key: nextKey(), role: "clinician", content: "Added a document" },
+        { key: nextKey(), role: "aeon", content: reply.text, steps: reply.steps, approvalIds: reply.approvalIds },
+      ]);
+      if (data.conversationId && data.conversationId !== conversationId) {
+        setConversationId(data.conversationId);
+        window.history.replaceState(null, "", `/?c=${data.conversationId}`);
+      }
+      refreshList();
+      setAsked((n) => n + 1);
+    } catch (err) {
+      notify.error(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+      setAdding(null);
+    }
+  }
+
   async function changeMode(next: ApprovalMode) {
     const before = mode;
     setMode(next);
@@ -253,10 +298,30 @@ export function AeonChat({
         placeholder="Ask Aeon anything"
         defaultValue={ask}
         controls={<ModePicker mode={mode} onChange={changeMode} readOnly={modeReadOnly} />}
+        onAttach={modeReadOnly ? undefined : () => picker.current?.click()}
+        attachments={
+          adding && (
+            <AttachmentList label="Adding">
+              <Attachment name={adding.name} kind={adding.kind} state="processing" details="Reading it on your computer…" />
+            </AttachmentList>
+          )
+        }
       />
       <span aria-live="polite" className="sr-only">
         {modeNote}
       </span>
+      {/* Business documents only: a payer contract, fee schedule, board letter, malpractice face sheet, W-9 or CE certificate. */}
+      <input
+        ref={picker}
+        type="file"
+        hidden
+        accept="application/pdf,.pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.txt,text/plain,image/*"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (file) void addFile(file);
+        }}
+      />
     </div>
   );
 

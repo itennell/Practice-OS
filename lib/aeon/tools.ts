@@ -67,6 +67,8 @@ export type AeonTool = {
   input: z.ZodRawShape;
   output?: z.ZodRawShape;
   annotations: { readOnlyHint?: boolean; destructiveHint?: boolean; openWorldHint?: boolean; idempotentHint?: boolean };
+  /** Left out of the chat's tool list (MCP only): the chat box has its own way in. */
+  mcpOnly?: boolean;
   /** What the chat shows after it runs, in her words: "Checked your deadlines". */
   label: string;
   /** Changes saved data. Refused on the Vercel demo copy. Drafts that only queue an approval don't count. A function decides per call. */
@@ -382,6 +384,34 @@ export const TOOLS: AeonTool[] = [
       if (input.kind === "superbill") return makeSuperbill(input.superbill!, ctx);
       if (input.kind === "release_form") return makeRelease(input.release_form!);
       return makeCms855i(ctx);
+    },
+  }),
+
+  // MCP only: in the chat she adds a file with the + button (app/api/chat/upload), which runs the same steps.
+  tool({
+    name: "file_upload",
+    title: "Add a business document",
+    description:
+      "Reads one business document from a file on this computer (PDF, Word .docx or plain text): a payer contract, fee schedule, licensing board letter, " +
+      "malpractice face sheet, W-9 or CE certificate. Checks it for crisis words, client records and client details before any model reads it; refuses client records. " +
+      "Keeps it in Practice-OS, sorts it, and puts anything it changes in her records (a new deadline, a payer date, CE hours) in her approvals. Returns its card.",
+    input: { path: z.string().trim().min(1).max(1000).describe("The file's full path on this computer.") },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+    label: "Read and kept your document",
+    changesData: true,
+    mcpOnly: true,
+    run: async ({ path: filePath }, ctx) => {
+      const { lstat, readFile } = await import("node:fs/promises");
+      const { isAbsolute } = await import("node:path");
+      const { fileUpload } = await import("../uploads/file");
+      const { MAX_BYTES } = await import("../uploads/read");
+      if (!isAbsolute(filePath)) return { content: [{ type: "text", text: "Give the file's full path." }], isError: true };
+      const info = await lstat(filePath).catch(() => null);
+      if (!info?.isFile()) return { content: [{ type: "text", text: "No file at that path." }], isError: true };
+      if (info.size > MAX_BYTES) return { content: [{ type: "text", text: "That file is over 10 MB." }], isError: true };
+      const outcome = await fileUpload(new Uint8Array(await readFile(filePath)), { by: ctx.by });
+      if (!outcome.ok) return { content: [{ type: "text", text: outcome.text }], isError: outcome.reason !== "unreadable" ? undefined : true };
+      return withCards({ said: outcome.text, approval_id: outcome.approvalId, duplicate: outcome.duplicate }, [outcome.card]);
     },
   }),
 
@@ -1004,7 +1034,7 @@ export async function runTool(name: string, args: unknown, ctx: ToolContext): Pr
 
 /** The tool list in Chat Completions shape (cookbook 03_tool_calling.ipynb). */
 export function chatTools(names?: string[]) {
-  return TOOLS.filter((t) => !names || names.includes(t.name)).map((t) => ({
+  return TOOLS.filter((t) => !t.mcpOnly && (!names || names.includes(t.name))).map((t) => ({
     type: "function" as const,
     function: {
       name: t.name,

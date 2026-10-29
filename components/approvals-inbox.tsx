@@ -27,6 +27,7 @@ const KIND_LABEL: Record<string, string> = {
   state_rules: "State rules",
   gfe_issue: "Good Faith Estimate",
   aeon_action: "Change Aeon wants to make",
+  file_document: "File a document",
 };
 
 type Filter = "waiting" | "done" | "declined" | "all";
