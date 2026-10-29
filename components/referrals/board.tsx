@@ -9,6 +9,8 @@ import { StatusPill } from "@/components/shared/status-mark";
 import { Button } from "@/components/ui";
 import { STAGES, STAGE_LABEL, type Stage } from "@/lib/referrals/stages";
 import type { LetterState, ReferralSource } from "@/lib/referrals/store";
+import type { TierResult } from "@/lib/referrals/tier";
+import { TierBadge } from "./tier-badge";
 
 // The Referrals board (Isaiah's pipeline, AGENTS.md > Referrals). Cards move by
 // drag and drop, or by the "Move to" menu on every card, which is the way for
@@ -18,8 +20,8 @@ const SHOW_FIRST = 12;
 const MOVE_OPTIONS = STAGES.map((s) => ({ value: s, label: STAGE_LABEL[s] }));
 
 const HINT: Record<Stage, string> = {
-  found: "From the NPI Registry. Draft a letter to start.",
-  contacted: "Letter approved. Follow up in a week.",
+  found: "From the map. Draft an email to start.",
+  contacted: "Letter approved. Send it, then follow up in a week.",
   follow_up: "Time for a friendly check-in.",
   connected: "You've talked. Keep in touch.",
   not_a_fit: "Set aside.",
@@ -29,42 +31,129 @@ function dateLabel(iso: string): string {
   return new Date(`${iso}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 }
 
-function LetterLine({ letter }: { letter: LetterState | undefined }) {
-  if (!letter) return null;
-  if (letter.status === "pending" || letter.status === "running") {
-    return (
+/**
+ * The drafted email on the card: subject and letter, a Copy button, and plain
+ * steps. Aeon never sends; she pastes it into her own email.
+ */
+function LetterBox({ letter, name, demo }: { letter: LetterState; name: string; demo: boolean }) {
+  const [copied, setCopied] = useState(false);
+  const [open, setOpen] = useState(false);
+  const boxId = `letter-${letter.approvalId}`;
+  if (!letter.letter) {
+    return letter.status === "pending" ? (
       <Link href="/approvals" className="w-fit text-small text-[var(--link)] underline underline-offset-2">
-        <StatusPill status="pending">Letter waiting for you</StatusPill>
+        <StatusPill status="pending">Letter waiting in Approvals</StatusPill>
       </Link>
-    );
+    ) : null;
   }
-  if (letter.status === "done") {
-    return (
-      <Link href="/approvals" className="w-fit text-small text-[var(--link)] underline underline-offset-2">
-        {letter.dryRun ? "Letter approved (dry run: preview only, no Gmail draft)" : "Letter saved as a Gmail draft"}
-      </Link>
-    );
+  const text = `Subject: ${letter.subject ?? ""}\n\n${letter.letter}`;
+  // She approves the letter first; only then can she copy it to send.
+  const approved = letter.status === "done";
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // Older browsers or a blocked clipboard: select the text so Cmd/Ctrl+C works.
+      setOpen(true);
+      notify.error("Your browser didn't let me copy. The letter is selected: press Cmd+C (Ctrl+C on Windows).");
+      requestAnimationFrame(() => {
+        const el = document.getElementById(`${boxId}-text`) as HTMLTextAreaElement | null;
+        el?.focus();
+        el?.select();
+      });
+      return;
+    }
+    setCopied(true);
+    notify.success(`Copied the email to ${name}. Paste it into your email.`);
+    window.setTimeout(() => setCopied(false), 4000);
   }
-  if (letter.status === "failed") {
-    return (
-      <Link href="/approvals" className="w-fit text-small font-medium text-[var(--danger-fg)] underline underline-offset-2">
-        The letter didn&rsquo;t go through. See why
-      </Link>
-    );
-  }
-  return null;
+
+  return (
+    <div className="flex flex-col gap-2 rounded-[16px] border border-[var(--line)] p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-small font-semibold">{approved ? "Email to send yourself" : "Email draft"}</p>
+        {(letter.status === "pending" || letter.status === "running") && (
+          <Link href="/approvals" className="text-small text-[var(--link)] underline underline-offset-2">
+            <StatusPill status="pending">Waiting in Approvals</StatusPill>
+          </Link>
+        )}
+        {approved && <StatusPill status="done">Approved</StatusPill>}
+        {letter.status === "failed" && (
+          <Link href="/approvals" className="text-small font-medium text-[var(--danger-fg)] underline underline-offset-2">
+            Didn&rsquo;t go through. See why
+          </Link>
+        )}
+      </div>
+      <p className="text-small">
+        <span className="text-[var(--fg-muted)]">Subject: </span>
+        <span className="font-medium">{letter.subject}</span>
+      </p>
+      {open ? (
+        <textarea
+          id={`${boxId}-text`}
+          readOnly
+          value={text}
+          rows={10}
+          aria-label={`Email to ${name}`}
+          className="w-full resize-y rounded-[12px] border border-[var(--line)] bg-[var(--chip-off-bg)] p-3 text-small text-[var(--fg)]"
+        />
+      ) : (
+        <p className="line-clamp-4 text-small whitespace-pre-line text-[var(--fg-muted)]">{letter.letter}</p>
+      )}
+      {approved && demo && (
+        <p className="rounded-[12px] bg-[var(--status-pending-bg)] px-3 py-2 text-small font-medium text-[var(--status-pending-fg)]">
+          Demo practice: don&rsquo;t send this to a real provider.
+        </p>
+      )}
+      <div className="flex flex-wrap gap-2">
+        {approved && (
+          <Button variant="accent" onClick={copy} aria-label={`Copy email to ${name}`}>
+            {copied ? "Copied" : "Copy"}
+          </Button>
+        )}
+        <Button variant="quiet" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-controls={open ? `${boxId}-text` : undefined}>
+          {open ? "Show less" : "Read it all"}
+        </Button>
+      </div>
+      {approved ? (
+        <ol className="list-decimal pl-5 text-small text-[var(--fg-muted)]">
+          <li>Press Copy.</li>
+          <li>Open your email and start a new message to {name}.</li>
+          <li>Paste, check it, and send it yourself. Aeon never sends.</li>
+        </ol>
+      ) : (
+        letter.status !== "failed" && (
+          <ol className="list-decimal pl-5 text-small text-[var(--fg-muted)]">
+            <li>
+              Read it in{" "}
+              <Link href="/approvals" className="text-[var(--link)] underline underline-offset-2">
+                Approvals
+              </Link>{" "}
+              and approve it (you can change it there).
+            </li>
+            <li>Then a Copy button shows here, to paste it into your own email.</li>
+          </ol>
+        )
+      )}
+    </div>
+  );
 }
 
 function Card({
   card,
+  tier,
   letter,
   drafting,
+  demo,
   onMove,
   onDraft,
 }: {
   card: ReferralSource;
+  tier: TierResult | undefined;
   letter: LetterState | undefined;
   drafting: boolean;
+  demo: boolean;
   onMove: (stage: Stage) => void;
   onDraft: () => void;
 }) {
@@ -84,20 +173,14 @@ function Card({
       }}
       className="flex cursor-grab flex-col gap-2 rounded-[20px] border border-[var(--hairline)] bg-[var(--glass-strong)] p-4 active:cursor-grabbing"
     >
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <h3 id={headingId} className="min-w-0 font-semibold leading-snug break-words">
           {card.name}
         </h3>
-        {card.fit_score !== null && (
-          <span
-            className="shrink-0 rounded-full border border-[var(--hairline)] px-2.5 py-0.5 text-small font-semibold"
-            aria-label={`Fit score ${card.fit_score} out of 100`}
-          >
-            Fit {card.fit_score}
-          </span>
-        )}
+        {tier && <TierBadge tier={tier.tier} />}
       </div>
       <p className="text-small text-[var(--fg-muted)]">{meta.join(" · ")}</p>
+      {tier && <p className="text-small text-[var(--fg-muted)]">Why: {tier.reasons.slice(1).join("; ")}.</p>}
       {card.address && (
         <p className="flex items-start gap-1.5 text-small text-[var(--fg-muted)]">
           <MapPin aria-hidden size={14} className="mt-0.5 shrink-0" />
@@ -116,7 +199,7 @@ function Card({
       {card.next_follow_up_on && card.stage !== "connected" && card.stage !== "not_a_fit" && (
         <p className="text-small font-medium">Follow up {dateLabel(card.next_follow_up_on)}</p>
       )}
-      <LetterLine letter={letter} />
+      {letter && <LetterBox letter={letter} name={card.name} demo={demo} />}
       <SettingSelect
         compact
         label="Move to"
@@ -126,7 +209,7 @@ function Card({
       />
       {canDraft && (
         <Button variant="quiet" onClick={onDraft} disabled={drafting} aria-describedby={headingId}>
-          {drafting ? "Aeon is writing…" : card.stage === "follow_up" ? "Draft a check-in letter" : "Draft intro letter"}
+          {drafting ? "Aeon is writing…" : card.stage === "follow_up" ? "Draft a check-in email" : "Draft email"}
         </Button>
       )}
     </li>
@@ -194,7 +277,18 @@ function Column({
   );
 }
 
-export function ReferralBoard({ initial, letters: initialLetters }: { initial: ReferralSource[]; letters: Record<string, LetterState> }) {
+export function ReferralBoard({
+  initial,
+  letters: initialLetters,
+  tiers,
+  demo,
+}: {
+  initial: ReferralSource[];
+  letters: Record<string, LetterState>;
+  tiers: Record<string, TierResult>;
+  /** The fictional demo practice: letters must never reach a real provider. */
+  demo: boolean;
+}) {
   const [cards, setCards] = useState(initial);
   const [letters, setLetters] = useState(initialLetters);
   const [drafting, setDrafting] = useState<string | null>(null);
@@ -229,10 +323,13 @@ export function ReferralBoard({ initial, letters: initialLetters }: { initial: R
     setDrafting(card.id);
     try {
       const res = await fetch(`/api/referrals/${card.id}/draft`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
-      const data = (await res.json()) as { approval_id?: string; error?: string };
+      const data = (await res.json()) as { approval_id?: string; subject?: string; letter?: string; error?: string };
       if (!res.ok || !data.approval_id) throw new Error(data.error ?? "I couldn't write the letter. Try again.");
-      setLetters((l) => ({ ...l, [card.id]: { approvalId: data.approval_id!, status: "pending", dryRun: null } }));
-      notify.success(`The letter to ${card.name} is waiting for you in Approvals.`);
+      setLetters((l) => ({
+        ...l,
+        [card.id]: { approvalId: data.approval_id!, status: "pending", subject: data.subject ?? null, letter: data.letter ?? null },
+      }));
+      setAnnounce(`The email to ${card.name} is ready. Approve it in Approvals, then copy it from its card.`);
     } catch (err) {
       notify.error(err instanceof Error ? err.message : "I couldn't write the letter. Try again.");
     } finally {
@@ -259,8 +356,10 @@ export function ReferralBoard({ initial, letters: initialLetters }: { initial: R
                   <Card
                     key={c.id}
                     card={c}
+                    tier={tiers[c.id]}
                     letter={letters[c.id]}
                     drafting={drafting === c.id}
+                    demo={demo}
                     onMove={(s) => move(c.id, s)}
                     onDraft={() => draft(c)}
                   />

@@ -226,7 +226,7 @@ export async function planSeveral(
   return { outcome: "planned", saved, blocked: saved.filter((s) => s.status === "blocked").length };
 }
 
-/** Points posts at the research behind them (migration 020). */
+/** Points posts at the research behind them (migration 021). */
 async function linkResearch(postIds: string[], researchId: string | undefined) {
   if (!researchId || !postIds.length) return;
   await db()`update practice_os.posts set research_id = ${researchId} where id = any(${postIds}::uuid[])`;
@@ -243,4 +243,45 @@ export async function researchPost(topic: string, opts: { search?: SearchFn; cha
   if (gate) return gate;
   const [p] = await db()<{ is_sample: boolean }[]>`select is_sample from practice_os.clinician_profile limit 1`;
   return { outcome: "researched", research: await research(topic, { ...opts, isSample: p?.is_sample ?? false }) };
+}
+
+export type RetryResult = { ok: true; approvalId: string } | { ok: false; status: number; why: string };
+
+/**
+ * Retry a post whose picture didn't finish (or that never reached her approvals):
+ * draw the picture again from its saved words and queue a fresh approval. Blocked
+ * and ready posts are never retried.
+ */
+export async function retryPost(by: string, postId: string, opts: { graphic?: GraphicDeps } = {}): Promise<RetryResult> {
+  if (await instagramDeclined()) return { ok: false, status: 409, why: DECLINED };
+  const [p] = await db()<{ id: string; topic: PillarId | "other"; caption: string; headline: string | null; alt_text: string | null; status: string; approval_status: string | null }[]>`
+    select p.id, p.topic, p.caption, p.headline, p.alt_text, p.status, a.status as approval_status
+      from practice_os.posts p left join practice_os.approvals a on a.id = p.approval_id
+     where p.id = ${postId}`;
+  if (!p) return { ok: false, status: 404, why: "That post isn't here any more." };
+  if (p.status === "blocked" || p.status === "ready" || p.status === "published" || p.approval_status === "pending" || p.approval_status === "running") {
+    return { ok: false, status: 409, why: "This post doesn't need a retry." };
+  }
+  const facts = await practiceFacts();
+  const headline = p.headline ?? "Post";
+  const graphic = await designPost(
+    PILLAR_BY_ID.get(p.topic === "other" ? "first_session" : p.topic)!,
+    { headline, practiceName: facts.practiceName, licenseLine: facts.licenseLine },
+    { neverShow: facts.voice?.neverShow, ...opts.graphic },
+  );
+  await db()`
+    update practice_os.posts
+       set image_jpeg = ${graphic.jpeg}, graphic_check = ${db().json({ ...graphic.check, tries: graphic.tries } as never)},
+           status = 'pending_approval', failed_reason = null, approval_id = null
+     where id = ${p.id}`;
+  const approvalId = await queueApproval({
+    kind: "instagram_post",
+    title: `Instagram post: ${headline}`,
+    preview: { body: p.caption, headline, alt_text: p.alt_text, image: `/api/instagram/posts/${p.id}/image`, picture_check: graphic.check.ok ? "passed" : graphic.check.problems.join(" ") },
+    payload: { post_id: p.id },
+    createdBy: by,
+  });
+  await db()`update practice_os.posts set approval_id = ${approvalId} where id = ${p.id} and approval_id is null`;
+  await audit({ actor: "clinician", action: "instagram_post_retried", subjectType: "post", subjectId: p.id, details: { approval_id: approvalId } });
+  return { ok: true, approvalId };
 }

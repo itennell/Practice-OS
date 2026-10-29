@@ -2,10 +2,10 @@ import { expect, test } from "@playwright/test";
 import { execSync } from "node:child_process";
 
 // The Instagram studio end to end against live Muse (writer, safety check, picture
-// and picture check). Runs only when MODEL_API_KEY is set for the test server; CI
-// without a key skips it. Takes several minutes.
+// and picture check). Runs only with PLAYWRIGHT_LIVE=1 and MODEL_API_KEY set (the
+// config otherwise blanks the key for the test server). Run with PLAYWRIGHT_LIVE=1 so the test server keeps the key. Takes several minutes.
 
-test.skip(!process.env.MODEL_API_KEY, "needs a Muse key (live model calls)");
+test.skip(process.env.PLAYWRIGHT_LIVE !== "1" || !process.env.MODEL_API_KEY, "live run only: PLAYWRIGHT_LIVE=1 and a Muse key");
 
 test("Write one post, then plan 3; each waits for her approval as a preview", async ({ page }) => {
   test.setTimeout(1_200_000);
