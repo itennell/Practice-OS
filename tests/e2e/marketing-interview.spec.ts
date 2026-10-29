@@ -165,12 +165,22 @@ test("Rosa says Instagram isn't for her: no Instagram questions or reminders, ev
   const todo = page.getByRole("region", { name: "Still to set up" });
   await expect(todo).toContainText("Make a practice website");
   await expect(todo).not.toContainText(/Instagram/);
-  expect(await menuHidden(page)).toEqual(["/instagram"]); // the chat menu leaves Instagram out
-  if (wide()) {
-    await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Admin" })).toBeVisible();
-    await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Instagram" })).toHaveCount(0);
-  }
+  // Media stays for everyone (Psychology Today and her website); only its Instagram tab goes.
+  expect(await menuHidden(page)).toEqual([]);
+  if (wide()) await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Media" })).toBeVisible();
   expect(await seriousViolations(page)).toEqual([]);
+  await page.goto("/media");
+  const tabs = page.getByRole("navigation", { name: "Media" });
+  await expect(tabs.getByRole("link", { name: "Website" })).toBeVisible();
+  await expect(tabs.getByRole("link", { name: "Instagram" })).toHaveCount(0);
+  // An old link to the Instagram tab gets a short note and the way back, not the studio.
+  await page.goto("/media/instagram");
+  await expect(page.getByText("You said Instagram isn’t for you, so Aeon leaves it out.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Plan this week" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Turn Instagram back on" })).toHaveAttribute("href", "/onboarding?q=instagram%3Aaccount");
+  expect(await seriousViolations(page)).toEqual([]);
+  await page.getByRole("link", { name: "Turn Instagram back on" }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Do you have an Instagram for your practice?");
   // Coming back to onboarding later still shows no Instagram questions after her answer.
   const state = await page.evaluate(() => fetch("/api/onboarding").then((r) => r.json()));
   expect((state.screens as { id: string }[]).filter((s) => s.id.startsWith("instagram:")).map((s) => s.id)).toEqual(["instagram:account"]);
