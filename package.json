@@ -21,6 +21,7 @@
     "models:download": "tsx scripts/download-models.ts",
     "aeon:record": "tsx scripts/record-aeon-fixture.ts",
     "eval:documents": "tsx scripts/eval-documents.ts",
+    "eval:instagram": "tsx scripts/eval-instagram.ts",
     "doctor": "tsx scripts/doctor.ts"
   },
   "dependencies": {

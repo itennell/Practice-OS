@@ -28,6 +28,9 @@ import * as superbill from "../superbill/store";
 import * as cms855i from "../payers/cms855i";
 import * as payers from "../payers/store";
 import * as instagram from "../instagram/store";
+import * as coach from "../instagram/coach";
+import type { ChatFn } from "../instagram/critic";
+import { ACCOUNT_STEPS } from "../instagram/onboarding";
 import { SPECIALTIES, type SpecialtyId } from "../referrals/nppes";
 import { draftOutreach } from "../referrals/outreach";
 import { DEFAULT_SPECIALTIES, getReferralSettings } from "../referrals/settings";
@@ -46,13 +49,19 @@ export type ToolContext = {
   mode?: ApprovalMode;
   /** She already approved this exact call (the aeon_action executor). */
   approved?: boolean;
+  /** The model call to use inside tools that write with Muse (Instagram): the chat's own, so a recorded conversation replays end to end. */
+  chat?: ChatFn;
 };
 
 /** aeon_action is queued only by runTool itself in Manual mode, never by an agent. */
 const QUEUEABLE_KINDS = APPROVAL_KINDS.filter((k) => k !== "aeon_action") as [Exclude<ApprovalKind, "aeon_action">, ...Exclude<ApprovalKind, "aeon_action">[]];
 
-/** Saving or forgetting a memory never waits for her tap, in any mode. */
-const ALWAYS_RUNS = new Set(["remember", "forget"]);
+/**
+ * Saving or forgetting a memory never waits for her tap, in any mode. Nor do the
+ * Instagram writers: they save ideas or drafts that wait for her approval anyway.
+ * They still count as changes, so the view-only demo copy refuses them (no writes, no Muse).
+ */
+const ALWAYS_RUNS = new Set(["remember", "forget", "post_ideas", "weekly_plan", "draft_post", "plan_instagram_week", "draft_instagram_post"]);
 
 export type ToolResult = {
   content: { type: "text"; text: string }[];
@@ -880,15 +889,15 @@ export const TOOLS: AeonTool[] = [
     name: "plan_instagram_week",
     title: "Plan this week's Instagram posts",
     description:
-      "Writes five Instagram posts about practice logistics, one each for: your first session, fees and superbills, how to book, " +
-      "meet the clinician, office and telehealth. Each is checked for safety (no client stories, testimonials, promises, advice or self-harm), " +
-      "gets a picture of her, and waits on the Instagram page for her approval. Takes a few minutes.",
+      "Writes ALL of this week's Instagram posts at once, as full drafts with pictures, one per topic she picked. Use when she asks you to write " +
+      "or draft all of this week's posts (not for ideas or a plan). For ideas, what to post, or a posting plan, use post_ideas or weekly_plan first. Each is checked for safety " +
+      "(no client stories, testimonials, promises, advice or self-harm) and waits on the Instagram page for her approval. Takes a few minutes.",
     input: {},
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: false },
     label: "Planned this week's posts",
-    changesData: false,
+    changesData: true,
     run: async (_input, ctx) => {
-      const r = await instagram.planWeek(ctx.by);
+      const r = await instagram.planWeek(ctx.by, { chat: ctx.chat });
       if (r.declined) return text({ written: false, why: instagram.DECLINED });
       return text({ week_of: r.week, waiting_for_approval: r.saved.length - r.blocked, blocked: r.blocked, see: "/instagram" });
     },
@@ -907,9 +916,9 @@ export const TOOLS: AeonTool[] = [
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: false },
     label: "Drafted an Instagram post",
-    changesData: false,
+    changesData: true,
     run: async ({ request, pillar }, ctx) => {
-      const r = await instagram.requestPost(ctx.by, request, pillar ?? null);
+      const r = await instagram.requestPost(ctx.by, request, pillar ?? null, { chat: ctx.chat });
       if (r.outcome === "blocked" || r.outcome === "declined") return text({ written: false, why: r.why });
       return text({
         written: r.outcome !== "blocked_after_rewrite",
@@ -925,7 +934,7 @@ export const TOOLS: AeonTool[] = [
   tool({
     name: "list_instagram_posts",
     title: "Instagram posts",
-    description: "Lists her recent Instagram posts with their status: waiting for her, blocked (and why), posted (with the link) or failed.",
+    description: "Lists her recent Instagram posts with their status: waiting for her, ready for her to post herself, blocked (and why) or failed.",
     input: { limit: z.number().int().min(1).max(30).default(10) },
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     label: "Checked your Instagram posts",
@@ -941,6 +950,88 @@ export const TOOLS: AeonTool[] = [
           why_failed: p.failedReason,
           link: p.permalink,
         })),
+      });
+    },
+  }),
+
+  // ---- Instagram content coach (lib/instagram/coach.ts): ideas and plans first,
+  // then a draft of the one she picks. Needs no relay or Meta app.
+  tool({
+    name: "instagram_account_steps",
+    title: "How to make an Instagram business account",
+    description:
+      "The five plain steps to make an Instagram business account for her practice. Use when she asks how to set up, start or make an Instagram.",
+    input: {},
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+    label: "Got the Instagram setup steps",
+    changesData: false,
+    run: async () => text({ steps: ACCOUNT_STEPS, after: "Aeon writes the posts; she posts them herself in the Instagram app. There's nothing to connect." }),
+  }),
+
+  tool({
+    name: "post_ideas",
+    title: "Instagram post ideas",
+    description:
+      "Suggests Instagram post ideas for this week from her saved answers (goals, topics, style, what posts never show, how often). " +
+      "Each idea has a hook (opening line), 2-3 points, a call to action such as how to book, and a suggested picture. Practice logistics only. " +
+      "Use when she asks for post ideas, what to post, or help with content. Show them numbered, then ask which one to write; don't draft yet. " +
+      "When she picks one of the ideas already shown, don't call this again: use draft_post.",
+    input: {
+      count: z.number().int().min(1).max(5).optional().describe("How many ideas. Omit to use her usual number."),
+      topic: z.enum(["first_session", "fees_superbills", "how_to_book", "meet_the_clinician", "office_telehealth"]).optional().describe("Only when she names one topic."),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: false },
+    label: "Came up with post ideas",
+    changesData: true,
+    run: async ({ count, topic }, ctx) => text(coach.ideasForModel(await coach.postIdeas(ctx.by, { count, topic, chat: ctx.chat }))),
+  }),
+
+  tool({
+    name: "weekly_plan",
+    title: "This week's posting plan",
+    description:
+      "Makes a posting calendar for the coming week at her chosen pace (1, 3 or 5 posts a week), one dated idea per post day, each with a hook, " +
+      "points, a call to action and a picture idea. Drafts and posts nothing. Use when she asks for a posting plan, schedule or calendar. " +
+      "When she picks a day or idea from a plan already shown, use draft_post. When she asks you to write all the posts, use plan_instagram_week.",
+    input: {},
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: false },
+    label: "Made a posting plan",
+    changesData: true,
+    run: async (_input, ctx) => text(coach.ideasForModel(await coach.postIdeas(ctx.by, { plan: true, chat: ctx.chat }))),
+  }),
+
+  tool({
+    name: "draft_post",
+    title: "Draft one of the post ideas",
+    description:
+      "Turns one idea from her latest list (post_ideas or weekly_plan) into a full caption in her picked style, checks it, makes its picture, " +
+      "and puts it in Approvals for her OK. Use when she picks an idea: 'draft the second one' is idea 2, 'write the first one' is idea 1. " +
+      "Her latest list is saved, so call this directly with the number; don't make new ideas or a new plan first. Aeon never posts: " +
+      "once she approves it, it's ready for her to post herself.",
+    input: {
+      idea: z.number().int().min(1).max(5).optional().describe("The idea's number in her latest list."),
+      idea_id: z.string().uuid().optional().describe("Or the idea's id."),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: false },
+    label: "Drafted the post",
+    changesData: true,
+    run: async ({ idea, idea_id }, ctx) => {
+      if (!idea && !idea_id) return text({ written: false, why: "Ask which idea she wants written." });
+      const r = await coach.draftIdea(ctx.by, { number: idea, id: idea_id }, { chat: ctx.chat });
+      if (!r.found) return text({ written: false, why: r.why });
+      if (r.outcome === "blocked" || r.outcome === "declined") return text({ written: false, why: r.why });
+      if (r.outcome === "already_drafted") {
+        return text({ written: false, already_drafted: true, idea: r.idea.number, headline: r.headline, approval_id: r.post.approvalId, why: "She already has a draft of this idea; it's in Approvals or on the Instagram page." });
+      }
+      return text({
+        written: r.outcome !== "blocked_after_rewrite",
+        idea: r.idea.number,
+        headline: r.headline,
+        approval_id: r.post.approvalId,
+        why: r.why,
+        ...(r.outcome !== "blocked_after_rewrite"
+          ? { next: "It's waiting in Approvals. Once she approves it, the Instagram page has the caption to copy, the picture to save and the steps to post it herself." }
+          : {}),
       });
     },
   }),
