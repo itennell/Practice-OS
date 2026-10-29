@@ -13,7 +13,7 @@ export function PageHeader({ title, description, action }: { title: string; desc
   return (
     <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
       <div className="flex min-w-0 flex-col gap-1">
-        <h1 className="text-[1.75rem] leading-[1.15] font-[650] tracking-[-0.01em]">{title}</h1>
+        <h1 className="text-title">{title}</h1>
         {description && <p className="max-w-[65ch] text-[var(--fg-muted)]">{description}</p>}
       </div>
       {action}
