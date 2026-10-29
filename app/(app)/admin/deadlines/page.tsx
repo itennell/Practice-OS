@@ -3,7 +3,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { DeadlineCard, ResearchedBadge, SourceLine, formatDate } from "@/components/deadline-card";
 import { SetupReminders } from "@/components/setup-reminders";
-import { Chip, GlassCard } from "@/components/ui";
+import { Chip, GlassCard, PageHeader } from "@/components/ui";
 import { deadlinesView } from "@/lib/compliance/view";
 import { listPayerApplications, payerDates } from "@/lib/payers/store";
 import Link from "next/link";
@@ -22,12 +22,10 @@ const FACT_QUESTION: Record<string, string> = {
 export default function DeadlinesPage() {
   return (
     <>
-      <header className="flex flex-col gap-2">
-        <h1 className="text-title">Deadlines</h1>
-        <p className="max-w-[65ch] text-[var(--fg-muted)]">
-          Everything due in the next 90 days, plus anything that needs a head start, most urgent first. Aeon prepares; the parts marked “You do this” are yours.
-        </p>
-      </header>
+      <PageHeader
+        title="Deadlines"
+        description="Everything due in the next 90 days, plus anything that needs a head start, most urgent first. Aeon prepares; the parts marked “You do this” are yours."
+      />
       <Suspense fallback={<ListSkeleton />}>
         <Deadlines />
       </Suspense>

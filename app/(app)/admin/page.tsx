@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense, type ReactNode } from "react";
-import { ChevronRight } from "lucide-react";
+import { CheckCheck, ChevronRight } from "lucide-react";
 import { Credentialing, GoodFaithEstimates, Insurance, ReleaseForms, Superbills } from "@/components/admin/panels";
 import { SidePanel } from "@/components/admin/side-panel";
+import { EmptyState } from "@/components/shared/empty-state";
 import { OfficeSettings } from "@/components/office-settings";
-import { ButtonLink, GlassCard, Orb } from "@/components/ui";
+import { ButtonLink, GlassCard, Orb, PageHeader } from "@/components/ui";
 import { loadNeeds } from "@/lib/admin/load";
 import { MAX_NEEDS, type AdminPanel, type NeedAction, type NeedItem } from "@/lib/admin/needs-next";
 import { deadlinesView } from "@/lib/compliance/view";
@@ -36,12 +37,10 @@ const isPanel = (v: unknown): v is AdminPanel => typeof v === "string" && v in P
 export default function AdminPage({ searchParams }: PageProps<"/admin">) {
   return (
     <>
-      <header className="flex flex-col gap-2">
-        <h1 className="text-title">Admin</h1>
-        <p className="max-w-[65ch] text-[var(--fg-muted)]">
-          Aeon keeps the business side moving. Here’s what needs you, in order. Aeon prepares; you send, sign and attest.
-        </p>
-      </header>
+      <PageHeader
+        title="Admin"
+        description="Aeon keeps the business side moving. Here’s what needs you, in order. Aeon prepares; you send, sign and attest."
+      />
       <Suspense fallback={<div aria-hidden className="h-72 animate-pulse rounded-[24px] bg-[var(--hairline)]" />}>
         <NeedsNext />
       </Suspense>
@@ -90,7 +89,9 @@ async function NeedsNext() {
         </h2>
       </div>
       {needs.length === 0 ? (
-        <p className="py-3 text-[var(--fg-muted)]">Nothing needs you right now. Aeon is keeping watch and will put anything new here.</p>
+        <EmptyState icon={<CheckCheck size={18} strokeWidth={1.75} />} title="Nothing needs you right now">
+          Aeon is keeping watch and will put anything new here.
+        </EmptyState>
       ) : (
         <>
           <ol className="flex flex-col">
