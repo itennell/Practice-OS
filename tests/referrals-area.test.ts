@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { canSearch } from "../lib/referrals/http";
 import { allow, limited, resetRateLimit } from "../lib/referrals/rate-limit";
 import fixture from "./fixtures/nppes-area.json";
-import { chicagolandZips, linkGroups, LOOP, parseArea, searchArea, zipsNear, type PracticeContext } from "../lib/referrals/area";
+import { chicagolandZips, linkGroups, LOOP, parseArea, placeAllowed, searchArea, zipsNear, type PracticeContext } from "../lib/referrals/area";
+import { isKnownPlace } from "../lib/referrals/places";
 import { addressKey, clearGeocodeCache, geocodeAddresses, geocodeCacheSize, oneAtATime, parseCensusLine } from "../lib/referrals/geocode";
 import { haversineMiles, zipCenters } from "../lib/referrals/geo";
 import {
@@ -381,5 +382,20 @@ describe("review fixes: who may search, and how often", () => {
     delete process.env.VERCEL;
     expect(limited(r, "area", 10)).toBeNull();
     expect(allow("k", 1, 0) && !allow("k", 1, 1) && allow("k", 1, 61_000)).toBe(true);
+  });
+});
+
+describe("known places skip the privacy guard", () => {
+  it.each(["Pilsen", "Logan Square", "Wicker Park", "Bronzeville", "Hyde Park", "pilsen, chicago", "Oak Park, IL", "O'Hare"])("%s is a known place", async (place) => {
+    expect(isKnownPlace(place)).toBe(true);
+    let guarded = false;
+    expect(await placeAllowed(place, async () => ((guarded = true), false))).toBe(true);
+    expect(guarded).toBe(false);
+  });
+  it("sends unknown text through the guard", async () => {
+    expect(isKnownPlace("Jane Smith")).toBe(false);
+    let guarded = false;
+    expect(await placeAllowed("Jane Smith", async () => ((guarded = true), false))).toBe(false);
+    expect(guarded).toBe(true);
   });
 });
