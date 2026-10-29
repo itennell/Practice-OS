@@ -17,7 +17,7 @@ export function shortCaption(caption: string): { text: string; cut: boolean } {
   const firstBlock = caption.split("\n")[0];
   if (caption.length <= SHORT && firstBlock === caption) return { text: caption, cut: false };
   const head = firstBlock.length <= SHORT ? firstBlock : firstBlock.slice(0, SHORT).replace(/\s+\S*$/, "");
-  return { text: head, cut: true };
+  return { text: head.replace(/[\s.,;:!?…]+$/, ""), cut: true };
 }
 
 export function PostPreview({
