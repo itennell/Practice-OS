@@ -141,7 +141,7 @@ export async function respond(message: string, opts: RespondOptions): Promise<Re
         await audit({ actor: "safety", action: "reply_held_back", subjectType: "chat", details: { kind: out.kind, by: opts.by } });
         return { kind: "answer", text: HELD_BACK, steps, approvalIds };
       }
-      return { kind: "answer", text, steps, approvalIds };
+      return { kind: "answer", text: out.text, steps, approvalIds };
     }
     messages.push(reply);
     for (const call of calls) {

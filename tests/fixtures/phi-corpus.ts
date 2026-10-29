@@ -156,6 +156,12 @@ export const PHI_CASES: PhiCase[] = [
   { text: "Howard Brown Health takes walk-ins", expect: "pass", note: "institution named after a person" },
   { text: "Interns come from Loyola University Chicago", expect: "pass", note: "institution" },
   { text: "My office is near Jackson Park and Hyde Park", expect: "pass", note: "parks named after people" },
+
+  // ---- app walk-throughs (Oct 29: "Link Instagram" was read as a person)
+  { text: "Look for a Connect or Link Instagram button at the top.", expect: "pass", note: "button name" },
+  { text: "Open Meta Business Suite, then Account Center, and choose Switch to Professional Account.", expect: "pass", note: "Meta screens" },
+  { text: "Press Connect Cal, then open Front Desk Settings.", expect: "pass", note: "app screens" },
+  { text: "Go to Settings, then Connections, and press Connect Gmail.", expect: "pass", note: "app screens" },
 ];
 
 /**

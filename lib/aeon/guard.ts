@@ -76,9 +76,10 @@ export async function guard(text: string, at: GuardPoint, allow?: Allowlist): Pr
   }
   const strangers = names.filter((n) => !isAllowedPerson(n, plain, list));
   if (strangers.length === 0) return { ok: true, text };
-  // A tool result keeps its business content with the names blanked out;
-  // anything she typed or Aeon would save or say is refused outright.
-  if (at !== "tool_result") return { ok: false, kind: "client_name" };
+  // A tool result or Aeon's own reply keeps its content with the names blanked
+  // out, so one word misread as a name doesn't throw away a whole answer.
+  // Anything she typed or Aeon would save is refused outright.
+  if (at !== "tool_result" && at !== "reply") return { ok: false, kind: "client_name" };
   let redacted = text;
   for (const n of strangers) redacted = redacted.replace(new RegExp(escape(n), "gi"), NAME_WITHHELD);
   // Names are found in the cleaned copy but blanked in the original, so a copy
