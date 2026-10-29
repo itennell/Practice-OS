@@ -33,45 +33,50 @@ async function saveCursor(vendor: string, stream: "voicemail" | "sms", seen: Dat
       last_error = excluded.last_error`;
 }
 
+/**
+ * Runs one check unless another copy is already running one. The lock is a
+ * transaction-level advisory lock: Postgres releases it when the transaction
+ * ends, on the same server connection that took it. A session lock taken and
+ * released as two statements could land on different backends through
+ * Supabase's transaction pooler and leak. The transaction only holds the lock;
+ * the check's own reads and writes run outside it, so nothing it does is rolled back.
+ */
 export async function checkFrontDesk(): Promise<CheckSummary> {
-  const sql = await db().reserve();
-  try {
-    const [{ locked }] = await sql`select pg_try_advisory_lock(${LOCK_KEY}) as locked`;
-    if (!locked) return { ran: false, reason: "locked" };
-    try {
-      const phone = await deps().phone();
-      if (!phone) return { ran: false, reason: "no_phone" };
-      const now = deps().now();
-      const summary = { ran: true as const, voicemails: 0, texts: 0, crises: 0, reminders: 0, error: undefined as string | undefined };
+  return (await db().begin(async (tx) => {
+    const [{ locked }] = await tx`select pg_try_advisory_xact_lock(${LOCK_KEY}) as locked`;
+    if (!locked) return { ran: false, reason: "locked" } satisfies CheckSummary;
+    return runCheck();
+  })) as CheckSummary;
+}
 
-      for (const stream of ["voicemail", "sms"] as const) {
-        let newest: Date | null = null;
-        try {
-          const since = await cursor(phone.vendor, stream, now);
-          const items = stream === "voicemail" ? await phone.listVoicemails(since) : await phone.listInboundTexts(since);
-          for (const item of items) {
-            const outcome =
-              stream === "voicemail"
-                ? await processVoicemail(item as Parameters<typeof processVoicemail>[0], phone)
-                : await processText(item as Parameters<typeof processText>[0], phone);
-            if (outcome !== "skipped") summary[stream === "voicemail" ? "voicemails" : "texts"]++;
-            if (outcome === "crisis") summary.crises++;
-            if (!newest || item.receivedAt > newest) newest = item.receivedAt;
-          }
-          await saveCursor(phone.vendor, stream, newest, null);
-        } catch (e) {
-          const msg = e instanceof PhoneError ? e.fix : e instanceof Error ? e.message : String(e);
-          summary.error = msg;
-          await saveCursor(phone.vendor, stream, newest, msg);
-          await audit({ actor: "system", action: "front_desk_check_failed", details: { stream, error: msg } });
-        }
+async function runCheck(): Promise<CheckSummary> {
+  const phone = await deps().phone();
+  if (!phone) return { ran: false, reason: "no_phone" };
+  const now = deps().now();
+  const summary = { ran: true as const, voicemails: 0, texts: 0, crises: 0, reminders: 0, error: undefined as string | undefined };
+
+  for (const stream of ["voicemail", "sms"] as const) {
+    let newest: Date | null = null;
+    try {
+      const since = await cursor(phone.vendor, stream, now);
+      const items = stream === "voicemail" ? await phone.listVoicemails(since) : await phone.listInboundTexts(since);
+      for (const item of items) {
+        const outcome =
+          stream === "voicemail"
+            ? await processVoicemail(item as Parameters<typeof processVoicemail>[0], phone)
+            : await processText(item as Parameters<typeof processText>[0], phone);
+        if (outcome !== "skipped") summary[stream === "voicemail" ? "voicemails" : "texts"]++;
+        if (outcome === "crisis") summary.crises++;
+        if (!newest || item.receivedAt > newest) newest = item.receivedAt;
       }
-      summary.reminders = await queueReminders().catch(() => 0);
-      return summary;
-    } finally {
-      await sql`select pg_advisory_unlock(${LOCK_KEY})`;
+      await saveCursor(phone.vendor, stream, newest, null);
+    } catch (e) {
+      const msg = e instanceof PhoneError ? e.fix : e instanceof Error ? e.message : String(e);
+      summary.error = msg;
+      await saveCursor(phone.vendor, stream, newest, msg);
+      await audit({ actor: "system", action: "front_desk_check_failed", details: { stream, error: msg } });
     }
-  } finally {
-    sql.release();
   }
+  summary.reminders = await queueReminders().catch(() => 0);
+  return summary;
 }
