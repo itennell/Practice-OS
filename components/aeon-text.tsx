@@ -27,20 +27,21 @@ function inline(text: string, key: string): ReactNode[] {
   return out;
 }
 
-type Block = { kind: "p"; lines: string[] } | { kind: "ul" | "ol"; items: string[] };
+// `start` keeps a numbered list counting when a line of text splits it ("1. ... What you do: ... 2. ...").
+type Block = { kind: "p"; lines: string[] } | { kind: "ul" | "ol"; items: string[]; start?: number };
 
-function blocks(text: string): Block[] {
+export function blocks(text: string): Block[] {
   const out: Block[] = [];
   for (const raw of text.replace(/\r\n/g, "\n").split("\n")) {
     const line = raw.trimEnd();
     const bullet = /^\s*[-*•]\s+(.*)$/.exec(line);
-    const numbered = /^\s*\d+[.)]\s+(.*)$/.exec(line);
+    const numbered = /^\s*(\d+)[.)]\s+(.*)$/.exec(line);
     const last = out.at(-1);
     if (bullet || numbered) {
       const kind = bullet ? "ul" : "ol";
-      const item = (bullet ?? numbered)![1].replace(/^#+\s*/, "");
+      const item = (bullet ? bullet[1] : numbered![2]).replace(/^#+\s*/, "");
       if (last?.kind === kind) last.items.push(item);
-      else out.push({ kind, items: [item] });
+      else out.push(numbered ? { kind, items: [item], start: Number(numbered[1]) } : { kind, items: [item] });
     } else if (line.trim() === "") {
       if (last && !(last.kind === "p" && last.lines.length === 0)) out.push({ kind: "p", lines: [] });
     } else if (/^\s{2,}\S/.test(raw) && last && last.kind !== "p") {
@@ -72,7 +73,7 @@ export function AeonText({ text }: { text: string }) {
             ))}
           </ul>
         ) : (
-          <ol key={i} className="flex list-decimal flex-col gap-1 pl-5">
+          <ol key={i} start={b.start !== 1 ? b.start : undefined} className="flex list-decimal flex-col gap-1 pl-5">
             {b.items.map((item, j) => (
               <li key={j}>{withBreaks(item, `o${i}-${j}`)}</li>
             ))}
