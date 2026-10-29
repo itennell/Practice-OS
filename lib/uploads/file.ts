@@ -27,6 +27,8 @@ export type FileOutcome =
 
 const CRISIS_FILE =
   "This file mentions self-harm or someone in danger, so I didn't read it further. If anyone is in danger right now: call or text 988 (Suicide & Crisis Lifeline), or call 911.";
+/** An EIN (12-3456789) or SSN (123-45-6789): never sent to the model, even when the guard lets it pass. */
+const TAX_ID = /\b\d{2}-\d{7}\b|\b\d{3}-\d{2}-\d{4}\b/;
 const GUARD_UNAVAILABLE = "My privacy check isn't working right now, so I can't read files. Try again in a minute.";
 
 function describe(f: Fact): string {
@@ -76,9 +78,10 @@ export async function fileUpload(bytes: Uint8Array, opts: { by: string; chat?: C
     return { ok: true, duplicate: true, approvalId: null, card: uploadedCard(existing), text: `I already have this one: ${existing.title}. Nothing new to add.` };
   }
 
-  // An ID number (a W-9's tax ID) keeps the text from the model: plain code sorts it.
+  // An ID number (a W-9's tax ID, an EIN or SSN) keeps the text from the model: plain code sorts it.
+  const private_ = !checked.ok || TAX_ID.test(text);
   const today = await practiceToday();
-  const sorted: Classified = checked.ok ? await classifyWithMuse(checked.text, today, opts.chat) : classifyByRules(text);
+  const sorted: Classified = private_ ? classifyByRules(text) : await classifyWithMuse(checked.ok ? checked.text : text, today, opts.chat);
 
   const doc = await keepDocument({ bytes, mime, kind: sorted.kind, title: sorted.title, summary: sorted.summary, payer: sorted.payer, createdBy: opts.by });
   await audit({ actor: "aeon", action: "document_kept", subjectType: "document", subjectId: doc.id, details: { kind: doc.kind, facts: sorted.facts.length, by: opts.by } });
@@ -103,7 +106,7 @@ export async function fileUpload(bytes: Uint8Array, opts: { by: string; chat?: C
 
   const lines = [
     `I kept your ${DOC_KIND_LABEL[sorted.kind].toLowerCase()}: ${sorted.title}.${sorted.summary ? ` ${sorted.summary}` : ""}`,
-    checked.ok ? null : "It has an ID number in it, so I sorted it on your computer without sending it to Muse.",
+    private_ ? "It has a tax or ID number in it, so I sorted it on your computer without sending it to Muse." : null,
     sorted.facts.length
       ? `I found ${sorted.facts.length === 1 ? "one thing" : `${sorted.facts.length} things`} for your records: ${sorted.facts.map(describe).join("; ")}. They're waiting for your OK below; nothing changes until you approve.`
       : "Nothing in it changes your records, so there's nothing to approve.",

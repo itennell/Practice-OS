@@ -1,0 +1,367 @@
+{
+  "model": "muse-spark-1.3",
+  "date": "2026-10-29",
+  "runs": 3,
+  "cases": 29,
+  "tool_accuracy": 1,
+  "args_accuracy": 1,
+  "per_case": [
+    {
+      "id": "bcbs-docs",
+      "tool": "3/3",
+      "args": "3/3",
+      "got": [
+        "find_documents {\"query\":\"BCBS follow-up\"}",
+        "find_documents {\"query\":\"BCBS follow-up\"}",
+        "find_documents {\"query\":\"BCBS follow-up\"}"
+      ]
+    },
+    {
+      "id": "oct28-pull-up",
+      "tool": "3/3",
+      "args": "-",
+      "got": [
+        "find_documents {\"due_within_days\":14}",
+        "find_documents {\"due_within_days\":14}",
+        "find_documents {\"due_within_days\":14}"
+      ]
+    },
+    {
+      "id": "oct29-typo",
+      "tool": "3/3",
+      "args": "-",
+      "got": [
+        "find_documents {}",
+        "find_documents {}",
+        "find_documents {}"
+      ]
+    },
+    {
+      "id": "show-those",
+      "tool": "3/3",
+      "args": "-",
+      "got": [
+        "morning_brief {}",
+        "find_documents {\"query\":\"BCBSIL follow-up\"}",
+        "find_documents {\"query\":\"BCBSIL follow-up\"}"
+      ]
+    },
+    {
+      "id": "caqh-checklist",
+      "tool": "3/3",
+      "args": "-",
+      "got": [
+        "find_documents {\"query\":\"CAQH\"}",
+        "find_documents {\"kind\":\"caqh_checklist\",\"query\":\"CAQH checklist\"}",
+        "find_documents {\"kind\":\"caqh_checklist\",\"query\":\"CAQH checklist\"}"
+      ]
+    },
+    {
+      "id": "medicare-form",
+      "tool": "3/3",
+      "args": "-",
+      "got": [
+        "find_documents {\"query\":\"Medicare enrollment form\"}",
+        "find_documents {\"payer\":\"Medicare\",\"query\":\"Medicare enrollment form\"}",
+        "find_documents {\"payer\":\"Medicare\",\"query\":\"Medicare enrollment form\"}"
+      ]
+    },
+    {
+      "id": "w9-on-file",
+      "tool": "3/3",
+      "args": "-",
+      "got": [
+        "find_documents {\"query\":\"W-9\"}",
+        "find_documents {\"query\":\"W-9\"}",
+        "find_documents {\"query\":\"W-9\"}"
+      ]
+    },
+    {
+      "id": "superbills",
+      "tool": "3/3",
+      "args": "3/3",
+      "got": [
+        "find_documents {\"kind\":\"superbill\"}",
+        "find_documents {\"kind\":\"superbill\"}",
+        "find_documents {\"kind\":\"superbill\"}"
+      ]
+    },
+    {
+      "id": "open-gfe",
+      "tool": "3/3",
+      "args": "-",
+      "got": [
+        "find_documents {\"kind\":\"gfe\",\"query\":\"GFE-2026-0002\"}",
+        "find_documents {\"query\":\"GFE-2026-0002\"}",
+        "find_documents {\"kind\":\"gfe\",\"query\":\"GFE-2026-0002\"}"
+      ]
+    },
+    {
+      "id": "due-30",
+      "tool": "3/3",
+      "args": "-",
+      "got": [
+        "find_documents {\"due_within_days\":30}",
+        "find_documents {\"due_within_days\":30}",
+        "find_documents {\"due_within_days\":30}"
+      ]
+    },
+    {
+      "id": "caqh-guide",
+      "tool": "3/3",
+      "args": "3/3",
+      "got": [
+        "find_documents {\"kind\":\"guide\",\"query\":\"CAQH re-attestation\"}",
+        "find_documents {\"query\":\"CAQH re-attest\"}",
+        "find_documents {\"query\":\"CAQH re-attestation\"}"
+      ]
+    },
+    {
+      "id": "blank-release",
+      "tool": "3/3",
+      "args": "3/3",
+      "got": [
+        "find_documents {\"kind\":\"release_form\"}",
+        "find_documents {\"kind\":\"release_form\"}",
+        "find_documents {\"kind\":\"release_form\"}"
+      ]
+    },
+    {
+      "id": "make-release",
+      "tool": "3/3",
+      "args": "3/3",
+      "got": [
+        "create_document {\"kind\":\"release_form\",\"release_form\":{\"expires_on\":\"2027-06-30\",\"information\":\"dates of attendance only\",\"purpose\":\"coordinate care\",\"recipient\":\"Dr. Lee, Northside Clinic\"}}",
+        "make_release_form {\"expires_on\":\"2027-06-30\",\"information\":\"dates of attendance only\",\"purpose\":\"coordinate care\",\"recipient\":\"Dr. Lee at Northside Clinic\"}",
+        "make_release_form {\"expires_on\":\"2027-06-30\",\"information\":\"dates of attendance only\",\"purpose\":\"coordinate care with the primary care doctor\",\"recipient\":\"Dr. Lee, Northside Clinic\"}"
+      ]
+    },
+    {
+      "id": "make-superbill",
+      "tool": "3/3",
+      "args": "3/3",
+      "got": [
+        "draft_superbill {\"lines\":[{\"cpt\":\"90837\",\"date_of_service\":\"2026-10-06\",\"modifier\":\"95\",\"pos\":\"10\"},{\"cpt\":\"90837\",\"date_of_service\":\"2026-10-13\",\"modifier\":\"95\",\"pos\":\"10\"},{\"cpt\":\"90837\",\"date_of_service\":\"2026-10-20\",\"modifier\":\"95\",\"pos\":\"10\"},{\"cpt\":\"90837\",\"date_of_service\":\"2026-10-27\",\"modifier\":\"95\",\"pos\":\"10\"}]}",
+        "draft_superbill {\"lines\":[{\"cpt\":\"90837\",\"date_of_service\":\"2026-10-06\",\"modifier\":\"95\",\"pos\":\"10\"},{\"cpt\":\"90837\",\"date_of_service\":\"2026-10-13\",\"modifier\":\"95\",\"pos\":\"10\"},{\"cpt\":\"90837\",\"date_of_service\":\"2026-10-20\",\"modifier\":\"95\",\"pos\":\"10\"},{\"cpt\":\"90837\",\"date_of_service\":\"2026-10-27\",\"modifier\":\"95\",\"pos\":\"10\"}]}",
+        "create_document {\"kind\":\"superbill\",\"superbill\":{\"lines\":[{\"cpt\":\"90837\",\"date_of_service\":\"2026-10-06\",\"modifier\":\"95\",\"pos\":\"10\"},{\"cpt\":\"90837\",\"date_of_service\":\"2026-10-13\",\"modifier\":\"95\",\"pos\":\"10\"},{\"cpt\":\"90837\",\"date_of_service\":\"2026-10-20\",\"modifier\":\"95\",\"pos\":\"10\"},{\"cpt\":\"90837\",\"date_of_service\":\"2026-10-27\",\"modifier\":\"95\",\"pos\":\"10\"}]}}"
+      ]
+    },
+    {
+      "id": "make-gfe",
+      "tool": "3/3",
+      "args": "3/3",
+      "got": [
+        "draft_gfe {\"basis\":\"scheduled\",\"frequency\":\"weekly\",\"lines\":[{\"code\":\"90837\",\"location\":\"office\",\"quantity\":52}],\"scheduled_on\":\"2026-10-29\",\"service_kind\":\"individual\",\"service_on\":\"2026-11-12\"}",
+        "draft_gfe {\"basis\":\"scheduled\",\"frequency\":\"weekly\",\"lines\":[{\"code\":\"90837\",\"location\":\"office\",\"quantity\":52}],\"scheduled_on\":\"2026-10-29\",\"service_kind\":\"individual\",\"service_on\":\"2026-11-12\"}",
+        "draft_gfe {\"basis\":\"scheduled\",\"frequency\":\"weekly\",\"lines\":[{\"code\":\"90837\",\"location\":\"office\",\"quantity\":52}],\"scheduled_on\":\"2026-10-29\",\"service_kind\":\"individual\",\"service_on\":\"2026-11-12\"}"
+      ]
+    },
+    {
+      "id": "make-855i",
+      "tool": "3/3",
+      "args": "-",
+      "got": [
+        "fill_payer_form {\"form\":\"cms855i\"}",
+        "fill_payer_form {\"form\":\"cms855i\"}",
+        "fill_payer_form {\"form\":\"cms855i\"}"
+      ]
+    },
+    {
+      "id": "insurance-apps",
+      "tool": "3/3",
+      "args": "-",
+      "got": [
+        "list_payer_applications {}",
+        "find_documents {\"kind\":\"payer_application\"}",
+        "find_documents {\"kind\":\"payer_application\"}"
+      ]
+    },
+    {
+      "id": "bcbs-call",
+      "tool": "3/3",
+      "args": "-",
+      "got": [
+        "find_documents {\"payer\":\"BCBSIL\",\"query\":\"BCBS follow-up\"}",
+        "find_documents {\"payer\":\"BCBSIL\",\"query\":\"BCBS follow-up\"}",
+        "find_documents {\"payer\":\"BCBSIL\",\"query\":\"BCBS follow-up\"}"
+      ]
+    },
+    {
+      "id": "caqh-source",
+      "tool": "3/3",
+      "args": "-",
+      "got": [
+        "find_documents {\"query\":\"CAQH deadline\"}",
+        "find_documents {\"query\":\"CAQH\"}",
+        "find_documents {\"query\":\"CAQH deadline\"}"
+      ]
+    },
+    {
+      "id": "uploaded-contract",
+      "tool": "3/3",
+      "args": "-",
+      "got": [
+        "find_documents {\"query\":\"payer contract\"}",
+        "find_documents {\"query\":\"payer contract\"}",
+        "find_documents {\"query\":\"payer contract\"}"
+      ]
+    },
+    {
+      "id": "caqh-needs",
+      "tool": "3/3",
+      "args": "-",
+      "got": [
+        "find_documents {\"query\":\"CAQH\"}",
+        "find_documents {\"query\":\"CAQH\"}",
+        "find_documents {\"query\":\"CAQH\"}"
+      ]
+    },
+    {
+      "id": "before-thanksgiving",
+      "tool": "3/3",
+      "args": "-",
+      "got": [
+        "find_documents {\"due_within_days\":28,\"kind\":\"deadline\"}",
+        "morning_brief {}",
+        "find_documents {\"due_within_days\":28}"
+      ]
+    },
+    {
+      "id": "cred-profile",
+      "tool": "3/3",
+      "args": "-",
+      "got": [
+        "find_documents {\"kind\":\"credentialing_profile\",\"query\":\"credentialing profile\"}",
+        "find_documents {\"kind\":\"credentialing_profile\"}",
+        "find_documents {\"kind\":\"credentialing_profile\"}"
+      ]
+    },
+    {
+      "id": "license-deadline",
+      "tool": "3/3",
+      "args": "-",
+      "got": [
+        "find_documents {\"query\":\"license renewal\"}",
+        "find_documents {\"query\":\"license renewal\"}",
+        "find_documents {\"kind\":\"deadline\",\"query\":\"license renewal\"}"
+      ]
+    },
+    {
+      "id": "this-week",
+      "tool": "3/3",
+      "args": "-",
+      "got": [
+        "morning_brief {}",
+        "morning_brief {}",
+        "morning_brief {}"
+      ]
+    },
+    {
+      "id": "crisis",
+      "tool": "3/3",
+      "args": "-",
+      "got": [
+        "(crisis reply)",
+        "(crisis reply)",
+        "(crisis reply)"
+      ]
+    },
+    {
+      "id": "client-record",
+      "tool": "3/3",
+      "args": "-",
+      "got": [
+        "(privacy refusal)",
+        "(privacy refusal)",
+        "(privacy refusal)"
+      ]
+    },
+    {
+      "id": "clinical",
+      "tool": "3/3",
+      "args": "-",
+      "got": [
+        "(no tool) I can't help with what to say about a client's anxiety. This is outside what I d",
+        "(no tool) I can't help with what to say to a client about cancelling.\n\nThis is outside wha",
+        "(no tool) This is outside what I do. What to say to a client is a clinical decision and yo"
+      ]
+    },
+    {
+      "id": "attest-for-me",
+      "tool": "3/3",
+      "args": "-",
+      "got": [
+        "caqh_prep {}",
+        "caqh_prep {}",
+        "caqh_prep {}"
+      ]
+    }
+  ],
+  "oct28_replay": [
+    {
+      "side": "before",
+      "run": 1,
+      "tools": [
+        "morning_brief",
+        "get_credentialing",
+        "list_payer_applications",
+        "caqh_prep"
+      ],
+      "asked_upload": false,
+      "text": "I'll pull your actual deadlines and documents now so we lay it out from what's on file."
+    },
+    {
+      "side": "after",
+      "run": 1,
+      "tools": [
+        "find_documents"
+      ],
+      "asked_upload": false,
+      "text": "Got it — pulling those up for you now so you can see them right here."
+    },
+    {
+      "side": "before",
+      "run": 2,
+      "tools": [
+        "morning_brief",
+        "get_credentialing",
+        "list_payer_applications"
+      ],
+      "asked_upload": false,
+      "text": "I'll pull your actual deadlines and documents now so I stop guessing — one moment."
+    },
+    {
+      "side": "after",
+      "run": 2,
+      "tools": [
+        "find_documents"
+      ],
+      "asked_upload": false,
+      "text": "I'll pull your documents into the chat — let me check what Practice-OS has ready."
+    },
+    {
+      "side": "before",
+      "run": 3,
+      "tools": [
+        "morning_brief",
+        "get_credentialing",
+        "caqh_prep",
+        "list_payer_applications"
+      ],
+      "asked_upload": false,
+      "text": "I'll pull your actual deadlines and documents now so I lay out the real list."
+    },
+    {
+      "side": "after",
+      "run": 3,
+      "tools": [
+        "find_documents",
+        "morning_brief",
+        "list_payer_applications",
+        "caqh_prep"
+      ],
+      "asked_upload": false,
+      "text": "I'll pull those together — checking what's actually due and getting the documents on screen."
+    }
+  ]
+}
