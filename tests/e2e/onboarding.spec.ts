@@ -123,11 +123,21 @@ test("A new clinician sets up the whole practice, and the home page lists what s
 
   // Three fixed follow-up questions (no Muse key here), one per screen.
   await step(page, /off your plate/, () => page.getByLabel("Your answer").fill("Insurance paperwork"));
-  await step(page, /find you now/, () => page.getByLabel("Your answer").fill("Word of mouth"));
+  await step(page, /new clients would you like each month/, () => page.getByLabel("Your answer").fill("About four"));
   await step(page, /never want consults booked/, () => page.getByLabel("Your answer").fill("Fridays"));
 
   // 5 · Stage, 6 · Connect your tools, 7 · How Aeon asks
   await step(page, /Where is your practice right now\?/, () => radio(page, /Beginning/));
+  // The marketing interview (tests/e2e/marketing-interview.spec.ts has the other paths).
+  await step(page, /How do new clients find you now\?/, () => page.getByRole("button", { name: "Word of mouth", exact: true }).click());
+  await step(page, /Do you have an Instagram for your practice\?/, () => radio(page, "Yes, I have one"));
+  await step(page, /What should your posts help with\?/, () => page.getByRole("button", { name: "Fill my open spots" }).click());
+  // All five topics start picked.
+  await step(page, /What should your posts be about\?/, () => page.getByRole("button", { name: "Office and telehealth", pressed: true }).click());
+  await step(page, /How often do you want to post\?/, () => radio(page, "3 times a week"));
+  await step(page, /What should posts never show\?/, none, "skip");
+  await step(page, /Which one sounds most like you\?/, () => radio(page, /Plain/));
+  await step(page, /Do you have a website for your practice\?/, () => radio(page, "No, a website isn't for me"));
   await step(page, /Connect your tools/, none);
   await step(page, /text clients/, () => radio(page, "Yes"));
   // Referrals' own setup question (lib/referrals/onboarding.ts); the ZIP one is skipped because she has an office.
@@ -138,11 +148,6 @@ test("A new clinician sets up the whole practice, and the home page lists what s
     if ((await oncology.getAttribute("aria-pressed")) !== "true") await oncology.click();
     await expect(oncology).toHaveAttribute("aria-pressed", "true");
   });
-  // Instagram's own setup questions (lib/instagram/onboarding.ts): all five topics start picked.
-  await step(page, /What should your Instagram posts be about\?/, () =>
-    page.getByRole("button", { name: "Office and telehealth", pressed: true }).click(),
-  );
-  await step(page, /How many posts should Aeon plan each week\?/, () => radio(page, "3 a week"));
   // Front Desk's own setup questions (lib/frontdesk/onboarding.ts).
   // Skipping the greeting keeps the suggested one, shown on the Front Desk page.
   await step(page, /voicemail greeting/, none, "skip");

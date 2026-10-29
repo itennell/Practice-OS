@@ -20,20 +20,43 @@ type Base = {
   id: string;
   ask: string; // plain words, about a 6th-grade level
   help?: string;
-  /** Leave out when it doesn't apply. Defaults to always. */
-  appliesWhen?: (basics: PracticeBasics) => boolean;
+  /** Aeon's speech bubble on this screen; defaults to "This is for your … helper." */
+  says?: string;
+  /** Picking this answer puts the screen on "Still to set up", under these words. */
+  later?: { when: string; ask: string };
+  /**
+   * Leave out when it doesn't apply. Defaults to always. `mine` holds this block's
+   * answers so far (ids without the helper prefix), so a block can branch.
+   */
+  appliesWhen?: (basics: PracticeBasics, mine?: Record<string, unknown>) => boolean;
 };
+
+type Choice = { value: string; label: string };
 
 export type HelperQuestion =
   | (Base & { kind: "zip" })
   | (Base & { kind: "text"; maxLength?: number })
   | (Base & { kind: "number"; min?: number; max?: number; unit?: string })
   | (Base & { kind: "yesno" })
-  | (Base & { kind: "choices"; multi: boolean; options: { value: string; label: string }[] });
+  | (Base & {
+      kind: "choices";
+      multi: boolean;
+      options: Choice[];
+      /** For multi: the "none of these" option that clears the others. */
+      exclusive?: string;
+      /** A short will/won't note shown on the screen. */
+      note?: { will: string; wont: string };
+    })
+  /** Numbered steps to follow, then a choice (done, or later). */
+  | (Base & { kind: "steps"; steps: string[]; options: Choice[] })
+  /** Three [Sample] captions to pick from, or a pasted post she likes: { pick, example }. */
+  | (Base & { kind: "style" });
 
 export type HelperBlock = {
   helper: "referrals" | "instagram" | "front_desk" | "admin";
   questions: HelperQuestion[];
+  /** Slot these screens in after this question id; defaults to "uses_texting". */
+  after?: string;
   /** Prefills from the helper's own storage (and may use basics, e.g. officeZip). */
   load(basics: PracticeBasics): Promise<Record<string, unknown>>;
   /** Saves to the helper's own storage. Throws an Error with a plain-words message on bad input. */
