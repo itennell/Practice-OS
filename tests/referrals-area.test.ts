@@ -12,6 +12,7 @@ import {
   clearNppesCache,
   nppesCacheSize,
   parseResponses,
+  looksResidential,
   parseResult,
   searchProviders,
   specialtyForCode,
@@ -19,7 +20,7 @@ import {
   type NppesResponse,
   type NppesResult,
 } from "../lib/referrals/nppes";
-import { boardTier, BUILT_IN_WEIGHTS, capFirst, focusFrom, readWeights, SPECIALTY_POINTS, TIER_LABEL, tierFor, WEIGHTS } from "../lib/referrals/tier";
+import { boardTier, SCORE_VERSION, BUILT_IN_WEIGHTS, capFirst, focusFrom, readWeights, SPECIALTY_POINTS, TIER_LABEL, tierFor, WEIGHTS } from "../lib/referrals/tier";
 import research from "../docs/research/referral-tiers.json";
 
 // Real NPPES replies recorded 2026-10-29 (tests/fixtures/nppes-area.json, fields the app reads only).
@@ -115,14 +116,14 @@ describe("NPPES on real recorded replies", () => {
 
 describe("Census geocoder reply", () => {
   it("reads a match as [lat, lon] and a miss as null, and caches by address", async () => {
-    expect(parseCensusLine(`"1","2551 N Clark St, Chicago, IL, 60614","Match","Exact","2551 N CLARK ST, CHICAGO, IL, 60614","-87.6425,41.9291","111767067","R"`)).toEqual({
+    expect(parseCensusLine(`"1","700 W Example Rd, Chicago, IL, 60614","Match","Exact","2551 N CLARK ST, CHICAGO, IL, 60614","-87.6425,41.9291","111767067","R"`)).toEqual({
       id: "1",
       point: [41.9291, -87.6425],
     });
     expect(parseCensusLine(`"2","1 Bad Rd, Nowhere, IL, 60614","No_Match"`)).toEqual({ id: "2", point: null });
     let posts = 0;
     const post = async () => (posts++, `"0","x","Match","Exact","x","-87.64,41.92","1","R"\n`);
-    const a = { street: "2551 N Clark St", city: "Chicago", state: "IL", zip: "60614" };
+    const a = { street: "700 W Example Rd", city: "Chicago", state: "IL", zip: "60614" };
     expect((await geocodeAddresses([a, a], { post })).get(addressKey(a))).toEqual([41.92, -87.64]);
     await geocodeAddresses([a], { post });
     expect(posts).toBe(1);
@@ -195,7 +196,7 @@ describe("tiers (plain code, with reasons)", () => {
 });
 
 describe("board cards", () => {
-  const card = { taxonomy: "207Q00000X", npi_type: "organization" as const, phone: null, state: "IL", fit_score: 81, score_version: 2, distance_miles: 0.6 };
+  const card = { taxonomy: "207Q00000X", npi_type: "organization" as const, phone: null, state: "IL", address: "100 W Example St", fit_score: 81, score_version: SCORE_VERSION, distance_miles: 0.6 };
   it("take the tier from the score saved when found, and still say why", () => {
     const r = boardTier(card, { focus: ["adults"], clinicianState: "IL" });
     expect(r).toMatchObject({ tier: "first", score: 81 });
@@ -397,5 +398,80 @@ describe("known places skip the privacy guard", () => {
     let guarded = false;
     expect(await placeAllowed("Jane Smith", async () => ((guarded = true), false))).toBe(false);
     expect(guarded).toBe(true);
+  });
+});
+
+describe("home-looking practice addresses", () => {
+  it.each([
+    ["500 W Example Ave Apt 1502", null, true],
+    ["600 W Sample St", "Unit 2206", true],
+    ["100 W Example St #12", null, true],
+    ["100 W Example St", "Apartment 4B", true],
+    ["100 W Example St", "Ste 300", false],
+    ["100 W Example St Suite 4", null, false],
+    ["100 W Example St", "Fl 2", false],
+    ["100 W Example St", "Unit 5, Suite 200", false],
+    ["700 W Example Rd", null, false],
+    ["100 W Lot Ave", null, false],
+  ])("%s / %s is home-like: %s", (line1, line2, home) => {
+    expect(looksResidential(line1, line2)).toBe(home);
+  });
+
+  const person = (addresses: NppesResult["addresses"], practiceLocations?: NppesResult["practiceLocations"]): NppesResult => ({
+    number: "1999999991",
+    enumeration_type: "NPI-1",
+    basic: { status: "A", first_name: "[SAMPLE] ALEX", last_name: "EXAMPLE" },
+    addresses,
+    practiceLocations,
+    taxonomies: [{ code: "207Q00000X", primary: true }],
+  });
+  const loc = (address_1: string, extra: Record<string, string> = {}) => ({ address_purpose: "LOCATION", address_1, city: "CHICAGO", state: "IL", postal_code: "60610", ...extra });
+
+  it("uses the LOCATION address, never MAILING, and skips a provider with no LOCATION", () => {
+    const p = parseResult(person([{ ...loc("200 W Example St Ste 5"), address_purpose: "MAILING" }, loc("300 W Example St")]))!;
+    expect(p.address).toBe("300 W Example St");
+    expect(parseResult(person([{ ...loc("200 W Example St"), address_purpose: "MAILING" }]))).toBeNull();
+  });
+
+  it("prefers an extra practice location that isn't a home, else flags the home", () => {
+    const flagged = parseResult(person([loc("500 W Example Ave Apt 1502")]))!;
+    expect(flagged).toMatchObject({ homeAddress: true, address: "500 W Example Ave Apt 1502" });
+    const moved = parseResult(person([loc("500 W Example Ave Apt 1502")], [{ address_1: "400 W Example St", address_2: "Suite 10", city: "CHICAGO", state: "IL", postal_code: "60610" }]))!;
+    expect(moved).toMatchObject({ homeAddress: false, address: "400 W Example St, Suite 10" });
+    const group = parseResult({ ...person([loc("1 W Example St Apt 2")]), enumeration_type: "NPI-2", basic: { status: "A", organization_name: "[SAMPLE] GROUP" } })!;
+    expect(group.homeAddress).toBe(false);
+  });
+
+  it("scores a home-looking address as low as a front desk, and says to call first", () => {
+    const office = tierFor({ taxonomy: "207Q00000X", npiType: "individual" }, { miles: 0.5, focus: [] });
+    const home = tierFor({ taxonomy: "207Q00000X", npiType: "individual", homeAddress: true }, { miles: 0.5, focus: [] });
+    expect(office.score - home.score).toBe(BUILT_IN_WEIGHTS.reachable.individual - BUILT_IN_WEIGHTS.reachable.groupOnly);
+    expect(home.reasons).toContain("the address looks like a home, so call before you write");
+  });
+
+  it("never geocodes a home-looking address: it stays at the ZIP center", async () => {
+    const asked: string[] = [];
+    const home = { results: [{ ...person([loc("500 W Example Ave Apt 1502")]), number: "1999999993" }] } as NppesResponse;
+    const result = await searchArea(
+      { area: { kind: "zips", zips: ["60610"] }, radiusMiles: 1, specialties: ["family_medicine"] },
+      { office: null, officeZip: "60610", state: "IL", focus: [] },
+      {
+        search: (s, z, o) => searchProviders(s, z, { ...o, fetcher: async (url) => (url.includes("Family") && url.includes("skip=0") && url.includes("60610") ? home : { results: [] }) }),
+        geocode: async (addresses) => (asked.push(...addresses.map((a) => a.street)), new Map()),
+      },
+    );
+    expect(asked).toEqual([]);
+    expect(result.providers[0]).toMatchObject({ homeAddress: true, precision: "zip" });
+  });
+});
+
+describe("home-looking addresses and tiers", () => {
+  it("are never Reach out first", () => {
+    const r = tierFor(
+      { taxonomy: "207Q00000X", npiType: "individual", homeAddress: true, phone: "312-555-0100", fax: "312-555-0101", lastUpdated: "2026-06-01", state: "IL" },
+      { miles: 0.1, focus: ["adults"], clinicianState: "IL", today: new Date("2026-10-29") },
+    );
+    expect(r.score).toBeGreaterThanOrEqual(70);
+    expect(r.tier).toBe("next");
   });
 });

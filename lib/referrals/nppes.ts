@@ -87,6 +87,8 @@ export type NppesResult = {
     authorized_official_title_or_position?: string;
   };
   addresses?: NppesAddress[];
+  /** Extra practice locations a provider listed (not the main LOCATION address). */
+  practiceLocations?: NppesAddress[];
   taxonomies?: NppesTaxonomy[];
   /** "Doing Business As" and former names; type code "3" is the DBA a group puts on its sign. */
   other_names?: { organization_name?: string; type?: string; code?: string }[];
@@ -112,6 +114,12 @@ export type Provider = {
   state: string;
   zip: string;
   phone: string | null;
+  /**
+   * The practice location looks like a home (Apt, Unit, # with no group name):
+   * many solo clinicians list where they live. The app then shows no street
+   * line and pins it at the ZIP center.
+   */
+  homeAddress: boolean;
   /** Fax at the practice location: medical offices still send referrals by fax. */
   fax: string | null;
   /** For a group: the person NPPES lists as its authorized official, so a letter can name someone. */
@@ -138,6 +146,20 @@ function formatPhone(raw: string | undefined): string | null {
   return d.length === 10 ? `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}` : null;
 }
 
+// USPS Publication 28, Appendix C2 (secondary unit designators). These mark a
+// dwelling: APT, UNIT, PH (penthouse), TRLR, and a bare "#", followed by a unit
+// that has a digit or is one or two letters ("Apt 1502", "Unit B"), so street
+// names like "Unity Ave" don't count. Office ones (STE, FL, RM, OFC, BLDG,
+// DEPT) don't mark a home.
+const RESIDENTIAL_UNIT = /(?:^|[\s,])(?:(?:APT|APARTMENT|UNIT|PH|PENTHOUSE|TRLR|TRAILER)\.?\s*#?|#)\s*(?=[\w-]*\d|[A-Z]{1,2}\b)[\w-]+/i;
+
+/** True when a street line carries a home unit marker (Apt 1502, Unit B, #12) and no office one. */
+export function looksResidential(line1?: string | null, line2?: string | null): boolean {
+  const s = [line1, line2].filter(Boolean).join(", ");
+  if (/\b(?:STE|SUITE|FL|FLOOR|RM|ROOM|OFC|OFFICE|BLDG|DEPT)\b/i.test(s)) return false;
+  return RESIDENTIAL_UNIT.test(s);
+}
+
 /** One NPPES result to a Provider, or null when it isn't active or its primary specialty isn't one we want. */
 export function parseResult(r: NppesResult, want?: Set<SpecialtyId>): Provider | null {
   const npi = String(r.number);
@@ -148,11 +170,17 @@ export function parseResult(r: NppesResult, want?: Set<SpecialtyId>): Provider |
   const spec = specialtyForCode(primary.code);
   if (!spec || (want && !want.has(spec.id))) return null;
 
-  const addresses = r.addresses ?? [];
-  const loc = addresses.find((a) => a.address_purpose === "LOCATION") ?? addresses[0];
+  // Only where they see people: the LOCATION address, never the MAILING one
+  // (often billing or home). A LOCATION that looks like a home gives way to an
+  // extra practice location that doesn't.
+  const individual = r.enumeration_type === "NPI-1";
+  const main = (r.addresses ?? []).find((a) => a.address_purpose === "LOCATION");
+  const hasGroupName = !individual && Boolean(r.basic.organization_name);
+  const homeLike = (a: NppesAddress) => !hasGroupName && looksResidential(a.address_1, a.address_2);
+  const office = (r.practiceLocations ?? []).find((a) => a.postal_code && !homeLike(a));
+  const loc = main && !homeLike(main) ? main : (office ?? main);
   if (!loc?.postal_code) return null;
 
-  const individual = r.enumeration_type === "NPI-1";
   const credential = individual ? cleanCredential(r.basic.credential) : null;
   const person = [r.basic.first_name, r.basic.last_name].filter(Boolean).map((p) => titleCase(p!)).join(" ");
   const org = r.basic.organization_name ? titleCase(r.basic.organization_name) : null;
@@ -176,6 +204,7 @@ export function parseResult(r: NppesResult, want?: Set<SpecialtyId>): Provider |
     state: (loc.state ?? "").toUpperCase(),
     zip: loc.postal_code.slice(0, 5),
     phone: formatPhone(loc.telephone_number),
+    homeAddress: homeLike(loc),
     fax: formatPhone(loc.fax_number),
     official: individual
       ? null

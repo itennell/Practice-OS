@@ -36,15 +36,15 @@ insert into practice_os.settings (id) values (true) on conflict (id) do nothing;
 insert into practice_os.referral_sources
   (id, name, organization, taxonomy, specialty, npi_type, city, state, email, stage, last_contacted_at, next_follow_up_on, distance_miles, fit_score, score_version, notes, is_sample) values
   ('00000000-0000-4000-8000-000000000201', '[Sample] Lakeview Family Medicine', '[Sample] Lakeview Family Medicine',
-   '207Q00000X', 'Family medicine', 'organization', 'Chicago', 'IL', 'frontdesk@example.com', 'found', null, null, 0.6, 81, 2, '[Sample] Near the office.', true),
+   '207Q00000X', 'Family medicine', 'organization', 'Chicago', 'IL', 'frontdesk@example.com', 'found', null, null, 0.6, 81, 3, '[Sample] Near the office.', true),
   ('00000000-0000-4000-8000-000000000202', '[Sample] Dr. Alex Example', '[Sample] North Side Internal Medicine',
-   '207R00000X', 'Internal medicine', 'individual', 'Chicago', 'IL', 'alex@example.com', 'contacted', now() - interval '8 days', current_date + 6, 1.4, 77, 2,
+   '207R00000X', 'Internal medicine', 'individual', 'Chicago', 'IL', 'alex@example.com', 'contacted', now() - interval '8 days', current_date + 6, 1.4, 77, 3,
    '[Sample] Sent intro letter.', true),
   ('00000000-0000-4000-8000-000000000203', '[Sample] Old Town OB-GYN', '[Sample] Old Town OB-GYN',
-   '207V00000X', 'OB/GYN', 'organization', 'Chicago', 'IL', 'office@example.com', 'follow_up', now() - interval '20 days', current_date, 1.1, 69, 2,
+   '207V00000X', 'OB/GYN', 'organization', 'Chicago', 'IL', 'office@example.com', 'follow_up', now() - interval '20 days', current_date, 1.1, 69, 3,
    '[Sample] Follow-up due today.', true),
   ('00000000-0000-4000-8000-000000000204', '[Sample] Lincoln Park Pediatrics', '[Sample] Lincoln Park Pediatrics',
-   '208000000X', 'Pediatrics', 'organization', 'Chicago', 'IL', 'hello@example.com', 'connected', now() - interval '35 days', null, 0.3, 79, 2,
+   '208000000X', 'Pediatrics', 'organization', 'Chicago', 'IL', 'hello@example.com', 'connected', now() - interval '35 days', null, 0.3, 79, 3,
    '[Sample] Happy to share referrals for parents.', true);
 
 -- Dana's Referrals setup. Seeded only when missing: db:reset never overwrites her choice.

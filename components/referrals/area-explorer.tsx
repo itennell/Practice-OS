@@ -23,6 +23,7 @@ const ReferralMap = dynamic(() => import("./referral-map").then((m) => m.Referra
 });
 
 const RADII = [1, 3, 5, 10] as const;
+export const HOME_ADDRESS = "Address may be a home address; call first";
 const SHOW_FIRST = 20;
 const FOCUS = "outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] focus-visible:outline-solid";
 
@@ -99,9 +100,15 @@ function ProviderRow({
         </dt>
         <dd className="text-[var(--fg-muted)]">
           <span className="sr-only">Location: </span>
-          {p.address ? `${p.address}, ${p.city} ${p.zip}` : `Address not listed in NPPES (${p.zip})`}
+          {p.homeAddress
+            ? `${HOME_ADDRESS} (${p.city} ${p.zip})`
+            : p.address
+              ? `${p.address}, ${p.city} ${p.zip}`
+              : `Address not listed in NPPES (${p.zip})`}
           {p.distanceMiles !== null && ` · ${milesLabel(p.distanceMiles, approximate)}`}
-          {approximate && <span className="block">Pin is at the ZIP code&rsquo;s center; the street address wasn&rsquo;t found on the map.</span>}
+          {approximate && !p.homeAddress && (
+            <span className="block">Pin is at the ZIP code&rsquo;s center; the street address wasn&rsquo;t found on the map.</span>
+          )}
         </dd>
         <dt aria-hidden className="pt-0.5 text-[var(--fg-muted)]">
           <Phone size={14} />
