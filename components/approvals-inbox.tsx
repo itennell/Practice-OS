@@ -1,9 +1,11 @@
 "use client";
 
+import { Inbox } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ApprovalView } from "@/lib/approvals";
+import { EmptyState } from "./shared/empty-state";
 import { StatusPill } from "./shared/status-mark";
-import { Button } from "./ui";
+import { Button, chipClass } from "./ui";
 
 const STATUS = {
   pending: { label: "Waiting for you", mark: "pending" },
@@ -25,6 +27,14 @@ const KIND_LABEL: Record<string, string> = {
   state_rules: "State rules",
   gfe_issue: "Good Faith Estimate",
   aeon_action: "Change Aeon wants to make",
+};
+
+type Filter = "waiting" | "done" | "declined" | "all";
+const FILTERS: Record<Filter, { label: string; test: (s: ApprovalView["status"]) => boolean; empty: string; emptyLine: string }> = {
+  waiting: { label: "Waiting", test: (s) => s === "pending" || s === "running", empty: "Nothing waiting for you", emptyLine: "New drafts from Aeon show up here. Nothing is sent, posted or booked until you approve it." },
+  done: { label: "Done", test: (s) => s === "done" || s === "failed", empty: "Nothing done yet", emptyLine: "Once you approve something, it shows here with how it went." },
+  declined: { label: "Declined", test: (s) => s === "rejected", empty: "Nothing declined yet", emptyLine: "When you decline something Aeon asked for, it shows up here." },
+  all: { label: "All", test: () => true, empty: "No approvals yet", emptyLine: "New drafts from Aeon show up here." },
 };
 
 function ApprovalStatus({ status }: { status: ApprovalView["status"] }) {
@@ -119,10 +129,7 @@ function ApprovalItem({
   const line = previewLine(approval);
 
   return (
-    <li
-      aria-labelledby={headingId}
-      className="flex flex-col gap-3 rounded-[20px] border border-[var(--hairline)] bg-[var(--glass-strong)] p-5"
-    >
+    <li aria-labelledby={headingId} className="flex flex-col gap-3 border-t border-[var(--line)] px-5 py-4 first:border-t-0">
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0 flex-1">
           <h3 id={headingId} className="font-semibold leading-snug">
@@ -256,6 +263,7 @@ export function ApprovalsInbox({
   }, [refresh, anyRunning, ids]);
 
   async function decide(id: string, action: "approve" | "decline", edit?: string) {
+    setDecided((d) => new Set(d).add(id));
     setProblem(null);
     setBusy((s) => new Set(s).add(id));
     if (action === "approve") {
@@ -283,6 +291,10 @@ export function ApprovalsInbox({
   }
 
   const pendingCount = approvals.filter((a) => a.status === "pending").length;
+  // The full page filters by status; what she decides here stays in view so she sees how it ended.
+  const [filter, setFilter] = useState<Filter>(() => (initial.some((a) => a.status === "pending") ? "waiting" : "all"));
+  const [decided, setDecided] = useState<ReadonlySet<string>>(new Set());
+  const shown = ids ? approvals : approvals.filter((a) => decided.has(a.id) || FILTERS[filter].test(a.status));
 
   return (
     <div className="flex flex-col gap-4">
@@ -298,18 +310,42 @@ export function ApprovalsInbox({
           {problem}
         </p>
       )}
-      <ul className="flex flex-col gap-3">
-        {approvals.map((a) => (
-          <ApprovalItem
-            key={a.id}
-            approval={a}
-            busy={busy.has(a.id)}
-            now={now}
-            onApprove={(edit) => decide(a.id, "approve", edit)}
-            onDecline={() => decide(a.id, "decline")}
-          />
-        ))}
-      </ul>
+      {!ids && (
+        <div role="group" aria-label="Show" className="flex flex-wrap gap-2">
+          {(Object.keys(FILTERS) as Filter[]).map((f) => {
+            const n = f === "waiting" ? pendingCount : null;
+            return (
+              <button key={f} type="button" aria-pressed={filter === f} onClick={() => {
+                  setFilter(f);
+                  setDecided(new Set());
+                }} className={chipClass(filter === f, true)}>
+                {FILTERS[f].label}
+                {n ? <span className="ml-2 tabular-nums">{n}</span> : null}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {shown.length === 0 ? (
+        <div className="rounded-[var(--radius-card-sm)] border border-[var(--line)] bg-[var(--glass)]">
+          <EmptyState icon={<Inbox size={18} strokeWidth={1.75} />} title={FILTERS[filter].empty}>
+            {FILTERS[filter].emptyLine}
+          </EmptyState>
+        </div>
+      ) : (
+        <ul className="flex flex-col overflow-hidden rounded-[var(--radius-card-sm)] border border-[var(--line)] bg-[var(--glass)]">
+          {shown.map((a) => (
+            <ApprovalItem
+              key={a.id}
+              approval={a}
+              busy={busy.has(a.id)}
+              now={now}
+              onApprove={(edit) => decide(a.id, "approve", edit)}
+              onDecline={() => decide(a.id, "decline")}
+            />
+          ))}
+        </ul>
+      )}
       <p aria-live="polite" role="status" className="sr-only">
         {announcement}
       </p>

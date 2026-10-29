@@ -41,3 +41,16 @@ test("The menu has no axe issues when open, and every row is at least 44px tall"
     expect(box!.height).toBeGreaterThanOrEqual(44);
   }
 });
+
+test("Approvals: filter chips, the shared empty state, and Ask Aeon one tap away", async ({ page }) => {
+  execSync("npm run db:reset", { stdio: "ignore" });
+  await page.goto("/approvals");
+  const show = page.getByRole("group", { name: "Show" });
+  await expect(show.getByRole("button", { name: /^Waiting \d+$/ })).toHaveAttribute("aria-pressed", "true");
+  await show.getByRole("button", { name: "Declined" }).click();
+  await expect(page.getByText("Nothing declined yet")).toBeVisible();
+  expect(await violations(page)).toEqual([]);
+  await expect(page.getByRole("link", { name: "Ask Aeon" })).toHaveAttribute("href", "/");
+  await page.goto("/");
+  await expect(page.getByRole("link", { name: "Ask Aeon" })).toHaveCount(0);
+});
