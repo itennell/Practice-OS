@@ -131,7 +131,7 @@ async function FrontDesk({ searchParams }: { searchParams: PageProps<"/front-des
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <PhoneCard initial={{ connected: phone.connected, label: phone.check?.ok ? phone.check.label : undefined, fix: phone.check && !phone.check.ok ? phone.check.fix : undefined, devLine: phone.devLine }} />
+        <PhoneCard initial={{ connected: phone.connected, label: phone.check?.ok ? phone.check.label : undefined, fix: phone.check && !phone.check.ok ? phone.check.fix : undefined, devLine: phone.devLine, number: phone.number, note: phone.note }} />
         <CalendarCard
           initial={{
             calcom: { connected: calcom, label: calcom && calendar.check?.ok ? calendar.check.label : undefined, fix: calcom && calendar.check && !calendar.check.ok ? calendar.check.fix : undefined },
