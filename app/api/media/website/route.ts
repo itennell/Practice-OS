@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { refuse } from "../guard";
+import { failed, refuse } from "../guard";
 import { loadMediaFacts } from "@/lib/media/facts";
 import { draftSite, saveChecklist, saveSiteCopy, saveWebsiteUrl } from "@/lib/media/website";
 
@@ -24,6 +24,6 @@ export async function POST(request: Request) {
     await saveSiteCopy(site);
     return Response.json({ site });
   } catch (err) {
-    return Response.json({ error: err instanceof Error ? err.message : "That didn't work. Try again." }, { status: 400 });
+    return failed(err, "That didn't work. Try again.");
   }
 }

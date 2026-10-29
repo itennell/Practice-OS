@@ -190,7 +190,19 @@ function Box({ field, onSaved }: { field: DraftField; onSaved: (f: DraftField) =
       ))}
       <p className="text-small text-[var(--fg-muted)]">Paste into: {field.pasteWhere}</p>
       <div className="flex flex-wrap gap-2">
-        <CopyButton text={text} what={field.label} />
+        <CopyButton
+          text={text}
+          what={field.label}
+          blockedBecause={
+            over
+              ? `Shorten it to ${field.limit} characters first.`
+              : changed
+                ? "Save your change first, so Aeon can check it."
+                : blockers.length
+                  ? "Fix what's marked above first."
+                  : null
+          }
+        />
         {changed && (
           <Button
             type="button"

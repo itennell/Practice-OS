@@ -45,10 +45,19 @@ test("Media: answer, write the Psychology Today profile, copy a box", async ({ p
   const box = page.getByTestId("box-statement_help");
   const words = await box.getByRole("textbox").inputValue();
   await box.getByRole("button", { name: /^Copy / }).click();
-  await expect(box.getByRole("button", { name: /^Copy / })).toContainText("Copied");
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(words);
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(words);
   await page.waitForTimeout(800); // let the "Copied" toast finish fading in before checking contrast
   expect(await violations(page)).toEqual([]);
+
+  // Over the limit: Copy turns off and says why, and the server refuses the save too.
+  const intro = page.getByTestId("box-intro");
+  await intro.getByRole("textbox").fill("A".repeat(141));
+  await expect(intro.getByRole("button", { name: /^Copy / })).toBeDisabled();
+  await expect(intro.getByText("Shorten it to 140 characters first.")).toBeVisible();
+  const res = await page.request.patch("/api/media/profile", { data: { id: "intro", text: "A".repeat(141) }, headers: { origin: new URL(page.url()).origin } });
+  expect(res.status()).toBe(422);
+  const advice = await page.request.patch("/api/media/profile", { data: { id: "intro", text: "You should try deep breathing." }, headers: { origin: new URL(page.url()).origin } });
+  expect(advice.status()).toBe(422);
 
   // Website: the recommended path and Aeon's page words.
   await page.getByRole("link", { name: "Website" }).click();

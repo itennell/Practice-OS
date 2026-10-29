@@ -9,7 +9,7 @@ import { STATES } from "../compliance/states";
 import { normalizeWebsite } from "../onboarding/store";
 import { chat as metaChat } from "../meta";
 import { blocks, lintDesignation, lintText, type Finding } from "./lint";
-import { mainFee, money, place, type MediaFacts } from "./facts";
+import { AnswerRefused, mainFee, money, place, type MediaFacts } from "./facts";
 import { fitTo, templateFields, type ChatFn } from "./profile";
 import { WEBSITE } from "./schema";
 
@@ -166,7 +166,7 @@ export async function loadSiteCopy(): Promise<SiteCopy | null> {
 /** Saves her website address (same rules as the marketing interview). */
 export async function saveWebsiteUrl(input: string): Promise<string> {
   const url = normalizeWebsite(input);
-  if (!url) throw new Error("That doesn't look like a website address. Try something like reyescounseling.com.");
+  if (!url) throw new AnswerRefused("That doesn't look like a website address. Try something like reyescounseling.com.");
   await db()`
     update practice_os.clinician_profile
        set onboarding_answers = jsonb_set(coalesce(onboarding_answers, '{}'::jsonb), '{marketing}',
