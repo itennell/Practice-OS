@@ -34,7 +34,14 @@ export type Ctx = {
   medicare: "enrolled" | "opted_out" | "none" | null;
   medicaid: boolean | null;
   officeZip: string | null;
+  /** How new clients find her now (FIND_OPTIONS values). */
+  findClients: string[];
+  website: Channel | null;
+  instagram: Channel | null;
 };
+
+/** For Instagram and a website: has one, would like one, or not for her. */
+export type Channel = "has" | "wants" | "no";
 
 export type Kind =
   | "name"
@@ -65,6 +72,8 @@ export type Kind =
   | "mode"
   | "team"
   | "helper"
+  | "chips"
+  | "url"
   | "slot";
 
 export type Option = { value: string; label: string; hint?: string };
@@ -90,6 +99,10 @@ export type Question = {
   /** Shown on "Still to set up" when skipped: what can't work without it. */
   blocks?: string;
   appliesWhen?: (c: Ctx) => boolean;
+  /** Picking this answer puts the screen on "Still to set up", under these words. */
+  later?: { when: string; ask: string };
+  /** For "chips": the "not sure" option that clears the others. */
+  exclusive?: string;
 };
 
 const insured = (c: Ctx) => c.insurance === "some" || c.insurance === "planning";
@@ -107,6 +120,17 @@ export const STAGE_OPTIONS: Option[] = [
   { value: "beginning", label: "Beginning", hint: "I'm just opening my practice." },
   { value: "middle", label: "Middle", hint: "I'm building my caseload." },
   { value: "late", label: "Late", hint: "My practice is established and mostly full." },
+];
+
+export const FIND_OPTIONS: Option[] = [
+  { value: "directories", label: "Psychology Today or other lists" },
+  { value: "insurance_panels", label: "Insurance company lists" },
+  { value: "doctors", label: "Doctors who send people to me" },
+  { value: "website", label: "My website" },
+  { value: "google", label: "Google search" },
+  { value: "word_of_mouth", label: "Word of mouth" },
+  { value: "social", label: "Instagram or other social media" },
+  { value: "not_sure", label: "I'm not sure yet" },
 ];
 
 export const MODE_OPTIONS: Option[] = [
@@ -423,8 +447,42 @@ export const QUESTIONS: Question[] = [
     options: STAGE_OPTIONS,
   },
 
-  // 6 · Connect your tools. Each helper session adds its own questions after these
-  // (lib/onboarding/helper-questions.ts); they're slotted in by flatten().
+  // 6 · Connect your tools. It opens on how clients find her, then Instagram's own
+  // branching questions (lib/instagram/onboarding.ts, slotted in after find_clients),
+  // then her website. Other helper sessions' questions go after "Do you text clients?"
+  // (lib/onboarding/helper-questions.ts); flatten() slots them in.
+  {
+    id: "find_clients",
+    chapter: "tools",
+    kind: "chips",
+    ask: "How do new clients find you now?",
+    help: "Pick all that fit.",
+    aeonSays: "This helps me pick which helpers to start first.",
+    options: FIND_OPTIONS,
+    exclusive: "not_sure",
+  },
+  {
+    id: "website",
+    chapter: "tools",
+    kind: "choice",
+    ask: "Do you have a website for your practice?",
+    aeonSays: "A website helps people find you on Google.",
+    options: [
+      { value: "has", label: "Yes, I have one" },
+      { value: "wants", label: "No, but I'd like one" },
+      { value: "no", label: "No, a website isn't for me" },
+    ],
+    later: { when: "wants", ask: "Make a practice website" },
+    appliesWhen: (c) => !c.findClients.includes("website"),
+  },
+  {
+    id: "website_url",
+    chapter: "tools",
+    kind: "url",
+    ask: "What is your website address?",
+    aeonSays: "I'll put it in posts and letters.",
+    appliesWhen: (c) => c.findClients.includes("website") || c.website === "has",
+  },
   {
     id: "connect",
     chapter: "tools",
@@ -484,6 +542,12 @@ export type Screen = {
   workOptions?: Option[];
   dateAsk?: string;
   required?: boolean;
+  later?: { when: string; ask: string };
+  exclusive?: string;
+  /** For "connect": cards left out (Instagram). For "team": helpers left out (Instagram after "Not for me"). */
+  hide?: string[];
+  /** For "team": which helpers start switched on, from her stage and answers. */
+  defaults?: Record<HelperId, boolean>;
   /** Set for questions a helper session added. */
   helper?: { helper: string; question: HelperQuestion };
 };
@@ -506,9 +570,11 @@ export function flatten(
   c: Ctx,
   opts: {
     states?: Record<string, string>;
-    helpers?: { helper: string; questions: HelperQuestion[] }[];
+    helpers?: { helper: string; questions: HelperQuestion[]; after?: string }[];
     extra?: { after: string; screen: Screen }[];
     basics?: Parameters<NonNullable<HelperQuestion["appliesWhen"]>>[0];
+    /** Each helper's answers so far, by helper then question id, so its block can branch. */
+    mine?: Record<string, Record<string, unknown>>;
   } = {},
 ): Screen[] {
   const states = opts.states ?? {};
@@ -526,22 +592,28 @@ export function flatten(
       dateAsk: q.dateWhen && !q.dateWhen(c) ? undefined : q.dateAsk,
       help: q.dateWhen && !q.dateWhen(c) ? undefined : q.help,
       required: q.required,
+      later: q.later,
+      exclusive: q.exclusive,
+      // No connect button for Instagram in onboarding (publishing is cut for now), and after
+      // "Not for me" the Instagram helper isn't offered on the team screen either.
+      ...(q.kind === "connect" ? { hide: ["instagram"] } : {}),
+      ...(q.kind === "team" ? { defaults: teamDefaults(c), ...(c.instagram === "no" ? { hide: ["instagram"] } : {}) } : {}),
     });
-    if (q.id === "uses_texting") {
-      for (const block of opts.helpers ?? []) {
-        for (const hq of block.questions) {
-          if (hq.appliesWhen && opts.basics && !hq.appliesWhen(opts.basics)) continue;
-          out.push({
-            id: `${block.helper}:${hq.id}`,
-            chapter: "tools",
-            kind: "helper",
-            ask: hq.ask,
-            help: hq.help,
-            aeonSays: HELPER_SAYS[block.helper] ?? "One more setup question for your team.",
-            // appliesWhen ran above, on the server; a function can't go to the browser.
-            helper: { helper: block.helper, question: { ...hq, appliesWhen: undefined } },
-          });
-        }
+    for (const block of opts.helpers ?? []) {
+      if ((block.after ?? "uses_texting") !== q.id) continue;
+      for (const hq of block.questions) {
+        if (hq.appliesWhen && opts.basics && !hq.appliesWhen(opts.basics, opts.mine?.[block.helper] ?? {})) continue;
+        out.push({
+          id: `${block.helper}:${hq.id}`,
+          chapter: "tools",
+          kind: "helper",
+          ask: hq.ask,
+          help: hq.help,
+          aeonSays: hq.says ?? HELPER_SAYS[block.helper] ?? "One more setup question for your team.",
+          later: hq.later,
+          // appliesWhen ran above, on the server; a function can't go to the browser.
+          helper: { helper: block.helper, question: { ...hq, appliesWhen: undefined } },
+        });
       }
     }
     for (const x of opts.extra ?? []) if (x.after === q.id) out.push(x.screen);
@@ -586,6 +658,18 @@ export function firstFor(stage: Stage | null): { helpers: HelperId[]; focus: str
     default:
       return { helpers: ["admin", "referrals"], focus: "You're just opening, so I'll start with setup, credentialing prep and finding referral sources." };
   }
+}
+
+/**
+ * Which helpers start switched on: her stage's picks, plus Referrals when doctors or
+ * word of mouth send her clients, and Instagram only when she has or wants an account.
+ */
+export function teamDefaults(c: Pick<Ctx, "stage" | "findClients" | "instagram">): Record<HelperId, boolean> {
+  const on = new Set<HelperId>(["admin", ...firstFor(c.stage).helpers]);
+  if (c.findClients.some((x) => x === "doctors" || x === "word_of_mouth")) on.add("referrals");
+  if (c.instagram === "has" || c.instagram === "wants") on.add("instagram");
+  if (c.instagram === "no") on.delete("instagram");
+  return Object.fromEntries(HELPERS.map((h) => [h.id, on.has(h.id)])) as Record<HelperId, boolean>;
 }
 
 /** The NUCC taxonomy code for each license type (NPPES uses it). */
