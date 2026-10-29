@@ -17,11 +17,14 @@ test("Referrals board: five columns, sample cards, Move to menu moves and announ
   const card = found.getByRole("listitem", { name: "[Sample] Lakeview Family Medicine" });
   await expect(card).toContainText("Family medicine");
   await expect(card).toContainText("0.6 mi");
-  await expect(card.getByLabel("Fit score 81 out of 100")).toBeVisible();
+  await expect(card).toContainText("Reach out first");
+  await expect(card).toContainText("Why:");
 
   // Keyboard and screen-reader way: the Move to menu.
   await card.getByRole("combobox", { name: "Move to" }).click();
+  const saved = page.waitForResponse((r) => r.url().endsWith("/stage") && r.request().method() === "POST");
   await page.getByRole("option", { name: "Connected" }).click();
+  expect((await saved).ok()).toBe(true);
   await expect(page.getByRole("status").filter({ hasText: "Moved [Sample] Lakeview Family Medicine to Connected." })).toBeAttached();
   await expect(page.getByRole("region", { name: "Connected" }).getByRole("listitem", { name: "[Sample] Lakeview Family Medicine" })).toBeVisible();
   await page.reload();
