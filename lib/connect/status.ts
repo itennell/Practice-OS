@@ -1,7 +1,9 @@
 import type { ConnectionStatus } from "@/components/connections/registry";
 import { getConnection, type Provider } from "../connections";
-import { INSTAGRAM_NOT_READY, peekInstagramReadiness } from "./instagram";
 import { phoneStatus } from "../frontdesk/connect";
+
+/** The Google card on a copy with no Google client set up. */
+export const GOOGLE_LATER = "Gmail drafts come later. For now, approved referral letters show as a preview in Practice-OS.";
 
 /** What a Connect card shows. Never includes a token. */
 export async function getConnectionStatus(provider: string): Promise<ConnectionStatus> {
@@ -14,17 +16,18 @@ export async function getConnectionStatus(provider: string): Promise<ConnectionS
       connected: p.connected,
       accountLabel: p.check?.ok ? p.check.label : undefined,
       scopes: [],
-      phone: { devLine: Boolean(p.devLine), number: p.number, note: p.note, fix: p.check && !p.check.ok ? p.check.fix : undefined },
+      phone: { devLine: Boolean(p.devLine), vendor: p.vendor, number: p.number, note: p.note, texting: p.texting, voicemailOn: p.voicemailOn, fix: p.check && !p.check.ok ? p.check.fix : undefined },
     };
   }
+  // Google needs a developer's own OAuth client (docs/self-hosting/google.md): without one, say "later" instead of a dead-end button.
+  if (provider === "google" && !process.env.GOOGLE_CLIENT_ID) {
+    const g = await getConnection("google").catch(() => null);
+    if (!g) return { provider, connected: false, scopes: [], notReady: GOOGLE_LATER };
+  }
   const c = await getConnection(provider as Provider).catch(() => null);
-  // Never waits on the relay: the last known answer, refreshed in the background.
-  // Set for a stored sign-in too, so "Connect again" isn't offered when it can't work.
-  const readiness = provider === "instagram" ? peekInstagramReadiness() : null;
-  const notReady = readiness && !readiness.ready ? { notReady: INSTAGRAM_NOT_READY } : {};
-  if (!c) return { provider, connected: false, scopes: [], ...notReady };
+  // Instagram posting is cut for now (its card is information only), so the relay isn't asked.
+  if (!c) return { provider, connected: false, scopes: [] };
   return {
-    ...notReady,
     provider,
     connected: Boolean(c.accessToken || c.meta?.lineId || c.meta?.eventTypeId),
     accountLabel: c.accountLabel ?? undefined,

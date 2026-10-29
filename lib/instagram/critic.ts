@@ -17,7 +17,8 @@ export type CriticRule =
   | "advice"
   | "license_line"
   | "invented_fee"
-  | "caption_limits";
+  | "caption_limits"
+  | "never_show";
 
 export type Finding = { rule: CriticRule; by: "code" | "muse"; message: string };
 
@@ -41,6 +42,7 @@ export const RULE_TEXT: Record<CriticRule, string> = {
   license_line: "Every post ends with your exact license line.",
   invented_fee: "A price in the post doesn't match your fee list.",
   caption_limits: "The caption is over one of Instagram's limits.",
+  never_show: "It shows something you said posts never show.",
 };
 
 const b = (s: string) => new RegExp(`\\b(?:${s})\\b`, "i");

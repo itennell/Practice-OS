@@ -55,11 +55,12 @@ function when(i: BriefItem): string {
 }
 
 /** Plain text an agent can read aloud or paste: short, most urgent first. */
-function summarize(b: Omit<MorningBrief, "summary">): string {
+export function summarize(b: Omit<MorningBrief, "summary">): string {
   const lines: string[] = [];
   if (b.is_sample) lines.push("[Sample] Dana Reyes is a fictional demo practice.");
-  if (b.this_week.length === 0) lines.push("Nothing is due in the next 7 days.");
-  else {
+  // Insurance follow-ups count as this week too: never say "nothing is due" above one.
+  if (b.this_week.length === 0 && b.payer_dates.length === 0) lines.push("Nothing is due in the next 7 days.");
+  else if (b.this_week.length) {
     lines.push(`Due in the next 7 days (${b.this_week.length}):`);
     for (const i of b.this_week) lines.push(`- ${i.title}: ${when(i)}. ${i.you_must ? `You do this: ${i.you_must}` : ""}`.trim());
   }
@@ -72,7 +73,7 @@ function summarize(b: Omit<MorningBrief, "summary">): string {
   }
   if (b.needs_dates.length) lines.push(`Aeon needs a date for: ${b.needs_dates.map((n) => n.title).join("; ")}.`);
   if (b.payer_dates.length) {
-    lines.push("Insurance:");
+    lines.push(`Insurance dates (${b.payer_dates.length}):`);
     for (const d of b.payer_dates) {
       const w = d.days_left < 0 ? `${-d.days_left} days overdue` : d.days_left === 0 ? "today" : `in ${d.days_left} days`;
       lines.push(`- ${d.what} (${w}, ${formatBriefDate(d.due_on)})`);

@@ -38,7 +38,8 @@ export function GoogleCard({ status }: { status: ConnectionStatus }) {
       connected={status.connected}
       accountLabel={status.accountLabel}
     >
-      {PARTS.map((part) =>
+      {status.notReady && <p className="max-w-[60ch] text-small text-[var(--fg-muted)]">{status.notReady}</p>}
+      {!status.notReady && PARTS.map((part) =>
         status.connected && has(part.scopes) ? (
           <Chip key={part.label} on>
             {part.label} on
