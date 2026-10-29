@@ -1,9 +1,10 @@
 "use client";
 
-// The dark chat menu (UI-005), ChatGPT style: Aeon, New chat, Search chats, the
-// practice links with counts, her recent chats, and the clinician at the bottom
-// (UI-029). Desktop keeps it on the left; phones open the same menu as a panel
-// that slides in from the left.
+// The chat menu (UI-005): Aeon, New chat, Search chats, the practice links with
+// counts, her recent chats, and the clinician at the bottom (UI-029). Calm
+// redesign: a quiet list on the page colour (one step darker in dark mode),
+// 16px icons, 14px labels, counts as plain numbers. Desktop keeps it on the
+// left; phones open the same menu as a panel that slides in from the left.
 
 import { Dialog } from "@base-ui/react/dialog";
 import { Brain, Camera, ClipboardList, Inbox, Menu, Phone, Plus, Search, Settings, Users, X, type LucideIcon } from "lucide-react";
@@ -60,7 +61,7 @@ function MenuBody({ data, chatId, onNavigate }: { data: MenuData; chatId: string
   const onChat = pathname === "/";
   const row = (active: boolean) =>
     cn(
-      "flex min-h-touch items-center gap-3 rounded-[14px] px-3 text-body transition-colors duration-150",
+      "flex min-h-touch items-center gap-2.5 rounded-[var(--radius-control)] px-2.5 text-[0.875rem] transition-colors duration-150",
       active ? "bg-[var(--menu-active)] font-semibold text-[var(--menu-fg)]" : "text-[var(--menu-muted)] hover:bg-[var(--menu-hover)] hover:text-[var(--menu-fg)]",
       FOCUS,
     );
@@ -72,44 +73,34 @@ function MenuBody({ data, chatId, onNavigate }: { data: MenuData; chatId: string
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4 p-3 text-[var(--menu-fg)]">
-      <div className="flex items-center gap-3 px-2 pt-2">
-        <Orb size={32} />
-        <div className="min-w-0">
-          <p className="font-semibold leading-tight">Aeon</p>
-          <p className="text-small text-[var(--menu-muted)]">Practice co-owner</p>
-        </div>
+    <div className="flex h-full min-h-0 flex-col gap-3 px-2.5 py-3 text-[var(--menu-fg)]">
+      <div className="flex h-touch items-center gap-2.5 px-2.5">
+        <Orb size={22} />
+        <p className="font-semibold">Aeon</p>
       </div>
 
-      <div className="flex flex-col gap-2">
-        <button
-          type="button"
-          onClick={newChat}
-          className={cn(
-            "flex h-touch items-center gap-2 rounded-full border border-[var(--menu-line)] px-4 font-semibold text-[var(--menu-fg)] hover:bg-[var(--menu-hover)]",
-            FOCUS,
-          )}
-        >
-          <Plus aria-hidden size={18} />
+      <div className="flex flex-col gap-0.5">
+        <button type="button" onClick={newChat} className={row(false)}>
+          <Plus aria-hidden size={16} strokeWidth={1.75} className="shrink-0" />
           New chat
         </button>
-        <label className="flex h-touch items-center gap-2 rounded-full border border-[var(--menu-line)] px-4 text-[var(--menu-muted)] focus-within:border-[var(--menu-focus)]">
-          <Search aria-hidden size={16} className="shrink-0" />
+        <label className="flex min-h-touch items-center gap-2.5 rounded-[var(--radius-control)] px-2.5 text-[var(--menu-muted)] hover:bg-[var(--menu-hover)] focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-[var(--menu-focus)] focus-within:outline-solid">
+          <Search aria-hidden size={16} strokeWidth={1.75} className="shrink-0" />
           <span className="sr-only">Search chats</span>
           <input
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search chats"
-            className="h-full min-w-0 flex-1 bg-transparent text-body text-[var(--menu-fg)] outline-none placeholder:text-[var(--menu-muted)]"
+            className="h-full min-w-0 flex-1 bg-transparent text-[0.875rem] text-[var(--menu-fg)] outline-none placeholder:text-[var(--menu-muted)]"
           />
         </label>
       </div>
 
-      <nav aria-label="Main" className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+      <nav aria-label="Main" className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
         {!q && (
           <div className="flex flex-col gap-0.5">
-            <p className="px-3 pb-1 text-label font-semibold tracking-[0.06em] text-[var(--menu-muted)] uppercase">Practice</p>
+            <p className="px-2.5 pt-1 pb-1 text-label text-[var(--menu-muted)]">Practice</p>
             <ul className="flex flex-col gap-0.5">
               {PRACTICE.map(({ href, label, icon: Icon, count, countWord }) => {
                 const n = count ? data.counts[count] : 0;
@@ -117,10 +108,11 @@ function MenuBody({ data, chatId, onNavigate }: { data: MenuData; chatId: string
                 return (
                   <li key={label}>
                     <Link href={href} onClick={onNavigate} aria-current={here ? "page" : undefined} className={row(here)}>
-                      <Icon aria-hidden size={18} strokeWidth={1.75} className="shrink-0" />
+                      <Icon aria-hidden size={16} strokeWidth={1.75} className="shrink-0" />
                       <span className="flex-1">{label}</span>
                       {n > 0 && (
-                        <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-[var(--menu-badge)] px-2 text-small font-semibold text-[var(--menu-fg)] tabular-nums">
+                        <span className="inline-flex items-center gap-2 text-small font-normal text-[var(--menu-muted)] tabular-nums">
+                          {count === "approvals" && <span aria-hidden className="size-[7px] rounded-full bg-[var(--menu-dot)]" />}
                           {n}
                           <span className="sr-only"> {countWord}</span>
                         </span>
@@ -134,11 +126,11 @@ function MenuBody({ data, chatId, onNavigate }: { data: MenuData; chatId: string
         )}
 
         <div className="flex flex-col gap-0.5">
-          <p className="px-3 pb-1 text-label font-semibold tracking-[0.06em] text-[var(--menu-muted)] uppercase">
+          <p className="px-2.5 pt-1 pb-1 text-label text-[var(--menu-muted)]">
             {q ? "Matching chats" : "Recent chats"}
           </p>
           {chats.length === 0 ? (
-            <p className="px-3 text-small text-[var(--menu-muted)]">{q ? "No chat matches that." : "No chats yet."}</p>
+            <p className="px-2.5 text-small text-[var(--menu-muted)]">{q ? "No chat matches that." : "No chats yet."}</p>
           ) : (
             <ul className="flex flex-col gap-0.5">
               {chats.map((c) => {
@@ -158,22 +150,22 @@ function MenuBody({ data, chatId, onNavigate }: { data: MenuData; chatId: string
 
       <div className="flex flex-col gap-0.5 border-t border-[var(--menu-line)] pt-3">
         <Link href="/memory" onClick={onNavigate} aria-current={isAt(pathname, "/memory") ? "page" : undefined} className={row(isAt(pathname, "/memory"))}>
-          <Brain aria-hidden size={18} strokeWidth={1.75} />
+          <Brain aria-hidden size={16} strokeWidth={1.75} />
           Memory
         </Link>
         <Link href="/settings" onClick={onNavigate} aria-current={isAt(pathname, "/settings") ? "page" : undefined} className={row(isAt(pathname, "/settings"))}>
-          <Settings aria-hidden size={18} strokeWidth={1.75} />
+          <Settings aria-hidden size={16} strokeWidth={1.75} />
           Settings
         </Link>
         {data.clinician && (
           <Link href="/settings" onClick={onNavigate} className={cn(row(false), "mt-1 py-2")}>
             <Avatar name={data.clinician.name} tone="lilac" size="sm" />
             <span className="flex min-w-0 flex-col">
-              <span className="truncate font-semibold text-[var(--menu-fg)]">
+              <span className="truncate text-small font-semibold text-[var(--menu-fg)]">
                 {data.clinician.name}
                 {data.clinician.credential && `, ${data.clinician.credential}`}
               </span>
-              {data.clinician.isSample && <span className="truncate text-small">Fictional demo practice</span>}
+              {data.clinician.isSample && <span className="truncate text-label">Fictional demo practice</span>}
             </span>
           </Link>
         )}
@@ -184,6 +176,7 @@ function MenuBody({ data, chatId, onNavigate }: { data: MenuData; chatId: string
 
 export function Sidebar({ initial = EMPTY_MENU }: { initial?: MenuData }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [data, setData] = useState(initial);
   const chatId = useSyncExternalStore(watchUrl, currentChat, () => null);
   const [open, setOpen] = useState(false);
@@ -201,7 +194,7 @@ export function Sidebar({ initial = EMPTY_MENU }: { initial?: MenuData }) {
   return (
     <>
       {/* The column runs the page's full height; the menu inside stays put while the page scrolls. */}
-      <aside className="hidden w-[264px] shrink-0 bg-[var(--menu-bg)] md:block">
+      <aside className="hidden w-[240px] shrink-0 border-r border-[var(--menu-line)] bg-[var(--menu-bg)] md:block">
         <div className="sticky top-0 h-dvh">
           <MenuBody data={data} chatId={chatId} />
         </div>
@@ -209,15 +202,25 @@ export function Sidebar({ initial = EMPTY_MENU }: { initial?: MenuData }) {
 
       {/* Phone: a top bar whose menu button slides the same menu in from the left. */}
       <Dialog.Root open={open} onOpenChange={setOpen}>
-        <header className="sticky top-0 z-20 flex items-center justify-between border-b border-[var(--hairline)] bg-[var(--bg)] px-3 py-2 md:hidden">
+        <header className="sticky top-0 z-20 flex items-center justify-between bg-[var(--bg)] px-2 py-1.5 md:hidden">
           <Dialog.Trigger aria-label="Open menu" className="flex size-touch items-center justify-center rounded-full hover:bg-[var(--hairline)]">
             <Menu aria-hidden size={20} />
           </Dialog.Trigger>
           <div className="flex items-center gap-2">
-            <Orb size={28} />
+            <Orb size={22} />
             <span className="font-semibold">Aeon</span>
           </div>
-          <span aria-hidden className="size-touch" />
+          <button
+            type="button"
+            aria-label="New chat"
+            onClick={() => {
+              window.dispatchEvent(new Event(NEW_CHAT));
+              router.push("/");
+            }}
+            className="flex size-touch items-center justify-center rounded-full text-[var(--fg-muted)] hover:bg-[var(--hairline)]"
+          >
+            <Plus aria-hidden size={20} />
+          </button>
         </header>
         <Dialog.Portal>
           <Dialog.Backdrop className="fixed inset-0 z-40 bg-[var(--scrim)] transition-opacity duration-200 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 md:hidden" />
