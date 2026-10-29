@@ -2,23 +2,26 @@
 
 // A form opens in a panel on the right of Admin, never as the page itself (redesign
 // plan, frame 3). The panel lives in the URL (/admin?panel=gfe) so a needs-next button
-// or Aeon can link straight to a filled form; closing it goes back to /admin.
+// or Aeon can link straight to a filled form; closing it goes back to /admin, or to the
+// chat she came from when the link carries &back=/?c=<chat> (app paths only).
 // Base UI Dialog: the page behind dims, focus stays inside, Escape closes.
 
 import { Dialog } from "@base-ui/react/dialog";
 import { X } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
 export function SidePanel({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   const router = useRouter();
+  const back = useSearchParams().get("back");
+  const closeTo = back && /^\/(?![/\\])[^\s\\]*$/.test(back) ? back : "/admin";
   const [open, setOpen] = useState(true);
   return (
     <Dialog.Root
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (!next) router.push("/admin", { scroll: false });
+        if (!next) router.push(closeTo, { scroll: false });
       }}
     >
       <Dialog.Portal>

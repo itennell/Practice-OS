@@ -66,7 +66,7 @@ Every UI piece Isaiah picked for Practice-OS, where it goes, and how to build it
 | UI-020 | Card Nav (menu that opens into cards) | SHL | Phone top bar and menu | must | approved | React Bits (app exception) |  |
 | UI-021 | Dock (Mac-style magnifying dock) | TBD | Anywhere it fits | nice | parked | React Bits (reference) |  |
 | UI-022 | Stepper (onboarding steps) | ONB | Step list | must | built (own) | React Bits (reference) | `app/onboarding/onboarding-flow.tsx` (chapter list in the glass panel; compact line on phones) |
-| UI-023 | Attachment (file and image cards) | IGM | Post composer | must | built | shadcn/ui (MIT) | `components/shared/attachment.tsx` (`Attachment`, `AttachmentList`) |
+| UI-023 | Attachment (file and image cards) | IGM | Post composer | must | built | shadcn/ui (MIT) | `components/shared/attachment.tsx` (`Attachment`, `AttachmentList`); document cards in the chat: `components/document-cards.tsx` (`DocumentCards`) |
 | UI-024 | Library page (file manager layout) | LIB | Whole page | must | approved | Screenshot (React Bits Pro demo, layout reference only) (layout reference) |  |
 | UI-025 | Front Desk work queue (list plus schedule panel) | FDK | Inquiries list | must | approved | Screenshot (React Bits Pro demo, layout reference only) (layout reference) |  |
 | UI-026 | Chat-first home (the app opens on Aeon) | HOM | Opening view (whole page) | must | built | Screenshot (layout reference only) (layout reference) | `app/(app)/page.tsx`, `components/aeon-chat.tsx` (`AeonChat`) |
@@ -220,6 +220,8 @@ The step-by-step frame for the beginning of onboarding. Matches the AGENTS.md on
 **IGM · Post composer** · must · approved · shadcn/ui (MIT) · [link](https://ui.shadcn.com/docs/components/base/attachment)
 
 Cards that show an image or file with a preview, name, details and small actions (remove, open), in a scrolling row. States: uploading, processing, error, done (title shimmers while working; errors say why in words). Main spot: the Instagram post composer, for the post's image and any inspiration photos: generating with muse-image (processing), converting to JPEG with sharp (processing), ready (done) or failed with the reason (error, e.g. "Blocked: mentions self-harm" per the posting rules). Also reuse it for files added in the Chat with Aeon panel (Prompt Bar UI-011 has an attachments slot) and payer PDF forms in credentialing prep, so files look the same everywhere. Give icon-only actions labels like "Remove first-session.jpg". Colors via shadcn's CSS variables mapped to the Caseload palette: card = glass white / #121022, border #D4CDF0, text ink #17142B and muted #5D5878, error = #A1261B, radius 20px. Install: npx shadcn@latest add attachment. First shadcn component in the app: needs a one-time shadcn setup (components.json, cn helper, Button) on Base UI, which every shadcn piece uses (decided at review). License: shadcn/ui is MIT. Not React Bits, so no pipeline exception needed.
+
+In the chat (built 2026-10-29): `DocumentCards` draws the cards Aeon's document tools return (lib/documents) as Attachments in a row, each with a plain-words line (what only she has to do) and 44px text actions: "Open" (the Admin side panel already filled in; closing it returns to the chat through `&back=`), "Download PDF" when the document has a GET link, or "Source" for a deadline or guide's official page.
 
 ### UI-024 Library page (file manager layout)
 

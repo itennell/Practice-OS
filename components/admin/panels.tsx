@@ -6,6 +6,7 @@ import { GfeMakePdf } from "@/components/gfe-make-pdf";
 import { GfeTimingCheck } from "@/components/gfe-timing-check";
 import { StatusPill } from "@/components/shared/status-mark";
 import { ButtonLink, GlassCard } from "@/components/ui";
+import { ScrollIntoView } from "@/components/shared/scroll-into-view";
 import { danaFacts } from "@/lib/compliance/demo";
 import { loadSavedRules } from "@/lib/compliance/researched";
 import { SHIPPED_RULES } from "@/lib/compliance/rules";
@@ -28,10 +29,11 @@ import { SERVICE_KINDS, estimateStatus, listEstimates, loadPracticeSettings, toO
 // The Admin page's side panels (?panel=...): each form opens already filled with what
 // Aeon knows (today's date, her fees, her profile), next to its list. These were the
 // Paperwork tabs. Server components; the forms inside them are client components.
+// ?focus=<id> (from a document card in the chat) outlines that estimate or superbill and scrolls to it.
 
 const WEEKDAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-export async function GoodFaithEstimates() {
+export async function GoodFaithEstimates({ focus }: { focus?: string } = {}) {
   await connection(); // read the database per request, never at build time
   const [{ hours, fees }, estimates, today] = await Promise.all([loadPracticeSettings(), listEstimates(), practiceToday()]);
   const open = toOpenDays(hours);
@@ -67,7 +69,13 @@ export async function GoodFaithEstimates() {
               const status = estimateStatus(e);
               const tone = e.issued_on ? (e.on_time ? "done" : "failed") : e.approval_status === "rejected" ? "declined" : "pending";
               return (
-                <li key={e.id} aria-label={e.reference} className="rounded-[20px] border border-[var(--hairline)] bg-[var(--glass-strong)] p-4">
+                <li
+                  key={e.id}
+                  aria-label={e.reference}
+                  aria-current={e.id === focus ? "true" : undefined}
+                  className={`rounded-[20px] border bg-[var(--glass-strong)] p-4 ${e.id === focus ? "border-[var(--accent-fg)]" : "border-[var(--hairline)]"}`}
+                >
+                  {e.id === focus && <ScrollIntoView />}
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="flex flex-col gap-1">
                       <h3 className="font-semibold">
@@ -92,7 +100,7 @@ export async function GoodFaithEstimates() {
                     </p>
                   )}
                   {e.approval_status !== "rejected" && (
-                    <details className="mt-3">
+                    <details className="mt-3" open={e.id === focus}>
                       <summary className="flex min-h-touch cursor-pointer items-center font-medium">Make the PDF</summary>
                       <div className="pt-2">
                         <GfeMakePdf id={e.id} reference={e.reference} issued={Boolean(e.issued_on)} />
@@ -141,7 +149,7 @@ export async function GoodFaithEstimates() {
   );
 }
 
-export async function Superbills() {
+export async function Superbills({ focus }: { focus?: string } = {}) {
   await connection(); // read the database per request, never at build time
   const [{ fees }, today, profile] = await Promise.all([loadPracticeSettings(), practiceToday(), loadCredentialingProfile()]);
   const bills = await listSuperbills().catch(() => null);
@@ -185,7 +193,13 @@ export async function Superbills() {
             {bills.map((b) => {
               const tone = b.issued_on ? "done" : "pending";
               return (
-                <li key={b.id} aria-label={b.reference} className="rounded-[20px] border border-[var(--hairline)] bg-[var(--glass-strong)] p-4">
+                <li
+                  key={b.id}
+                  aria-label={b.reference}
+                  aria-current={b.id === focus ? "true" : undefined}
+                  className={`rounded-[20px] border bg-[var(--glass-strong)] p-4 ${b.id === focus ? "border-[var(--accent-fg)]" : "border-[var(--hairline)]"}`}
+                >
+                  {b.id === focus && <ScrollIntoView />}
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="flex flex-col gap-1">
                       <h3 className="font-semibold">

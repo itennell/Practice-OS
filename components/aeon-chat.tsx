@@ -21,12 +21,14 @@ import type { ApprovalMode } from "@/lib/approval-modes";
 import { SUGGESTIONS } from "@/lib/aeon/suggestions";
 import { cn } from "@/lib/utils";
 import { AeonText } from "./aeon-text";
+import { DocumentCards, cardsOf } from "./document-cards";
+import type { DocumentCard } from "@/lib/documents/card";
 import { CHATS_CHANGED, NEW_CHAT } from "./sidebar";
 import { Orb } from "./ui";
 
 const AgentBlob = dynamic(() => import("./agent-blob/agent-blob"), { ssr: false });
 
-export type ChatStep = { tool: string; label: string; ms: number; ok: boolean };
+export type ChatStep = { tool: string; label: string; ms: number; ok: boolean; documents?: DocumentCard[] };
 export type ChatEntry = {
   key: string;
   role: "clinician" | "aeon";
@@ -108,6 +110,7 @@ function Message({ entry }: { entry: ChatEntry }) {
           )}
           <AeonText text={entry.content} />
         </div>
+        {!guarded && <DocumentCards cards={cardsOf(entry.steps)} />}
         {entry.approvalIds && entry.approvalIds.length > 0 && <ApprovalsInbox initial={[]} ids={entry.approvalIds} />}
       </div>
     </li>

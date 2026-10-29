@@ -15,6 +15,7 @@ import { relevantMemories, type Memory } from "./memory";
 import { soul } from "./soul";
 import { getProfile, STAGE_LABEL, type Profile } from "../profile";
 import type { ApprovalMode } from "../approval-policy";
+import { cardsFrom, type DocumentCard } from "../documents/card";
 import { TOOLS_BY_NAME, chatTools, runTool, type ToolResult } from "./tools";
 
 export const FEATURE = "aeon_chat";
@@ -23,7 +24,8 @@ const MAX_TOOL_TEXT = 12_000;
 const HISTORY_TURNS = 20;
 
 export type Turn = { role: "clinician" | "aeon"; content: string };
-export type Step = { tool: string; label: string; ms: number; ok: boolean };
+/** One tool run. documents: the cards it found or made, drawn under the reply and saved with it. */
+export type Step = { tool: string; label: string; ms: number; ok: boolean; documents?: DocumentCard[] };
 export type Reply =
   | { kind: "crisis"; text: string }
   | { kind: "refused"; text: string; reason: GuardKind }
@@ -149,11 +151,13 @@ export async function respond(message: string, opts: RespondOptions): Promise<Re
             (err): ToolResult => ({ content: [{ type: "text", text: `Error: ${err instanceof Error ? err.message : String(err)}` }], isError: true }),
           )
         : { content: [{ type: "text", text: "Error: the arguments were not valid JSON." }], isError: true };
+      const cards = result.isError ? [] : cardsFrom(result.structuredContent);
       steps.push({
         tool: call.name,
         label: TOOLS_BY_NAME.get(call.name)?.label ?? call.name,
         ms: Date.now() - started,
         ok: !result.isError,
+        ...(cards.length ? { documents: cards } : {}),
       });
       approvalIds.push(...approvalIdsOf(result));
       const text = result.content.map((b) => b.text).join("\n");

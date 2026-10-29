@@ -198,13 +198,15 @@ async function Panel({ searchParams }: { searchParams: PageProps<"/admin">["sear
   if (!isPanel(params.panel)) return null;
   const which = params.panel;
   const draft = typeof params.draft === "string" ? params.draft : undefined;
+  // A document card in the chat opens the panel on one item (lib/documents).
+  const focus = typeof params.focus === "string" && /^[0-9a-f-]{36}$/i.test(params.focus) ? params.focus : undefined;
   return (
     <SidePanel key={which} title={PANELS[which].title} description={PANELS[which].description}>
       <Suspense fallback={<div aria-hidden className="h-96 animate-pulse rounded-[24px] bg-[var(--hairline)]" />}>
         {which === "gfe" ? (
-          <GoodFaithEstimates />
+          <GoodFaithEstimates focus={focus} />
         ) : which === "superbill" ? (
-          <Superbills />
+          <Superbills focus={focus} />
         ) : which === "release" ? (
           <ReleaseForms draft={draft} />
         ) : which === "credentialing" ? (
