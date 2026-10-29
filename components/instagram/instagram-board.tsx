@@ -11,6 +11,7 @@ import { StatusPill, type Status } from "../shared/status-mark";
 import { ThoughtLine } from "../shared/thought-line";
 import { Button, ButtonLink, GlassCard } from "../ui";
 import { PostPreview, type PreviewProfile } from "./post-preview";
+import { ReelEditor } from "./reel-editor";
 
 const PILLAR_LABEL: Record<PostView["pillar"], string> = {
   first_session: "Your first session",
@@ -73,6 +74,7 @@ function ReadyToPost({ post }: { post: PostView }) {
           </div>
         )}
       </div>
+      {post.hasImage && <ReelEditor postId={post.id} />}
       <p role="status" aria-live="polite" className={copied ? "text-small" : "sr-only"}>
         {copied === "yes" ? "Caption copied." : copied === "no" ? "Couldn't copy. Tap more on the caption, then select it and copy it." : ""}
       </p>
