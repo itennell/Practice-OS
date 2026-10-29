@@ -282,7 +282,8 @@ export const TOOLS: AeonTool[] = [
     title: "Morning brief: what needs you this week",
     description:
       "Answers 'What needs me this week?' for the clinician's practice: compliance deadlines due in the next 7 days " +
-      "(license, CE, CAQH, taxes, filings), anything urgent just after, setup questions waiting, and dates Aeon still needs. " +
+      "(license, CE, CAQH, taxes, filings), insurance follow-ups in the same week, anything urgent just after, setup questions waiting, " +
+      "and dates Aeon still needs. Never say nothing is due when an insurance date is listed. " +
       "Each item says what to do and the part only she can do. Read-only; changes nothing.",
     input: {},
     output: {
