@@ -3,7 +3,7 @@
 import type { PostView } from "@/lib/instagram/store";
 import type { Status } from "../shared/status-mark";
 
-export type PostState = "ready" | "posted" | "blocked" | "waiting" | "working" | "declined" | "retry";
+export type PostState = "ready" | "posted" | "blocked" | "waiting" | "working" | "declined" | "draft" | "retry";
 
 /** One answer per post: the card's label and the header's counts both come from here. */
 export function postState(p: Pick<PostView, "status" | "approvalStatus" | "approvalId">): PostState {
@@ -13,6 +13,8 @@ export function postState(p: Pick<PostView, "status" | "approvalStatus" | "appro
   if (p.approvalStatus === "pending" && p.approvalId) return "waiting";
   if (p.approvalStatus === "running") return "working";
   if (p.approvalStatus === "rejected") return "declined";
+  // Written but not sent to her approvals yet.
+  if (p.status === "draft") return "draft";
   // Failed, or a draft that never reached her approvals: she can retry it.
   return "retry";
 }
@@ -24,5 +26,6 @@ export const STATE: Record<PostState, { status: Status; label: string }> = {
   waiting: { status: "pending", label: "Waiting for you" },
   working: { status: "running", label: "Working…" },
   declined: { status: "declined", label: "Declined" },
+  draft: { status: "declined", label: "Draft" },
   retry: { status: "failed", label: "Didn't finish" },
 };

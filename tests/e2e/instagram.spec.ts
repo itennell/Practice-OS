@@ -57,7 +57,7 @@ async function axe(page: import("@playwright/test").Page) {
 }
 
 test("Posts show as Instagram previews; approve one, then download its pictures", async ({ page }) => {
-  await page.goto("/instagram");
+  await page.goto("/media/instagram");
   await expect(page.getByRole("heading", { level: 1, name: "Instagram" })).toBeVisible();
   // One box, two actions. The old five-post plan, Connect and "Read the caption" are gone.
   await expect(page.getByLabel("What should the post be about?")).toBeVisible();
@@ -76,7 +76,10 @@ test("Posts show as Instagram previews; approve one, then download its pictures"
   // The preview: profile row, picture, caption with "more".
   const waiting = page.getByRole("listitem").filter({ hasText: "[Sample] How to book" }).first();
   await expect(waiting.getByRole("img", { name: "Reyes Counseling PLLC" })).toBeVisible();
-  await expect(waiting.getByRole("img", { name: "Dana smiling beside the words How to book" })).toBeVisible();
+  const picture = waiting.getByRole("img", { name: "Dana smiling beside the words How to book" });
+  await expect(picture).toBeVisible();
+  // The whole picture shows, never cropped at the sides (QA: "ample] What appens…").
+  expect(await picture.evaluate((e) => getComputedStyle(e).objectFit)).toBe("contain");
   await expect(waiting).not.toContainText("Dana Reyes, LCPC (fictional demo practice)");
   await waiting.getByRole("button", { name: "more of the caption" }).click();
   await expect(waiting).toContainText("Dana Reyes, LCPC (fictional demo practice)");
@@ -105,7 +108,7 @@ test("Posts show as Instagram previews; approve one, then download its pictures"
 });
 
 test("An advice topic is explained and the nearest logistics post is offered", async ({ page }) => {
-  await page.goto("/instagram");
+  await page.goto("/media/instagram");
   await page.getByLabel("What should the post be about?").fill("how to work through anxiety");
   await page.getByRole("button", { name: "Write this post" }).click();
   await expect(page.getByText("Posts stay on how your practice works, so Aeon can't write advice about anxiety.")).toBeVisible();
@@ -118,7 +121,7 @@ test("An advice topic is explained and the nearest logistics post is offered", a
 });
 
 test("Research first: a short summary and angles with their links, then she picks one", async ({ page }) => {
-  await page.goto("/instagram");
+  await page.goto("/media/instagram");
   await page.getByLabel("What should the post be about?").fill("what to bring to a first session");
   await page.getByRole("button", { name: "Plan several" }).click();
   const panel = page.getByRole("region", { name: "What other therapists post about this" });
@@ -198,7 +201,7 @@ test("A post whose picture didn't finish stays on the board with a plain message
   } finally {
     await sql.end();
   }
-  await page.goto("/instagram");
+  await page.goto("/media/instagram");
   // Header counts and card labels agree: 2 waiting (How to book, Parking), the unfinished draft is not counted.
   await expect(page.getByText("2 waiting for you · 1 ready to post")).toBeVisible();
   const unfinished = page.getByRole("listitem").filter({ hasText: "[Sample] Booking, unfinished" }).first();
@@ -220,7 +223,7 @@ test("A post whose picture didn't finish stays on the board with a plain message
 });
 
 test("Keyboard reaches every action, and text at 200% still fits", async ({ page }) => {
-  await page.goto("/instagram");
+  await page.goto("/media/instagram");
   await page.getByLabel("What should the post be about?").fill("how superbills work");
   await page.getByLabel("What should the post be about?").focus();
   await page.keyboard.press("Tab");

@@ -902,7 +902,7 @@ export const TOOLS: AeonTool[] = [
     run: async (_input, ctx) => {
       const r = await instagram.planWeek(ctx.by, { chat: ctx.chat });
       if (r.declined) return text({ written: false, why: instagram.DECLINED });
-      return text({ week_of: r.week, waiting_for_approval: r.saved.length - r.blocked, blocked: r.blocked, see: "/instagram" });
+      return text({ week_of: r.week, waiting_for_approval: r.saved.length - r.blocked, blocked: r.blocked, see: "/media/instagram" });
     },
   }),
 
@@ -930,7 +930,7 @@ export const TOOLS: AeonTool[] = [
         approval_id: r.post.approvalId,
         changed_from_her_request: r.outcome === "rewritten",
         why: r.why,
-        see: "/instagram",
+        see: "/media/instagram",
       });
     },
   }),
@@ -956,7 +956,7 @@ export const TOOLS: AeonTool[] = [
         from_the_web: research.source === "web",
         angles: research.angles.map((a, i) => ({ number: i + 1, title: a.title, hook: a.hook, format: a.format, why: a.why, links: a.sources })),
         next: "Ask which angle to write; then draft_instagram_post with that angle's title and hook as the request.",
-        see: "/instagram",
+        see: "/media/instagram",
       });
     },
   }),

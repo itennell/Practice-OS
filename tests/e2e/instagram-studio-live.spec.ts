@@ -12,7 +12,7 @@ test.skip(process.env.PLAYWRIGHT_LIVE !== "1" || !process.env.MODEL_API_KEY, "li
 test("Write one post, plan 3, approve one, then download its JPEG and MP4", async ({ page }) => {
   test.setTimeout(1_200_000);
   execSync("npm run db:reset", { stdio: "ignore" });
-  await page.goto("/instagram");
+  await page.goto("/media/instagram");
   const box = page.getByLabel("What should the post be about?");
   await expect(page.getByText(/waiting for you ·/)).toBeVisible();
   const posts = page.locator("#posts-heading").locator("xpath=../..").locator(":scope > ul > li");
