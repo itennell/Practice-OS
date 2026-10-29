@@ -28,6 +28,8 @@ export default defineConfig({
       PLAYWRIGHT_CALCOM_STANDIN: "1",
       // Instagram research uses fixed notes with example.com links, except on a live run (PLAYWRIGHT_LIVE=1).
       PLAYWRIGHT_RESEARCH_STANDIN: process.env.PLAYWRIGHT_RESEARCH_STANDIN ?? (process.env.PLAYWRIGHT_LIVE === "1" ? "0" : "1"),
+      // Reel slide edits get Muse's critic; without a key the specs use a stand-in that finds nothing (plain-code checks still run).
+      PLAYWRIGHT_CRITIC_STANDIN: process.env.PLAYWRIGHT_LIVE === "1" ? "0" : "1",
       DRY_RUN: "true",
       FRONT_DESK_POLL: "off",
       ...Object.fromEntries(

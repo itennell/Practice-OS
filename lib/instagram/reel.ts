@@ -6,9 +6,12 @@
 // (components/instagram/reel-render.ts). Nothing is stored but the words.
 import { db } from "../db";
 import { chat as metaChat } from "../meta";
-import { codeCritic, RULE_TEXT, type ChatFn } from "./critic";
-import { instagramDeclined } from "./onboarding";
+import { alertCrisis, checkCrisis } from "../safety";
+import { codeCritic, museCritic, RULE_TEXT, type ChatFn } from "./critic";
+import { neverShowHits } from "./never-show";
+import { instagramDeclined, loadInstagramPrefs } from "./onboarding";
 import { DECLINED } from "./store";
+import { gateTopic } from "./topic-gate";
 
 export type SlideKind = "picture" | "point" | "book";
 export type Slide = { kind: SlideKind; text: string };
@@ -19,13 +22,19 @@ export const SLIDE_TEXT_MAX = 90;
 
 /** The rules a slide can break; the license line and prices belong to the caption. */
 function slideProblems(text: string): string[] {
-  return codeCritic(text, { licenseLine: "", feesCents: [] })
+  const found = codeCritic(text, { licenseLine: "", feesCents: [] })
     .findings.filter((f) => !["license_line", "invented_fee", "caption_limits"].includes(f.rule))
     .map((f) => f.message);
+  // The same advice gate as the box she types in ("How to work through anxiety").
+  const gate = gateTopic(text);
+  if (!gate.ok && !found.includes(gate.why)) found.push(gate.hardStop ? RULE_TEXT.self_harm : gate.why);
+  return [...new Set(found)];
 }
 
+export type SlideLimits = { neverShow?: string[] };
+
 /** Plain-code shape and safety check of a reel she edited. Returns her words for every problem. */
-export function checkReel(reel: Reel): string[] {
+export function checkReel(reel: Reel, limits: SlideLimits = {}): string[] {
   const problems: string[] = [];
   const { slides, seconds } = reel;
   if (!Number.isInteger(seconds) || seconds < REEL_SECONDS.min || seconds > REEL_SECONDS.max) problems.push(`The reel is ${REEL_SECONDS.min} to ${REEL_SECONDS.max} seconds long.`);
@@ -37,8 +46,19 @@ export function checkReel(reel: Reel): string[] {
     if (s.kind !== "picture" && !t) problems.push(`Slide ${i + 1} has no words.`);
     if (t.length > SLIDE_TEXT_MAX) problems.push(`Slide ${i + 1} is over ${SLIDE_TEXT_MAX} letters.`);
     for (const p of slideProblems(t)) problems.push(`Slide ${i + 1}: ${p}`);
+    // Her never-show list, like caption words: her face (or first name) and her family.
+    if (limits.neverShow?.length && neverShowHits(t, limits.neverShow, { only: ["face", "family"] }).length) problems.push(`Slide ${i + 1}: ${RULE_TEXT.never_show}`);
   });
   return [...new Set(problems)];
+}
+
+/** Tests only (PLAYWRIGHT_CRITIC_STANDIN=1): the Muse slide check finds nothing. Refused on Vercel. */
+async function slideCritic(text: string, callModel?: ChatFn) {
+  if (process.env.PLAYWRIGHT_CRITIC_STANDIN === "1") {
+    if (process.env.VERCEL) throw new Error("PLAYWRIGHT_CRITIC_STANDIN is for tests only.");
+    return [];
+  }
+  return museCritic(text, callModel);
 }
 
 const POINTS_SCHEMA = {
@@ -122,14 +142,34 @@ export async function getReel(postId: string, opts: { chat?: ChatFn } = {}): Pro
   return { ok: true, reel, credits: creditsOf(post) };
 }
 
-/** Saves her edits after the safety check. A slide about suicide or self-harm is never saved. */
-export async function saveReel(postId: string, reel: Reel): Promise<ReelResult> {
+/**
+ * Saves her edits after the same checks as a caption: plain code (critic, advice
+ * gate, never-show), then Muse's critic on any words she changed. A slide about
+ * suicide or self-harm is never saved, and alerts her like the chat does.
+ */
+export async function saveReel(postId: string, reel: Reel, opts: { chat?: ChatFn; by?: string } = {}): Promise<ReelResult> {
   if (await instagramDeclined()) return { ok: false, status: 409, why: DECLINED };
   const post = await loadPost(postId);
   if (!post) return { ok: false, status: 404, why: "That post isn't here any more." };
   if (post.status === "blocked" || !post.has_image) return { ok: false, status: 409, why: "This post has no picture to make a reel from." };
   const clean: Reel = { seconds: reel.seconds, slides: reel.slides.map((s) => ({ kind: s.kind, text: s.kind === "picture" ? "" : s.text.trim() })) };
-  const problems = checkReel(clean);
+  const words = clean.slides.map((s) => s.text).join("\n");
+  const crisis = checkCrisis(words);
+  if (crisis.crisis) await alertCrisis({ source: "media", category: crisis.category, by: opts.by ?? "aeon:instagram" });
+  const prefs = await loadInstagramPrefs();
+  const problems = checkReel(clean, { neverShow: prefs.neverShow });
+  if (!problems.length) {
+    // Muse reads only words she changed; the first draft came from a caption that already passed it.
+    const before = new Set((post.reel?.slides ?? []).map((s) => s.text));
+    const changed = clean.slides.filter((s) => s.text && !before.has(s.text)).map((s) => s.text);
+    if (changed.length) {
+      try {
+        for (const f of await slideCritic(changed.join("\n"), opts.chat)) problems.push(`The safety check: ${f.message}`);
+      } catch {
+        return { ok: false, status: 503, why: "Aeon's safety check didn't answer, so your edits weren't saved. Try again in a minute." };
+      }
+    }
+  }
   if (problems.length) {
     const why = problems.some((p) => p.includes(RULE_TEXT.self_harm)) ? RULE_TEXT.self_harm : "Aeon can't make this reel yet.";
     return { ok: false, status: 422, why, problems };
