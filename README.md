@@ -4,6 +4,16 @@ Aeon is an open-source AI co-owner for independently licensed mental health clin
 
 It is practice operations software, not clinical care. It never gives medical or mental health advice, and nothing is sent, posted or booked until the clinician approves it.
 
+Practice-OS is built by **Caseload** (a sole proprietorship).
+
+## Text messages
+
+The Front Desk helper texts people who call a practice line and leave a voicemail, to offer times for a free consultation. Scheduling only, never marketing. Reply STOP to opt out, HELP for help. Message and data rates may apply. During the demo, the practice (Reyes Counseling) is fictional and texts go only to the developer's own phone.
+
+- [Privacy Policy](docs/privacy-policy.md)
+- [Terms & Conditions](docs/terms.md)
+- [How SMS opt-in works](docs/sms-opt-in.md)
+
 ## Four helpers
 
 - **Admin**: compliance calendar, "how do I" guides, credentialing prep, Good Faith Estimates.
