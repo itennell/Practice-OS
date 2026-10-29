@@ -34,17 +34,17 @@ insert into practice_os.settings (id) values (true) on conflict (id) do nothing;
 
 -- Made-up referral sources (never real NPPES providers).
 insert into practice_os.referral_sources
-  (id, name, organization, taxonomy, specialty, npi_type, city, state, email, stage, last_contacted_at, next_follow_up_on, distance_miles, fit_score, notes, is_sample) values
+  (id, name, organization, taxonomy, specialty, npi_type, city, state, email, stage, last_contacted_at, next_follow_up_on, distance_miles, fit_score, score_version, notes, is_sample) values
   ('00000000-0000-4000-8000-000000000201', '[Sample] Lakeview Family Medicine', '[Sample] Lakeview Family Medicine',
-   '207Q00000X', 'Family medicine', 'organization', 'Chicago', 'IL', 'frontdesk@example.com', 'found', null, null, 0.6, 81, '[Sample] Near the office.', true),
+   '207Q00000X', 'Family medicine', 'organization', 'Chicago', 'IL', 'frontdesk@example.com', 'found', null, null, 0.6, 81, 2, '[Sample] Near the office.', true),
   ('00000000-0000-4000-8000-000000000202', '[Sample] Dr. Alex Example', '[Sample] North Side Internal Medicine',
-   '207R00000X', 'Internal medicine', 'individual', 'Chicago', 'IL', 'alex@example.com', 'contacted', now() - interval '8 days', current_date + 6, 1.4, 77,
+   '207R00000X', 'Internal medicine', 'individual', 'Chicago', 'IL', 'alex@example.com', 'contacted', now() - interval '8 days', current_date + 6, 1.4, 77, 2,
    '[Sample] Sent intro letter.', true),
   ('00000000-0000-4000-8000-000000000203', '[Sample] Old Town OB-GYN', '[Sample] Old Town OB-GYN',
-   '207V00000X', 'OB/GYN', 'organization', 'Chicago', 'IL', 'office@example.com', 'follow_up', now() - interval '20 days', current_date, 1.1, 69,
+   '207V00000X', 'OB/GYN', 'organization', 'Chicago', 'IL', 'office@example.com', 'follow_up', now() - interval '20 days', current_date, 1.1, 69, 2,
    '[Sample] Follow-up due today.', true),
   ('00000000-0000-4000-8000-000000000204', '[Sample] Lincoln Park Pediatrics', '[Sample] Lincoln Park Pediatrics',
-   '208000000X', 'Pediatrics', 'organization', 'Chicago', 'IL', 'hello@example.com', 'connected', now() - interval '35 days', null, 0.3, 79,
+   '208000000X', 'Pediatrics', 'organization', 'Chicago', 'IL', 'hello@example.com', 'connected', now() - interval '35 days', null, 0.3, 79, 2,
    '[Sample] Happy to share referrals for parents.', true);
 
 -- Dana's Referrals setup. Seeded only when missing: db:reset never overwrites her choice.
@@ -112,9 +112,11 @@ insert into practice_os.alerts (id, kind, inquiry_id, message, is_sample) values
 insert into practice_os.approvals (id, kind, title, preview, payload, created_by, is_sample) values
   ('00000000-0000-4000-8000-000000000901', 'referral_letter',
    '[Sample] Intro letter to Lakeview Family Medicine',
-   '{"to": "Your test inbox (Gmail draft)", "subject": "[Sample] Introducing Reyes Counseling in Lincoln Park",
-     "excerpt": "[Sample] I recently opened a private practice near your office and wanted to introduce myself..."}'::jsonb,
-   '{"referral_source_id": "00000000-0000-4000-8000-000000000201", "delivery": "gmail_draft_to_test_inbox"}'::jsonb,
+   '{"subject": "[Sample] Introducing Reyes Counseling in Lincoln Park", "provider": "[Sample] Lakeview Family Medicine", "specialty": "Family medicine",
+     "body": "[Sample] Dear Lakeview Family Medicine team,\n\nI''m Dana Reyes, a licensed clinical professional counselor, and I recently opened Reyes Counseling in Lincoln Park, a few blocks from your office. I see adults working through stress at work and big life changes, in person and by video, with weekday and evening times.\n\nWhen one of your patients asks about talking with a counselor nearby, I''d be glad to be one of the names you share. Would you be open to a 15-minute call in the next few weeks so we can introduce ourselves and talk about how we might work together?\n\nThank you for the care you give this neighborhood.\n\nDana Reyes, LCPC (fictional demo practice)\nReyes Counseling PLLC",
+     "delivery": "Copy it from the Referrals board and send it from your own email. Aeon sends nothing."}'::jsonb,
+   '{"referral_source_id": "00000000-0000-4000-8000-000000000201", "subject": "[Sample] Introducing Reyes Counseling in Lincoln Park",
+     "letter": "[Sample] Dear Lakeview Family Medicine team,\n\nI''m Dana Reyes, a licensed clinical professional counselor, and I recently opened Reyes Counseling in Lincoln Park, a few blocks from your office. I see adults working through stress at work and big life changes, in person and by video, with weekday and evening times.\n\nWhen one of your patients asks about talking with a counselor nearby, I''d be glad to be one of the names you share. Would you be open to a 15-minute call in the next few weeks so we can introduce ourselves and talk about how we might work together?\n\nThank you for the care you give this neighborhood.\n\nDana Reyes, LCPC (fictional demo practice)\nReyes Counseling PLLC"}'::jsonb,
    'aeon:referrals', true),
   ('00000000-0000-4000-8000-000000000902', 'instagram_post',
    '[Sample] Post: What happens at a first session',

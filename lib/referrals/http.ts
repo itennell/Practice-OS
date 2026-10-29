@@ -13,3 +13,15 @@ export function canChange(request: Request): boolean {
   if (process.env.VERCEL) return canDecide(request) && isSameOrigin(request);
   return isLocalAppRequest(request);
 }
+
+/**
+ * Who may run a map search. It saves nothing but asks outside services (NPPES,
+ * Census, OpenStreetMap), so: the app's own page, as JSON, and on the Vercel
+ * copy only someone with the admin password (an Origin header can be forged,
+ * and the demo password is shared).
+ */
+export function canSearch(request: Request): boolean {
+  if (!(request.headers.get("content-type") ?? "").toLowerCase().startsWith("application/json")) return false;
+  if (process.env.VERCEL) return canDecide(request) && isSameOrigin(request);
+  return isLocalAppRequest(request);
+}
