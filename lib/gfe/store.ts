@@ -253,7 +253,7 @@ export function estimateStatus(e: Pick<EstimateRow, "approval_status" | "issued_
 /** The estimate needs her NPI and tax ID (45 CFR 149.610(c)(1)(v)); they come from Credentialing. */
 export class MissingProviderDetails extends Error {
   constructor() {
-    super("Add your NPI and tax ID on Paperwork > Credentialing first. The estimate must show both.");
+    super("Add your NPI and tax ID on Admin > Credentialing first. The estimate must show both.");
   }
 }
 
