@@ -3,7 +3,7 @@ import { audit } from "../audit";
 import { deleteConnection, getConnection, saveConnection, type Connection } from "../connections";
 import { isAllowedGoogleScope } from "./google-scopes";
 import { emailFromIdToken, exchangeGoogleCode, GOOGLE_BASE_SCOPES, googleAuthUrl, GoogleTokenError, refreshGoogle, revokeGoogle } from "./google";
-import { beginInstagram, deleteFromRelay, openInstagramToken, refreshInstagram, uploadToRelay, type Uploader } from "./instagram";
+import { beginInstagram, deleteFromRelay, INSTAGRAM_NOT_READY, instagramReadiness, openInstagramToken, refreshInstagram, uploadToRelay, type Uploader } from "./instagram";
 import { ConnectError, createConnectState, takeConnectState, type ConnectProvider } from "./state";
 
 // Connect buttons: one place to start a sign-in, finish it, and get a working
@@ -47,6 +47,11 @@ export async function startConnect(provider: ConnectProvider, opts: { scopes?: s
     const challenge = createHash("sha256").update(verifier).digest("base64url");
     const state = await createConnectState("google", scopes, redirectUri, verifier);
     return { authUrl: googleAuthUrl(scopes, redirectUri, state, challenge) };
+  }
+  const readiness = await instagramReadiness();
+  if (!readiness.ready) {
+    console.error("connect instagram: not ready:", readiness.reason);
+    throw new ConnectError(INSTAGRAM_NOT_READY);
   }
   const key = randomBytes(32);
   const state = await createConnectState("instagram", [], redirectUri, key.toString("base64"));

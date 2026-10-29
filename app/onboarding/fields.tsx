@@ -3,7 +3,7 @@
 import { Plus } from "lucide-react";
 import { CONNECTION_CARDS, type ConnectionStatus } from "@/components/connections/registry";
 import { DateField } from "@/components/shared/date-field";
-import { SettingRadio, SettingSelect, SettingSwitch, TextField } from "@/components/shared/settings-controls";
+import { SettingRadio, SettingSelect, SettingSwitch, TextAreaField, TextField } from "@/components/shared/settings-controls";
 import { Button, chipClass, Orb } from "@/components/ui";
 import { STATES } from "@/lib/compliance/states";
 import { firstFor, HELPERS, type Screen, type Stage } from "@/lib/onboarding/chapters";
@@ -402,12 +402,12 @@ export function Field({ screen: s, value, onChange, setupItems, stage, homeState
               ))}
             </div>
           </div>
-          <TextField label="In your own words (optional)" placeholder="Like: adults going through big life changes" value={String(o.text ?? "")} onChange={(e) => set({ text: e.target.value })} maxLength={400} error={error} />
+          <TextAreaField label="In your own words (optional)" placeholder="Like: adults going through big life changes" value={String(o.text ?? "")} onChange={(e) => set({ text: e.target.value })} maxLength={400} error={error} />
         </div>
       );
     }
     case "followups":
-      return <TextField label="Your answer" value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} maxLength={400} error={error} />;
+      return <TextAreaField label="Your answer" value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} maxLength={400} error={error} />;
     case "connect": {
       // The Muse key has its own screen in chapter 1.
       const cards = CONNECTION_CARDS.filter((c) => c.id !== "muse").sort((a, b) => a.order - b.order);
@@ -467,13 +467,15 @@ export function Field({ screen: s, value, onChange, setupItems, stage, homeState
         return <SettingRadio label={label} value={String(value ?? "")} onValueChange={(v) => onChange(v)} options={q.options} />;
       }
       if (q.kind === "yesno") return <SettingRadio label={label} value={yn(value)} onValueChange={(v) => onChange(v === "yes")} options={YES_NO} />;
+      if (q.kind === "text")
+        return <TextAreaField label="Your answer" value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} maxLength={q.maxLength ?? 400} error={error} />;
       return (
         <TextField
-          label={q.kind === "zip" ? "ZIP code" : q.kind === "number" ? `Number${q.unit ? ` (${q.unit})` : ""}` : "Your answer"}
-          inputMode={q.kind === "text" ? undefined : "numeric"}
+          label={q.kind === "zip" ? "ZIP code" : `Number${q.kind === "number" && q.unit ? ` (${q.unit})` : ""}`}
+          inputMode="numeric"
           value={String(value ?? "")}
           onChange={(e) => onChange(e.target.value)}
-          maxLength={q.kind === "text" ? (q.maxLength ?? 400) : 10}
+          maxLength={10}
           error={error}
         />
       );
