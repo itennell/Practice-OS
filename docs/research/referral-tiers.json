@@ -1,0 +1,211 @@
+{
+  "version": "1.0",
+  "updated": "2026-10-29",
+  "status": "final for the research pass; weights are judgment informed by the cited evidence (no source measures referral share by source). Not yet re-ranked on a live result set.",
+  "score": {
+    "min": 0,
+    "max": 100,
+    "note": "plain sum of factor points, rounded, capped at 100"
+  },
+  "tiers": [
+    {
+      "id": "A",
+      "label": "Reach out first",
+      "min": 70,
+      "color_hint": "accent",
+      "target_per_month": "3 to 5 letters"
+    },
+    {
+      "id": "B",
+      "label": "Warm up next",
+      "min": 50,
+      "color_hint": "neutral",
+      "target_per_month": "up to 10 letters"
+    },
+    {
+      "id": "C",
+      "label": "Later",
+      "min": 0,
+      "color_hint": "muted",
+      "target_per_month": "only if A and B are empty"
+    }
+  ],
+  "factors": [
+    {
+      "id": "specialty",
+      "max": 35,
+      "source": "nppes",
+      "points": {
+        "family_medicine": 35,
+        "pediatrics": 33,
+        "ob_gyn": 32,
+        "psychiatry": 30,
+        "internal_medicine": 30,
+        "oncology": 22,
+        "therapists": 20
+      },
+      "note": "psychiatry is new (taxonomy 2084P0800X). Its code family also holds neurology, so match the primary code, not the word. Not in NPPES at all: school and college counselors, EAPs, clergy, attorneys. Add them by hand or from other lists as 'manual' sources, default 18.",
+      "reason_template": "{specialtyLabel} offices see people who need talk therapy and often have no one to send them to."
+    },
+    {
+      "id": "distance",
+      "max": 25,
+      "source": "zip_centroid",
+      "rule": "max minus per_mile times miles, never below 0",
+      "per_mile": 5,
+      "unknown_distance_points": 8,
+      "note": "Straight-line miles between ZIP centroids (Census ZCTA gazetteer, public domain). Existing code uses 30 and 6 per mile; this keeps the same shape. For rural states set per_mile to 1.5.",
+      "reason_template": "About {miles} miles from your office."
+    },
+    {
+      "id": "reachable_person",
+      "max": 15,
+      "source": "nppes",
+      "points": {
+        "individual": 15,
+        "organization_with_named_official": 8,
+        "organization_only": 3
+      },
+      "note": "A letter to a named clinician gets read; a letter to a big group's front desk rarely does. NPPES lists an authorized official for organizations (NPI-2).",
+      "reason_template": "You can write to a named person ({name}) rather than a front desk."
+    },
+    {
+      "id": "contact",
+      "max": 10,
+      "source": "nppes",
+      "points": {
+        "location_phone": 6,
+        "location_fax": 4
+      },
+      "note": "Fax counts: medical offices send and receive referrals by fax. NPPES has no email. Mailing-address-only phone numbers are often billing lines, so score the LOCATION address only.",
+      "reason_template": "Office phone{andFax} on file."
+    },
+    {
+      "id": "record_fresh",
+      "max": 10,
+      "source": "nppes",
+      "points": {
+        "updated_within_2y": 10,
+        "updated_2_to_5y": 4,
+        "older": 0
+      },
+      "flag_if_older_than_years": 5,
+      "flag_text": "Record last updated {year}; confirm they still practice before writing.",
+      "reason_template": "NPPES record updated {year}."
+    },
+    {
+      "id": "location_state",
+      "max": 5,
+      "source": "nppes",
+      "points": {
+        "practice_location_in_clinician_state": 5,
+        "otherwise": 0
+      },
+      "note": "Live check found providers whose mailing address is Chicago but whose LOCATION is in another state. Use the LOCATION address.",
+      "reason_template": null
+    }
+  ],
+  "relationship_modifiers": {
+    "note": "Applied after the sum. Values come from the pipeline board, not NPPES.",
+    "add_points": {
+      "warm_intro_available": 15,
+      "sent_us_a_referral_before": 20,
+      "met_in_person": 10,
+      "replied_to_letter": 8
+    },
+    "suppress": {
+      "contacted_within_days": 30,
+      "marked_not_interested": "hide",
+      "same_practice_already_contacted_within_days": 14
+    },
+    "reasons": {
+      "warm_intro_available": "You know someone who can introduce you.",
+      "sent_us_a_referral_before": "They have sent you a client before: thank them and keep the line open.",
+      "met_in_person": "You have met.",
+      "replied_to_letter": "They answered your letter."
+    }
+  },
+  "nppes_gives": [
+    "name, credential, sole_proprietor flag",
+    "primary and secondary NUCC taxonomy plus license number and state",
+    "LOCATION and MAILING address, phone, fax",
+    "authorized official name, title, phone (organizations only)",
+    "enumeration date and last_updated",
+    "endpoints (Direct addresses) when the provider registered one; empty for most"
+  ],
+  "nppes_does_not_give": [
+    "accepting new patients or accepting referrals",
+    "email address or website",
+    "insurance panels",
+    "patient volume, age mix or what they actually refer",
+    "which practice or hospital a person works for (no reliable link between NPI-1 and NPI-2)",
+    "whether the record is still true: records can be 15+ years old"
+  ],
+  "hard_rules": [
+    "No factor, reason or modifier may reward or offer anything of value for a referral. No gifts, no paid placement, no per-referral pricing.",
+    "Reason text states facts about the source, never a promise about what they will send.",
+    "Never mention a client to a source without that client's written consent."
+  ],
+  "evidence_refs": [
+    {
+      "factor": "specialty",
+      "claim": "General medical sector treats 22.8% of treated adults but gives minimally adequate care 12.7% vs 48.3% in specialty",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/15939840",
+      "tag": "strong"
+    },
+    {
+      "factor": "specialty",
+      "claim": "Pediatricians agree they should treat ADHD (70%) but under one third agree they should treat other mental health problems",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/?term=Stein+2008+AAP+Periodic+Survey+pediatricians+mental+health",
+      "tag": "strong"
+    },
+    {
+      "factor": "specialty",
+      "claim": "Psychotherapy share of psychiatrist visits fell from 44.4% to 28.9%",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/18678801",
+      "tag": "moderate"
+    },
+    {
+      "factor": "specialty",
+      "claim": "Perinatal referral uptake pooled 43%; on-site 60% vs outside service 32%",
+      "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC7372167/fullTextXML",
+      "tag": "strong"
+    },
+    {
+      "factor": "specialty",
+      "claim": "80.8% of college counseling centers cannot meet demand; 28.1% refer more students off campus",
+      "url": "https://www.aucccd.org/assets/documents/Survey/2024-2025%20Annual%20Survey%20Report%20Public.pdf",
+      "tag": "moderate"
+    },
+    {
+      "factor": "distance",
+      "claim": "66.8% of PCPs had trouble getting outpatient mental health services; access and coverage top reasons",
+      "url": "https://www.patientcareonline.com/view/pcps-challenged-obtain-mental-health-referrals",
+      "tag": "strong (2004-05 data)"
+    },
+    {
+      "factor": "reachable_person",
+      "claim": "Referrals often pass through the office manager or front desk; mailed letters often discarded",
+      "url": "https://www.therapymarketer.co/articles/how-to-get-referrals-from-doctors",
+      "tag": "weak (practice-building blog)"
+    },
+    {
+      "factor": "modifiers",
+      "claim": "Thank referrers, confirm each referral, set reminders to re-contact quiet sources",
+      "url": "https://zandahealth.com/blog/how-to-build-referral-relationships/",
+      "tag": "weak (vendor blog)"
+    },
+    {
+      "factor": "hard_rules",
+      "claim": "Anti-Kickback Statute: remuneration to induce or reward referrals is a felony for federal program business",
+      "url": "https://www.law.cornell.edu/uscode/text/42/1320a-7b",
+      "tag": "primary law"
+    },
+    {
+      "factor": "hard_rules",
+      "claim": "Illinois 740 ILCS 92/5 bars remuneration to induce procuring patients for insurance-billed services",
+      "url": "https://law.onecle.com/illinois/740ilcs92/5.html",
+      "tag": "primary law (mirror)"
+    }
+  ]
+}
