@@ -1,22 +1,22 @@
 {
  "recorded": "2026-10-28",
- "source": "https://npiregistry.cms.hhs.gov/api/ v2.1, postal_code=60614",
+ "source": "Synthetic records in the shape of an NPPES API v2.1 reply for postal_code=60614 (all fields kept). Every name, NPI, street, phone and license is fake; NPIs fail the NPI check digit.",
  "responses": [
   {
    "description": "Family Medicine",
    "result_count": 30,
    "results": [
     {
-     "number": "1922987833",
+     "number": "1800000001",
      "enumeration_type": "NPI-2",
      "basic": {
       "status": "A",
-      "organization_name": "1977 MESK",
+      "organization_name": "[SAMPLE] EXAMPLE CLINIC 1 LLC",
       "last_updated": "2026-01-26"
      },
      "addresses": [
       {
-       "address_1": "2118 N HALSTED ST",
+       "address_1": "200 W EXAMPLE ST",
        "address_purpose": "MAILING",
        "address_type": "DOM",
        "city": "CHICAGO",
@@ -26,7 +26,7 @@
        "state": "IL"
       },
       {
-       "address_1": "2118 N HALSTED ST",
+       "address_1": "200 W EXAMPLE ST",
        "address_purpose": "LOCATION",
        "address_type": "DOM",
        "city": "CHICAGO",
@@ -34,7 +34,7 @@
        "country_name": "United States",
        "postal_code": "606140758",
        "state": "IL",
-       "telephone_number": "407-305-3791"
+       "telephone_number": "312-555-0001"
       }
      ],
      "taxonomies": [
@@ -57,16 +57,16 @@
      ]
     },
     {
-     "number": "1073490314",
+     "number": "1800000002",
      "enumeration_type": "NPI-2",
      "basic": {
       "status": "A",
-      "organization_name": "1977 MESK MEDICAL GROUP LLC",
+      "organization_name": "[SAMPLE] EXAMPLE CLINIC 2 LLC",
       "last_updated": "2026-01-26"
      },
      "addresses": [
       {
-       "address_1": "2118 N HALSTED ST",
+       "address_1": "200 W EXAMPLE ST",
        "address_purpose": "LOCATION",
        "address_type": "DOM",
        "city": "CHICAGO",
@@ -74,10 +74,10 @@
        "country_name": "United States",
        "postal_code": "606140758",
        "state": "IL",
-       "telephone_number": "407-305-3791"
+       "telephone_number": "312-555-0002"
       },
       {
-       "address_1": "2118 N HALSTED ST",
+       "address_1": "200 W EXAMPLE ST",
        "address_purpose": "MAILING",
        "address_type": "DOM",
        "city": "CHICAGO",
@@ -107,37 +107,37 @@
      ]
     },
     {
-     "number": "1114448644",
+     "number": "1800000003",
      "enumeration_type": "NPI-2",
      "basic": {
       "status": "A",
-      "organization_name": "AGELESS MEN'S HEALTH HOLDINGS INC",
+      "organization_name": "[SAMPLE] EXAMPLE CLINIC 3 LLC",
       "last_updated": "2026-10-16"
      },
      "addresses": [
       {
-       "address_1": "10501 W GOWAN RD STE 200",
+       "address_1": "210 W EXAMPLE ST",
        "address_purpose": "MAILING",
        "address_type": "DOM",
        "city": "LAS VEGAS",
        "country_code": "US",
        "country_name": "United States",
-       "fax_number": "725-204-6055",
+       "fax_number": "312-555-0004",
        "postal_code": "891296602",
        "state": "NV",
-       "telephone_number": "725-204-6055"
+       "telephone_number": "312-555-0003"
       },
       {
-       "address_1": "1729 N CLYBOURN AVE",
+       "address_1": "220 W EXAMPLE ST",
        "address_purpose": "LOCATION",
        "address_type": "DOM",
        "city": "CHICAGO",
        "country_code": "US",
        "country_name": "United States",
-       "fax_number": "312-291-8337",
+       "fax_number": "312-555-0006",
        "postal_code": "606146503",
        "state": "IL",
-       "telephone_number": "312-291-8335"
+       "telephone_number": "312-555-0005"
       }
      ],
      "taxonomies": [
@@ -152,18 +152,18 @@
      ]
     },
     {
-     "number": "1235364761",
+     "number": "1800000004",
      "enumeration_type": "NPI-1",
      "basic": {
       "status": "A",
-      "first_name": "JONATHAN",
-      "last_name": "ALDE",
+      "first_name": "[SAMPLE] AVERY",
+      "last_name": "DEMO",
       "credential": "M.D.",
       "last_updated": "2015-08-27"
      },
      "addresses": [
       {
-       "address_1": "2868 N BROADWAY ST",
+       "address_1": "230 W EXAMPLE ST",
        "address_purpose": "LOCATION",
        "address_type": "DOM",
        "city": "CHICAGO",
@@ -171,10 +171,10 @@
        "country_name": "United States",
        "postal_code": "606576017",
        "state": "IL",
-       "telephone_number": "773-569-3525"
+       "telephone_number": "312-555-0007"
       },
       {
-       "address_1": "435 W ARMITAGE AVE",
+       "address_1": "240 W EXAMPLE ST",
        "address_purpose": "MAILING",
        "address_type": "DOM",
        "city": "CHICAGO",
@@ -188,7 +188,7 @@
       {
        "code": "207Q00000X",
        "desc": "Family Medicine",
-       "license": "036128940",
+       "license": "SAMPLE-0000",
        "primary": true,
        "state": "IL",
        "taxonomy_group": ""
@@ -196,16 +196,16 @@
      ]
     },
     {
-     "number": "1013539980",
+     "number": "1800000005",
      "enumeration_type": "NPI-2",
      "basic": {
       "status": "A",
-      "organization_name": "ALLIANCE POST-ACUTE CONSULTANTS LLC",
+      "organization_name": "[SAMPLE] EXAMPLE CLINIC 4 LLC",
       "last_updated": "2020-05-13"
      },
      "addresses": [
       {
-       "address_1": "2536 PEBBLE CREEK DR",
+       "address_1": "250 W EXAMPLE ST",
        "address_purpose": "MAILING",
        "address_type": "DOM",
        "city": "LISLE",
@@ -213,10 +213,10 @@
        "country_name": "United States",
        "postal_code": "605320802",
        "state": "IL",
-       "telephone_number": "630-807-9907"
+       "telephone_number": "312-555-0008"
       },
       {
-       "address_1": "9525 MAYFIELD AVE",
+       "address_1": "260 W EXAMPLE ST",
        "address_purpose": "LOCATION",
        "address_type": "DOM",
        "city": "OAK LAWN",
@@ -224,7 +224,7 @@
        "country_name": "United States",
        "postal_code": "604532817",
        "state": "IL",
-       "telephone_number": "708-801-0181"
+       "telephone_number": "312-555-0009"
       }
      ],
      "taxonomies": [
@@ -239,46 +239,46 @@
      ]
     },
     {
-     "number": "1558351643",
+     "number": "1800000007",
      "enumeration_type": "NPI-1",
      "basic": {
       "status": "A",
-      "first_name": "JAMES",
-      "last_name": "ARONS",
+      "first_name": "[SAMPLE] AVERY",
+      "last_name": "TESTWELL",
       "credential": "D.O.",
       "last_updated": "2014-02-05"
      },
      "addresses": [
       {
-       "address_1": "830 W DIVERSEY PKWY",
+       "address_1": "270 W EXAMPLE ST",
        "address_purpose": "LOCATION",
        "address_type": "DOM",
        "city": "CHICAGO",
        "country_code": "US",
        "country_name": "United States",
-       "fax_number": "773-880-6051",
+       "fax_number": "312-555-0011",
        "postal_code": "606141454",
        "state": "IL",
-       "telephone_number": "773-281-3563"
+       "telephone_number": "312-555-0010"
       },
       {
-       "address_1": "830 W DIVERSEY PKWY",
+       "address_1": "270 W EXAMPLE ST",
        "address_purpose": "MAILING",
        "address_type": "DOM",
        "city": "CHICAGO",
        "country_code": "US",
        "country_name": "United States",
-       "fax_number": "773-880-6051",
+       "fax_number": "312-555-0013",
        "postal_code": "606141454",
        "state": "IL",
-       "telephone_number": "773-281-3563"
+       "telephone_number": "312-555-0012"
       }
      ],
      "taxonomies": [
       {
        "code": "207Q00000X",
        "desc": "Family Medicine",
-       "license": "036-062347",
+       "license": "SAMPLE-0000",
        "primary": true,
        "state": "IL",
        "taxonomy_group": ""
@@ -286,18 +286,18 @@
      ]
     },
     {
-     "number": "1730568684",
+     "number": "1800000008",
      "enumeration_type": "NPI-1",
      "basic": {
       "status": "A",
-      "first_name": "ANIL",
-      "last_name": "BAJNATH",
+      "first_name": "[SAMPLE] QUINN",
+      "last_name": "DEMO",
       "credential": "M.D.",
       "last_updated": "2025-09-11"
      },
      "addresses": [
       {
-       "address_1": "2024 WEST ST STE 202",
+       "address_1": "280 W EXAMPLE ST",
        "address_purpose": "LOCATION",
        "address_type": "DOM",
        "city": "ANNAPOLIS",
@@ -305,10 +305,10 @@
        "country_name": "United States",
        "postal_code": "214013555",
        "state": "MD",
-       "telephone_number": "410-858-4086"
+       "telephone_number": "312-555-0014"
       },
       {
-       "address_1": "2953 TIMBERNECK WAY",
+       "address_1": "290 W EXAMPLE ST",
        "address_purpose": "MAILING",
        "address_type": "DOM",
        "city": "HANOVER",
@@ -316,14 +316,14 @@
        "country_name": "United States",
        "postal_code": "210762261",
        "state": "MD",
-       "telephone_number": "954-907-7999"
+       "telephone_number": "312-555-0015"
       }
      ],
      "taxonomies": [
       {
        "code": "207Q00000X",
        "desc": "Family Medicine",
-       "license": "D0085140",
+       "license": "SAMPLE-0000",
        "primary": true,
        "state": "MD",
        "taxonomy_group": ""
@@ -331,18 +331,18 @@
      ]
     },
     {
-     "number": "1588740955",
+     "number": "1800000009",
      "enumeration_type": "NPI-1",
      "basic": {
       "status": "A",
-      "first_name": "JANE",
-      "last_name": "BANG",
+      "first_name": "[SAMPLE] CASEY",
+      "last_name": "SAMPLE",
       "credential": "M.D.",
       "last_updated": "2026-02-19"
      },
      "addresses": [
       {
-       "address_1": "29373 NETWORK PL",
+       "address_1": "300 W EXAMPLE ST",
        "address_purpose": "MAILING",
        "address_type": "DOM",
        "city": "CHICAGO",
@@ -350,26 +350,26 @@
        "country_name": "United States",
        "postal_code": "606731293",
        "state": "IL",
-       "telephone_number": "847-390-5900"
+       "telephone_number": "312-555-0016"
       },
       {
-       "address_1": "1435 W WEBSTER AVE",
+       "address_1": "310 W EXAMPLE ST",
        "address_purpose": "LOCATION",
        "address_type": "DOM",
        "city": "CHICAGO",
        "country_code": "US",
        "country_name": "United States",
-       "fax_number": "312-204-5501",
+       "fax_number": "312-555-0018",
        "postal_code": "606143049",
        "state": "IL",
-       "telephone_number": "773-880-0320"
+       "telephone_number": "312-555-0017"
       }
      ],
      "taxonomies": [
       {
        "code": "207Q00000X",
        "desc": "Family Medicine",
-       "license": "036113330",
+       "license": "SAMPLE-0000",
        "primary": true,
        "state": "IL",
        "taxonomy_group": ""
@@ -377,30 +377,30 @@
      ]
     },
     {
-     "number": "1972612760",
+     "number": "1800000010",
      "enumeration_type": "NPI-1",
      "basic": {
       "status": "A",
-      "first_name": "TATIANA",
-      "last_name": "BATISTA",
+      "first_name": "[SAMPLE] QUINN",
+      "last_name": "TESTWELL",
       "credential": "DO",
       "last_updated": "2025-05-19"
      },
      "addresses": [
       {
-       "address_1": "5346 N CLARK ST",
+       "address_1": "320 W EXAMPLE ST",
        "address_purpose": "LOCATION",
        "address_type": "DOM",
        "city": "CHICAGO",
        "country_code": "US",
        "country_name": "United States",
-       "fax_number": "773-293-8843",
+       "fax_number": "312-555-0020",
        "postal_code": "606402120",
        "state": "IL",
-       "telephone_number": "773-293-8880"
+       "telephone_number": "312-555-0019"
       },
       {
-       "address_1": "1656 N WELLS",
+       "address_1": "330 W EXAMPLE ST",
        "address_purpose": "MAILING",
        "address_type": "DOM",
        "city": "CHICAGO",
@@ -408,14 +408,14 @@
        "country_name": "United States",
        "postal_code": "60614",
        "state": "IL",
-       "telephone_number": "312-643-1333"
+       "telephone_number": "312-555-0021"
       }
      ],
      "taxonomies": [
       {
        "code": "207Q00000X",
        "desc": "Family Medicine",
-       "license": "036113050",
+       "license": "SAMPLE-0000",
        "primary": true,
        "state": "IL",
        "taxonomy_group": ""
@@ -423,18 +423,18 @@
      ]
     },
     {
-     "number": "1568780740",
+     "number": "1800000011",
      "enumeration_type": "NPI-1",
      "basic": {
       "status": "A",
-      "first_name": "CHRISTOPHER",
-      "last_name": "BOISSELLE",
+      "first_name": "[SAMPLE] DREW",
+      "last_name": "SAMPLE",
       "credential": "M.D.",
       "last_updated": "2026-07-21"
      },
      "addresses": [
       {
-       "address_1": "1931 N HALSTED ST",
+       "address_1": "340 W EXAMPLE ST",
        "address_purpose": "LOCATION",
        "address_type": "DOM",
        "city": "CHICAGO",
@@ -442,10 +442,10 @@
        "country_name": "United States",
        "postal_code": "606145008",
        "state": "IL",
-       "telephone_number": "312-219-2230"
+       "telephone_number": "312-555-0022"
       },
       {
-       "address_1": "1 EMBARCADERO CTR STE 1900",
+       "address_1": "350 W EXAMPLE ST",
        "address_purpose": "MAILING",
        "address_type": "DOM",
        "city": "SAN FRANCISCO",
@@ -453,14 +453,14 @@
        "country_name": "United States",
        "postal_code": "941113723",
        "state": "CA",
-       "telephone_number": "415-658-6791"
+       "telephone_number": "312-555-0023"
       }
      ],
      "taxonomies": [
       {
        "code": "207Q00000X",
        "desc": "Family Medicine",
-       "license": "036131507",
+       "license": "SAMPLE-0000",
        "primary": true,
        "state": "IL",
        "taxonomy_group": ""
@@ -468,18 +468,18 @@
      ]
     },
     {
-     "number": "1639390230",
+     "number": "1800000012",
      "enumeration_type": "NPI-1",
      "basic": {
       "status": "A",
-      "first_name": "SARA",
-      "last_name": "BROWN",
+      "first_name": "[SAMPLE] SAM",
+      "last_name": "TESTWELL",
       "credential": "DO",
       "last_updated": "2025-03-07"
      },
      "addresses": [
       {
-       "address_1": "4600 N RAVENSWOOD AVE FL 1",
+       "address_1": "360 W EXAMPLE ST",
        "address_purpose": "LOCATION",
        "address_type": "DOM",
        "city": "CHICAGO",
@@ -487,10 +487,10 @@
        "country_name": "United States",
        "postal_code": "606404510",
        "state": "IL",
-       "telephone_number": "847-384-3500"
+       "telephone_number": "312-555-0024"
       },
       {
-       "address_1": "29373 NETWORK PL",
+       "address_1": "300 W EXAMPLE ST",
        "address_purpose": "MAILING",
        "address_type": "DOM",
        "city": "CHICAGO",
@@ -498,14 +498,14 @@
        "country_name": "United States",
        "postal_code": "606731174",
        "state": "IL",
-       "telephone_number": "847-390-5900"
+       "telephone_number": "312-555-0025"
       }
      ],
      "taxonomies": [
       {
        "code": "207QS0010X",
        "desc": "Family Medicine, Sports Medicine",
-       "license": "036-116499",
+       "license": "SAMPLE-0000",
        "primary": true,
        "state": "IL",
        "taxonomy_group": ""
@@ -513,47 +513,47 @@
      ]
     },
     {
-     "number": "1770664856",
+     "number": "1800000013",
      "enumeration_type": "NPI-1",
      "basic": {
       "status": "A",
-      "first_name": "GARY",
-      "last_name": "BUCHER",
+      "first_name": "[SAMPLE] RILEY",
+      "last_name": "SAMPLE",
       "credential": "MD",
       "last_updated": "2025-05-16"
      },
      "addresses": [
       {
-       "address_1": "2551 N CLARK ST",
-       "address_2": "SUITE 203",
+       "address_1": "370 W EXAMPLE ST",
+       "address_2": "SUITE 1",
        "address_purpose": "LOCATION",
        "address_type": "DOM",
        "city": "CHICAGO",
        "country_code": "US",
        "country_name": "United States",
-       "fax_number": "773-289-0685",
+       "fax_number": "312-555-0027",
        "postal_code": "606141798",
        "state": "IL",
-       "telephone_number": "312-623-2625"
+       "telephone_number": "312-555-0026"
       },
       {
-       "address_1": "3023 N CLARK ST # 200",
+       "address_1": "380 W EXAMPLE ST",
        "address_purpose": "MAILING",
        "address_type": "DOM",
        "city": "CHICAGO",
        "country_code": "US",
        "country_name": "United States",
-       "fax_number": "773-289-0685",
+       "fax_number": "312-555-0029",
        "postal_code": "606575200",
        "state": "IL",
-       "telephone_number": "312-623-2625"
+       "telephone_number": "312-555-0028"
       }
      ],
      "taxonomies": [
       {
        "code": "207QA0505X",
        "desc": "Family Medicine, Adult Medicine",
-       "license": "036-087460",
+       "license": "SAMPLE-0000",
        "primary": true,
        "state": "IL",
        "taxonomy_group": ""
@@ -561,44 +561,44 @@
      ]
     },
     {
-     "number": "1073666061",
+     "number": "1800000015",
      "enumeration_type": "NPI-2",
      "basic": {
       "status": "A",
-      "organization_name": "BUCHER MEDICAL SERVICES SC",
+      "organization_name": "[SAMPLE] EXAMPLE CLINIC 5 LLC",
       "last_updated": "2025-05-16"
      },
      "addresses": [
       {
-       "address_1": "2551 N CLARK ST STE 203",
+       "address_1": "390 W EXAMPLE ST",
        "address_purpose": "LOCATION",
        "address_type": "DOM",
        "city": "CHICAGO",
        "country_code": "US",
        "country_name": "United States",
-       "fax_number": "773-289-0685",
+       "fax_number": "312-555-0031",
        "postal_code": "606147738",
        "state": "IL",
-       "telephone_number": "312-623-2625"
+       "telephone_number": "312-555-0030"
       },
       {
-       "address_1": "3023 N CLARK ST STE 200",
+       "address_1": "400 W EXAMPLE ST",
        "address_purpose": "MAILING",
        "address_type": "DOM",
        "city": "CHICAGO",
        "country_code": "US",
        "country_name": "United States",
-       "fax_number": "773-289-0685",
+       "fax_number": "312-555-0033",
        "postal_code": "606575200",
        "state": "IL",
-       "telephone_number": "312-623-2625"
+       "telephone_number": "312-555-0032"
       }
      ],
      "taxonomies": [
       {
        "code": "207QA0505X",
        "desc": "Family Medicine, Adult Medicine",
-       "license": "036087460",
+       "license": "SAMPLE-0000",
        "primary": true,
        "state": "IL",
        "taxonomy_group": "193400000X - Single Specialty Group"
@@ -606,19 +606,19 @@
      ]
     },
     {
-     "number": "1093740490",
+     "number": "1800000016",
      "enumeration_type": "NPI-1",
      "basic": {
       "status": "A",
-      "first_name": "BRIAN",
-      "last_name": "CASACLANG",
+      "first_name": "[SAMPLE] SAM",
+      "last_name": "DEMO",
       "credential": "D.O.",
       "last_updated": "2007-07-08"
      },
      "addresses": [
       {
-       "address_1": "2311 W 22ND ST",
-       "address_2": "SUITE 202",
+       "address_1": "410 W EXAMPLE ST",
+       "address_2": "SUITE 1",
        "address_purpose": "MAILING",
        "address_type": "DOM",
        "city": "OAK BROOK",
@@ -626,10 +626,10 @@
        "country_name": "United States",
        "postal_code": "605231225",
        "state": "IL",
-       "telephone_number": "630-320-1160"
+       "telephone_number": "312-555-0034"
       },
       {
-       "address_1": "2400 N SHEFFIELD AVE",
+       "address_1": "420 W EXAMPLE ST",
        "address_purpose": "LOCATION",
        "address_type": "DOM",
        "city": "CHICAGO",
@@ -637,14 +637,14 @@
        "country_name": "United States",
        "postal_code": "606142215",
        "state": "IL",
-       "telephone_number": "773-880-0320"
+       "telephone_number": "312-555-0035"
       }
      ],
      "taxonomies": [
       {
        "code": "207Q00000X",
        "desc": "Family Medicine",
-       "license": "036-094084",
+       "license": "SAMPLE-0000",
        "primary": true,
        "state": "IL",
        "taxonomy_group": ""
@@ -652,40 +652,40 @@
      ]
     },
     {
-     "number": "1831849744",
+     "number": "1800000017",
      "enumeration_type": "NPI-1",
      "basic": {
       "status": "A",
-      "first_name": "NITHIN",
-      "last_name": "CHARLLY",
+      "first_name": "[SAMPLE] ALEX",
+      "last_name": "DEMO",
       "credential": "MD",
       "last_updated": "2025-09-02"
      },
      "addresses": [
       {
-       "address_1": "1475 E. BELVIDERE ROAD",
-       "address_2": "SUITE 385",
+       "address_1": "430 W EXAMPLE ST",
+       "address_2": "SUITE 1",
        "address_purpose": "LOCATION",
        "address_type": "DOM",
        "city": "GRAYSLAKE",
        "country_code": "US",
        "country_name": "United States",
-       "fax_number": "312-694-0655",
+       "fax_number": "312-555-0037",
        "postal_code": "600302012",
        "state": "IL",
-       "telephone_number": "847-535-7157"
+       "telephone_number": "312-555-0036"
       },
       {
-       "address_1": "1475 E BELVIDERE RD UNIT 385",
+       "address_1": "440 W EXAMPLE ST",
        "address_purpose": "MAILING",
        "address_type": "DOM",
        "city": "GRAYSLAKE",
        "country_code": "US",
        "country_name": "United States",
-       "fax_number": "312-694-0655",
+       "fax_number": "312-555-0039",
        "postal_code": "600302026",
        "state": "IL",
-       "telephone_number": "847-535-7157"
+       "telephone_number": "312-555-0038"
       }
      ],
      "taxonomies": [
@@ -700,7 +700,7 @@
       {
        "code": "207Q00000X",
        "desc": "Family Medicine",
-       "license": "125079374",
+       "license": "SAMPLE-0000",
        "primary": true,
        "state": "IL",
        "taxonomy_group": ""
@@ -708,17 +708,17 @@
      ]
     },
     {
-     "number": "1548847114",
+     "number": "1800000018",
      "enumeration_type": "NPI-1",
      "basic": {
       "status": "A",
-      "first_name": "KATHERINE",
-      "last_name": "CROSS",
+      "first_name": "[SAMPLE] TAYLOR",
+      "last_name": "TESTWELL",
       "last_updated": "2025-02-21"
      },
      "addresses": [
       {
-       "address_1": "1435 W WEBSTER AVE",
+       "address_1": "310 W EXAMPLE ST",
        "address_purpose": "LOCATION",
        "address_type": "DOM",
        "city": "CHICAGO",
@@ -726,10 +726,10 @@
        "country_name": "United States",
        "postal_code": "60614",
        "state": "IL",
-       "telephone_number": "773-356-7700"
+       "telephone_number": "312-555-0040"
       },
       {
-       "address_1": "29373 NETWORK PL",
+       "address_1": "300 W EXAMPLE ST",
        "address_purpose": "MAILING",
        "address_type": "DOM",
        "city": "CHICAGO",
@@ -737,14 +737,14 @@
        "country_name": "United States",
        "postal_code": "606734510",
        "state": "IL",
-       "telephone_number": "847-390-5900"
+       "telephone_number": "312-555-0041"
       }
      ],
      "taxonomies": [
       {
        "code": "207Q00000X",
        "desc": "Family Medicine",
-       "license": "036-170990",
+       "license": "SAMPLE-0000",
        "primary": true,
        "state": "IL",
        "taxonomy_group": ""
@@ -752,17 +752,17 @@
      ]
     },
     {
-     "number": "1952007114",
+     "number": "1800000019",
      "enumeration_type": "NPI-2",
      "basic": {
       "status": "A",
-      "organization_name": "ELIS YNGVE OLSON, M.D., P.C.",
+      "organization_name": "[SAMPLE] EXAMPLE CLINIC 6 LLC",
       "last_updated": "2023-01-31"
      },
      "addresses": [
       {
-       "address_1": "1713 W. DIVERSEY PKWY",
-       "address_2": "SUITE G",
+       "address_1": "450 W EXAMPLE ST",
+       "address_2": "SUITE 1",
        "address_purpose": "LOCATION",
        "address_type": "DOM",
        "city": "CHICAGO",
@@ -770,10 +770,10 @@
        "country_name": "United States",
        "postal_code": "60614",
        "state": "IL",
-       "telephone_number": "331-472-7443"
+       "telephone_number": "312-555-0042"
       },
       {
-       "address_1": "1440 W TAYLOR ST # 227",
+       "address_1": "460 W EXAMPLE ST",
        "address_purpose": "MAILING",
        "address_type": "DOM",
        "city": "CHICAGO",
@@ -781,7 +781,7 @@
        "country_name": "United States",
        "postal_code": "606074623",
        "state": "IL",
-       "telephone_number": "331-472-7443"
+       "telephone_number": "312-555-0043"
       }
      ],
      "taxonomies": [
@@ -820,37 +820,37 @@
      ]
     },
     {
-     "number": "1992802664",
+     "number": "1800000020",
      "enumeration_type": "NPI-2",
      "basic": {
       "status": "A",
-      "organization_name": "FAMILY CARE ASSOCIATES LTD",
+      "organization_name": "[SAMPLE] EXAMPLE CLINIC 7 LLC",
       "last_updated": "2020-02-10"
      },
      "addresses": [
       {
-       "address_1": "4438 N MIWAUKEE AVE",
+       "address_1": "470 W EXAMPLE ST",
        "address_purpose": "LOCATION",
        "address_type": "DOM",
        "city": "CHICAGO",
        "country_code": "US",
        "country_name": "United States",
-       "fax_number": "773-205-1222",
+       "fax_number": "312-555-0045",
        "postal_code": "606306063",
        "state": "IL",
-       "telephone_number": "773-205-8200"
+       "telephone_number": "312-555-0044"
       },
       {
-       "address_1": "PO BOX 14439",
+       "address_1": "480 W EXAMPLE ST",
        "address_purpose": "MAILING",
        "address_type": "DOM",
        "city": "CHICAGO",
        "country_code": "US",
        "country_name": "United States",
-       "fax_number": "773-205-1222",
+       "fax_number": "312-555-0047",
        "postal_code": "606140439",
        "state": "IL",
-       "telephone_number": "773-205-8200"
+       "telephone_number": "312-555-0046"
       }
      ],
      "taxonomies": [
@@ -865,47 +865,47 @@
      ]
     },
     {
-     "number": "1134225543",
+     "number": "1800000021",
      "enumeration_type": "NPI-1",
      "basic": {
       "status": "A",
-      "first_name": "DOUGLAS",
-      "last_name": "FINLAYSON",
+      "first_name": "[SAMPLE] DREW",
+      "last_name": "FAKELY",
       "credential": "MD",
       "last_updated": "2020-01-18"
      },
      "addresses": [
       {
-       "address_1": "364 PEMBROKE LN",
-       "address_2": "APT 4",
+       "address_1": "490 W EXAMPLE ST",
+       "address_2": "SUITE 1",
        "address_purpose": "LOCATION",
        "address_type": "DOM",
        "city": "GLEN ELLYN",
        "country_code": "US",
        "country_name": "United States",
-       "fax_number": "773-360-2508",
+       "fax_number": "312-555-0049",
        "postal_code": "601376643",
        "state": "IL",
-       "telephone_number": "224-392-5796"
+       "telephone_number": "312-555-0048"
       },
       {
-       "address_1": "2217 N LINCOLN AVE",
+       "address_1": "500 W EXAMPLE ST",
        "address_purpose": "MAILING",
        "address_type": "DOM",
        "city": "CHICAGO",
        "country_code": "US",
        "country_name": "United States",
-       "fax_number": "773-409-5123",
+       "fax_number": "312-555-0051",
        "postal_code": "606143717",
        "state": "IL",
-       "telephone_number": "773-880-9090"
+       "telephone_number": "312-555-0050"
       }
      ],
      "taxonomies": [
       {
        "code": "207Q00000X",
        "desc": "Family Medicine",
-       "license": "36-42256",
+       "license": "SAMPLE-0000",
        "primary": true,
        "state": "IL",
        "taxonomy_group": ""
@@ -913,17 +913,17 @@
      ]
     },
     {
-     "number": "1174458350",
+     "number": "1800000023",
      "enumeration_type": "NPI-1",
      "basic": {
       "status": "A",
-      "first_name": "MARY THERESE",
-      "last_name": "FORSYTH",
+      "first_name": "[SAMPLE] JORDAN",
+      "last_name": "DEMO",
       "last_updated": "2026-06-17"
      },
      "addresses": [
       {
-       "address_1": "1900 N SHEFFIELD AVE APT 3S",
+       "address_1": "510 W EXAMPLE ST",
        "address_purpose": "MAILING",
        "address_type": "DOM",
        "city": "CHICAGO",
@@ -931,10 +931,10 @@
        "country_name": "United States",
        "postal_code": "606148449",
        "state": "IL",
-       "telephone_number": "847-525-9171"
+       "telephone_number": "312-555-0052"
       },
       {
-       "address_1": "5140 N CALIFORNIA AVE",
+       "address_1": "520 W EXAMPLE ST",
        "address_purpose": "LOCATION",
        "address_type": "DOM",
        "city": "CHICAGO",
@@ -942,14 +942,14 @@
        "country_name": "United States",
        "postal_code": "606253645",
        "state": "IL",
-       "telephone_number": "773-878-8200"
+       "telephone_number": "312-555-0053"
       }
      ],
      "taxonomies": [
       {
        "code": "207Q00000X",
        "desc": "Family Medicine",
-       "license": "125088529",
+       "license": "SAMPLE-0000",
        "primary": true,
        "state": "IL",
        "taxonomy_group": ""
@@ -957,37 +957,37 @@
      ]
     },
     {
-     "number": "1487031407",
+     "number": "1800000024",
      "enumeration_type": "NPI-1",
      "basic": {
       "status": "A",
-      "first_name": "LUCIA",
-      "last_name": "GLEASON",
+      "first_name": "[SAMPLE] ALEX",
+      "last_name": "DEMO",
       "credential": "M.D.",
       "last_updated": "2021-03-17"
      },
      "addresses": [
       {
-       "address_1": "1150 W FULLERTON AVE",
-       "address_2": "FLOOR 2",
+       "address_1": "530 W EXAMPLE ST",
+       "address_2": "SUITE 1",
        "address_purpose": "LOCATION",
        "address_type": "DOM",
        "city": "CHICAGO",
        "country_code": "US",
        "country_name": "United States",
-       "fax_number": "773-549-1221",
+       "fax_number": "312-555-0055",
        "postal_code": "60614",
        "state": "IL",
-       "telephone_number": "773-549-7757"
+       "telephone_number": "312-555-0054"
       },
       {
-       "address_1": "1000 REMINGTON BLVD STE 100",
+       "address_1": "540 W EXAMPLE ST",
        "address_purpose": "MAILING",
        "address_type": "DOM",
        "city": "BOLINGBROOK",
        "country_code": "US",
        "country_name": "United States",
-       "fax_number": "630-914-2469",
+       "fax_number": "312-555-0056",
        "postal_code": "604404707",
        "state": "IL"
       }
@@ -996,7 +996,7 @@
       {
        "code": "390200000X",
        "desc": "Student in an Organized Health Care Education/Training Program",
-       "license": "125067787",
+       "license": "SAMPLE-0000",
        "primary": false,
        "state": "IL",
        "taxonomy_group": ""
@@ -1004,7 +1004,7 @@
       {
        "code": "207Q00000X",
        "desc": "Family Medicine",
-       "license": "036146576",
+       "license": "SAMPLE-0000",
        "primary": true,
        "state": "IL",
        "taxonomy_group": ""
@@ -1012,46 +1012,46 @@
      ]
     },
     {
-     "number": "1417368226",
+     "number": "1800000025",
      "enumeration_type": "NPI-1",
      "basic": {
       "status": "A",
-      "first_name": "ANDREW",
-      "last_name": "GUZMAN",
+      "first_name": "[SAMPLE] SAM",
+      "last_name": "EXAMPLE",
       "credential": "MD",
       "last_updated": "2025-03-17"
      },
      "addresses": [
       {
-       "address_1": "1931 N HALSTED ST",
+       "address_1": "340 W EXAMPLE ST",
        "address_purpose": "LOCATION",
        "address_type": "DOM",
        "city": "CHICAGO",
        "country_code": "US",
        "country_name": "United States",
-       "fax_number": "415-252-7176",
+       "fax_number": "312-555-0058",
        "postal_code": "606145008",
        "state": "IL",
-       "telephone_number": "888-663-6331"
+       "telephone_number": "312-555-0057"
       },
       {
-       "address_1": "4025 N. SHERIDAN ROAD",
+       "address_1": "550 W EXAMPLE ST",
        "address_purpose": "MAILING",
        "address_type": "DOM",
        "city": "CHICAGO",
        "country_code": "US",
        "country_name": "United States",
-       "fax_number": "773-388-1602",
+       "fax_number": "312-555-0060",
        "postal_code": "60613",
        "state": "IL",
-       "telephone_number": "773-388-1600"
+       "telephone_number": "312-555-0059"
       }
      ],
      "taxonomies": [
       {
        "code": "207Q00000X",
        "desc": "Family Medicine",
-       "license": "036.144243",
+       "license": "SAMPLE-0000",
        "primary": true,
        "state": "IL",
        "taxonomy_group": ""
@@ -1059,18 +1059,18 @@
      ]
     },
     {
-     "number": "1942239447",
+     "number": "1800000026",
      "enumeration_type": "NPI-1",
      "basic": {
       "status": "A",
-      "first_name": "ERICA",
-      "last_name": "HARTL",
+      "first_name": "[SAMPLE] ALEX",
+      "last_name": "SAMPLE",
       "credential": "MD",
       "last_updated": "2025-04-22"
      },
      "addresses": [
       {
-       "address_1": "29373 NETWORK PL",
+       "address_1": "300 W EXAMPLE ST",
        "address_purpose": "MAILING",
        "address_type": "DOM",
        "city": "CHICAGO",
@@ -1080,23 +1080,23 @@
        "state": "IL"
       },
       {
-       "address_1": "1435 WEST WEBSTER AVE",
+       "address_1": "560 W EXAMPLE ST",
        "address_purpose": "LOCATION",
        "address_type": "DOM",
        "city": "CHICAGO",
        "country_code": "US",
        "country_name": "United States",
-       "fax_number": "312-204-5501",
+       "fax_number": "312-555-0062",
        "postal_code": "60614",
        "state": "IL",
-       "telephone_number": "773-880-0320"
+       "telephone_number": "312-555-0061"
       }
      ],
      "taxonomies": [
       {
        "code": "207Q00000X",
        "desc": "Family Medicine",
-       "license": "036103206",
+       "license": "SAMPLE-0000",
        "primary": true,
        "state": "IL",
        "taxonomy_group": ""
@@ -1104,46 +1104,46 @@
      ]
     },
     {
-     "number": "1801902960",
+     "number": "1800000027",
      "enumeration_type": "NPI-1",
      "basic": {
       "status": "A",
-      "first_name": "JAAFAR",
-      "last_name": "HUSSEIN",
+      "first_name": "[SAMPLE] CASEY",
+      "last_name": "DEMO",
       "credential": "MD",
       "last_updated": "2025-09-11"
      },
      "addresses": [
       {
-       "address_1": "550 W WEBSTER AVE",
+       "address_1": "570 W EXAMPLE ST",
        "address_purpose": "MAILING",
        "address_type": "DOM",
        "city": "CHICAGO",
        "country_code": "US",
        "country_name": "United States",
-       "fax_number": "773-883-1273",
+       "fax_number": "312-555-0064",
        "postal_code": "606143965",
        "state": "IL",
-       "telephone_number": "773-883-1220"
+       "telephone_number": "312-555-0063"
       },
       {
-       "address_1": "550 W WEBSTER AVE",
+       "address_1": "570 W EXAMPLE ST",
        "address_purpose": "LOCATION",
        "address_type": "DOM",
        "city": "CHICAGO",
        "country_code": "US",
        "country_name": "United States",
-       "fax_number": "773-883-1273",
+       "fax_number": "312-555-0066",
        "postal_code": "606143965",
        "state": "IL",
-       "telephone_number": "773-883-1220"
+       "telephone_number": "312-555-0065"
       }
      ],
      "taxonomies": [
       {
        "code": "207Q00000X",
        "desc": "Family Medicine",
-       "license": "036-044601",
+       "license": "SAMPLE-0000",
        "primary": false,
        "state": "IL",
        "taxonomy_group": ""
@@ -1151,7 +1151,7 @@
       {
        "code": "208600000X",
        "desc": "Surgery",
-       "license": "036-044601",
+       "license": "SAMPLE-0000",
        "primary": true,
        "state": "IL",
        "taxonomy_group": ""
@@ -1159,46 +1159,46 @@
      ]
     },
     {
-     "number": "1114397056",
+     "number": "1800000028",
      "enumeration_type": "NPI-2",
      "basic": {
       "status": "A",
-      "organization_name": "INNOVATIVE PLATINUM CARE, SC",
+      "organization_name": "[SAMPLE] EXAMPLE CLINIC 8 LLC",
       "last_updated": "2016-01-12"
      },
      "addresses": [
       {
-       "address_1": "2400 N ASHLAND AVE",
-       "address_2": "SUITE 150",
+       "address_1": "580 W EXAMPLE ST",
+       "address_2": "SUITE 1",
        "address_purpose": "MAILING",
        "address_type": "DOM",
        "city": "CHICAGO",
        "country_code": "US",
        "country_name": "United States",
-       "fax_number": "773-360-7378",
+       "fax_number": "312-555-0068",
        "postal_code": "606142021",
        "state": "IL",
-       "telephone_number": "773-270-5600"
+       "telephone_number": "312-555-0067"
       },
       {
-       "address_1": "2400 N ASHLAND AVE",
-       "address_2": "SUITE 150",
+       "address_1": "580 W EXAMPLE ST",
+       "address_2": "SUITE 1",
        "address_purpose": "LOCATION",
        "address_type": "DOM",
        "city": "CHICAGO",
        "country_code": "US",
        "country_name": "United States",
-       "fax_number": "773-360-7378",
+       "fax_number": "312-555-0070",
        "postal_code": "606142021",
        "state": "IL",
-       "telephone_number": "773-270-5600"
+       "telephone_number": "312-555-0069"
       }
      ],
      "taxonomies": [
       {
        "code": "207Q00000X",
        "desc": "Family Medicine",
-       "license": "36111153",
+       "license": "SAMPLE-0000",
        "primary": true,
        "state": "IL",
        "taxonomy_group": "193200000X - Multi-Specialty Group"
@@ -1206,16 +1206,16 @@
      ]
     },
     {
-     "number": "1013753821",
+     "number": "1800000029",
      "enumeration_type": "NPI-2",
      "basic": {
       "status": "A",
-      "organization_name": "IYENGAR GERIATRIC HOSPITALIST SC",
+      "organization_name": "[SAMPLE] EXAMPLE CLINIC 9 LLC",
       "last_updated": "2024-07-02"
      },
      "addresses": [
       {
-       "address_1": "2674 N HALSTED ST",
+       "address_1": "590 W EXAMPLE ST",
        "address_purpose": "LOCATION",
        "address_type": "DOM",
        "city": "CHICAGO",
@@ -1223,10 +1223,10 @@
        "country_name": "United States",
        "postal_code": "606142361",
        "state": "IL",
-       "telephone_number": "773-697-3729"
+       "telephone_number": "312-555-0071"
       },
       {
-       "address_1": "1740 OAK AVE STE C1C2",
+       "address_1": "600 W EXAMPLE ST",
        "address_purpose": "MAILING",
        "address_type": "DOM",
        "city": "EVANSTON",
@@ -1234,7 +1234,7 @@
        "country_name": "United States",
        "postal_code": "602015989",
        "state": "IL",
-       "telephone_number": "775-848-1032"
+       "telephone_number": "312-555-0072"
       }
      ],
      "taxonomies": [
@@ -1257,18 +1257,18 @@
      ]
     },
     {
-     "number": "1588071294",
+     "number": "1800000031",
      "enumeration_type": "NPI-1",
      "basic": {
       "status": "A",
-      "first_name": "ANNA",
-      "last_name": "JAROSZEWSKA",
+      "first_name": "[SAMPLE] ALEX",
+      "last_name": "TESTWELL",
       "credential": "M. D.",
       "last_updated": "2017-10-04"
      },
      "addresses": [
       {
-       "address_1": "5647 W ADDISON ST",
+       "address_1": "610 W EXAMPLE ST",
        "address_purpose": "LOCATION",
        "address_type": "DOM",
        "city": "CHICAGO",
@@ -1276,10 +1276,10 @@
        "country_name": "United States",
        "postal_code": "606344403",
        "state": "IL",
-       "telephone_number": "773-736-1830"
+       "telephone_number": "312-555-0073"
       },
       {
-       "address_1": "2232 N CLYBOURN AVE FL 3",
+       "address_1": "620 W EXAMPLE ST",
        "address_purpose": "MAILING",
        "address_type": "DOM",
        "city": "CHICAGO",
@@ -1287,14 +1287,14 @@
        "country_name": "United States",
        "postal_code": "606143193",
        "state": "IL",
-       "telephone_number": "312-633-5841"
+       "telephone_number": "312-555-0074"
       }
      ],
      "taxonomies": [
       {
        "code": "207Q00000X",
        "desc": "Family Medicine",
-       "license": "036143294",
+       "license": "SAMPLE-0000",
        "primary": true,
        "state": "IL",
        "taxonomy_group": ""
@@ -1302,16 +1302,16 @@
      ]
     },
     {
-     "number": "1033780325",
+     "number": "1800000032",
      "enumeration_type": "NPI-2",
      "basic": {
       "status": "A",
-      "organization_name": "JOHN STRACKS, MD, LLC",
+      "organization_name": "[SAMPLE] EXAMPLE CLINIC 10 LLC",
       "last_updated": "2021-07-07"
      },
      "addresses": [
       {
-       "address_1": "1828 W WEBSTER AVE STE 450",
+       "address_1": "630 W EXAMPLE ST",
        "address_purpose": "MAILING",
        "address_type": "DOM",
        "city": "CHICAGO",
@@ -1319,10 +1319,10 @@
        "country_name": "United States",
        "postal_code": "606142916",
        "state": "IL",
-       "telephone_number": "312-489-8890"
+       "telephone_number": "312-555-0075"
       },
       {
-       "address_1": "1828 W WEBSTER AVE STE 450",
+       "address_1": "630 W EXAMPLE ST",
        "address_purpose": "LOCATION",
        "address_type": "DOM",
        "city": "CHICAGO",
@@ -1330,7 +1330,7 @@
        "country_name": "United States",
        "postal_code": "606142916",
        "state": "IL",
-       "telephone_number": "312-489-8890"
+       "telephone_number": "312-555-0076"
       }
      ],
      "taxonomies": [
@@ -1345,18 +1345,18 @@
      ]
     },
     {
-     "number": "1043657877",
+     "number": "1800000033",
      "enumeration_type": "NPI-1",
      "basic": {
       "status": "A",
-      "first_name": "POOJA",
-      "last_name": "KAMATH",
+      "first_name": "[SAMPLE] MORGAN",
+      "last_name": "TESTWELL",
       "credential": "M.D.",
       "last_updated": "2025-11-07"
      },
      "addresses": [
       {
-       "address_1": "1 EMBARCADERO CTR STE 1900",
+       "address_1": "350 W EXAMPLE ST",
        "address_purpose": "MAILING",
        "address_type": "DOM",
        "city": "SAN FRANCISCO",
@@ -1366,7 +1366,7 @@
        "state": "CA"
       },
       {
-       "address_1": "36040 DETROIT RD STE A",
+       "address_1": "640 W EXAMPLE ST",
        "address_purpose": "LOCATION",
        "address_type": "DOM",
        "city": "AVON",
@@ -1374,14 +1374,14 @@
        "country_name": "United States",
        "postal_code": "440111686",
        "state": "OH",
-       "telephone_number": "312-219-2230"
+       "telephone_number": "312-555-0077"
       }
      ],
      "taxonomies": [
       {
        "code": "207Q00000X",
        "desc": "Family Medicine",
-       "license": "31.136859",
+       "license": "SAMPLE-0000",
        "primary": true,
        "state": "OH",
        "taxonomy_group": ""
@@ -1389,7 +1389,7 @@
       {
        "code": "207Q00000X",
        "desc": "Family Medicine",
-       "license": "036-138871",
+       "license": "SAMPLE-0000",
        "primary": false,
        "state": "IL",
        "taxonomy_group": ""
@@ -1405,46 +1405,46 @@
      ]
     },
     {
-     "number": "1629224092",
+     "number": "1800000034",
      "enumeration_type": "NPI-1",
      "basic": {
       "status": "A",
-      "first_name": "NEETI",
-      "last_name": "KAPUR",
+      "first_name": "[SAMPLE] DREW",
+      "last_name": "SAMPLE",
       "credential": "M.D.",
       "last_updated": "2019-06-19"
      },
      "addresses": [
       {
-       "address_1": "1095 N BRAGG BLVD STE 104",
+       "address_1": "650 W EXAMPLE ST",
        "address_purpose": "MAILING",
        "address_type": "DOM",
        "city": "SPRING LAKE",
        "country_code": "US",
        "country_name": "United States",
-       "fax_number": "910-758-8042",
+       "fax_number": "312-555-0079",
        "postal_code": "283903307",
        "state": "NC",
-       "telephone_number": "910-568-5793"
+       "telephone_number": "312-555-0078"
       },
       {
-       "address_1": "1095 N BRAGG BLVD STE 104",
+       "address_1": "650 W EXAMPLE ST",
        "address_purpose": "LOCATION",
        "address_type": "DOM",
        "city": "SPRING LAKE",
        "country_code": "US",
        "country_name": "United States",
-       "fax_number": "910-758-8042",
+       "fax_number": "312-555-0081",
        "postal_code": "28390",
        "state": "NC",
-       "telephone_number": "910-568-5793"
+       "telephone_number": "312-555-0080"
       }
      ],
      "taxonomies": [
       {
        "code": "207Q00000X",
        "desc": "Family Medicine",
-       "license": "125051423",
+       "license": "SAMPLE-0000",
        "primary": true,
        "state": "IL",
        "taxonomy_group": ""
@@ -1458,46 +1458,46 @@
    "result_count": 3,
    "results": [
     {
-     "number": "1629162540",
+     "number": "1800000035",
      "enumeration_type": "NPI-1",
      "basic": {
       "status": "A",
-      "first_name": "HECOTR",
-      "last_name": "GOMEZ",
+      "first_name": "[SAMPLE] QUINN",
+      "last_name": "SAMPLE",
       "credential": "MD",
       "last_updated": "2007-07-08"
      },
      "addresses": [
       {
-       "address_1": "PO BOX 148670",
+       "address_1": "660 W EXAMPLE ST",
        "address_purpose": "MAILING",
        "address_type": "DOM",
        "city": "CHICAGO",
        "country_code": "US",
        "country_name": "United States",
-       "fax_number": "630-858-2335",
+       "fax_number": "312-555-0083",
        "postal_code": "606148670",
        "state": "IL",
-       "telephone_number": "773-577-3458"
+       "telephone_number": "312-555-0082"
       },
       {
-       "address_1": "850 W IRVING PARK ROAD",
+       "address_1": "670 W EXAMPLE ST",
        "address_purpose": "LOCATION",
        "address_type": "DOM",
        "city": "CHICAGO",
        "country_code": "US",
        "country_name": "United States",
-       "fax_number": "630-858-2335",
+       "fax_number": "312-555-0085",
        "postal_code": "60613",
        "state": "IL",
-       "telephone_number": "773-577-3458"
+       "telephone_number": "312-555-0084"
       }
      ],
      "taxonomies": [
       {
        "code": "207RH0003X",
        "desc": "Internal Medicine, Hematology & Oncology",
-       "license": "036-051642",
+       "license": "SAMPLE-0000",
        "primary": true,
        "state": "IL",
        "taxonomy_group": ""
@@ -1505,18 +1505,18 @@
      ]
     },
     {
-     "number": "1679657324",
+     "number": "1800000036",
      "enumeration_type": "NPI-1",
      "basic": {
       "status": "A",
-      "first_name": "THITI",
-      "last_name": "JAOJAROENKUL",
+      "first_name": "[SAMPLE] RILEY",
+      "last_name": "TESTWELL",
       "credential": "MD",
       "last_updated": "2007-07-08"
      },
      "addresses": [
       {
-       "address_1": "PO BOX 8153",
+       "address_1": "680 W EXAMPLE ST",
        "address_purpose": "MAILING",
        "address_type": "DOM",
        "city": "NORTHFIELD",
@@ -1526,23 +1526,23 @@
        "state": "IL"
       },
       {
-       "address_1": "550 W WEBSTER",
+       "address_1": "690 W EXAMPLE ST",
        "address_purpose": "LOCATION",
        "address_type": "DOM",
        "city": "CHICAGO",
        "country_code": "US",
        "country_name": "United States",
-       "fax_number": "773-883-3749",
+       "fax_number": "312-555-0087",
        "postal_code": "60614",
        "state": "IL",
-       "telephone_number": "773-883-3787"
+       "telephone_number": "312-555-0086"
       }
      ],
      "taxonomies": [
       {
        "code": "207RH0003X",
        "desc": "Internal Medicine, Hematology & Oncology",
-       "license": "036056550",
+       "license": "SAMPLE-0000",
        "primary": true,
        "state": "IL",
        "taxonomy_group": ""
@@ -1550,46 +1550,46 @@
      ]
     },
     {
-     "number": "1639299894",
+     "number": "1800000037",
      "enumeration_type": "NPI-2",
      "basic": {
       "status": "A",
-      "organization_name": "PATEL AND PATEL LTD",
+      "organization_name": "[SAMPLE] EXAMPLE CLINIC 11 LLC",
       "last_updated": "2011-12-29"
      },
      "addresses": [
       {
-       "address_1": "1900 N HUDSON AVE",
-       "address_2": "UNIT B",
+       "address_1": "700 W EXAMPLE ST",
+       "address_2": "SUITE 1",
        "address_purpose": "MAILING",
        "address_type": "DOM",
        "city": "CHICAGO",
        "country_code": "US",
        "country_name": "United States",
-       "fax_number": "312-951-2720",
+       "fax_number": "312-555-0089",
        "postal_code": "606147749",
        "state": "IL",
-       "telephone_number": "312-951-8378"
+       "telephone_number": "312-555-0088"
       },
       {
-       "address_1": "2800 N SHERIDAN RD",
-       "address_2": "SUITE 303",
+       "address_1": "710 W EXAMPLE ST",
+       "address_2": "SUITE 1",
        "address_purpose": "LOCATION",
        "address_type": "DOM",
        "city": "CHICAGO",
        "country_code": "US",
        "country_name": "United States",
-       "fax_number": "773-549-3684",
+       "fax_number": "312-555-0091",
        "postal_code": "606576156",
        "state": "IL",
-       "telephone_number": "773-549-3683"
+       "telephone_number": "312-555-0090"
       }
      ],
      "taxonomies": [
       {
        "code": "207RH0003X",
        "desc": "Internal Medicine, Hematology & Oncology",
-       "license": "036-044119",
+       "license": "SAMPLE-0000",
        "primary": true,
        "state": "IL",
        "taxonomy_group": "193200000X - Multi-Specialty Group"

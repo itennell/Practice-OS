@@ -8,6 +8,7 @@ import { guard } from "../aeon/guard";
 import { db } from "../db";
 import { geocodeAddresses, geocodePlace, addressKey, type Point } from "./geocode";
 import { haversineMiles, zipCenters } from "./geo";
+import { isKnownPlace } from "./places";
 import { searchProviders, SPECIALTY_BY_ID, type Provider, type SpecialtyId } from "./nppes";
 import { getReferralSettings } from "./settings";
 import { capFirst, focusFrom, providerTier, TIERS, type Focus, type TierResult } from "./tier";
@@ -94,7 +95,12 @@ type Deps = {
 /** How long a search may take before it answers with what it has (the route allows 120 s). */
 export const SEARCH_MS = 90_000;
 
-const checkPlace = async (text: string) => (await guard(text, "message")).ok;
+/** A known neighborhood or suburb goes straight through; anything else must pass the chat's guard. */
+export async function placeAllowed(text: string, check: (text: string) => Promise<boolean> = async (t) => (await guard(t, "message")).ok): Promise<boolean> {
+  return isKnownPlace(text) || check(text);
+}
+
+const checkPlace = (text: string) => placeAllowed(text);
 
 export class AreaError extends Error {}
 
