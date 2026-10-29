@@ -145,39 +145,91 @@ export function designationOf(credential: string): RegExp[] {
   return TITLES[credential] ?? [new RegExp(`\\b${credential.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`)];
 }
 
+// Payer names to look for. Any of these she isn't with is blocked. Names that are
+// also everyday words (Grow, Alma, Horizon, Empire, Devoted...) are left out here;
+// "in network with ..." below catches any payer by name.
 const INSURERS = [
   "aetna",
   "cigna",
   "evernorth",
   "blue cross",
+  "blue shield",
   "bcbs",
+  "bcbsil",
   "anthem",
+  "elevance",
   "unitedhealthcare",
   "united healthcare",
+  "uhc",
   "optum",
+  "umr",
   "humana",
   "magellan",
   "oscar",
   "tricare",
+  "triwest",
   "medicare",
   "medicaid",
   "meridian",
   "ambetter",
   "carelon",
   "kaiser",
-];
+  "molina",
+  "centene",
+  "wellcare",
+  "countycare",
+  "health alliance",
+  "harvard pilgrim",
+  "highmark",
+  "premera",
+  "regence",
+  "multiplan",
+  "first health",
+  "cofinity",
+  "lyra",
+  "spring health",
+  "headway",
+  "comPsych",
+  "health net",
+  "geha",
+  "meritain",
+  "lucet",
+  "new directions",
+  "valueoptions",
+  "cigna behavioral",
+].map((x) => x.toLowerCase());
+
+const NUMBER_WORDS: Record<string, number> = {
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+  eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19,
+  twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70,
+};
+const NUMBER_WORD = Object.keys(NUMBER_WORDS).join("|");
+
+/** "twenty-five" -> 25, "six" -> 6. */
+function wordsToNumber(w: string): number {
+  return w
+    .toLowerCase()
+    .split(/[\s-]+/)
+    .reduce((n, part) => n + (NUMBER_WORDS[part] ?? 0), 0);
+}
 
 /** Facts in the text that aren't in her saved details: fees, years, free consult, insurers, titles. */
 function unknownFacts(text: string, f: MediaFacts): string[] {
   const out: string[] = [];
   const cents = new Set(f.fees.map((x) => x.cents));
-  for (const m of text.matchAll(/\$\s?(\d{1,4}(?:,\d{3})?(?:\.\d{2})?)/g)) {
-    const c = Math.round(Number(m[1].replace(/,/g, "")) * 100);
-    if (!cents.has(c)) out.push(`the fee ${m[0]}`);
-  }
-  for (const m of text.matchAll(/\b(\d{1,2})\+? years?\b/gi)) {
-    if (f.answers.yearsInPractice === null || Number(m[1]) !== f.answers.yearsInPractice) out.push(`"${m[0]}"`);
-  }
+  const fee = (raw: string, shown: string) => {
+    const c = Math.round(Number(raw.replace(/,/g, "")) * 100);
+    if (!cents.has(c)) out.push(`the fee ${shown.trim()}`);
+  };
+  for (const m of text.matchAll(/\$\s?(\d{1,4}(?:,\d{3})?(?:\.\d{2})?)/g)) fee(m[1], m[0]);
+  // Fees written without "$": "150 dollars", "150 per session", "150 for a session", "150/session".
+  for (const m of text.matchAll(/(?<![$\d])\b(\d{2,4}(?:\.\d{2})?)\s*(?:dollars?|usd|per (?:session|hour|visit|appointment)|(?:for )?an? (?:session|hour|visit)|\/\s?(?:session|hour|visit))\b/gi)) fee(m[1], m[0]);
+  const years = (n: number, shown: string) => {
+    if (f.answers.yearsInPractice === null || n !== f.answers.yearsInPractice) out.push(`"${shown}"`);
+  };
+  for (const m of text.matchAll(/\b(\d{1,2})\+? years?\b/gi)) years(Number(m[1]), m[0]);
+  for (const m of text.matchAll(new RegExp(`\\b((?:${NUMBER_WORD})(?:[\\s-](?:${NUMBER_WORD}))?)\\+? years?\\b`, "gi"))) years(wordsToNumber(m[1]), m[0]);
   if (/\bfree\b[^.]{0,30}\b(consult\w*|call|phone call|session)\b/i.test(text) && !f.answers.freeConsultMinutes) out.push("a free consult");
   for (const m of text.matchAll(/\b(\d{2})[- ]minute\b[^.]{0,20}\b(consult\w*|call)\b/gi)) {
     if (Number(m[1]) !== f.answers.freeConsultMinutes) out.push(`a ${m[1]}-minute consult`);
@@ -186,6 +238,12 @@ function unknownFacts(text: string, f: MediaFacts): string[] {
   const hers = f.insurers.map((p) => p.toLowerCase()).join(" | ");
   for (const name of INSURERS) {
     if (new RegExp(`\\b${name}\\b`).test(lower) && !hers.includes(name)) out.push(name.replace(/\b\w/g, (c) => c.toUpperCase()));
+  }
+  // "in network with X": X must be one of hers, even a payer not on the list above.
+  for (const m of text.matchAll(/\bin[- ]network with ([^.;:!?]+)/gi)) {
+    for (const part of m[1].split(/,\s*|\s+and\s+|\s+or\s+/i).map((x) => x.trim().toLowerCase()).filter(Boolean)) {
+      if (!f.insurers.some((p) => p.toLowerCase().includes(part) || part.includes(p.toLowerCase()))) out.push(part.replace(/\b\w/g, (c) => c.toUpperCase()));
+    }
   }
   if (/\bDr\.\s/.test(text) && f.credential !== "Psychologist") out.push('"Dr."');
   for (const [title, forms] of Object.entries(TITLES)) {

@@ -90,7 +90,7 @@ export function checkCrisis(text: string): CrisisResult {
  * approvals). Never includes the words that triggered it. Front Desk has its own
  * caller-facing version (lib/frontdesk/crisis.ts) and shares the alert phone.
  */
-export async function alertCrisis(input: { source: "chat" | "upload"; category: CrisisCategory; by: string }): Promise<{ alerted: boolean }> {
+export async function alertCrisis(input: { source: "chat" | "upload" | "media"; category: CrisisCategory; by: string }): Promise<{ alerted: boolean }> {
   const { audit } = await import("./audit");
   const { alertPhone } = await import("./frontdesk/crisis");
   const { sendText } = await import("./frontdesk/store");
@@ -100,7 +100,8 @@ export async function alertCrisis(input: { source: "chat" | "upload"; category: 
     await audit({ actor: "safety", action: "crisis_alert_failed", subjectType: input.source, details: { error: "no alert phone (settings.alert_phone or CLINICIAN_ALERT_PHONE)" } });
     return { alerted: false };
   }
-  const what = input.source === "chat" ? "A message in your chat with Aeon" : "A file added in your chat with Aeon";
+  const what =
+    input.source === "chat" ? "A message in your chat with Aeon" : input.source === "upload" ? "A file added in your chat with Aeon" : "Something typed on the Media page";
   try {
     await sendText({
       to,

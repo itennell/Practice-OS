@@ -8,7 +8,7 @@ import { audit } from "../audit";
 import { db } from "../db";
 import { chat as metaChat, type ChatParams } from "../meta";
 import { lintDesignation, lintText, blocks, type Finding } from "./lint";
-import { checkAnswerText, mainFee, money, place, type MediaFacts } from "./facts";
+import { AnswerRefused, checkAnswerText, mainFee, money, place, type MediaFacts } from "./facts";
 import { STATES } from "../compliance/states";
 import { DIRECTORIES, HOOK_CHARS, LIMIT, PT_FIELDS, TEXT_IDS, type PtTextId } from "./schema";
 
@@ -278,12 +278,20 @@ export async function loadProfileDraft(): Promise<ProfileDraft | null> {
   return row?.d && Array.isArray(row.d.fields) ? row.d : null;
 }
 
-/** Her edit of one box: checked again against its limit and the lint before it's kept. */
+/**
+ * Her edit of one box: checked again before it's kept. Over the limit, or anything the
+ * lint blocks (advice, a testimonial, a promise, a wrong title, a fee she doesn't charge),
+ * is refused with the reason; warnings are kept beside the text.
+ */
 export async function saveFieldEdit(id: PtTextId, text: string, f: MediaFacts): Promise<DraftField> {
   if (!TEXT_IDS.includes(id)) throw new Error("Unknown box.");
-  await checkAnswerText(text);
+  const clean = text.trim();
+  await checkAnswerText(clean);
+  const findings = lintText(clean, f, { limit: LIMIT[id] });
+  const blocked = findings.filter((x) => x.severity === "block");
+  if (blocked.length) throw new AnswerRefused(blocked.map((x) => x.message).join(" "));
   const d = (await loadProfileDraft()) ?? (await draftProfile(f, { hasKey: false }));
-  const field: DraftField = { id, label: LABEL.get(id)!, limit: LIMIT[id], text: text.trim(), pasteWhere: PASTE.get(id)!, findings: lintText(text.trim(), f, { limit: LIMIT[id] }), from: "her" };
+  const field: DraftField = { id, label: LABEL.get(id)!, limit: LIMIT[id], text: clean, pasteWhere: PASTE.get(id)!, findings, from: "her" };
   const fields = d.fields.map((x) => (x.id === id ? field : x));
   await saveProfileDraft(finish(f, fields, d.source));
   return field;

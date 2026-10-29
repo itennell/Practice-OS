@@ -6,7 +6,7 @@
 // fact-checked). Her answers live in clinician_profile.onboarding_answers -> 'media'.
 import { z } from "zod";
 import { db } from "../db";
-import { checkCrisis } from "../safety";
+import { alertCrisis, checkCrisis, CRISIS_REPLY } from "../safety";
 import { guard, REFUSAL } from "../aeon/guard";
 import { loadCredentialingProfile } from "../credentialing/store";
 import { loadPracticeSettings } from "../gfe/store";
@@ -88,13 +88,24 @@ export function missingAnswers(a: MediaAnswers): (keyof MediaAnswers)[] {
   return (["focus", "approach", "firstSession", "why"] as const).filter((k) => !a[k]);
 }
 
-export class AnswerRefused extends Error {}
+export class AnswerRefused extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AnswerRefused";
+  }
+}
 
-/** Her typed words go through the crisis check and the client-detail guard before they are saved. */
-export async function checkAnswerText(value: string): Promise<void> {
+/**
+ * Her typed words go through the crisis check and the client-detail guard before they
+ * are saved. A crisis hit answers with the fixed reply and alerts her phone, like the chat.
+ */
+export async function checkAnswerText(value: string, by = "clinician"): Promise<void> {
   if (!value) return;
-  if (checkCrisis(value).crisis)
-    throw new AnswerRefused("That mentions something Aeon keeps out of profiles. If you or someone is in danger, call or text 988, or 911.");
+  const crisis = checkCrisis(value);
+  if (crisis.crisis) {
+    await alertCrisis({ source: "media", category: crisis.category, by });
+    throw new AnswerRefused(CRISIS_REPLY);
+  }
   const g = await guard(value, "message");
   if (!g.ok) throw new AnswerRefused(REFUSAL[g.kind]);
 }
