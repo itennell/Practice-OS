@@ -22,7 +22,7 @@ export function db(): postgres.Sql {
     // A script or helper started without DATABASE_URL joins the built-in database the app is running.
     const url = process.env.DATABASE_URL || builtInDatabaseUrl();
     if (!url) throw new Error("DATABASE_URL is not set and the built-in database hasn't been started (run npm run dev or npm run db:migrate).");
-    const options = { max: 5, prepare: false, max_pipeline: 0, onnotice: () => {} } as postgres.Options<{}>;
+    const options = { max: 5, prepare: false, max_pipeline: 0, onnotice: () => {} } as postgres.Options<Record<string, postgres.PostgresType>>;
     const sql = postgres(url, options);
     sql.begin = begin.bind(null, sql) as postgres.Sql["begin"];
     client = sql;
