@@ -264,3 +264,40 @@ export function TextField({ label, description, error, className, wrapClassName,
     </div>
   );
 }
+
+export type TextAreaFieldProps = Omit<ComponentProps<"textarea">, "id"> & {
+  label: string;
+  description?: string;
+  error?: string;
+  wrapClassName?: string;
+} & FieldLayout;
+
+/** A labelled multi-line box for answers longer than a line, with an optional error in words. */
+export function TextAreaField({ label, description, error, className, wrapClassName, compact, hideLabel, rows = 4, ...props }: TextAreaFieldProps) {
+  const id = useId();
+  const describedBy = [description && `${id}-d`, error && `${id}-e`].filter(Boolean).join(" ") || undefined;
+  return (
+    <div className={cn(WRAP_CLASS(compact), wrapClassName)}>
+      <Text label={label} description={description} htmlFor={id} id={`${id}-d`} compact={compact} hideLabel={hideLabel} />
+      <textarea
+        id={id}
+        rows={rows}
+        aria-describedby={describedBy}
+        aria-invalid={error ? true : undefined}
+        className={cn(
+          "min-h-28 w-full resize-y rounded-[20px] border border-[var(--fg-muted)] bg-[var(--chip-off-bg)] px-5 py-3.5 text-body leading-relaxed text-[var(--fg)] placeholder:text-[var(--fg-muted)] disabled:cursor-not-allowed disabled:opacity-50",
+          !compact && "max-w-xl",
+          "aria-invalid:border-[var(--danger-fg)]",
+          FOCUS,
+          className,
+        )}
+        {...props}
+      />
+      {error && (
+        <span id={`${id}-e`} className="text-small font-medium text-[var(--danger-fg)]">
+          {error}
+        </span>
+      )}
+    </div>
+  );
+}

@@ -145,6 +145,13 @@ const APP_WORDS = new Set(
     "Support Key Token API Form Forms Estimate Superbill Superbills Deadline Deadlines Credentialing Insurance"
   ).split(" "),
 );
+// Words for who a practice serves. On its own the name model reads "Couples"
+// at the start of a sentence as a person (it finds "Coup", which grows back to
+// "Couples" as written); a one-word hit from this list isn't one.
+const AUDIENCE_WORDS = new Set(
+  "Couples Couple Families Family Teens Teen Teenagers Children Kids Adults Adult Groups Group Parents Individuals Clients Veterans Students Seniors"
+    .split(" "),
+);
 // A second read costs one more model call, so each 1500-character slice gets at
 // most this many. Past the cap it does not fail closed: the first read still
 // covers every word, and the second read is an extra net for names with odd
@@ -165,7 +172,8 @@ export async function findNames(text: string): Promise<string[]> {
     const read = slice.replace(GLUED_TAIL, (m) => " ".repeat(m.length));
     for (const e of await people(read)) {
       // Fails closed: a name the model is sure of still counts when it can't be found as written.
-      names.push(located(e.text, slice) ?? e.text);
+      const name = located(e.text, slice) ?? e.text;
+      if (!AUDIENCE_WORDS.has(name)) names.push(name);
     }
 
     // Runs come from the slice as written, so a comma still separates "Fri, Nov 6".

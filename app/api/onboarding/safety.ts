@@ -41,6 +41,12 @@ function chipsValid(id: string, v: unknown): boolean {
   return ok(o.chips ?? [], q.options) && ok(o.work ?? [], q.workOptions);
 }
 
+function chipValues(id: string): Set<string> {
+  const q = QUESTIONS.find((x) => x.id === id);
+  if (!q || q.kind !== "who") return new Set();
+  return new Set([...(q.options ?? []), ...(q.workOptions ?? [])].map((x) => x.value));
+}
+
 export type Check = { ok: true } | { ok: false; status: number; body: { crisis?: string; refused?: string; error?: string } };
 
 export async function checkAnswers(answers: Record<string, unknown>): Promise<Check> {
@@ -54,7 +60,10 @@ export async function checkAnswers(answers: Record<string, unknown>): Promise<Ch
   for (const [id, value] of Object.entries(answers)) {
     if (!chipsValid(id, value)) return { ok: false, status: 400, body: { error: "Please pick from the choices shown, or type in the box." } };
     if (OWN_DETAILS.has(id)) continue;
-    for (const text of strings(value).filter((t) => t.trim())) {
+    // Chips come from the screen's fixed list (checked above), so only typed
+    // text is read for names: the name model calls the chip "Couples" a person.
+    const offered = chipValues(id);
+    for (const text of strings(value).filter((t) => t.trim() && !offered.has(t))) {
       const g = await guard(text, "message");
       if (!g.ok) {
         await audit({ actor: "safety", action: "phi_refused", subjectType: "onboarding", details: { kind: g.kind, question: id } });
