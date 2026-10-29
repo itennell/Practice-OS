@@ -1,4 +1,5 @@
 import { requireEnv } from "../env";
+import { IMAGES_NOT_SET_UP } from "../../relay/lib/health";
 import { GRAPH } from "../../relay/lib/instagram";
 import type { SealedSignIn } from "../../relay/lib/handlers";
 import { unseal } from "../../relay/lib/seal";
@@ -13,37 +14,72 @@ const relay = () => requireEnv("RELAY_URL").replace(/\/$/, "");
 /** What the Instagram card and Connect button say when this copy's relay isn't set up. */
 export const INSTAGRAM_NOT_READY = "Instagram isn't ready on this copy yet.";
 
+/** What she sees when the relay can't host post images yet. */
+export const INSTAGRAM_IMAGES_NOT_READY = "Instagram posts can't go out from this copy yet: the image hosting isn't set up.";
+
 export type Readiness = { ready: true } | { ready: false; reason: string };
-const READY_CACHE_MS = 60_000;
+// A working relay is re-asked after a minute, a broken one after 15 seconds,
+// so a relay that comes back is noticed quickly.
+const READY_MS = 60_000;
+const NOT_READY_MS = 15_000;
 let readyCache: { at: number; value: Readiness } | null = null;
+let inflight: Promise<Readiness> | null = null;
+
+async function askRelay(fetchImpl: typeof fetch, url: string): Promise<Readiness> {
+  try {
+    const res = await fetchImpl(`${url.replace(/\/$/, "")}/api/health`, { cache: "no-store", signal: AbortSignal.timeout(3_000) });
+    const json = (await res.json().catch(() => null)) as { ready?: boolean; checks?: Record<string, boolean>; signIn?: string[] } | null;
+    if (!res.ok || !json) return { ready: false, reason: `relay health answered HTTP ${res.status}` };
+    if (json.ready) return { ready: true };
+    const signIn = new Set(json.signIn ?? Object.keys(json.checks ?? {}));
+    const missing = Object.entries(json.checks ?? {}).filter(([k, ok]) => !ok && signIn.has(k)).map(([k]) => k);
+    return { ready: false, reason: `relay is missing ${missing.join(", ") || "settings"}` };
+  } catch (e) {
+    return { ready: false, reason: `relay unreachable: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}
+
+function refresh(fetchImpl: typeof fetch, now: () => number): Promise<Readiness> {
+  const url = process.env.RELAY_URL;
+  if (!url) return Promise.resolve({ ready: false, reason: "RELAY_URL is not set in .env" });
+  inflight ??= askRelay(fetchImpl, url)
+    .then((value) => {
+      readyCache = { at: now(), value };
+      return value;
+    })
+    .finally(() => {
+      inflight = null;
+    });
+  return inflight;
+}
+
+const isFresh = (now: number) => readyCache !== null && now - readyCache.at < (readyCache.value.ready ? READY_MS : NOT_READY_MS);
 
 /**
- * Asks the relay's /api/health whether every setting it needs is there. The
- * technical reason is for the server log only; the clinician sees INSTAGRAM_NOT_READY.
+ * Asks the relay's /api/health whether sign-in can work, waiting for a fresh
+ * answer (at most about 3 seconds). Used when she presses Connect. The technical
+ * reason is for the server log only; she sees INSTAGRAM_NOT_READY.
  */
-export async function instagramReadiness(fetchImpl: typeof fetch = fetch, now = Date.now()): Promise<Readiness> {
-  if (readyCache && now - readyCache.at < READY_CACHE_MS) return readyCache.value;
-  const value = await (async (): Promise<Readiness> => {
-    const url = process.env.RELAY_URL;
-    if (!url) return { ready: false, reason: "RELAY_URL is not set in .env" };
-    try {
-      const res = await fetchImpl(`${url.replace(/\/$/, "")}/api/health`, { cache: "no-store", signal: AbortSignal.timeout(3_000) });
-      const json = (await res.json().catch(() => null)) as { ready?: boolean; checks?: Record<string, boolean> } | null;
-      if (!res.ok || !json) return { ready: false, reason: `relay health answered HTTP ${res.status}` };
-      if (json.ready) return { ready: true };
-      const missing = Object.entries(json.checks ?? {}).filter(([, ok]) => !ok).map(([k]) => k);
-      return { ready: false, reason: `relay is missing ${missing.join(", ") || "settings"}` };
-    } catch (e) {
-      return { ready: false, reason: `relay unreachable: ${e instanceof Error ? e.message : String(e)}` };
-    }
-  })();
-  readyCache = { at: now, value };
-  return value;
+export async function instagramReadiness(fetchImpl: typeof fetch = fetch, now: () => number = Date.now): Promise<Readiness> {
+  if (isFresh(now())) return readyCache!.value;
+  return refresh(fetchImpl, now);
+}
+
+/**
+ * For drawing a page: never waits on the network. Returns the last known answer
+ * (or null when there is none yet, which shows Connect) and refreshes it in the
+ * background, one request at a time.
+ */
+export function peekInstagramReadiness(fetchImpl: typeof fetch = fetch, now: () => number = Date.now): Readiness | null {
+  if (!process.env.RELAY_URL) return { ready: false, reason: "RELAY_URL is not set in .env" };
+  if (!isFresh(now())) void refresh(fetchImpl, now);
+  return readyCache?.value ?? null;
 }
 
 /** Tests only. */
 export function resetInstagramReadiness() {
   readyCache = null;
+  inflight = null;
 }
 
 /** Asks the relay for Meta's sign-in page. `key` is the one-time key the token comes back sealed with. */
@@ -82,6 +118,10 @@ export async function uploadToRelay(jpeg: Buffer, u: Uploader): Promise<{ url: s
     body: new Uint8Array(jpeg),
   });
   const json = (await res.json().catch(() => ({}))) as { url?: string; expiresAt?: string; error?: string };
+  if (res.status === 503 && json.error === IMAGES_NOT_SET_UP) {
+    console.error("instagram upload: relay image hosting not set up");
+    throw new Error(INSTAGRAM_IMAGES_NOT_READY);
+  }
   if (!res.ok || !json.url || !json.expiresAt) throw new Error(`Image upload failed: ${json.error ?? res.status}`);
   return { url: json.url, expiresAt: json.expiresAt };
 }
