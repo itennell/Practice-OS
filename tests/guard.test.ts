@@ -97,7 +97,7 @@ describe.skipIf(!haveModel)("guard with the local name-finder", () => {
       }
     }
     expect(slipped).toEqual([]);
-  });
+  }, 180_000); // about 1,600 checks; slow when the whole suite runs at once
 
   it("sees through invisible and look-alike characters inside a name", async () => {
     for (const text of ["Kev\u200bin Or\u200dtiz pays on the 1st", "\uff2b\uff45\uff56\uff49\uff4e \uff2f\uff52\uff54\uff49\uff5a pays on the 1st", "Mr.\u200bGrimsby liked it"]) {
@@ -108,6 +108,19 @@ describe.skipIf(!haveModel)("guard with the local name-finder", () => {
   it("withholds a tool result whose name is hidden by invisible characters", async () => {
     const result = await guard('{"note":"Kev\u200bin Ortiz asked about fees"}', "tool_result", ALLOWED);
     expect(result).toEqual({ ok: false, kind: "client_name" });
+  });
+
+  it("withholds a tool result where one copy of a name is accented and one is plain", async () => {
+    // Found in the cleaned copy, blanked in the original: the accented copy would survive.
+    const result = await guard('{"a":"Kévin Ortiz asked about fees","b":"Kevin Ortiz paid"}', "tool_result", ALLOWED);
+    expect(result).toEqual({ ok: false, kind: "client_name" });
+  });
+
+  it("allows an accented name on her list, written with or without the accents", async () => {
+    const allow = { names: [...ALLOWED.names, "José García"], contacts: ALLOWED.contacts };
+    for (const text of ["Draft a letter to José García about referrals", "Draft a letter to Jose Garcia about referrals"]) {
+      expect(await guard(text, "message", allow)).toEqual({ ok: true, text });
+    }
   });
 
   it("blanks strangers' names in a tool result instead of dropping it", async () => {

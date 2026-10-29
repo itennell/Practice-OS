@@ -108,7 +108,8 @@ const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
  * of two or more capitalized words the first read didn't already call a person
  * gets a second read on its own, in a plain sentence about a person. Real
  * companies, places and forms ("Blue Cross", "Psychology Today", "Lincoln
- * Park", "Good Faith Estimate") stay what they are.
+ * Park", "Good Faith Estimate") stay what they are, and runs with a street,
+ * place or institution word (PLACE_WORDS) or a weekday or month are skipped.
  */
 const GLUED_TAIL = /(?<=\p{L})[\p{P}\p{S}\p{N}_]+(?=\s|$)/gu;
 const WORD_TAIL = "[\\p{L}\\p{M}\\p{N}_'’-]*";
@@ -120,7 +121,23 @@ const CALENDAR_WORDS = new Set(
     "September October November December"
   ).split(" "),
 );
-// A second read costs one more model call; long tool results stop here.
+// Words that make a run a street, place or institution, never a person:
+// "Martin Luther King Drive", "Logan Square", "Rush University Medical Center".
+const PLACE_WORDS = new Set(
+  (
+    "Drive Dr Street St Avenue Ave Boulevard Blvd Road Rd Lane Ln Court Ct Place Pl Way Parkway Pkwy Terrace Ter " +
+    "Highway Hwy Expressway Plaza Square Park Circle Trail Row Loop Bridge Lake Shore Station Building Tower " +
+    "Hospital Hospitals Center Centre Clinic Clinics University College School Academy Institute Health Healthcare " +
+    "Medical Medicine Insurance Counseling Therapy Services Group Associates Partners Practice Foundation Network " +
+    "Department Dept County City Village Township State Library Church Museum Bank Company Inc Corp LLC PLLC"
+  ).split(" "),
+);
+// A second read costs one more model call, so each 1500-character slice gets at
+// most this many. Past the cap it does not fail closed: the first read still
+// covers every word, and the second read is an extra net for names with odd
+// characters glued on. Memories, messages and replies are short and stay far
+// under it; only long tool results (rule text, lists) reach it, and failing
+// closed there would withhold official sources.
 const MAX_SECOND_READS = 24;
 
 export async function findNames(text: string): Promise<string[]> {
@@ -142,7 +159,7 @@ export async function findNames(text: string): Promise<string[]> {
     const runs = new Set<string>();
     for (const m of slice.matchAll(CAPITALIZED_RUN)) {
       const run = m[0].trim();
-      if (run.split(/\s+/).some((w) => CALENDAR_WORDS.has(w))) continue;
+      if (run.split(/\s+/).some((w) => CALENDAR_WORDS.has(w) || PLACE_WORDS.has(w))) continue;
       if (names.some((n) => run.includes(n) || n.includes(run))) continue;
       runs.add(run);
     }

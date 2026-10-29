@@ -60,7 +60,9 @@ export function normalizeForCheck(text: string): string {
 }
 
 export async function guard(text: string, at: GuardPoint, allow?: Allowlist): Promise<GuardResult> {
-  const list = allow ?? (await practiceAllowlist());
+  // The allowlist is cleaned the same way, so an allowed "José García" matches "Jose Garcia".
+  const raw = allow ?? (await practiceAllowlist());
+  const list: Allowlist = { names: raw.names.map(normalizeForCheck), contacts: raw.contacts.map(normalizeForCheck) };
   const plain = normalizeForCheck(text);
   const rules = at === "tool_result" ? checkIdentity(plain, list, TOOL_RESULT_RULES) : checkIdentity(plain, list);
   if (!rules.ok) return { ok: false, kind: rules.kind };
@@ -77,11 +79,17 @@ export async function guard(text: string, at: GuardPoint, allow?: Allowlist): Pr
   // A tool result keeps its business content with the names blanked out;
   // anything she typed or Aeon would save or say is refused outright.
   if (at !== "tool_result") return { ok: false, kind: "client_name" };
-  // A name written differently in the original (hidden characters) can't be blanked: withhold it all.
-  const lower = text.toLowerCase();
-  if (strangers.some((n) => !lower.includes(n.toLowerCase()))) return { ok: false, kind: "client_name" };
   let redacted = text;
   for (const n of strangers) redacted = redacted.replace(new RegExp(escape(n), "gi"), NAME_WITHHELD);
+  // Names are found in the cleaned copy but blanked in the original, so a copy
+  // written differently ("Kévin", hidden characters) can survive. Check again:
+  // if any stranger is still there, withhold the whole result.
+  try {
+    const again = normalizeForCheck(redacted);
+    if ((await findNames(again)).some((n) => !isAllowedPerson(n, again, list))) return { ok: false, kind: "client_name" };
+  } catch {
+    return { ok: false, kind: "unavailable" };
+  }
   return { ok: true, text: redacted };
 }
 

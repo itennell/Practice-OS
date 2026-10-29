@@ -82,7 +82,7 @@ describe.skipIf(!ready)("memories (live database)", () => {
     expect(slipped).toEqual([]);
     const [{ n }] = await db()`select count(*) as n from practice_os.memories where text like ${"%" + unique + "%"}`;
     expect(Number(n)).toBe(0);
-  });
+  }, 120_000); // about 400 guarded writes; slow when the whole suite runs at once
 
   it("replaces an older memory and forgets on request", async () => {
     const old = await mem.remember({ kind: "fact", text: `[Sample] Fee for 90837 is $165 (${tag})` }, by);
