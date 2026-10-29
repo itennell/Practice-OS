@@ -916,6 +916,7 @@ export const TOOLS: AeonTool[] = [
     run: async ({ request, pillar }, ctx) => {
       const r = await instagram.requestPost(ctx.by, request, pillar ?? null, { chat: ctx.chat });
       if (r.outcome === "blocked" || r.outcome === "declined") return text({ written: false, why: r.why });
+      if (r.outcome === "off_topic") return text({ written: false, why: r.why, offer_instead: r.angle.label });
       return text({
         written: r.outcome !== "blocked_after_rewrite",
         headline: r.headline,
@@ -1016,6 +1017,7 @@ export const TOOLS: AeonTool[] = [
       const r = await coach.draftIdea(ctx.by, { number: idea, id: idea_id }, { chat: ctx.chat });
       if (!r.found) return text({ written: false, why: r.why });
       if (r.outcome === "blocked" || r.outcome === "declined") return text({ written: false, why: r.why });
+      if (r.outcome === "off_topic") return text({ written: false, why: r.why, offer_instead: r.angle.label });
       return text({
         written: r.outcome !== "blocked_after_rewrite",
         idea: r.idea.number,

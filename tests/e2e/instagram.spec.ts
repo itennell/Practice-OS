@@ -54,49 +54,79 @@ async function axe(page: import("@playwright/test").Page) {
   expect(serious.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);
 }
 
-test("See the week's posts, why one was blocked, and approve one", async ({ page }) => {
+test("Posts show as Instagram previews; approve one, then download its pictures", async ({ page }) => {
   await page.goto("/instagram");
   await expect(page.getByRole("heading", { level: 1, name: "Instagram" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Plan this week" })).toBeVisible();
-  await expect(page.getByText("1 waiting for you · 1 ready to post")).toBeVisible();
-  await expect(page.getByText(/Aeon writes your posts\. You post them yourself/)).toBeVisible();
+  // One box, two actions. The old five-post plan, Connect and "Read the caption" are gone.
+  await expect(page.getByLabel("What should the post be about?")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Write this post" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Plan several" })).toBeVisible();
+  await expect(page.getByRole("slider", { name: "Posts" })).toHaveAttribute("aria-valuetext", "3 posts");
+  await expect(page.getByRole("button", { name: "Plan this week" })).toHaveCount(0);
+  await expect(page.getByText("Read the caption")).toHaveCount(0);
   await expect(page.getByRole("link", { name: /Connect Instagram/ })).toHaveCount(0);
+  await expect(page.getByText("1 waiting for you · 1 ready to post")).toBeVisible();
 
   const blocked = page.getByRole("listitem").filter({ hasText: "A client story" });
   await expect(blocked).toContainText("Blocked");
   await expect(blocked).toContainText("can't tell a client's story");
 
+  // The preview: profile row, picture, caption with "more".
+  const waiting = page.getByRole("listitem").filter({ hasText: "[Sample] How to book" }).first();
+  await expect(waiting.getByRole("img", { name: "Reyes Counseling PLLC" })).toBeVisible();
+  await expect(waiting.getByRole("img", { name: "Dana smiling beside the words How to book" })).toBeVisible();
+  await expect(waiting).not.toContainText("Dana Reyes, LCPC (fictional demo practice)");
+  await waiting.getByRole("button", { name: "more of the caption" }).click();
+  await expect(waiting).toContainText("Dana Reyes, LCPC (fictional demo practice)");
+
   const ready = page.getByRole("listitem").filter({ hasText: "What a session costs" }).first();
   await expect(ready.getByText("Ready to post").first()).toBeVisible();
-  await expect(ready.getByRole("img", { name: "Dana at her desk" })).toBeVisible();
   await expect(ready.getByRole("button", { name: "Copy caption" })).toBeVisible();
-  const download = ready.getByRole("link", { name: "Save picture" });
-  await expect(download).toHaveAttribute("href", /\/image\?download=1$/);
-  const res = await page.request.get((await download.getAttribute("href"))!);
-  expect(res.headers()["content-type"]).toBe("image/jpeg");
-  expect(res.headers()["content-disposition"]).toMatch(/^attachment; filename="instagram-post-/);
+  for (const [name, w, h] of [
+    [/Picture 4:5/, 1080, 1350],
+    [/Square picture/, 1080, 1080],
+  ] as const) {
+    const [file] = await Promise.all([page.waitForEvent("download"), ready.getByRole("link", { name }).click()]);
+    expect(file.suggestedFilename()).toMatch(/^instagram-post-.*\.jpg$/);
+    const meta = await sharp(readFileSync(await file.path())).metadata();
+    expect([meta.format, meta.width, meta.height]).toEqual(["jpeg", w, h]);
+  }
   await expect(ready.getByRole("listitem").filter({ hasText: "Open the Instagram app" })).toBeVisible();
 
   await axe(page);
 
-  const waiting = page.getByRole("listitem").filter({ hasText: "[Sample] How to book" }).first();
-  await waiting.getByText("Read the caption").click();
-  await expect(waiting).toContainText("Dana Reyes, LCPC (fictional demo practice)");
   await waiting.getByRole("button", { name: "Approve" }).click();
-  await expect(waiting.getByText("Done").first()).toBeVisible();
   // Approving never posts: the post is now ready for her to post herself.
-  await page.reload();
+  await expect(page.getByText("0 waiting for you · 2 ready to post")).toBeVisible();
   const approved = page.getByRole("listitem").filter({ hasText: "[Sample] How to book" }).first();
   await expect(approved.getByRole("button", { name: "Copy caption" })).toBeVisible();
-  await expect(page.getByText("0 waiting for you · 2 ready to post")).toBeVisible();
+});
+
+test("An advice topic is explained and the nearest logistics post is offered", async ({ page }) => {
+  await page.goto("/instagram");
+  await page.getByLabel("What should the post be about?").fill("how to work through anxiety");
+  await page.getByRole("button", { name: "Write this post" }).click();
+  await expect(page.getByText("Posts stay on how your practice works, so Aeon can't write advice about anxiety.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Write “What a first session for anxiety looks like”" })).toBeVisible();
+  // Nothing was written.
+  await expect(page.getByText("1 waiting for you · 1 ready to post")).toBeVisible();
+  await page.getByRole("button", { name: "Write something else" }).click();
+  await expect(page.getByText(/so Aeon can't write advice/)).toHaveCount(0);
+  await axe(page);
 });
 
 test("Keyboard reaches every action, and text at 200% still fits", async ({ page }) => {
   await page.goto("/instagram");
-  await page.getByRole("button", { name: "Plan this week" }).focus();
-  await expect(page.getByRole("button", { name: "Plan this week" })).toBeFocused();
+  await page.getByLabel("What should the post be about?").fill("how superbills work");
+  await page.getByLabel("What should the post be about?").focus();
   await page.keyboard.press("Tab");
-  await expect(page.getByLabel("Or ask for one post")).toBeFocused();
+  await expect(page.getByRole("button", { name: "Write this post" })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("slider", { name: "Posts" })).toBeFocused();
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.getByRole("slider", { name: "Posts" })).toHaveAttribute("aria-valuetext", "2 posts");
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("button", { name: "Plan several" })).toBeFocused();
 
   await page.evaluate(() => (document.documentElement.style.fontSize = "200%"));
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

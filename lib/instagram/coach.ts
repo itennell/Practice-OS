@@ -295,7 +295,7 @@ export async function draftIdea(by: string, ref: { number?: number; id?: string 
   if (!idea) return { found: false, why: ref.id ? "No idea with that id." : `Her latest list has no idea number ${ref.number}. Offer to make new ideas.` };
   const request = [`Write the full post from this idea.`, `Hook: ${idea.hook}`, ...idea.points.map((p) => `Point: ${p}`), `Call to action: ${idea.cta}`].join("\n");
   const r = await requestPost(by, request, idea.topic, opts);
-  if (r.outcome !== "blocked" && r.outcome !== "declined") {
+  if ("post" in r) {
     await db()`
       update practice_os.posts set critic = jsonb_set(critic, '{idea,drafted_post}', to_jsonb(${r.post.id}::text), true) where id = ${idea.id}`;
   }

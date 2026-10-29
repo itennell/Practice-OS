@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { closeDb, db } from "../lib/db";
 import type { ChatFn } from "../lib/instagram/critic";
 import { PILLARS } from "../lib/instagram/pillars";
-import { listPosts, planWeek, practiceFacts, requestPost } from "../lib/instagram/store";
+import { listPosts, planSeveral, planWeek, practiceFacts, requestPost } from "../lib/instagram/store";
 
 const hasDb = Boolean(process.env.DATABASE_URL);
 let LICENSE = "";
@@ -79,15 +79,39 @@ describe.skipIf(!hasDb)("Instagram posts", () => {
     }
   });
 
-  it("never writes 'a client of mine who…'; it writes a logistics post and says why", async () => {
-    const { chat } = stubModels();
+  it("never writes 'a client of mine who…'; it says why and offers a logistics angle, with nothing written", async () => {
+    const { chat, seen } = stubModels();
+    const before = (await listPosts()).length;
     const r = await requestPost("test", "Make a post about a client of mine who finally got her life back", null, { chat, graphic });
-    expect(r.outcome).toBe("rewritten");
-    if (r.outcome === "blocked" || r.outcome === "declined") throw new Error("unreachable");
-    expect(r.why).toMatch(/client's story/);
-    const [post] = await db()`select caption, status from practice_os.posts where id = ${r.post.id}`;
-    expect(post.caption).not.toMatch(/client of mine/i);
-    expect(post.status).toBe("pending_approval");
+    expect(r).toMatchObject({ outcome: "off_topic", angle: { pillar: "first_session" } });
+    expect(r.outcome === "off_topic" && r.why).toMatch(/client's story/);
+    expect(seen).toEqual([]);
+    expect((await listPosts()).length).toBe(before);
+  });
+
+  it("an advice topic gets the plain reason and the nearest logistics angle, never a silent swap", async () => {
+    const { chat, seen } = stubModels();
+    const r = await requestPost("test", "how to work through anxiety", null, { chat, graphic });
+    expect(r).toEqual({
+      outcome: "off_topic",
+      why: "Posts stay on how your practice works, so Aeon can't write advice about anxiety.",
+      angle: { label: "What a first session for anxiety looks like", pillar: "first_session" },
+    });
+    expect(seen).toEqual([]);
+    // Picking the offered angle writes it.
+    const ok = await requestPost("test", "What a first session for anxiety looks like", "first_session", { chat, graphic });
+    expect(ok.outcome).toBe("queued");
+  });
+
+  it("plans several: 3 posts on her topic, each waiting for approval", async () => {
+    const { chat } = stubModels();
+    const r = await planSeveral("test", "superbills and out-of-network costs", 3, { chat, graphic });
+    expect(r.outcome).toBe("planned");
+    if (r.outcome !== "planned") throw new Error("unreachable");
+    expect(r.saved).toHaveLength(3);
+    expect(r.saved.every((s) => s.status === "pending_approval" && s.approvalId)).toBe(true);
+    const off = await planSeveral("test", "tips for coping with grief", 2, { chat, graphic });
+    expect(off).toMatchObject({ outcome: "off_topic", angle: { label: "What a first session for grief looks like" } });
   });
 
   it("rewrites a draft that tells a story, once", async () => {

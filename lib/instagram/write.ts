@@ -181,13 +181,38 @@ export async function writeRequested(f: PracticeFacts, request: string, pillar: 
   const requestFindings = asked.findings.filter((x) => x.rule !== "license_line" && x.rule !== "invented_fee");
   const requestBlocked = requestFindings.length ? { ...asked, ok: false, findings: requestFindings } : null;
   if (requestBlocked?.hardStop) return { kind: "hard_stop", critic: requestBlocked };
-  const target = PILLAR_BY_ID.get(pillar ?? "first_session")!;
+  // With no pillar given, Muse picks the one her words fit, so her topic is never swapped for a default.
+  const target = pillar ? PILLAR_BY_ID.get(pillar)! : null;
+  const about = target ? `about ${pillarAsk(target)}` : `on the one pillar her request fits best, from:\n${PILLARS.map(pillarAsk).join("\n")}\n`;
   const ask = requestBlocked
-    ? `Write one post about ${pillarAsk(target)}. (Her request couldn't be used as asked because posts never describe clients.)`
-    : `Write one post about ${pillarAsk(target)}. Her request, in her words: "${request.slice(0, 500)}"`;
+    ? `Write one post ${about}. (Her request couldn't be used as asked because posts never describe clients.)`
+    : `Write one post ${about}. Keep to her topic. Her request, in her words: "${request.slice(0, 500)}"`;
   const [words] = await writeWords(f, ask, callModel);
   if (!words) throw new Error("Aeon couldn't write that post. Try asking again.");
-  const draft = await checked({ ...words, pillar: target.id }, f, ctx, callModel);
+  const draft = await checked({ ...words, pillar: target?.id ?? words.pillar }, f, ctx, callModel);
   if (draft.critic.hardStop) return { kind: "hard_stop", critic: draft.critic };
   return { kind: "draft", draft, requestBlocked };
+}
+
+/**
+ * "Plan several": 2 or 3 posts on what she typed, each a different logistics
+ * angle, each checked like any other draft. Her request has passed the topic
+ * gate (topic-gate.ts) before this runs.
+ */
+export async function writeSeveral(f: PracticeFacts, request: string, count: 2 | 3, opts: { chat?: ChatFn } = {}): Promise<Draft[]> {
+  const callModel = opts.chat ?? metaChat;
+  const ctx = criticContext(f);
+  const words = await writeWords(
+    f,
+    `Write ${count} different posts on her topic, each from a different angle (for example what to expect, cost, how to book), ` +
+      `each on the pillar it fits best, from:\n${PILLARS.map(pillarAsk).join("\n")}\nKeep to her topic. Her request, in her words: "${request.slice(0, 500)}"`,
+    callModel,
+  );
+  if (!words.length) throw new Error("Aeon couldn't write those posts. Try asking again.");
+  const drafts: Draft[] = [];
+  for (const w of words.slice(0, count)) {
+    const d = await checked(w, f, ctx, callModel);
+    if (!d.critic.hardStop) drafts.push(d);
+  }
+  return drafts;
 }

@@ -8,7 +8,8 @@ import type { ChatFn, CriticResult } from "./critic";
 import { designPost, type GraphicDeps } from "./graphic";
 import { GOALS, instagramDeclined, loadInstagramPrefs, weekTopics } from "./onboarding";
 import { PILLAR_BY_ID, type PillarId } from "./pillars";
-import { writeRequested, writeWeek, type Draft, type PracticeFacts } from "./write";
+import { gateTopic, type Angle } from "./topic-gate";
+import { writeRequested, writeSeveral, writeWeek, type Draft, type PracticeFacts } from "./write";
 
 export async function practiceFacts(): Promise<PracticeFacts> {
   const [p] = await db()<
@@ -167,11 +168,15 @@ export async function planWeek(by: string, opts: { chat?: ChatFn; graphic?: Grap
 export type RequestResult =
   | { outcome: "blocked"; why: string }
   | { outcome: "declined"; why: string }
+  /** Her topic is advice (or a client story, review, promise): nothing written, the nearest logistics angle offered. */
+  | { outcome: "off_topic"; why: string; angle: Angle }
   | { outcome: "queued" | "rewritten" | "blocked_after_rewrite"; post: SavedPost; headline: string; why: string | null };
 
 /** One post she asked for. A request about a client is never written as asked. */
 export async function requestPost(by: string, request: string, pillar: PillarId | null, opts: { chat?: ChatFn; graphic?: GraphicDeps } = {}): Promise<RequestResult> {
   if (await instagramDeclined()) return { outcome: "declined", why: DECLINED };
+  const gate = await checkRequest(request);
+  if (gate) return gate;
   const facts = await practiceFacts();
   const out = await writeRequested(facts, request, pillar, { chat: opts.chat });
   if (out.kind === "hard_stop") {
@@ -182,4 +187,28 @@ export async function requestPost(by: string, request: string, pillar: PillarId 
   if (post.status === "blocked") return { outcome: "blocked_after_rewrite", post, headline: out.draft.headline, why: blockedSummary(out.draft.critic) };
   const why = out.requestBlocked ? blockedSummary(out.requestBlocked) : null;
   return { outcome: why || out.draft.rewritten ? "rewritten" : "queued", post, headline: out.draft.headline, why };
+}
+
+/** The topic gate, audited: a hard stop or an off-topic request never reaches the writer. */
+async function checkRequest(request: string): Promise<Extract<RequestResult, { outcome: "blocked" | "off_topic" }> | null> {
+  const gate = gateTopic(request);
+  if (gate.ok) return null;
+  await audit({ actor: "aeon", action: gate.hardStop ? "instagram_request_refused" : "instagram_request_redirected", subjectType: "post", details: { rules: [gate.rule] } });
+  return gate.hardStop ? { outcome: "blocked", why: gate.why } : { outcome: "off_topic", why: gate.why, angle: gate.angle };
+}
+
+export type SeveralResult =
+  | Extract<RequestResult, { outcome: "blocked" | "declined" | "off_topic" }>
+  | { outcome: "planned"; saved: SavedPost[]; blocked: number };
+
+/** Plan several: 2 or 3 posts on what she typed, each checked, drawn and queued for her approval. */
+export async function planSeveral(by: string, request: string, count: 2 | 3, opts: { chat?: ChatFn; graphic?: GraphicDeps } = {}): Promise<SeveralResult> {
+  if (await instagramDeclined()) return { outcome: "declined", why: DECLINED };
+  const gate = await checkRequest(request);
+  if (gate) return gate;
+  const facts = await practiceFacts();
+  const drafts = await writeSeveral(facts, request, count, { chat: opts.chat });
+  const saved: SavedPost[] = [];
+  for (const d of drafts) saved.push(await saveDraft(d, { by, facts, graphic: opts.graphic && { chat: opts.chat, ...opts.graphic } }));
+  return { outcome: "planned", saved, blocked: saved.filter((s) => s.status === "blocked").length };
 }
