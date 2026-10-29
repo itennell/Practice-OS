@@ -5,10 +5,12 @@
 // before any model call. A refused message is never shown or saved: her text
 // goes back into the box so she can take the detail out.
 // TODO(UI-019): type the greeting in with Text Type.
+// Calm redesign (Redesign 3/5): Liquid Aeon, one display greeting, the message box as a
+// pill, three quiet chips, then the Today list. Nothing else above the fold.
 
 import { ShieldAlert } from "lucide-react";
 import dynamic from "next/dynamic";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { PromptBar } from "@/components/shared/prompt-bar";
 import { ThoughtLine } from "@/components/shared/thought-line";
 import { notify } from "@/components/shared/toaster";
@@ -16,6 +18,8 @@ import { ApprovalAskBar } from "./approval-ask-bar";
 import { ApprovalsInbox } from "./approvals-inbox";
 import { ModePicker, nextMode } from "./mode-picker";
 import type { ApprovalMode } from "@/lib/approval-modes";
+import { SUGGESTIONS } from "@/lib/aeon/suggestions";
+import { cn } from "@/lib/utils";
 import { AeonText } from "./aeon-text";
 import { CHATS_CHANGED, NEW_CHAT } from "./sidebar";
 import { Orb } from "./ui";
@@ -38,7 +42,17 @@ type Reply =
   | { kind: "refused"; text: string; reason: string }
   | { kind: "answer"; text: string; steps: ChatStep[]; approvalIds: string[] };
 
-export const SUGGESTIONS = ["What needs me this week?", "Draft a Good Faith Estimate", "Get me ready for CAQH"];
+
+/** "Good morning, Dana" by her clock. The server can't know her time, so it says "Hello" until the page wakes up. */
+function partOfDay(): string {
+  const h = new Date().getHours();
+  return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+}
+const noop = () => () => {};
+function useGreeting(firstName: string | null): string {
+  const word = useSyncExternalStore(noop, partOfDay, () => "Hello");
+  return firstName ? `${word}, ${firstName}` : word;
+}
 
 let counter = 0;
 const nextKey = () => `m${Date.now().toString(36)}${counter++}`;
@@ -108,6 +122,7 @@ export function AeonChat({
   mode: initialMode,
   modeReadOnly = false,
   ask,
+  suggestions = SUGGESTIONS,
 }: {
   /** A question waiting in the box (from Admin's "Ask Aeon" buttons). She reads it and presses send. */
   ask?: string;
@@ -120,7 +135,10 @@ export function AeonChat({
   firstName: string | null;
   /** Shown before the first message: today's brief and what's waiting. */
   start: ReactNode;
+  /** Chips under the box before the first message; built from what's waiting. */
+  suggestions?: string[];
 }) {
+  const greeting = useGreeting(firstName);
   const [conversationId, setConversationId] = useState(initialId);
   const [messages, setMessages] = useState(initialMessages);
   const [busy, setBusy] = useState(false);
@@ -211,32 +229,42 @@ export function AeonChat({
 
   const empty = messages.length === 0;
 
+  const box = (
+    <div
+      onKeyDownCapture={(e) => {
+        // Shift+Tab in the message box switches the mode, as in a coding agent.
+        if (e.key === "Tab" && e.shiftKey && !modeReadOnly && (e.target as HTMLElement).tagName === "TEXTAREA") {
+          e.preventDefault();
+          const next = nextMode(mode);
+          // Bypass always goes through the picker, which asks first.
+          void changeMode(next === "bypass" ? nextMode(next) : next);
+        }
+      }}
+    >
+      <PromptBar
+        shape="pill"
+        onSend={send}
+        busy={busy}
+        onStop={() => abort.current?.abort()}
+        dictation
+        placeholder="Ask Aeon anything"
+        defaultValue={ask}
+        controls={<ModePicker mode={mode} onChange={changeMode} readOnly={modeReadOnly} />}
+      />
+      <span aria-live="polite" className="sr-only">
+        {modeNote}
+      </span>
+    </div>
+  );
+
   return (
     <div className="flex min-h-[calc(100vh-5rem)] flex-col gap-4">
-      <section aria-label="Chat with Aeon" className="mx-auto flex w-full min-w-0 max-w-[760px] flex-1 flex-col gap-6">
+      <section aria-label="Chat with Aeon" className="mx-auto flex w-full min-w-0 max-w-[720px] flex-1 flex-col gap-6">
         {empty && (
-          <header className="flex flex-col items-center gap-4 pt-2 text-center md:pt-6">
-            <AgentBlob agent="aeon" eyes size={112} state={busy ? "work" : "rest"} splashOnMount label={busy ? "Aeon is working" : "Aeon"} />
-            <h1 className="text-title">{firstName ? `Hi, ${firstName}. How can I help?` : "How can I help?"}</h1>
-            <p className="text-[var(--fg-muted)]">Start typing, or pick one of these to get going.</p>
+          <header className="flex flex-col items-center gap-3 pt-[6vh] text-center md:pt-[11vh]">
+            <AgentBlob agent="aeon" eyes size={72} state={busy ? "work" : "rest"} splashOnMount label={busy ? "Aeon is working" : "Aeon"} />
+            <h1 className="text-[2rem] leading-[1.1] font-[650] tracking-[-0.02em] text-balance md:text-display">{greeting}</h1>
           </header>
-        )}
-
-        {empty && (
-          <ul aria-label="Suggestions" className="grid gap-3 sm:grid-cols-3">
-            {SUGGESTIONS.map((s) => (
-              <li key={s}>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void send(s).catch(() => {})}
-                  className="tile flex min-h-[72px] w-full items-center px-5 py-4 text-left font-medium hover:shadow-[var(--tile-shadow-hover)] disabled:opacity-60"
-                >
-                  {s}
-                </button>
-              </li>
-            ))}
-          </ul>
         )}
 
         {!empty && (
@@ -254,38 +282,42 @@ export function AeonChat({
         {/* Scrolls the newest reply clear of the message box pinned below it. */}
         <div ref={end} className="scroll-mb-44" />
 
-        <div className={`${empty ? "" : "sticky bottom-0 -mx-2 mt-auto bg-gradient-to-t from-[var(--bg)] from-70% to-transparent px-2 pb-4 pt-6"}`}>
-          <ApprovalAskBar refreshKey={asked} />
-          <div
-            onKeyDownCapture={(e) => {
-              // Shift+Tab in the message box switches the mode, as in a coding agent.
-              if (e.key === "Tab" && e.shiftKey && !modeReadOnly && (e.target as HTMLElement).tagName === "TEXTAREA") {
-                e.preventDefault();
-                const next = nextMode(mode);
-                // Bypass always goes through the picker, which asks first.
-                void changeMode(next === "bypass" ? nextMode(next) : next);
-              }
-            }}
-          >
-            <PromptBar
-              onSend={send}
-              busy={busy}
-              onStop={() => abort.current?.abort()}
-              dictation
-              placeholder="Ask Aeon anything about your practice"
-              defaultValue={ask}
-              controls={<ModePicker mode={mode} onChange={changeMode} readOnly={modeReadOnly} />}
-            />
-            <span aria-live="polite" className="sr-only">
-              {modeNote}
-            </span>
-          </div>
-          <p className="mt-3 text-center text-small text-[var(--fg-muted)]">
-            Aeon handles practice logistics, not clinical advice. Please don&apos;t type client names or details. Check anything important.
+        {/* One wrapper in both states, so the box keeps her words when the first message is refused. */}
+        <div
+          className={
+            empty
+              ? "flex flex-col items-center gap-3"
+              : "sticky bottom-0 -mx-2 mt-auto bg-gradient-to-t from-[var(--bg)] from-70% to-transparent px-2 pt-6 pb-4"
+          }
+        >
+          {!empty && <ApprovalAskBar refreshKey={asked} />}
+          <div className="w-full">{box}</div>
+          {empty && (
+            <>
+              {/* Phones: one row that scrolls sideways; wider screens: centred and wrapping. */}
+              <ul aria-label="Suggestions" className="-mx-5 flex w-[calc(100%+2.5rem)] gap-2 overflow-x-auto px-5 sm:mx-0 sm:w-full sm:flex-wrap sm:justify-center sm:overflow-visible sm:px-0">
+                {suggestions.map((s) => (
+                  <li key={s} className="shrink-0">
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void send(s).catch(() => {})}
+                      className="inline-flex h-chip items-center rounded-full border whitespace-nowrap border-[var(--line)] px-4 text-small font-medium text-[var(--fg-muted)] transition-colors duration-150 hover:border-[var(--fg-muted)] hover:text-[var(--fg)] disabled:opacity-60"
+                    >
+                      {s}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          <p className={cn("text-center text-label text-[var(--fg-muted)]", !empty && "mt-3")}>
+            Aeon handles practice logistics, not clinical advice. Please don&apos;t type client names or details.
+            {!empty && " Check anything important."}
           </p>
         </div>
 
-        {empty && start}
+        {empty && <div className="mt-4 flex flex-col gap-4">{start}</div>}
       </section>
     </div>
   );
