@@ -26,11 +26,16 @@ export default defineConfig({
     env: {
       CALCOM_API_BASE: "http://127.0.0.1:3299",
       PLAYWRIGHT_CALCOM_STANDIN: "1",
+      // Instagram research uses fixed notes with example.com links, except on a live run (PLAYWRIGHT_LIVE=1).
+      PLAYWRIGHT_RESEARCH_STANDIN: process.env.PLAYWRIGHT_RESEARCH_STANDIN ?? (process.env.PLAYWRIGHT_LIVE === "1" ? "0" : "1"),
+      // Reel slide edits get Muse's critic; without a key the specs use a stand-in that finds nothing (plain-code checks still run).
+      PLAYWRIGHT_CRITIC_STANDIN: process.env.PLAYWRIGHT_LIVE === "1" ? "0" : "1",
       DRY_RUN: "true",
       FRONT_DESK_POLL: "off",
       ...Object.fromEntries(
         [
-          "MODEL_API_KEY",
+          // A live proof run (PLAYWRIGHT_LIVE=1, tests/e2e/instagram-studio-live.spec.ts) keeps the Muse key.
+          ...(process.env.PLAYWRIGHT_LIVE === "1" ? [] : ["MODEL_API_KEY"]),
           "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_PHONE_NUMBER", "FRONT_DESK_DEV_TWILIO", "CLINICIAN_ALERT_PHONE",
           "CALCOM_API_KEY", "CALCOM_EVENT_TYPE_ID", "CALCOM_USERNAME", "CALCOM_EVENT_SLUG",
           "RELAY_URL", "INSTAGRAM_APP_ID", "INSTAGRAM_APP_SECRET", "INSTAGRAM_ACCESS_TOKEN", "INSTAGRAM_USER_ID",
