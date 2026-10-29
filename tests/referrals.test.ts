@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import fixture from "./fixtures/nppes-60614.json";
-import { fitScore } from "../lib/referrals/fit";
 import { NeedsConnectError } from "../lib/connect";
 import { createDraft, gmailToken, mimeMessage } from "../lib/referrals/gmail";
 import { checkLetter } from "../lib/referrals/outreach";
@@ -51,7 +50,7 @@ describe("NPPES parsing (recorded 60614 reply, no live calls)", () => {
     const person = parseResult(base)!;
     expect(person).toMatchObject({ name: "Jane O'Neil, MD", npiType: "individual", zip: "60614", phone: "312-555-0100", specialtyLabel: "Family medicine" });
     const org = parseResult({ ...base, enumeration_type: "NPI-2", basic: { status: "A", organization_name: "LAKEVIEW CLINIC LLC" } })!;
-    expect(org).toMatchObject({ name: "Lakeview Clinic Llc", organization: "Lakeview Clinic Llc", npiType: "organization", credential: null });
+    expect(org).toMatchObject({ name: "Lakeview Clinic LLC", organization: "Lakeview Clinic LLC", practiceName: "Lakeview Clinic LLC", npiType: "organization", credential: null });
     expect(parseResult({ ...base, basic: { ...base.basic, status: "D" } })).toBeNull();
     expect(parseResult(base, new Set(["oncology"]))).toBeNull();
   });
@@ -151,21 +150,5 @@ describe("Gmail draft message", () => {
     expect(JSON.parse(calls[0].body).message.raw).toMatch(/^[A-Za-z0-9_-]+$/);
     const denied = (async () => new Response("", { status: 401 })) as unknown as typeof fetch;
     await expect(createDraft("tok", { to: "a@example.com", subject: "s", body: "b" }, denied)).rejects.toThrow(/Connect Google first/);
-  });
-});
-
-describe("fit score (written-down formula)", () => {
-  const today = new Date("2026-10-28");
-  const base = { specialty: "family_medicine" as const, npiType: "individual" as const, phone: "312-555-0100", lastUpdated: "2026-01-01" };
-  it("adds up to 100 for a nearby family doctor with a phone and a fresh record", () => {
-    expect(fitScore(base, 0, today)).toBe(100);
-  });
-  it("loses 6 points a mile, nothing past 5 miles", () => {
-    expect(fitScore(base, 1, today)).toBe(94);
-    expect(fitScore(base, 7, today)).toBe(70);
-  });
-  it("ranks a big group, no phone, an old record lower", () => {
-    expect(fitScore({ ...base, npiType: "organization", phone: null, lastUpdated: "2019-01-01" }, 0, today)).toBe(70);
-    expect(fitScore({ ...base, specialty: "therapists" }, 0, today)).toBe(88);
   });
 });

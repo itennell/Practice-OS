@@ -5,9 +5,9 @@ import { forgetAllowlist } from "../aeon/guard";
 import { audit } from "../audit";
 import { practiceToday } from "../compliance/store";
 import { db } from "../db";
-import { fitScore } from "./fit";
 import { nearbyZips, zipCenters, zipDistance } from "./geo";
-import { fetchProviders, SPECIALTY_BY_ID, type Provider, type SpecialtyId } from "./nppes";
+import { fetchProviders, providerByNpi, SPECIALTY_BY_ID, type Provider, type SpecialtyId } from "./nppes";
+import { focusFrom, providerTier, type Focus } from "./tier";
 import { STAGES, STAGE_LABEL, type Stage } from "./stages";
 
 export { STAGES, STAGE_LABEL, type Stage };
@@ -47,10 +47,11 @@ export async function findReferralSources(
   if (!centers[opts.zip]) throw new Error(`I don't know ZIP ${opts.zip}. Check it and try again.`);
   const zips = nearbyZips(centers, opts.zip, opts.radiusMiles ?? 3, 5);
   const providers = await fetchProviders(opts.specialties, zips, opts.fetcher);
+  const { focus, state } = await practiceFacts(sql);
   const scored = providers
     .map((p) => {
       const distanceMiles = zipDistance(centers, opts.zip, p.zip);
-      return { ...p, distanceMiles, fitScore: fitScore(p, distanceMiles) };
+      return { ...p, distanceMiles, fitScore: providerTier(p, { miles: distanceMiles, focus, clinicianState: state }).score };
     })
     .sort((a, b) => b.fitScore - a.fitScore || (a.distanceMiles ?? 99) - (b.distanceMiles ?? 99) || a.name.localeCompare(b.name));
   // A city ZIP has thousands; the board keeps the best few of each kind.
@@ -65,6 +66,46 @@ export async function findReferralSources(
 }
 
 const PER_SPECIALTY = 20;
+
+/** Who she helps (onboarding), as the groups the tiers match on, and her state. */
+export async function practiceFacts(sql: postgres.Sql = db()): Promise<{ focus: Focus[]; state: string | null }> {
+  const [row] = await sql<{ who: string | null; state: string | null }[]>`
+    select onboarding_answers ->> 'who_i_help' as who, state from practice_os.clinician_profile limit 1`.catch(() => []);
+  return { focus: focusFrom(row?.who), state: row?.state ?? null };
+}
+
+/**
+ * "Add to board" on the map's list: each NPI is looked up again in NPPES (so
+ * the board holds the registry's words, not whatever the page sent) and saved
+ * under Found with its distance and tier score.
+ */
+export async function addToBoard(
+  items: { npi: string; distanceMiles: number | null }[],
+  sql: postgres.Sql = db(),
+  lookup: (npi: string) => Promise<Provider | null> = (npi) => providerByNpi(npi),
+): Promise<{ added: FoundSource[]; missing: string[] }> {
+  const { focus, state } = await practiceFacts(sql);
+  const added: FoundSource[] = [];
+  const missing: string[] = [];
+  // Each one is saved as soon as NPPES answers for it, so one slow lookup doesn't lose the rest.
+  for (const npi of new Set(items.map((i) => i.npi))) {
+    const item = items.find((i) => i.npi === npi)!;
+    const p = await lookup(npi).catch(() => null);
+    if (!p) {
+      missing.push(npi);
+      continue;
+    }
+    const miles = item.distanceMiles === null || !Number.isFinite(item.distanceMiles) ? null : Math.max(0, Math.min(500, item.distanceMiles));
+    const one: FoundSource = { ...p, distanceMiles: miles, fitScore: providerTier(p, { miles, focus, clinicianState: state }).score };
+    await saveSources([one], sql);
+    added.push(one);
+  }
+  await audit(
+    { actor: "clinician", action: "referral_sources_added", subjectType: "referral_sources", details: { npis: added.map((a) => a.npi), missing } },
+    sql,
+  );
+  return { added, missing };
+}
 
 /** The best of each kind in turn, so "primary care and oncology" shows both. */
 export function interleave(found: FoundSource[], count: number): FoundSource[] {
