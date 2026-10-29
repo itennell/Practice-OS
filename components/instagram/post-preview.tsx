@@ -54,7 +54,7 @@ export function PostPreview({
       </div>
       {imageSrc ? (
         // eslint-disable-next-line @next/next/no-img-element -- a private, per-post JPEG from our own route
-        <img src={imageSrc} alt={altText ?? ""} width={1080} height={1350} className="aspect-[4/5] w-full bg-[var(--hairline)] object-cover" />
+        <img src={imageSrc} alt={altText ?? ""} width={1080} height={1350} className="aspect-[4/5] w-full bg-[var(--hairline)] object-contain" />
       ) : (
         <div aria-hidden className="aspect-[4/5] w-full bg-[var(--hairline)]" />
       )}

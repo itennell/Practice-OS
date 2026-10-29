@@ -117,7 +117,7 @@ function Decide({ post, onDone }: { post: PostView; onDone: () => void }) {
   );
 }
 
-function Retry({ post, onDone }: { post: PostView; onDone: () => void }) {
+function Retry({ post, onDone, draft = false }: { post: PostView; onDone: () => void; draft?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   async function retry() {
@@ -136,11 +136,15 @@ function Retry({ post, onDone }: { post: PostView; onDone: () => void }) {
   }
   return (
     <div className="flex flex-col gap-2 border-t border-[var(--hairline)] p-4">
-      <p className="font-medium" style={{ color: "var(--danger-fg)" }}>
-        {post.failedReason ?? "Aeon couldn't finish this post. Try again."}
-      </p>
+      {draft ? (
+        <p className="text-small text-[var(--fg-muted)]">A draft. Send it to your approvals when you&apos;re ready; nothing is posted.</p>
+      ) : (
+        <p className="font-medium" style={{ color: "var(--danger-fg)" }}>
+          {post.failedReason ?? "Aeon couldn't finish this post. Try again."}
+        </p>
+      )}
       <Button variant="accent" className="w-full" disabled={busy} onClick={retry}>
-        {busy ? "Trying again…" : "Retry"}
+        {draft ? (busy ? "Sending…" : "Send for approval") : busy ? "Trying again…" : "Retry"}
       </Button>
       {problem && (
         <p role="alert" className="text-small font-medium" style={{ color: "var(--danger-fg)" }}>
@@ -179,7 +183,7 @@ function PostCard({ post, profile, onChange }: { post: PostView; profile: Previe
           caption={post.caption}
           headingId={headingId}
         >
-          {state === "retry" && <Retry post={post} onDone={onChange} />}
+          {(state === "retry" || state === "draft") && <Retry post={post} onDone={onChange} draft={state === "draft"} />}
           {state === "waiting" && <Decide post={post} onDone={onChange} />}
           {post.status === "ready" && <ReadyToPost post={post} />}
         </PostPreview>

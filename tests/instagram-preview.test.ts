@@ -27,6 +27,10 @@ describe("postState", () => {
     expect(postState({ status: "failed", approvalStatus: "failed", approvalId: "a" })).toBe("retry");
     expect(STATE.retry.label).toBe("Didn't finish");
   });
+  it("a draft not yet sent is a Draft, not a failure and not waiting", () => {
+    expect(postState({ status: "draft", approvalStatus: null, approvalId: null })).toBe("draft");
+    expect(STATE.draft.label).toBe("Draft");
+  });
   it("ready, blocked and declined keep their own labels", () => {
     expect(postState({ status: "ready", approvalStatus: "done", approvalId: "a" })).toBe("ready");
     expect(postState({ status: "blocked", approvalStatus: null, approvalId: null })).toBe("blocked");

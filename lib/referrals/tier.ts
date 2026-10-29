@@ -13,7 +13,7 @@
 // research has no points for that, so it adds no points: it adds a reason when
 // they see the same people, and a provider who only sees people she doesn't
 // (a pediatrician for an adults-only practice) is always "Later".
-import research from "../../docs/research/referral-tiers.json";
+import research from "../../docs/research/referral-tiers.json" with { type: "json" };
 import { looksResidential, specialtyForCode, SPECIALTY_BY_ID, type Provider, type SpecialtyId } from "./nppes";
 
 export type Tier = "first" | "next" | "later";

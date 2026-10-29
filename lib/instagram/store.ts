@@ -254,8 +254,8 @@ export type RetryResult = { ok: true; approvalId: string } | { ok: false; status
  */
 export async function retryPost(by: string, postId: string, opts: { graphic?: GraphicDeps } = {}): Promise<RetryResult> {
   if (await instagramDeclined()) return { ok: false, status: 409, why: DECLINED };
-  const [p] = await db()<{ id: string; topic: PillarId | "other"; caption: string; headline: string | null; alt_text: string | null; status: string; approval_status: string | null }[]>`
-    select p.id, p.topic, p.caption, p.headline, p.alt_text, p.status, a.status as approval_status
+  const [p] = await db()<{ id: string; topic: PillarId | "other"; caption: string; headline: string | null; alt_text: string | null; status: string; approval_status: string | null; has_image: boolean }[]>`
+    select p.id, p.topic, p.caption, p.headline, p.alt_text, p.status, a.status as approval_status, p.image_jpeg is not null as has_image
       from practice_os.posts p left join practice_os.approvals a on a.id = p.approval_id
      where p.id = ${postId}`;
   if (!p) return { ok: false, status: 404, why: "That post isn't here any more." };
@@ -264,6 +264,8 @@ export async function retryPost(by: string, postId: string, opts: { graphic?: Gr
   }
   const facts = await practiceFacts();
   const headline = p.headline ?? "Post";
+  // A finished draft keeps its picture; only a failed or missing one is drawn again.
+  if (p.status === "draft" && p.has_image) return queueAgain(by, p.id, headline, p.caption, p.alt_text);
   const graphic = await designPost(
     PILLAR_BY_ID.get(p.topic === "other" ? "first_session" : p.topic)!,
     { headline, practiceName: facts.practiceName, licenseLine: facts.licenseLine },
@@ -274,14 +276,19 @@ export async function retryPost(by: string, postId: string, opts: { graphic?: Gr
        set image_jpeg = ${graphic.jpeg}, graphic_check = ${db().json({ ...graphic.check, tries: graphic.tries } as never)},
            status = 'pending_approval', failed_reason = null, approval_id = null
      where id = ${p.id}`;
+  return queueAgain(by, p.id, headline, p.caption, p.alt_text, graphic.check.ok ? "passed" : graphic.check.problems.join(" "));
+}
+
+async function queueAgain(by: string, id: string, headline: string, caption: string, altText: string | null, pictureCheck?: string): Promise<RetryResult> {
+  await db()`update practice_os.posts set status = 'pending_approval', failed_reason = null, approval_id = null where id = ${id}`;
   const approvalId = await queueApproval({
     kind: "instagram_post",
     title: `Instagram post: ${headline}`,
-    preview: { body: p.caption, headline, alt_text: p.alt_text, image: `/api/instagram/posts/${p.id}/image`, picture_check: graphic.check.ok ? "passed" : graphic.check.problems.join(" ") },
-    payload: { post_id: p.id },
+    preview: { body: caption, headline, alt_text: altText, image: `/api/instagram/posts/${id}/image`, ...(pictureCheck ? { picture_check: pictureCheck } : {}) },
+    payload: { post_id: id },
     createdBy: by,
   });
-  await db()`update practice_os.posts set approval_id = ${approvalId} where id = ${p.id} and approval_id is null`;
-  await audit({ actor: "clinician", action: "instagram_post_retried", subjectType: "post", subjectId: p.id, details: { approval_id: approvalId } });
+  await db()`update practice_os.posts set approval_id = ${approvalId} where id = ${id} and approval_id is null`;
+  await audit({ actor: "clinician", action: "instagram_post_retried", subjectType: "post", subjectId: id, details: { approval_id: approvalId } });
   return { ok: true, approvalId };
 }
