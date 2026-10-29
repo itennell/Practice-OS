@@ -34,7 +34,7 @@ const card = (c: Omit<DocumentCard, "topics" | "source" | "needs_her" | "held_el
 });
 
 const words = (...parts: (string | null | undefined)[]) =>
-  [...new Set(parts.filter(Boolean).join(" ").toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 1))].slice(0, 20);
+  [...new Set(parts.filter(Boolean).join(" ").toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 1 && w.length <= 60))].slice(0, 20);
 
 function dueLine(due: ISODate | null, today: ISODate): string {
   if (!due) return "";
@@ -55,14 +55,14 @@ export function deadlineCard(o: ObligationView, today: ISODate): DocumentCard {
   return card({
     id: `deadline:${o.id}`,
     kind: "deadline",
-    title: o.title,
+    title: o.title.slice(0, 160),
     subtitle: [dueLine(o.due_on, today), o.what_to_do].filter(Boolean).join(" · ").slice(0, 240),
     status: o.urgency === "overdue" ? "Overdue" : o.urgency === "red" ? "Urgent" : o.due_on ? "Coming up" : "No date yet",
     due_on: o.due_on,
     topics: words(o.title, o.category, o.rule_id, o.jurisdiction, "deadline due"),
     open: `/admin/deadlines#obligation-${o.id}`,
-    source: o.source_url ? { label: o.citation ?? host(o.source_url), href: o.source_url } : null,
-    needs_her: o.you_must,
+    source: o.source_url && /^https:\/\//.test(o.source_url) ? { label: (o.citation ?? host(o.source_url)).slice(0, 160), href: o.source_url.slice(0, 500) } : null,
+    needs_her: o.you_must?.slice(0, 300) ?? null,
     is_sample: o.is_sample,
   });
 }
