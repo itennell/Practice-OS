@@ -2,8 +2,9 @@
 // the critic decides. A blocked draft gets one logistics rewrite; suicide or
 // self-harm gets none.
 import { chat as metaChat } from "../meta";
-import { codeCritic, critique, type ChatFn, type CriticContext, type CriticResult } from "./critic";
+import { codeCritic, critique, RULE_TEXT, type ChatFn, type CriticContext, type CriticResult, type Finding } from "./critic";
 import { PILLAR_BY_ID, PILLARS, type Pillar, type PillarId } from "./pillars";
+import { neverShowHits } from "./never-show";
 import { STYLES, type StyleId } from "./style-samples";
 
 /** Her answers from onboarding's marketing interview (lib/instagram/onboarding.ts). */
@@ -110,9 +111,27 @@ function pillarAsk(p: Pillar) {
   return `"${p.id}" (${p.label}): ${p.brief}`;
 }
 
+/** Her never-show picks, in plain code: anything in the picture's description, and her face or family in the words. */
+export function neverShowFindings(words: Pick<DraftWords, "headline" | "body" | "altText">, f: PracticeFacts): Finding[] {
+  const never = f.voice?.neverShow ?? [];
+  if (!never.length) return [];
+  const firstName = f.clinicianName.split(" ")[0];
+  const hits = [
+    ...neverShowHits(words.altText, never, { firstName }),
+    ...neverShowHits(`${words.headline}\n${words.body}`, never, { only: ["face", "family"] }),
+  ];
+  return hits.length ? [{ rule: "never_show", by: "code", message: `${RULE_TEXT.never_show} (${[...new Set(hits)].join(", ")})` }] : [];
+}
+
+async function critiqueWords(words: DraftWords, caption: string, f: PracticeFacts, ctx: CriticContext, callModel: ChatFn): Promise<CriticResult> {
+  const critic = await critique(`${words.headline}\n${caption}`, ctx, { chat: callModel });
+  const never = neverShowFindings(words, f);
+  return never.length ? { ...critic, ok: false, findings: [...critic.findings, ...never] } : critic;
+}
+
 async function checked(words: DraftWords, f: PracticeFacts, ctx: CriticContext, callModel: ChatFn): Promise<Draft> {
   const caption = captionOf(words.body, f.licenseLine);
-  let critic = await critique(`${words.headline}\n${caption}`, ctx, { chat: callModel });
+  let critic = await critiqueWords(words, caption, f, ctx, callModel);
   if (critic.ok || critic.hardStop) return { ...words, caption, critic, rewritten: false };
   const pillar = PILLAR_BY_ID.get(words.pillar)!;
   const [again] = await writeWords(
@@ -123,7 +142,7 @@ async function checked(words: DraftWords, f: PracticeFacts, ctx: CriticContext, 
   );
   if (!again) return { ...words, caption, critic, rewritten: false };
   const newCaption = captionOf(again.body, f.licenseLine);
-  critic = await critique(`${again.headline}\n${newCaption}`, ctx, { chat: callModel });
+  critic = await critiqueWords(again, newCaption, f, ctx, callModel);
   return { ...again, pillar: words.pillar, caption: newCaption, critic, rewritten: true };
 }
 

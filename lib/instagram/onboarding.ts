@@ -5,7 +5,7 @@
 // Answers live in clinician_profile.onboarding_answers -> 'instagram', and post
 // drafts (lib/instagram/write.ts) use her goals, topics, style and limits.
 import { db } from "../db";
-import { rememberLine } from "../onboarding/remember-line";
+import { rememberLine, retireLines } from "../onboarding/remember-line";
 import type { HelperQuestion, PracticeBasics } from "../onboarding/helper-questions";
 import { PILLARS, type PillarId } from "./pillars";
 import { STYLES, type StyleId } from "./style-samples";
@@ -16,7 +16,8 @@ export type NeverId = "face" | "office" | "family" | "home" | "none";
 
 export type InstagramPrefs = {
   account: Account | null;
-  connect: "now" | "later" | null;
+  /** After "I'd like one": she made the account, or will later. */
+  setup: "made" | "later" | null;
   goals: GoalId[];
   topics: PillarId[];
   postsPerWeek: 1 | 3 | 5;
@@ -28,7 +29,7 @@ export type InstagramPrefs = {
 
 export const DEFAULT_PREFS: InstagramPrefs = {
   account: null,
-  connect: null,
+  setup: null,
   goals: [],
   topics: PILLARS.map((p) => p.id),
   postsPerWeek: 5,
@@ -79,28 +80,15 @@ const questions: HelperQuestion[] = [
       { value: "no", label: "No, Instagram isn't for me" },
     ],
   },
-  {
-    id: "connect",
-    kind: "connect",
-    provider: "instagram",
-    ask: "Do you want to connect it now?",
-    says: "Then I can post for you, after you say yes to each post.",
-    options: [
-      { value: "now", label: "Connect now" },
-      { value: "later", label: "Later" },
-    ],
-    later: { when: "later", ask: "Connect Instagram" },
-    appliesWhen: when((a) => a.account === "has"),
-  },
+  // No "connect it now" screen: publishing is cut for now. Aeon writes, she posts.
   {
     id: "guide",
-    kind: "connect",
-    provider: "instagram",
+    kind: "steps",
     ask: "How to make a business account",
     says: "It takes about 10 minutes. You can also ask me in chat any time.",
     steps: ACCOUNT_STEPS,
     options: [
-      { value: "now", label: "I made it, connect it now" },
+      { value: "made", label: "I made it" },
       { value: "later", label: "I'll do it later" },
     ],
     later: { when: "later", ask: "Make an Instagram business account" },
@@ -134,7 +122,7 @@ const questions: HelperQuestion[] = [
     kind: "choices",
     multi: false,
     ask: "How often do you want to post?",
-    says: "You say yes to every post before it goes up.",
+    says: "I write them. You post them yourself when you're ready.",
     options: [
       { value: "1", label: "Once a week" },
       { value: "3", label: "3 times a week" },
@@ -172,7 +160,11 @@ export const instagramQuestions = {
   /** Onboarding saves one question at a time, so the other answers are kept. */
   async save(answers: Record<string, unknown>): Promise<void> {
     const before = await loadInstagramPrefs();
-    const next = parsePrefs({ ...toAnswers(before), ...answers });
+    let next = parsePrefs({ ...toAnswers(before), ...answers });
+    // A new branch starts clean: the old branch's step answer doesn't carry over, and
+    // "Not for me" clears every post answer so nothing about posts is kept or used.
+    if ("account" in answers && next.account !== before.account) next = { ...next, setup: "guide" in answers ? next.setup : null };
+    if (next.account === "no") next = { ...DEFAULT_PREFS, account: "no" };
     await saveInstagramPrefs(next);
     await afterSave(before, next, Object.keys(answers));
   },
@@ -187,7 +179,7 @@ function toAnswers(p: InstagramPrefs): Record<string, unknown> {
     style: { pick: p.style ?? "", example: p.example },
   };
   if (p.account) out.account = p.account;
-  if (p.connect) out.connect = out.guide = p.connect;
+  if (p.setup) out.guide = p.setup;
   return out;
 }
 
@@ -205,7 +197,7 @@ const someOf = <T extends string>(v: unknown, list: readonly T[], msg: string): 
 /** Checks onboarding's answers; throws plain words on anything else. */
 export function parsePrefs(answers: Record<string, unknown>): InstagramPrefs {
   const account = oneOf(answers.account, ["has", "wants", "no"] as const, "Pick one of the three.");
-  const connect = oneOf(answers.connect ?? answers.guide, ["now", "later"] as const, "Pick one.");
+  const setup = oneOf(answers.guide === "now" ? "made" : answers.guide, ["made", "later"] as const, "Pick one.");
   const goals = someOf(answers.goals, GOALS.map((g) => g.value), "Pick from the list.");
   const topics = someOf(answers.topics ?? DEFAULT_PREFS.topics, PILLARS.map((p) => p.id), "Pick topics from the list.");
   if (topics.length === 0) throw new Error("Pick at least one topic, or choose Set up later.");
@@ -219,7 +211,7 @@ export function parsePrefs(answers: Record<string, unknown>): InstagramPrefs {
   if (example.length > 600) throw new Error("Please keep it under 600 letters.");
   return {
     account,
-    connect,
+    setup,
     goals,
     topics,
     postsPerWeek: count,
@@ -234,7 +226,8 @@ export async function loadInstagramPrefs(): Promise<InstagramPrefs> {
   if (!row?.prefs || typeof row.prefs !== "object") return DEFAULT_PREFS;
   const p = row.prefs as Record<string, unknown>;
   try {
-    return parsePrefs({ ...p, style: { pick: p.style, example: p.example } });
+    // Older saves kept the step answer as connect: "now" | "later".
+    return parsePrefs({ ...p, guide: p.guide ?? p.connect, style: { pick: p.style, example: p.example } });
   } catch {
     return DEFAULT_PREFS;
   }
@@ -243,7 +236,7 @@ export async function loadInstagramPrefs(): Promise<InstagramPrefs> {
 export async function saveInstagramPrefs(p: InstagramPrefs): Promise<void> {
   const value = {
     account: p.account,
-    connect: p.connect,
+    guide: p.setup,
     goals: p.goals,
     topics: p.topics,
     posts_per_week: String(p.postsPerWeek),
@@ -261,6 +254,9 @@ export async function instagramDeclined(): Promise<boolean> {
   return (await loadInstagramPrefs()).account === "no";
 }
 
+/** The memories her post answers leave, retired after "Not for me". */
+const POST_MEMORIES = ["Instagram post goals:", "Instagram posts never show:", "Instagram post style:"];
+
 const ACCOUNT_WORDS: Record<Account, string> = {
   has: "Has an Instagram account for the practice.",
   wants: "Wants an Instagram business account for the practice; doesn't have one yet.",
@@ -275,6 +271,7 @@ async function afterSave(before: InstagramPrefs, p: InstagramPrefs, changed: str
       update practice_os.settings
          set helpers_enabled = coalesce(helpers_enabled, '{}'::jsonb) || ${db().json({ instagram: p.account !== "no" })}`;
     if (p.account !== before.account) await rememberLine("Instagram:", `Instagram: ${ACCOUNT_WORDS[p.account]}`, "preference");
+    if (p.account === "no") await retireLines(POST_MEMORIES);
   }
   if (changed.includes("goals") && p.goals.length) await rememberLine("Instagram post goals:", `Instagram post goals: ${label(GOALS, p.goals)}.`, "preference");
   if (changed.includes("never_show"))

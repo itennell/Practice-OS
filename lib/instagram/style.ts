@@ -10,6 +10,10 @@ import type { PracticeFacts } from "./write";
 
 export { FALLBACK_SAMPLES, STYLES, type StyleId, type StyleSample } from "./style-samples";
 
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([p, new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`Muse took longer than ${ms / 1000}s`)), ms))]);
+}
+
 const SCHEMA = {
   type: "object",
   additionalProperties: false,
@@ -30,12 +34,13 @@ export function sampleOk(text: unknown, f: Pick<PracticeFacts, "fees">): text is
 
 export async function writeStyleSamples(
   f: PracticeFacts,
-  opts: { chat?: ChatFn; hasKey?: boolean } = {},
+  opts: { chat?: ChatFn; hasKey?: boolean; timeoutMs?: number } = {},
 ): Promise<{ samples: StyleSample[]; source: "muse" | "fallback" }> {
   const hasKey = opts.hasKey ?? Boolean(process.env.MODEL_API_KEY);
   if (!hasKey) return { samples: FALLBACK_SAMPLES, source: "fallback" };
   try {
-    const res = await (opts.chat ?? metaChat)("onboarding.style_samples", {
+    // She is waiting on the screen: past about 8 seconds she gets the fixed three.
+    const res = await withTimeout((opts.chat ?? metaChat)("onboarding.style_samples", {
       messages: [
         {
           role: "user",
@@ -49,7 +54,7 @@ export async function writeStyleSamples(
         },
       ],
       response_format: { type: "json_schema", json_schema: { name: "style_samples", schema: SCHEMA as never } },
-    });
+    }), opts.timeoutMs ?? 8_000);
     const parsed = JSON.parse(res.choices[0]?.message.content ?? "{}") as Record<string, unknown>;
     const samples = STYLES.map((s) => ({ id: s.id, label: s.label, text: parsed[s.id] }));
     if (!samples.every((s) => sampleOk(s.text, f))) return { samples: FALLBACK_SAMPLES, source: "fallback" };

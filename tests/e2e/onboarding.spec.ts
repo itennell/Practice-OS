@@ -131,7 +131,6 @@ test("A new clinician sets up the whole practice, and the home page lists what s
   // The marketing interview (tests/e2e/marketing-interview.spec.ts has the other paths).
   await step(page, /How do new clients find you now\?/, () => page.getByRole("button", { name: "Word of mouth", exact: true }).click());
   await step(page, /Do you have an Instagram for your practice\?/, () => radio(page, "Yes, I have one"));
-  await step(page, /Do you want to connect it now\?/, () => radio(page, "Later"));
   await step(page, /What should your posts help with\?/, () => page.getByRole("button", { name: "Fill my open spots" }).click());
   // All five topics start picked.
   await step(page, /What should your posts be about\?/, () => page.getByRole("button", { name: "Office and telehealth", pressed: true }).click());
@@ -166,7 +165,6 @@ test("A new clinician sets up the whole practice, and the home page lists what s
   const todo = page.getByRole("region", { name: "Still to set up" });
   await expect(todo).toContainText("What's your NPI number?");
   await expect(todo).toContainText("What's your practice's tax ID (EIN)?");
-  await expect(todo).toContainText("Connect Instagram"); // she picked "Later"
   await expect(todo).not.toContainText("malpractice"); // Skip means "not for me"; only Set up later, or a skip that a form needs, is listed
   expect(await seriousViolations(page)).toEqual([]);
 

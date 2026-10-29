@@ -47,8 +47,8 @@ export type HelperQuestion =
       /** A short will/won't note shown on the screen. */
       note?: { will: string; wont: string };
     })
-  /** A choice that can show a Connect button (Settings › Connections card), with optional steps first. */
-  | (Base & { kind: "connect"; provider: string; options: Choice[]; steps?: string[] })
+  /** Numbered steps to follow, then a choice (done, or later). */
+  | (Base & { kind: "steps"; steps: string[]; options: Choice[] })
   /** Three [Sample] captions to pick from, or a pasted post she likes: { pick, example }. */
   | (Base & { kind: "style" });
 

@@ -544,7 +544,7 @@ export type Screen = {
   required?: boolean;
   later?: { when: string; ask: string };
   exclusive?: string;
-  /** For "connect": cards she said no to (Instagram after "not for me"). */
+  /** For "connect": cards left out (Instagram). For "team": helpers left out (Instagram after "Not for me"). */
   hide?: string[];
   /** For "team": which helpers start switched on, from her stage and answers. */
   defaults?: Record<HelperId, boolean>;
@@ -594,8 +594,10 @@ export function flatten(
       required: q.required,
       later: q.later,
       exclusive: q.exclusive,
-      ...(q.kind === "connect" && c.instagram === "no" ? { hide: ["instagram"] } : {}),
-      ...(q.kind === "team" ? { defaults: teamDefaults(c) } : {}),
+      // No connect button for Instagram in onboarding (publishing is cut for now), and after
+      // "Not for me" the Instagram helper isn't offered on the team screen either.
+      ...(q.kind === "connect" ? { hide: ["instagram"] } : {}),
+      ...(q.kind === "team" ? { defaults: teamDefaults(c), ...(c.instagram === "no" ? { hide: ["instagram"] } : {}) } : {}),
     });
     for (const block of opts.helpers ?? []) {
       if ((block.after ?? "uses_texting") !== q.id) continue;

@@ -894,6 +894,7 @@ export const TOOLS: AeonTool[] = [
     changesData: false,
     run: async (_input, ctx) => {
       const r = await instagram.planWeek(ctx.by, { chat: ctx.chat });
+      if (r.declined) return text({ written: false, why: instagram.DECLINED });
       return text({ week_of: r.week, waiting_for_approval: r.saved.length - r.blocked, blocked: r.blocked, see: "/instagram" });
     },
   }),
@@ -914,7 +915,7 @@ export const TOOLS: AeonTool[] = [
     changesData: false,
     run: async ({ request, pillar }, ctx) => {
       const r = await instagram.requestPost(ctx.by, request, pillar ?? null, { chat: ctx.chat });
-      if (r.outcome === "blocked") return text({ written: false, why: r.why });
+      if (r.outcome === "blocked" || r.outcome === "declined") return text({ written: false, why: r.why });
       return text({
         written: r.outcome !== "blocked_after_rewrite",
         headline: r.headline,

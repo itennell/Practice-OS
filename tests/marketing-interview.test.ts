@@ -3,10 +3,10 @@
 // branches the same way, and every word reads at about a 6th-grade level.
 import { describe, expect, it } from "vitest";
 import { flatten, QUESTIONS, teamDefaults, type Ctx } from "@/lib/onboarding/chapters";
-import { normalizeWebsite } from "@/lib/onboarding/store";
+import { normalizeWebsite, resumeAt } from "@/lib/onboarding/store";
 import { ACCOUNT_STEPS, instagramQuestions, parsePrefs } from "@/lib/instagram/onboarding";
 import { FALLBACK_SAMPLES, sampleOk, STYLES, writeStyleSamples } from "@/lib/instagram/style";
-import { voiceLines, type PracticeFacts } from "@/lib/instagram/write";
+import { neverShowFindings, voiceLines, type PracticeFacts } from "@/lib/instagram/write";
 import type { ChatFn } from "@/lib/instagram/critic";
 
 const base: Ctx = {
@@ -37,11 +37,10 @@ describe("the marketing interview", () => {
     expect(tools().slice(0, 3)).toEqual(["find_clients", "instagram:account", "website"]);
   });
 
-  it("Yes: connect now or later, then the post questions", () => {
+  it("Yes: straight to the post questions (no connect screen: publishing is cut for now)", () => {
     expect(tools({}, { account: "has" })).toEqual([
       "find_clients",
       "instagram:account",
-      "instagram:connect",
       "instagram:goals",
       "instagram:topics",
       "instagram:posts_per_week",
@@ -53,18 +52,24 @@ describe("the marketing interview", () => {
     ]);
   });
 
-  it("I'd like one: the step-by-step guide instead of Connect", () => {
+  it("I'd like one: the step-by-step guide, then the post questions", () => {
     const ids = tools({}, { account: "wants" });
     expect(ids).toContain("instagram:guide");
-    expect(ids).not.toContain("instagram:connect");
     expect(ids).toContain("instagram:style");
+    const guide = instagramQuestions.questions.find((q) => q.id === "guide")!;
+    expect(guide.kind === "steps" && guide.options.map((o) => o.label)).toEqual(["I made it", "I'll do it later"]);
+  });
+
+  it("onboarding never shows an Instagram connect button", () => {
+    expect(flatten(base).find((s) => s.id === "connect")?.hide).toContain("instagram");
   });
 
   it("Not for me: no more Instagram screens, and no Instagram card on Connect your tools", () => {
     const screens = flatten({ ...base, instagram: "no" }, { helpers: [instagramQuestions], basics, mine: { instagram: { account: "no" } } });
     expect(screens.filter((s) => s.id.startsWith("instagram:")).map((s) => s.id)).toEqual(["instagram:account"]);
     expect(screens.find((s) => s.id === "connect")?.hide).toEqual(["instagram"]);
-    expect(screens.find((s) => s.id === "team")?.defaults?.instagram).toBe(false);
+    // The team screen doesn't offer Instagram at all, so going Back can't turn it on.
+    expect(screens.find((s) => s.id === "team")).toMatchObject({ hide: ["instagram"], defaults: { instagram: false } });
   });
 
   it("website: picking 'My website' goes straight to the address; 'I'd like one' becomes a later task", () => {
@@ -90,12 +95,21 @@ describe("the marketing interview", () => {
     expect(normalizeWebsite("localhost")).toBeNull();
   });
 
+  it("picks up after the screen she answered when her answer removed the next one", () => {
+    const row = { state: "IL", credential: "LCPC" as const, practice_stage: "beginning" as const };
+    // She said "Yes" (the browser was heading to "instagram:goals"), went Back and chose "Not for me".
+    const p = { values: { find_clients: ["google"], "instagram:account": "no" }, skipped: [], later: [], current: "instagram:goals" };
+    expect(resumeAt(p, row as never, ["instagram:account"])).toBe("website");
+    expect(resumeAt({ ...p, current: "website" }, row as never, ["instagram:account"])).toBe("website");
+  });
+
   it("checks Instagram answers in plain words", () => {
     expect(parsePrefs({ never_show: ["face", "none"] }).neverShow).toEqual(["face"]);
     expect(() => parsePrefs({ account: "maybe" })).toThrow(/one of the three/);
     expect(() => parsePrefs({ style: { pick: "funny" } })).toThrow(/one of the three/);
     expect(() => parsePrefs({ style: { pick: "warm", example: "x".repeat(601) } })).toThrow(/600/);
     expect(parsePrefs({ style: { pick: "", example: "Book any time." } })).toMatchObject({ style: null, example: "Book any time." });
+    expect(parsePrefs({ guide: "now" }).setup).toBe("made"); // an older save
   });
 });
 
@@ -126,6 +140,22 @@ describe("her post style", () => {
     const bad = { ...good, warm: "Feeling anxious? Try deep breathing, then book a free call through the link in my bio today." };
     expect(await writeStyleSamples(facts, { hasKey: true, chat: reply(bad) })).toEqual({ samples: FALLBACK_SAMPLES, source: "fallback" });
     expect(await writeStyleSamples(facts, { hasKey: false })).toMatchObject({ source: "fallback" });
+  });
+
+  it("a Muse that hangs gives the fixed three after the timeout", async () => {
+    const hang = (() => new Promise(() => {})) as unknown as ChatFn;
+    expect(await writeStyleSamples(facts, { hasKey: true, chat: hang, timeoutMs: 50 })).toEqual({ samples: FALLBACK_SAMPLES, source: "fallback" });
+  });
+
+  it("never-show is checked in code: the picture's description, and her face or family in the words", () => {
+    const f = { ...facts, voice: { style: null, example: "", goals: [], neverShow: ["face", "office", "family"] } };
+    const ok = { headline: "How to book", body: "Our office is in Lincoln Park. Book a free call.", altText: "A calendar page with one day circled." };
+    expect(neverShowFindings(ok, f)).toEqual([]);
+    expect(neverShowFindings({ ...ok, altText: "Dana smiling in the lower right." }, f)[0].rule).toBe("never_show");
+    expect(neverShowFindings({ ...ok, altText: "Dana in the lower right." }, f)).toHaveLength(1); // her name is her face
+    expect(neverShowFindings({ ...ok, altText: "A desk in a sunny office." }, f)).toHaveLength(1);
+    expect(neverShowFindings({ ...ok, body: "My kids keep me busy, but book a call!" }, f)).toHaveLength(1);
+    expect(neverShowFindings({ ...ok, altText: "Dana smiling." }, { ...f, voice: { ...f.voice, neverShow: [] } })).toEqual([]);
   });
 
   it("drafts follow her pick, goals and limits", () => {

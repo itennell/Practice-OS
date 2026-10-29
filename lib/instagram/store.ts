@@ -6,7 +6,7 @@ import { db } from "../db";
 import { loadPracticeSettings } from "../gfe/store";
 import type { ChatFn, CriticResult } from "./critic";
 import { designPost, type GraphicDeps } from "./graphic";
-import { GOALS, loadInstagramPrefs, weekTopics } from "./onboarding";
+import { GOALS, instagramDeclined, loadInstagramPrefs, weekTopics } from "./onboarding";
 import { PILLAR_BY_ID, type PillarId } from "./pillars";
 import { writeRequested, writeWeek, type Draft, type PracticeFacts } from "./write";
 
@@ -148,10 +148,14 @@ export function blockedSummary(c: CriticResult): string {
 
 // ---- the two things Dana (or Aeon in chat) can ask for -----------------------------------
 
-export type PlanResult = { week: string; saved: SavedPost[]; blocked: number };
+export type PlanResult = { week: string; saved: SavedPost[]; blocked: number; declined?: true };
+
+/** What Aeon says when she said Instagram isn't for her (onboarding): nothing is written. */
+export const DECLINED = "You said Instagram isn't for you, so I haven't written anything. You can change that in Settings.";
 
 /** Plan this week: one draft per topic she picked (five by default), each checked, drawn and queued for approval. */
 export async function planWeek(by: string, opts: { chat?: ChatFn; graphic?: GraphicDeps } = {}): Promise<PlanResult> {
+  if (await instagramDeclined()) return { week: weekOf(), saved: [], blocked: 0, declined: true };
   const facts = await practiceFacts();
   const drafts = await writeWeek(facts, { chat: opts.chat, topics: weekTopics(await loadInstagramPrefs()) });
   const week = weekOf();
@@ -162,10 +166,12 @@ export async function planWeek(by: string, opts: { chat?: ChatFn; graphic?: Grap
 
 export type RequestResult =
   | { outcome: "blocked"; why: string }
+  | { outcome: "declined"; why: string }
   | { outcome: "queued" | "rewritten" | "blocked_after_rewrite"; post: SavedPost; headline: string; why: string | null };
 
 /** One post she asked for. A request about a client is never written as asked. */
 export async function requestPost(by: string, request: string, pillar: PillarId | null, opts: { chat?: ChatFn; graphic?: GraphicDeps } = {}): Promise<RequestResult> {
+  if (await instagramDeclined()) return { outcome: "declined", why: DECLINED };
   const facts = await practiceFacts();
   const out = await writeRequested(facts, request, pillar, { chat: opts.chat });
   if (out.kind === "hard_stop") {

@@ -72,7 +72,11 @@ function OnboardingFlow({ initial, connections, startAt }: Props & { startAt?: s
   const [currentId, setCurrentId] = useState<string>(() => {
     const ids = initial.screens.map((s) => s.id);
     const want = startAt ?? initial.progress.current;
-    return want && ids.includes(want) ? want : ids[0];
+    if (want && ids.includes(want)) return want;
+    // Where she left off is gone (an answer changed the questions): the first one she hasn't answered.
+    const p = initial.progress;
+    const open = initial.screens.find((s) => !(s.id in p.values) && !p.skipped.includes(s.id) && !p.later.includes(s.id));
+    return open?.id ?? ids[0];
   });
   const index = Math.max(0, screens.findIndex((s) => s.id === currentId || (currentId === "followups" && s.id === "followups#0")));
   const screen = screens[index];
