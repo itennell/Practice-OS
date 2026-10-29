@@ -17,6 +17,8 @@ async function seed() {
       .resize(1080, 1350, { fit: "cover" })
       .jpeg()
       .toBuffer();
+    // Only this spec's three posts: db:reset's own [Sample] posts would change the counts.
+    await sql`delete from practice_os.posts`;
     const [a] = await sql`
       insert into practice_os.approvals (kind, title, preview, payload, status, created_by, is_sample)
       values ('instagram_post', '[Sample] Instagram post: How to book', ${sql.json({ body: "Start with a free call." })}, '{}', 'pending', 'aeon:instagram', true)

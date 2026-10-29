@@ -857,14 +857,15 @@ export const TOOLS: AeonTool[] = [
     },
   }),
 
-  // Muse writes; nothing is sent. Approving makes a Gmail draft to the test inbox.
+  // Muse writes; nothing is sent. She copies it from the board and sends it herself.
   tool({
     name: "draft_outreach",
     title: "Draft an introduction letter",
     description:
       "Writes a short professional introduction letter from the clinician to one referral source on her board (by its id): " +
       "who she sees and an offer of a 15-minute call. Never offers fees, gifts or anything of value. The letter waits in her " +
-      "approvals; when she approves it, it becomes a Gmail draft in her test inbox for her to send, the card moves to " +
+      "approvals and on the Referrals board card, where she copies it into her own email and sends it herself (Aeon never sends). " +
+      "When she approves it, the card moves to " +
       "Contacted and a follow-up is set a week out. Takes about 10 seconds.",
     input: {
       id: z.string().uuid().describe("The referral source's id, from find_referral_sources or list_referral_sources."),
