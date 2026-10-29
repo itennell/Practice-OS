@@ -39,6 +39,8 @@ function ProviderRow({
   selected,
   onBoard,
   adding,
+  justAdded,
+  onFocused,
   onSelect,
   onAdd,
 }: {
@@ -46,9 +48,17 @@ function ProviderRow({
   selected: boolean;
   onBoard: string | null;
   adding: boolean;
+  justAdded: boolean;
+  onFocused: () => void;
   onSelect: () => void;
   onAdd: () => void;
 }) {
+  const boardLine = useRef<HTMLSpanElement>(null);
+  // After Add to board the button is gone: focus moves here, and again if the
+  // page refresh redraws the row, until focus leaves it.
+  useEffect(() => {
+    if (justAdded && onBoard) boardLine.current?.focus();
+  }, [justAdded, onBoard]);
   const id = `prov-${p.npi}`;
   const approximate = p.precision === "zip";
   const practice = p.practiceName ?? p.worksAt;
@@ -116,7 +126,9 @@ function ProviderRow({
         {onBoard ? (
           <span
             id={`onboard-${p.npi}`}
+            ref={boardLine}
             tabIndex={-1}
+            onBlur={onFocused}
             className={cn("inline-flex h-touch items-center rounded-full px-2 text-small font-medium text-[var(--fg-muted)]", FOCUS)}
           >
             On your board: {onBoard}
@@ -137,6 +149,8 @@ function TierSection({
   selected,
   board,
   adding,
+  justAdded,
+  onFocused,
   onSelect,
   onAdd,
 }: {
@@ -145,6 +159,8 @@ function TierSection({
   selected: string | null;
   board: Record<string, BoardEntry>;
   adding: string | null;
+  justAdded: string | null;
+  onFocused: () => void;
   onSelect: (npi: string) => void;
   onAdd: (p: AreaProvider) => void;
 }) {
@@ -175,6 +191,8 @@ function TierSection({
               selected={p.npi === selected}
               onBoard={board[p.npi]?.stage ?? null}
               adding={adding === p.npi}
+              justAdded={justAdded === p.npi}
+              onFocused={onFocused}
               onSelect={() => onSelect(p.npi)}
               onAdd={() => onAdd(p)}
             />
@@ -210,6 +228,7 @@ export function AreaExplorer({
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [adding, setAdding] = useState<string | null>(null);
+  const [justAdded, setJustAdded] = useState<string | null>(null);
   const [board, setBoard] = useState(initialBoard);
   const [announce, setAnnounce] = useState("");
   const [seenBoard, setSeenBoard] = useState(initialBoard);
@@ -293,8 +312,8 @@ export function AreaExplorer({
       const data = (await res.json()) as { added?: { npi: string }[]; error?: string };
       if (!res.ok || !data.added?.length) throw new Error(data.error ?? `${p.name} isn't in the NPI Registry any more.`);
       setBoard((b) => ({ ...b, [p.npi]: { stage: "Found" } }));
-      // The Add button is gone now; keep keyboard focus on the row.
-      window.setTimeout(() => document.getElementById(`onboard-${p.npi}`)?.focus(), 0);
+      // The Add button is gone now; keep keyboard focus on the row (its "On your board" line).
+      setJustAdded(p.npi);
       notify.success(`${p.name} is on your board under Found.`);
       router.refresh();
     } catch (err) {
@@ -416,6 +435,8 @@ export function AreaExplorer({
                   selected={selected}
                   board={board}
                   adding={adding}
+                  justAdded={justAdded}
+                  onFocused={() => setJustAdded(null)}
                   onSelect={select}
                   onAdd={add}
                 />
