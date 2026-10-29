@@ -77,6 +77,9 @@ Every UI piece Isaiah picked for Practice-OS, where it goes, and how to build it
 | UI-031 | Toast notifications | GLB | Toasts | must | built | shadcn/ui (MIT) | `components/shared/toaster.tsx` (`Toaster`, `notify`) |
 | UI-032 | Settings controls (switches and selects) | SET | Auto-approve kinds | must | built | shadcn/ui (MIT) | `components/shared/settings-controls.tsx` (`SettingSwitch`, `SettingSelect`, `SettingRadio`, `TextField`) |
 | UI-033 | List card (one card, hairline rows) | GLB | Lists | must | built | Calm redesign (Cal.com pattern, own build) | `components/shared/list-card.tsx` (`ListCard`, `ListRow`) |
+| UI-034 | Empty state | GLB | Empty lists | must | built | Calm redesign (own build) | `components/shared/empty-state.tsx` (`EmptyState`) |
+| UI-035 | Ask Aeon button (Aeon one tap away) | SHL | Every page but the chat | must | built | Calm redesign (own build) | `components/shared/ask-aeon-button.tsx` (`AskAeonButton`) |
+| UI-036 | Page header | GLB | Top of every page | must | built | Calm redesign (own build) | `components/ui.tsx` (`PageHeader`) |
 
 ## Build notes
 
@@ -271,6 +274,24 @@ Small messages that pop up in a corner and fade, confirming what just happened o
 **GLB · Lists** · must · built · Calm redesign (2026-10-28)
 
 One bordered card whose rows are split by hairlines, instead of a grid of separate cards (the Cal.com list pattern, rebuilt). `ListCard` has a small muted heading and an optional link on the right; `ListRow` has a small icon tile (accent-tinted for the row that needs her), a title, one muted line and an end slot (a chip, a date, a button). First used by Home's Today list and Still to set up; Approvals, Admin, Referrals and Front Desk adopt it next.
+
+### UI-034 Empty state
+
+**GLB · Empty lists** · must · built · Calm redesign (2026-10-28)
+
+A small icon tile (lucide), one bold line, one helpful sentence that says what will show up here, and at most one action. Not cute, no illustrations. First used by Approvals' filters.
+
+### UI-035 Ask Aeon button
+
+**SHL · Every page but the chat** · must · built · Calm redesign (2026-10-28)
+
+A 48px pill with Aeon's small orb and "Ask Aeon", fixed bottom right on every page except the chat and onboarding, opening the chat home. It leaves a little room at the end of the page so it never covers the last row.
+
+### UI-036 Page header
+
+**GLB · Top of every page** · must · built · Calm redesign (2026-10-28)
+
+One title (28px, 650), one plain line under it, and at most one action on the right. Pages adopt it in Redesign 4/5 and 5/5.
 
 ### UI-032 Settings controls (switches and selects)
 
