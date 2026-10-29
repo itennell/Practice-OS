@@ -155,12 +155,20 @@ export function danaCutout(): Promise<Buffer> {
   return cutoutCache;
 }
 
-export function backgroundPrompt(pillar: Pillar, retryNote?: string): string {
+const NEVER_SCENE: Record<string, string> = {
+  office: "No office rooms, desks or therapy rooms.",
+  home: "No homes, kitchens or living rooms.",
+  family: "No family photos or family scenes.",
+};
+
+export function backgroundPrompt(pillar: Pillar, retryNote?: string, neverShow: string[] = []): string {
+  const avoid = neverShow.map((n) => NEVER_SCENE[n]).filter(Boolean);
   return [
     `A calm, warm, minimal illustrated background for a therapy practice's Instagram post about ${pillar.scene}.`,
     LAYOUT_BRIEF,
     "Style: soft paper texture, gentle shapes, warm neutrals (cream #FAF9F5, sand, stone) with a little soft lavender #E3D9FF and one small touch of violet #5B47C9.",
     "Absolutely no text, letters, numbers, signs or logos. No people, faces or hands. No medical or clinical objects, no pills, no couches with patients.",
+    avoid.length ? `${avoid.join(" ")} Show a neutral scene instead, like soft shapes, plants or a calendar.` : "",
     retryNote ? `Fix from the last try: ${retryNote}` : "",
   ]
     .filter(Boolean)
@@ -212,18 +220,21 @@ export type GraphicDeps = {
   cutout?: () => Promise<Buffer | null>;
   background?: (prompt: string) => Promise<Buffer>;
   chat?: ChatFn;
+  /** Her "never show" picks from onboarding: "face" leaves her photo out; the rest stay out of the background. */
+  neverShow?: string[];
 };
 
 export type Graphic = { jpeg: Buffer; check: GraphicCheck; tries: number; backgroundPrompt: string };
 
 /** Draw, lay out, check; one redraw when the check fails. */
 export async function designPost(pillar: Pillar, words: Words, deps: GraphicDeps = {}): Promise<Graphic> {
-  const cutout = await (deps.cutout ?? danaCutout)();
+  const never = deps.neverShow ?? [];
+  const cutout = never.includes("face") ? null : await (deps.cutout ?? danaCutout)();
   const draw = deps.background ?? (async (prompt: string) => (await generateImage("instagram.background", prompt)).image);
   let note: string | undefined;
   let last: Graphic | null = null;
   for (let tries = 1; tries <= 2; tries++) {
-    const prompt = backgroundPrompt(pillar, note);
+    const prompt = backgroundPrompt(pillar, note, never);
     const jpeg = await composePost({ background: await draw(prompt), cutout, words });
     const check = await checkGraphic(jpeg, words, deps.chat);
     last = { jpeg, check, tries, backgroundPrompt: prompt };
