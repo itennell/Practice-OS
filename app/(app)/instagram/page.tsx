@@ -5,6 +5,7 @@ import { ListCard, ListRow } from "@/components/shared/list-card";
 import { InstagramBoard } from "@/components/instagram/instagram-board";
 import { listApprovalsById } from "@/lib/approvals";
 import { latestIdeas } from "@/lib/instagram/coach";
+import { instagramDeclined } from "@/lib/instagram/onboarding";
 import { PILLAR_BY_ID } from "@/lib/instagram/pillars";
 import { listPosts } from "@/lib/instagram/store";
 import { getProfile } from "@/lib/profile";
@@ -37,7 +38,8 @@ async function Board() {
   await connection(); // read the database per request, never at build time
   const [posts, ideas, profile] = await Promise.all([
     listPosts({ limit: 30 }),
-    latestIdeas().catch(() => []),
+    // After "Not for me" her old ideas don't show.
+    instagramDeclined().then((no) => (no ? [] : latestIdeas())).catch(() => []),
     getProfile().catch(() => null),
   ]);
   const approvals = await listApprovalsById(posts.flatMap((p) => (p.approvalId ? [p.approvalId] : [])));

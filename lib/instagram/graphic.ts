@@ -228,6 +228,7 @@ export type Graphic = { jpeg: Buffer; check: GraphicCheck; tries: number; backgr
 
 /** Tests and recorded conversations only (PLAYWRIGHT_IMAGE_STANDIN=1, like the Cal.com stand-in): a plain background, no image or photo model. */
 async function standIn(words: Words): Promise<Graphic> {
+  if (process.env.VERCEL || process.env.NODE_ENV === "production") throw new Error("PLAYWRIGHT_IMAGE_STANDIN is for tests only.");
   const background = await sharp({ create: { width: 1024, height: 1024, channels: 3, background: "#EDE7F6" } }).png().toBuffer();
   return { jpeg: await composePost({ background, cutout: null, words }), check: { ok: true, problems: [] }, tries: 1, backgroundPrompt: "(stand-in)" };
 }

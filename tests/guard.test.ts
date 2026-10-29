@@ -129,6 +129,10 @@ describe.skipIf(!haveModel)("guard with the local name-finder", () => {
     expect(await guard(idea, "reply", ALLOWED)).toEqual({ ok: true, text: idea });
     expect((await guard("Memory: Kevin Ortiz cancelled again", "memory", ALLOWED)).ok).toBe(false);
     expect((await guard("Post: Kevin Ortiz cancelled again", "memory", ALLOWED)).ok).toBe(false);
+    // An app word inside a name, with no label punctuation, keeps the whole name.
+    expect(await findNames("Remember Jenny Key cancelled again")).toEqual(["Jenny Key"]);
+    expect(await findNames("Jenny Key: she pays on the 1st")).toEqual(["Jenny Key"]);
+    expect((await guard("Remember Jenny Key cancelled again", "memory", ALLOWED)).ok).toBe(false);
   });
 
   it("blanks strangers' names in a tool result instead of dropping it", async () => {
