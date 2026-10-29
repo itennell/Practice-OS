@@ -107,7 +107,7 @@ Big rounded primary actions, dark on light (54px), with the purple accent pill (
 
 **CHT · Conversation list** · must · built · Design board p.8
 
-A dark side menu for talking to Aeon: search, navigation, pinned and recent chats, and a New chat button.
+A side menu for talking to Aeon: search, navigation, pinned and recent chats, and a New chat button. Calm redesign (2026-10-28, Redesign 2/5): the menu takes the page colour with a hairline edge in light mode and stays one step darker than the page (#1F1E1D) in dark mode; rows are 44px with 16px icons and 14px labels; New chat is a quiet row; counts are plain muted numbers, with an accent dot on Approvals when something is waiting. Tokens `--menu-*` in app/globals.css.
 
 ### UI-006 Chat bubbles with cut corners
 

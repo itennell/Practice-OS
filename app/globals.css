@@ -138,15 +138,17 @@
 
   --focus-ring: #5b47c9;
 
-  /* The dark chat menu (UI-005): dark in both themes. */
-  --menu-bg: #1f1e1d;
-  --menu-fg: #f5f4ef;
-  --menu-muted: #b5b3ab;
-  --menu-hover: rgb(255 255 255 / 0.06);
-  --menu-active: rgb(255 255 255 / 0.11);
-  --menu-line: rgb(255 255 255 / 0.14);
-  --menu-badge: rgb(255 255 255 / 0.14);
-  --menu-focus: #b0a3fb;
+  /* The chat menu (UI-005), calm redesign: the page colour with a hairline edge in light,
+     one step darker than the page in dark. */
+  --menu-bg: var(--color-canvas);
+  --menu-fg: var(--color-ink);
+  --menu-muted: var(--color-muted);
+  --menu-hover: rgb(31 30 29 / 0.05);
+  --menu-active: rgb(31 30 29 / 0.07);
+  --menu-line: var(--line);
+  --menu-badge: rgb(31 30 29 / 0.07);
+  --menu-focus: #5b47c9;
+  --menu-dot: #5b47c9;
 
   /* Motion durations. The orb breathes over --dur-breathe. */
   --dur-fast: 150ms;
@@ -215,7 +217,15 @@
 
     --focus-ring: #b0a3fb;
 
-    --menu-bg: #1b1a19;
+    --menu-bg: #1f1e1d;
+    --menu-fg: #f5f4ef;
+    --menu-muted: #b5b3ab;
+    --menu-hover: rgb(255 255 255 / 0.06);
+    --menu-active: rgb(255 255 255 / 0.1);
+    --menu-line: rgb(255 255 255 / 0.09);
+    --menu-badge: rgb(255 255 255 / 0.1);
+    --menu-focus: #b0a3fb;
+    --menu-dot: #b0a3fb;
   }
 }
 
