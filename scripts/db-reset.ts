@@ -4,6 +4,7 @@ import { loadEnv, requireEnv } from "../lib/env";
 import { prepareDatabase } from "../lib/local-db";
 import { danaFacts } from "../lib/compliance/demo";
 import { practiceToday, syncCalendar } from "../lib/compliance/store";
+import { SEED_POSTS } from "./seed-posts";
 
 // npm run db:reset: empties the demo-data tables and reseeds the fictional
 // Dana Reyes practice. Never touches settings, connections, audit_log,
@@ -67,6 +68,12 @@ try {
   await sql.begin(async (tx) => {
     await tx.unsafe(`truncate ${DEMO_TABLES.map((t) => `practice_os.${t}`).join(", ")}`);
     await tx.unsafe(seed);
+    // The [Sample] posts' finished pictures, so the demo post can be approved.
+    for (const post of SEED_POSTS) {
+      if (!post.picture) continue;
+      const jpeg = await readFile(`db/seed/posts/${post.id}.jpg`);
+      await tx`update practice_os.posts set image_jpeg = ${jpeg}, alt_text = ${`[Sample] Picture with the words: ${post.headline}`} where id = ${post.id}`;
+    }
   });
 
   // Dana's practice facts, then her calendar built from the rules.
