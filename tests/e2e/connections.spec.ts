@@ -81,7 +81,7 @@ test("The phone card walks her through her own Twilio number, one step at a time
   await steps.getByLabel("Account SID").fill("SK123");
   await steps.getByLabel("Auth Token").fill("not-a-token");
   await steps.getByRole("button", { name: "Check and connect" }).click();
-  await expect(steps.getByText(/starts with AC/)).toBeVisible();
+  await expect(steps.getByText(/The Account SID starts with AC/)).toBeVisible();
   expect(await axeSerious(page)).toEqual([]);
 
   // Ticks are remembered in this browser.
