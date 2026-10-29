@@ -114,7 +114,13 @@ function ProviderRow({
           Show on map
         </Button>
         {onBoard ? (
-          <span className="inline-flex h-touch items-center px-2 text-small font-medium text-[var(--fg-muted)]">On your board: {onBoard}</span>
+          <span
+            id={`onboard-${p.npi}`}
+            tabIndex={-1}
+            className={cn("inline-flex h-touch items-center rounded-full px-2 text-small font-medium text-[var(--fg-muted)]", FOCUS)}
+          >
+            On your board: {onBoard}
+          </span>
         ) : (
           <Button variant="accent" onClick={onAdd} disabled={adding} aria-label={`Add to board: ${p.name}`} className={FOCUS}>
             {adding ? "Adding…" : "Add to board"}
@@ -287,6 +293,8 @@ export function AreaExplorer({
       const data = (await res.json()) as { added?: { npi: string }[]; error?: string };
       if (!res.ok || !data.added?.length) throw new Error(data.error ?? `${p.name} isn't in the NPI Registry any more.`);
       setBoard((b) => ({ ...b, [p.npi]: { stage: "Found" } }));
+      // The Add button is gone now; keep keyboard focus on the row.
+      window.setTimeout(() => document.getElementById(`onboard-${p.npi}`)?.focus(), 0);
       notify.success(`${p.name} is on your board under Found.`);
       router.refresh();
     } catch (err) {

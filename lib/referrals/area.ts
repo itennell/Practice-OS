@@ -4,6 +4,7 @@
 // presses "Add to board". Only the area and the kinds of provider leave the
 // app, never anything about a client.
 import type postgres from "postgres";
+import { guard } from "../aeon/guard";
 import { db } from "../db";
 import { geocodeAddresses, geocodePlace, addressKey, type Point } from "./geocode";
 import { haversineMiles, zipCenters } from "./geo";
@@ -84,8 +85,16 @@ type Deps = {
   search?: typeof searchProviders;
   geocode?: typeof geocodeAddresses;
   place?: typeof geocodePlace;
+  /** The chat's sensitive-info check, run on a typed place before it leaves the app. */
+  check?: (text: string) => Promise<boolean>;
   centers?: Centers;
+  now?: () => number;
 };
+
+/** How long a search may take before it answers with what it has (the route allows 120 s). */
+export const SEARCH_MS = 90_000;
+
+const checkPlace = async (text: string) => (await guard(text, "message")).ok;
 
 export class AreaError extends Error {}
 
@@ -108,6 +117,8 @@ export async function searchArea(
   ctx: PracticeContext,
   deps: Deps = {},
 ): Promise<AreaResult> {
+  const now = deps.now ?? Date.now;
+  const deadline = now() + SEARCH_MS;
   const centers = deps.centers ?? (await zipCenters());
   const notes: string[] = [];
   let label: string;
@@ -135,6 +146,10 @@ export async function searchArea(
       points = area.zips.map((z) => centers[z]);
       label = area.zips.join(", ");
     } else {
+      // A typed place goes to OpenStreetMap, so it gets the same check as a chat message first.
+      if (!(await (deps.check ?? checkPlace)(area.place))) {
+        throw new AreaError("That looks like it could be about a person, so I didn't look it up. Try a ZIP code or a city instead.");
+      }
       const hit = await (deps.place ?? geocodePlace)(area.place, ctx.state || "Illinois");
       if (!hit) throw new AreaError(`I couldn't find "${area.place}" on the map. Try a ZIP code or a nearby city.`);
       points = [hit.point];
@@ -148,7 +163,10 @@ export async function searchArea(
     postals = zips;
   }
 
-  const found = await (deps.search ?? searchProviders)(req.specialties, postals, { maxRequests });
+  const found = await (deps.search ?? searchProviders)(req.specialties, postals, { maxRequests, deadline, now });
+  if (found.timedOut) {
+    notes.push(`The NPI Registry was slow, so this is showing the first ${found.timedOut.done} of ${found.timedOut.of} areas. Search again in a minute for the rest.`);
+  }
   const inArea = new Set(zips);
   const providers = found.providers.filter((p) => inArea.has(p.zip));
   if (found.truncated) {
@@ -161,6 +179,7 @@ export async function searchArea(
 
   const located = await (deps.geocode ?? geocodeAddresses)(
     providers.map((p) => ({ street: p.address, city: p.city, state: p.state, zip: p.zip })),
+    { timeoutMs: deadline + 25_000 - now() },
   );
   const works = linkGroups(providers);
   const officePoint = ctx.office ?? (ctx.officeZip ? (centers[ctx.officeZip] ?? null) : null);
