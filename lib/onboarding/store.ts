@@ -14,6 +14,7 @@ import { loadPracticeSettings, savePracticeSettings } from "../gfe/store";
 import { listPayerApplications, savePayerApplication } from "../payers/store";
 import {
   CHAPTERS,
+  FIND_OPTIONS,
   flatten,
   checkEin,
   HELPERS,
@@ -28,6 +29,7 @@ import {
   type Stage,
 } from "./chapters";
 import { HELPER_QUESTIONS, type HelperBlock, type PracticeBasics } from "./helper-questions";
+import { rememberLine } from "./remember-line";
 
 // Saving the interview. Every answer goes to the table and writer that already own
 // it; onboarding_answers.progress only remembers where she is, what she typed (to
@@ -90,7 +92,20 @@ export function ctxFrom(values: Record<string, unknown>, row: Pick<ProfileRow, "
     medicare: str(medicare?.status) as Ctx["medicare"],
     medicaid: bool(medicaid?.yes),
     officeZip: office?.zip ?? null,
+    findClients: Array.isArray(values.find_clients) ? (values.find_clients as string[]) : [],
+    website: str(values.website) as Ctx["website"],
+    instagram: str(values["instagram:account"]) as Ctx["instagram"],
   };
+}
+
+/** Each helper's answers so far ("instagram:account" -> mine.instagram.account), so a block can branch. */
+function helperAnswers(values: Record<string, unknown>): Record<string, Record<string, unknown>> {
+  const out: Record<string, Record<string, unknown>> = {};
+  for (const [id, v] of Object.entries(values)) {
+    const [helper, qid] = id.split(":");
+    if (qid) (out[helper] ??= {})[qid] = v;
+  }
+  return out;
 }
 
 function basicsFrom(c: Ctx): PracticeBasics {
@@ -129,7 +144,7 @@ export function screensFor(
 ): Screen[] {
   const c = ctxFrom(values, row);
   const extra = opts.museReady === false ? [MUSE_SCREEN] : [];
-  return flatten(c, { states: STATES, helpers: HELPER_QUESTIONS, extra, basics: basicsFrom(c) });
+  return flatten(c, { states: STATES, helpers: HELPER_QUESTIONS, extra, basics: basicsFrom(c), mine: helperAnswers(values) });
 }
 
 export type SetupItem = { id: string; title: string; status: string };
@@ -297,10 +312,31 @@ export async function saveAnswers(
     progress.values[id] = PRIVATE.has(id) ? true : value;
     progress.skipped = progress.skipped.filter((x) => x !== id);
     progress.later = progress.later.filter((x) => x !== id);
+    // "No, but I'd like one" and "Later" answers stay on "Still to set up".
+    if (laterFor(id)?.when === value) progress.later.push(id);
   }
   if (opts.current !== undefined) progress.current = opts.current;
+  progress.current = resumeAt(progress, row, Object.keys(answers));
   await saveProgress(progress, sql);
   return { pending: false, notes, state: await loadOnboarding(sql) };
+}
+
+/**
+ * Where she picks up. An answer can remove the screen the browser said was next
+ * (Instagram "Not for me"); then it's the screen after the one she just answered,
+ * in the list as it is now.
+ */
+export function resumeAt(p: Progress, row: ProfileRow, answered: string[]): string | null {
+  const ids = screensFor(p.values, row).map((s) => s.id);
+  if (!p.current || ids.includes(p.current)) return p.current;
+  const at = Math.max(...answered.map((id) => ids.indexOf(id)));
+  return at >= 0 ? (ids[at + 1] ?? null) : null;
+}
+
+function laterFor(id: string): { when: string; ask: string } | undefined {
+  const [helper, qid] = id.split(":");
+  if (qid) return HELPER_QUESTIONS.find((b) => b.helper === helper)?.questions.find((q) => q.id === qid)?.later;
+  return QUESTIONS.find((q) => q.id === id)?.later;
 }
 
 /** Skip ("doesn't fit me") or Set up later ("remind me"). */
@@ -312,6 +348,7 @@ export async function markSkipped(id: string, how: "skip" | "later", current: st
   p.later = p.later.filter((x) => x !== id);
   (how === "skip" ? p.skipped : p.later).push(id);
   p.current = current;
+  p.current = resumeAt(p, row, [id]);
   await saveProgress(p, sql);
   return loadOnboarding(sql);
 }
@@ -570,6 +607,29 @@ async function saveOne(id: string, value: unknown, all: Record<string, unknown>,
     case "caqh":
       await facts({ caqh_last_attested_on: isoDay.parse(value) });
       return null;
+    case "find_clients": {
+      const ids = new Set(FIND_OPTIONS.map((o) => o.value));
+      const v = z.array(z.string().refine((x) => ids.has(x), "Pick from the list.")).max(FIND_OPTIONS.length).parse(value);
+      const picked = v.includes("not_sure") && v.length > 1 ? v.filter((x) => x !== "not_sure") : [...new Set(v)];
+      await saveMarketing({ find_clients: picked }, sql);
+      if (picked.length)
+        await rememberLine("How new clients find her:", `How new clients find her: ${picked.map((x) => FIND_OPTIONS.find((o) => o.value === x)!.label).join(", ")}.`);
+      return null;
+    }
+    case "website": {
+      const v = z.enum(["has", "wants", "no"], { message: "Pick one of the three." }).parse(value);
+      // No website (yet): an address saved earlier no longer applies.
+      await saveMarketing(v === "has" ? { website: v } : { website: v, website_url: null }, sql);
+      await rememberLine("Practice website:", `Practice website: ${WEBSITE_WORDS[v]}`, v === "no" ? "preference" : "fact");
+      return null;
+    }
+    case "website_url": {
+      const url = normalizeWebsite(z.string().parse(value));
+      if (!url) throw new AnswerError("That doesn't look like a website address. Try something like reyescounseling.com.");
+      await saveMarketing({ website_url: url, website: "has" }, sql);
+      await rememberLine("Practice website:", `Practice website: ${url}`);
+      return null;
+    }
     case "who": {
       const v = z
         .object({ chips: z.array(z.string().max(60)).max(20), work: z.array(z.string().max(60)).max(20), text: z.string().trim().max(400) })
@@ -617,6 +677,8 @@ async function saveOne(id: string, value: unknown, all: Record<string, unknown>,
     case "team": {
       const ids = HELPERS.map((h) => h.id);
       const v = z.record(z.enum(ids as [HelperId, ...HelperId[]]), z.boolean()).parse(value);
+      // "Not for me" wins over a team map saved before it (going Back to this screen).
+      if (all["instagram:account"] === "no") v.instagram = false;
       await sql`update practice_os.settings set helpers_enabled = ${sql.json({ admin: true, referrals: true, instagram: true, front_desk: true, ...v } as never)}`;
       return null;
     }
@@ -624,6 +686,30 @@ async function saveOne(id: string, value: unknown, all: Record<string, unknown>,
       if (!QUESTIONS.some((q) => q.id === id)) throw new AnswerError("Unknown question.");
       return null;
   }
+}
+
+const WEBSITE_WORDS = { has: "has one.", wants: "wants one; doesn't have one yet.", no: "doesn't want one." } as const;
+
+/** "reyescounseling.com" or "https://…" as https://…, or null for anything else. */
+export function normalizeWebsite(input: string): string | null {
+  const t = input.trim().replace(/\/+$/, "");
+  if (t.length > 200 || /\s/.test(t)) return null;
+  const withScheme = /^https?:\/\//i.test(t) ? t : `https://${t}`;
+  try {
+    const u = new URL(withScheme);
+    if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(u.hostname) || u.username || u.password) return null;
+    return `https://${u.hostname.toLowerCase()}${u.pathname === "/" ? "" : u.pathname}`;
+  } catch {
+    return null;
+  }
+}
+
+/** How clients find her and her website, in onboarding_answers.marketing. */
+async function saveMarketing(patch: Record<string, unknown>, sql: postgres.Sql): Promise<void> {
+  await sql`
+    update practice_os.clinician_profile
+       set onboarding_answers = jsonb_set(coalesce(onboarding_answers, '{}'::jsonb), '{marketing}',
+             coalesce(onboarding_answers -> 'marketing', '{}'::jsonb) || ${sql.json(patch as never)}, true)`;
 }
 
 const INSURANCE_WORDS = { self_pay: "Self-pay only", some: "Takes some insurance", planning: "Self-pay now, plans to take insurance" } as const;
@@ -674,7 +760,7 @@ export async function stillToSetUp(sql: postgres.Sql = db()): Promise<{ id: stri
     .filter((s) => open.has(s.id))
     .map((s) => ({
       id: s.id,
-      ask: s.ask,
+      ask: s.later && p.values[s.id] === s.later.when ? s.later.ask : s.ask,
       why: QUESTIONS.find((q) => q.id === s.id)?.blocks ?? null,
       chapter: CHAPTERS.find((c) => c.id === s.chapter)!.title,
     }));

@@ -6,11 +6,13 @@ import { shortSlotLabel } from "./calendar/zone";
 import { saveFrontDeskSetup } from "./setup";
 import { calendarSettings, getCalendarAdapter, type CalcomMeta } from "./calendar";
 import { type CalendarProvider } from "./calendar/types";
-import { getPhoneAdapter, PHONE_PROVIDER, type PhoneMeta } from "./phone";
+import { getPhoneAdapter, ownTwilioConfig, PHONE_PROVIDER, type PhoneMeta } from "./phone";
 import { spruceAdapter } from "./phone/spruce";
 import { quickCache } from "./phone/quick-cache";
-import { textingNote, tollfreeStatus } from "./phone/tollfree";
-import { twilioFromEnv } from "./phone/twilio";
+import { textingNote, tollfreeStatus, type TollfreeStatus } from "./phone/tollfree";
+import { getVoiceSetting, isPracticeOsVoicemail, isTollFree, listTwilioNumbers, setVoiceSetting, twilioFromEnv, voicemailUrl, type TwilioNumber } from "./phone/twilio";
+import { defaultGreeting, loadFrontDeskSetup } from "./setup";
+import { PhoneError } from "./phone/types";
 import type { CheckResult } from "./phone/types";
 
 // The Connect cards' server side: every key is checked live before it is saved
@@ -19,7 +21,7 @@ import type { CheckResult } from "./phone/types";
 export type ConnectStatus = { connected: boolean; check: CheckResult | null; vendor?: string; devLine?: boolean };
 
 /** The phone card's facts. On the demo line, `note` says whether callers can get texts yet. */
-export type PhoneStatus = ConnectStatus & { number?: string; note?: string };
+export type PhoneStatus = ConnectStatus & { number?: string; note?: string; texting?: TollfreeStatus; voicemailOn?: boolean };
 
 // The live check runs on every Settings, onboarding and Front Desk load, so it is
 // cached like the toll-free status: only a working line is remembered, and a slow
@@ -35,9 +37,11 @@ export async function phoneStatus(): Promise<PhoneStatus> {
   if (!phone) return { connected: false, check: null };
   const check = () => checks.get(phone.vendor, () => phone.check(), null);
   const dev = twilioFromEnv();
-  if (!dev) return { connected: true, vendor: phone.vendor, devLine: false, check: await check() };
-  const [checked, texting] = await Promise.all([check(), tollfreeStatus(dev)]);
-  return { connected: true, vendor: phone.vendor, devLine: true, number: dev.phoneNumber, check: checked, note: textingNote(texting) ?? undefined };
+  const line = dev ?? (phone.vendor === "twilio" ? await ownTwilioConfig() : null);
+  if (!line) return { connected: true, vendor: phone.vendor, devLine: false, check: await check() };
+  const [checked, texting] = await Promise.all([check(), tollfreeStatus(line)]);
+  const voicemailOn = dev ? undefined : Boolean((line as { voicemailOn?: boolean }).voicemailOn);
+  return { connected: true, vendor: phone.vendor, devLine: Boolean(dev), number: line.phoneNumber, check: checked, texting, voicemailOn, note: textingNote(texting) ?? undefined };
 }
 
 export async function connectSpruce(token: string): Promise<CheckResult> {
@@ -57,10 +61,144 @@ export async function connectSpruce(token: string): Promise<CheckResult> {
   return check;
 }
 
-export async function disconnectPhone(): Promise<void> {
+export type TwilioConnectResult = CheckResult | { ok: false; choose: TwilioNumber[]; fix: string };
+
+const greeting = async () => (await loadFrontDeskSetup().catch(() => null))?.greeting ?? (await defaultGreeting());
+
+/**
+ * Her own Twilio account: check the keys by listing her numbers, pick the
+ * toll-free one (or ask which when there are several), then save the Auth
+ * Token encrypted. Changes nothing on her Twilio account: sending calls to
+ * her voicemail is a separate button (turnOnTwilioVoicemail).
+ */
+export async function connectTwilio(input: { accountSid: string; authToken: string; numberSid?: string }, fetchImpl: typeof fetch = fetch): Promise<TwilioConnectResult> {
+  const accountSid = input.accountSid.trim();
+  const authToken = input.authToken.trim();
+  if (!/^AC[0-9a-f]{32}$/i.test(accountSid)) return { ok: false, fix: "The Account SID starts with AC and has 34 letters and numbers. Copy it again from the Twilio Console home page." };
+  if (!/^[0-9a-f]{32}$/i.test(authToken)) return { ok: false, fix: "The Auth Token has 32 letters and numbers. On the Twilio Console home page, press the eye next to it, then copy it again." };
+  let numbers: TwilioNumber[];
+  try {
+    numbers = await listTwilioNumbers(accountSid, authToken, fetchImpl);
+  } catch (e) {
+    return { ok: false, fix: e instanceof PhoneError ? e.fix : "Couldn't reach Twilio. Try again in a minute." };
+  }
+  if (numbers.length === 0) return { ok: false, fix: "Your keys work, but there's no phone number on this Twilio account yet. Buy a toll-free number in Twilio, then press Check again." };
+  const pick =
+    numbers.find((n) => n.sid === input.numberSid) ??
+    (numbers.length === 1 ? numbers[0] : numbers.filter((n) => n.tollFree).length === 1 ? numbers.find((n) => n.tollFree) : undefined);
+  if (!pick) return { ok: false, choose: numbers, fix: "Which number is your practice line?" };
+  const label = `Connected: ${pick.label} (Twilio)`;
+  // A number already pointing at Practice-OS voicemail (an earlier copy, or a lost database) counts as on;
+  // its echo address is never kept as the "previous" setting. Same line as before: carry the old setting forward.
+  const earlier = await ownTwilioConfig();
+  const sameLine = earlier?.accountSid === accountSid && earlier.numberSid === pick.sid;
+  let voice: Pick<PhoneMeta, "voicemailOn" | "previousVoiceUrl" | "previousVoiceMethod">;
+  if (sameLine && earlier.voicemailOn) {
+    voice = { voicemailOn: true, previousVoiceUrl: earlier.previousVoiceUrl ?? null, previousVoiceMethod: earlier.previousVoiceMethod ?? null };
+  } else {
+    const now = await getVoiceSetting({ accountSid, authToken, phoneNumber: pick.phoneNumber }, pick.sid, fetchImpl).catch(() => null);
+    voice = isPracticeOsVoicemail(now?.voiceUrl) ? { voicemailOn: true, previousVoiceUrl: null, previousVoiceMethod: null } : { voicemailOn: false };
+  }
+  const meta: PhoneMeta = { vendor: "twilio", accountSid, phoneNumber: pick.phoneNumber, numberSid: pick.sid, lineLabel: label, ...voice };
+  try {
+    await saveConnection({ provider: PHONE_PROVIDER, accountLabel: label, accessToken: authToken, refreshToken: null, scopes: [], expiresAt: null, meta });
+  } catch {
+    return { ok: false, fix: "Twilio answered, but Practice-OS couldn't save the keys. Update Practice-OS, then try again." };
+  }
+  forgetPhoneCheck();
+  await audit({ actor: "clinician", action: "phone_connected", subjectType: "connection", subjectId: "phone", details: { vendor: "twilio", tollFree: isTollFree(pick.phoneNumber) } });
+  return { ok: true, label };
+}
+
+/** Saves new meta on her Twilio connection, keeping the token as it is. */
+async function updateTwilioMeta(change: Partial<PhoneMeta>): Promise<void> {
+  const conn = await getConnection(PHONE_PROVIDER);
+  if (!conn) throw new Error("no phone connection");
+  await saveConnection({ ...conn, meta: { ...conn.meta, ...change } });
+}
+
+/**
+ * Pressed by her on the card: sends calls to her Twilio number to her
+ * greeting and voicemail. The number's old call setting is saved first, so
+ * Undo can always put it back; if Twilio refuses the change, the saved
+ * setting is dropped again. Both changes go to audit_log.
+ */
+export async function turnOnTwilioVoicemail(fetchImpl: typeof fetch = fetch): Promise<CheckResult> {
+  const own = await ownTwilioConfig();
+  if (!own?.numberSid) return { ok: false, fix: "Connect your Twilio number first." };
+  const fail = (e: unknown) => ({ ok: false as const, fix: e instanceof PhoneError ? e.fix : "Couldn't change your number's call setting. Try again in a minute." });
+  let previous = { voiceUrl: own.previousVoiceUrl ?? null, voiceMethod: own.previousVoiceMethod ?? null };
+  if (!own.voicemailOn) {
+    try {
+      const now = await getVoiceSetting(own, own.numberSid, fetchImpl);
+      previous = isPracticeOsVoicemail(now.voiceUrl) ? { voiceUrl: null, voiceMethod: null } : now;
+      await updateTwilioMeta({ previousVoiceUrl: previous.voiceUrl, previousVoiceMethod: previous.voiceMethod });
+    } catch (e) {
+      return fail(e);
+    }
+  }
+  try {
+    await setVoiceSetting(own, own.numberSid, { voiceUrl: voicemailUrl(await greeting()), voiceMethod: "GET" }, fetchImpl);
+  } catch (e) {
+    if (!own.voicemailOn) await updateTwilioMeta({ previousVoiceUrl: undefined, previousVoiceMethod: undefined }).catch(() => {});
+    return fail(e);
+  }
+  try {
+    await updateTwilioMeta({ voicemailOn: true });
+  } catch (e) {
+    // Couldn't record it: put the number back, so what the card shows stays true.
+    if (!own.voicemailOn) await setVoiceSetting(own, own.numberSid, previous, fetchImpl).catch(() => {});
+    return fail(e);
+  }
+  await audit({ actor: "clinician", action: "phone_voicemail_on", subjectType: "connection", subjectId: "phone", details: { number: own.phoneNumber, previousVoiceUrl: previous.voiceUrl } });
+  forgetPhoneCheck();
+  return { ok: true, label: "Calls to your number now go to your greeting and voicemail." };
+}
+
+/** Undo: puts her number's old call setting back. */
+export async function undoTwilioVoicemail(fetchImpl: typeof fetch = fetch): Promise<CheckResult> {
+  const own = await ownTwilioConfig();
+  if (!own?.numberSid || !own.voicemailOn) return { ok: false, fix: "There's nothing to undo." };
+  const previous = { voiceUrl: own.previousVoiceUrl ?? null, voiceMethod: own.previousVoiceMethod ?? null };
+  try {
+    await setVoiceSetting(own, own.numberSid, previous, fetchImpl);
+    await updateTwilioMeta({ voicemailOn: false, previousVoiceUrl: undefined, previousVoiceMethod: undefined });
+    await audit({ actor: "clinician", action: "phone_voicemail_undone", subjectType: "connection", subjectId: "phone", details: { number: own.phoneNumber, restoredVoiceUrl: previous.voiceUrl } });
+  } catch (e) {
+    return { ok: false, fix: e instanceof PhoneError ? e.fix : "Couldn't put the old setting back. Try again in a minute." };
+  }
+  forgetPhoneCheck();
+  return { ok: true, label: "Your number's call setting is back to what it was." };
+}
+
+/** Puts her current Front Desk greeting on her number again (after she changes it). */
+export async function refreshTwilioGreeting(fetchImpl: typeof fetch = fetch): Promise<CheckResult> {
+  const own = await ownTwilioConfig();
+  if (!own?.numberSid || !own.voicemailOn) return { ok: false, fix: "Send calls to your voicemail first." };
+  try {
+    await setVoiceSetting(own, own.numberSid, { voiceUrl: voicemailUrl(await greeting()), voiceMethod: "GET" }, fetchImpl);
+  } catch (e) {
+    return { ok: false, fix: e instanceof PhoneError ? e.fix : "Couldn't update the greeting. Try again in a minute." };
+  }
+  await audit({ actor: "clinician", action: "phone_greeting_updated", subjectType: "connection", subjectId: "phone" });
+  return { ok: true, label: "Your greeting is on your number." };
+}
+
+/**
+ * Forgets her phone company. A Twilio number still sending calls to
+ * Practice-OS voicemail gets its old call setting back first; if that fails,
+ * nothing is forgotten, so Undo stays possible.
+ */
+export async function disconnectPhone(fetchImpl: typeof fetch = fetch): Promise<CheckResult> {
+  const own = await ownTwilioConfig();
+  if (own?.voicemailOn) {
+    const undone = await undoTwilioVoicemail(fetchImpl);
+    if (!undone.ok) return { ok: false, fix: `Your number still sends calls to your voicemail, so it stays connected. ${undone.fix}` };
+  }
   await deleteConnection(PHONE_PROVIDER);
   forgetPhoneCheck();
   await audit({ actor: "clinician", action: "phone_disconnected", subjectType: "connection", subjectId: "phone" });
+  return { ok: true, label: "Disconnected." };
 }
 
 export async function calendarStatus(): Promise<ConnectStatus & { provider: CalendarProvider | null; eventTypeLabel?: string }> {

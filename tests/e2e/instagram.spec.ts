@@ -6,8 +6,9 @@ import postgres from "postgres";
 import sharp from "sharp";
 
 // The Instagram page with three [Sample] posts seeded straight into the
-// database (no model calls): one waiting for her, one blocked, one live.
-// The server runs with DRY_RUN, so approving checks the post and posts nothing.
+// database (no model calls): one waiting for her, one blocked, one ready to post.
+// Publishing is cut for now: approving marks a post ready, and she copies the
+// caption and downloads the picture to post it herself.
 
 async function seed() {
   const sql = postgres(process.env.DATABASE_URL!, { max: 1 });
@@ -31,9 +32,9 @@ async function seed() {
       values ('first_session', '[Sample] A client of mine…', '[Sample] A client story', 'blocked',
               ${"Posts can't tell a client's story, even with details changed. That protects your clients and your license."}, current_date, true)`;
     await sql`
-      insert into practice_os.posts (topic, caption, headline, alt_text, image_jpeg, status, ig_permalink, published_at, week_of, is_sample)
+      insert into practice_os.posts (topic, caption, headline, alt_text, image_jpeg, status, week_of, is_sample)
       values ('fees_superbills', ${"[Sample] Sessions are $175.\n\nDana Reyes, LCPC (fictional demo practice)"}, '[Sample] What a session costs',
-              'Dana at her desk', ${jpeg}, 'published', 'https://www.instagram.com/p/SAMPLE123/', now(), current_date, true)`;
+              'Dana at her desk', ${jpeg}, 'ready', current_date, true)`;
   } finally {
     await sql.end();
   }
@@ -57,15 +58,24 @@ test("See the week's posts, why one was blocked, and approve one", async ({ page
   await page.goto("/instagram");
   await expect(page.getByRole("heading", { level: 1, name: "Instagram" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Plan this week" })).toBeVisible();
-  await expect(page.getByText("1 waiting for you · 1 live")).toBeVisible();
+  await expect(page.getByText("1 waiting for you · 1 ready to post")).toBeVisible();
+  await expect(page.getByText(/Aeon writes your posts\. You post them yourself/)).toBeVisible();
+  await expect(page.getByRole("link", { name: /Connect Instagram/ })).toHaveCount(0);
 
   const blocked = page.getByRole("listitem").filter({ hasText: "A client story" });
   await expect(blocked).toContainText("Blocked");
   await expect(blocked).toContainText("can't tell a client's story");
 
-  const live = page.getByRole("listitem").filter({ hasText: "What a session costs" });
-  await expect(live.getByRole("link", { name: /View on Instagram/ })).toHaveAttribute("href", "https://www.instagram.com/p/SAMPLE123/");
-  await expect(live.getByRole("img", { name: "Dana at her desk" })).toBeVisible();
+  const ready = page.getByRole("listitem").filter({ hasText: "What a session costs" }).first();
+  await expect(ready.getByText("Ready to post").first()).toBeVisible();
+  await expect(ready.getByRole("img", { name: "Dana at her desk" })).toBeVisible();
+  await expect(ready.getByRole("button", { name: "Copy caption" })).toBeVisible();
+  const download = ready.getByRole("link", { name: "Save picture" });
+  await expect(download).toHaveAttribute("href", /\/image\?download=1$/);
+  const res = await page.request.get((await download.getAttribute("href"))!);
+  expect(res.headers()["content-type"]).toBe("image/jpeg");
+  expect(res.headers()["content-disposition"]).toMatch(/^attachment; filename="instagram-post-/);
+  await expect(ready.getByRole("listitem").filter({ hasText: "Open the Instagram app" })).toBeVisible();
 
   await axe(page);
 
@@ -74,6 +84,11 @@ test("See the week's posts, why one was blocked, and approve one", async ({ page
   await expect(waiting).toContainText("Dana Reyes, LCPC (fictional demo practice)");
   await waiting.getByRole("button", { name: "Approve" }).click();
   await expect(waiting.getByText("Done").first()).toBeVisible();
+  // Approving never posts: the post is now ready for her to post herself.
+  await page.reload();
+  const approved = page.getByRole("listitem").filter({ hasText: "[Sample] How to book" }).first();
+  await expect(approved.getByRole("button", { name: "Copy caption" })).toBeVisible();
+  await expect(page.getByText("0 waiting for you · 2 ready to post")).toBeVisible();
 });
 
 test("Keyboard reaches every action, and text at 200% still fits", async ({ page }) => {

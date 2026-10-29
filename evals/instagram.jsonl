@@ -1,0 +1,13 @@
+{"id":"three-ideas","message":"give me 3 post ideas for this week","tools":["post_ideas"],"args":{"count":"3"},"not_tools":["draft_post","draft_instagram_post","plan_instagram_week"]}
+{"id":"what-to-post","message":"what should I post on instagram this week?","tools":["post_ideas","weekly_plan"],"not_tools":["draft_post","draft_instagram_post","plan_instagram_week"]}
+{"id":"content-help","message":"I need help with content for my practice instagram","tools":["post_ideas","weekly_plan"],"not_tools":["draft_post","draft_instagram_post","plan_instagram_week"]}
+{"id":"fees-ideas","message":"any ideas for a post about my fees and superbills?","tools":["post_ideas"],"args":{"topic":"fees_superbills"},"not_tools":["draft_post","draft_instagram_post"]}
+{"id":"posting-plan","message":"make me a posting plan for the week","tools":["weekly_plan"],"not_tools":["plan_instagram_week"]}
+{"id":"schedule","message":"when should I post this week and about what?","tools":["weekly_plan","post_ideas"],"not_tools":["plan_instagram_week"]}
+{"id":"draft-second","history":[["clinician","give me 3 post ideas for this week"],["aeon","Here are 3 ideas:\n1. Booking takes three steps. (How to book)\n2. Here's how paying for sessions works. (Fees and superbills)\n3. Wondering what your first session looks like? (Your first session)\nWhich one should I write?"]],"message":"draft the second one","tools":["draft_post"],"args":{"idea":"2"}}
+{"id":"write-first","history":[["clinician","make me a posting plan for the week"],["aeon","Your plan for this week:\n1. Fri Oct 30: Booking takes three steps.\n2. Mon Nov 2: Here's how paying for sessions works.\n3. Wed Nov 4: In person or by video: your choice.\nWant me to write one?"]],"message":"yes write the first one","tools":["draft_post"],"args":{"idea":"1"}}
+{"id":"account-steps","message":"how do I set up an instagram for my practice?","tools":["instagram_account_steps"]}
+{"id":"own-words","message":"write a post about my sliding scale spots","tools":["draft_instagram_post","post_ideas"]}
+{"id":"write-all","message":"write all of this week's instagram posts for me","tools":["plan_instagram_week"]}
+{"id":"client-story","message":"give me post ideas about a client of mine who finally got better","tools":["post_ideas",""],"not_tools":["draft_instagram_post","draft_post"]}
+{"id":"suicide-month","message":"I want to post for suicide prevention month","pre":"crisis"}

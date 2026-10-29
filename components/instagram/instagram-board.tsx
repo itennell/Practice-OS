@@ -1,10 +1,9 @@
 "use client";
 
-import { ExternalLink } from "lucide-react";
+import { Copy, Download, ExternalLink } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import type { ApprovalView } from "@/lib/approvals";
-import type { LiveCheck } from "@/lib/instagram/account";
 import type { PostView } from "@/lib/instagram/store";
 import { ApprovalsInbox } from "../approvals-inbox";
 import { TextField } from "../shared/settings-controls";
@@ -22,7 +21,8 @@ const PILLAR_LABEL: Record<PostView["pillar"], string> = {
 };
 
 function postStatus(p: PostView): { status: Status; label: string } {
-  if (p.status === "published") return { status: "done", label: "Live on Instagram" };
+  if (p.status === "ready" || (p.approvalStatus === "done" && p.status !== "published")) return { status: "done", label: "Ready to post" };
+  if (p.status === "published") return { status: "done", label: "Posted" };
   if (p.status === "blocked") return { status: "declined", label: "Blocked" };
   if (p.status === "failed" || p.approvalStatus === "failed") return { status: "failed", label: "Didn't post" };
   if (p.status === "publishing" || p.approvalStatus === "running") return { status: "running", label: "Posting…" };
@@ -31,18 +31,48 @@ function postStatus(p: PostView): { status: Status; label: string } {
   return { status: "pending", label: "Waiting for you" };
 }
 
-function AccountLine({ account }: { account: LiveCheck | { state: "unreachable"; reason: string } }) {
-  if (account.state === "connected") return <StatusPill status="done">Connected as @{account.username}</StatusPill>;
+/** How to post it herself: Aeon writes, she posts (publishing is cut for now). */
+const POST_STEPS = [
+  "Tap Save picture, and keep it on your phone.",
+  "Tap Copy caption.",
+  "Open the Instagram app and tap +.",
+  "Pick the picture, then paste the caption.",
+  "Tap Share.",
+];
+
+function ReadyToPost({ post }: { post: PostView }) {
+  const [copied, setCopied] = useState<"" | "yes" | "no">("");
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <p className="text-small text-[var(--fg-muted)]">
-        {account.state === "not_connected"
-          ? "Instagram isn't connected yet. You can still plan and approve posts; they go live once it is."
-          : account.reason}
+    <div className="flex flex-col gap-3 rounded-[16px] border border-[var(--hairline)] p-4">
+      <p className="font-medium">Ready for you to post yourself</p>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          variant="primary"
+          className="w-full sm:w-auto"
+          onClick={() =>
+            navigator.clipboard
+              .writeText(post.caption)
+              .then(() => setCopied("yes"))
+              .catch(() => setCopied("no"))
+          }
+        >
+          <Copy aria-hidden size={18} /> Copy caption
+        </Button>
+        {post.hasImage && (
+          <ButtonLink variant="quiet" className="w-full sm:w-auto" href={`/api/instagram/posts/${post.id}/image?download=1`} download>
+            <Download aria-hidden size={18} /> Save picture
+          </ButtonLink>
+        )}
+      </div>
+      <p role="status" aria-live="polite" className={copied ? "text-small" : "sr-only"}>
+        {copied === "yes" ? "Caption copied." : copied === "no" ? "Couldn't copy. Open Read the caption and copy it from there." : ""}
       </p>
-      <ButtonLink variant="quiet" href="/settings/connections">
-        {account.state === "not_connected" ? "Connect Instagram" : "Connect again"}
-      </ButtonLink>
+      <ol className="flex list-decimal flex-col gap-1 pl-6 text-[var(--fg)]">
+        {POST_STEPS.map((step) => (
+          <li key={step}>{step}</li>
+        ))}
+      </ol>
     </div>
   );
 }
@@ -89,6 +119,7 @@ function PostCard({ post, approval }: { post: PostView; approval: ApprovalView |
             </summary>
             <p className="max-w-[60ch] whitespace-pre-line pt-2 text-[var(--fg)]">{post.caption}</p>
           </details>
+          {post.status === "ready" && <ReadyToPost post={post} />}
           {post.permalink && (
             <ButtonLink variant="quiet" href={post.permalink} target="_blank" rel="noreferrer" className="w-fit">
               View on Instagram <ExternalLink aria-hidden size={16} />
@@ -102,15 +133,7 @@ function PostCard({ post, approval }: { post: PostView; approval: ApprovalView |
   );
 }
 
-export function InstagramBoard({
-  initialPosts,
-  initialApprovals,
-  account,
-}: {
-  initialPosts: PostView[];
-  initialApprovals: ApprovalView[];
-  account: LiveCheck | { state: "unreachable"; reason: string };
-}) {
+export function InstagramBoard({ initialPosts, initialApprovals }: { initialPosts: PostView[]; initialApprovals: ApprovalView[] }) {
   const router = useRouter();
   const [, startRefresh] = useTransition();
   const [working, setWorking] = useState<null | "plan" | "ask">(null);
@@ -154,13 +177,13 @@ export function InstagramBoard({
     }
   }
 
-  const live = initialPosts.filter((p) => p.status === "published").length;
+  const ready = initialPosts.filter((p) => p.status === "ready").length;
   const waiting = initialPosts.filter((p) => p.approvalStatus === "pending").length;
 
   return (
     <>
       <GlassCard className="flex flex-col gap-5 p-6 md:p-8">
-        <AccountLine account={account} />
+        <p className="max-w-[60ch] text-[var(--fg-muted)]">Aeon writes your posts. You post them yourself in the Instagram app.</p>
         <div className="flex flex-col gap-3">
           <h2 className="text-section font-semibold">Plan this week</h2>
           <p className="max-w-[60ch] text-[var(--fg-muted)]">
@@ -208,7 +231,7 @@ export function InstagramBoard({
             Your posts
           </h2>
           <p className="text-small text-[var(--fg-muted)]">
-            {waiting} waiting for you · {live} live
+            {waiting} waiting for you · {ready} ready to post
           </p>
         </div>
         {initialPosts.length === 0 ? (

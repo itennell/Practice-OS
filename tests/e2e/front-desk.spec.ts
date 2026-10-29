@@ -41,7 +41,10 @@ test("Front Desk shows sample callers, filters, Up next and both Connect cards",
   await expect(page.getByText("[Sample] Riley Example")).toHaveCount(0);
 
   const phone = page.getByRole("region", { name: "Practice phone" });
-  await expect(phone.getByText("Spruce Health")).toBeVisible();
+  // Twilio is the default; Spruce is one tap away.
+  await expect(phone.getByRole("button", { name: "Twilio" })).toHaveAttribute("aria-pressed", "true");
+  await expect(phone.getByRole("region", { name: "Set up your Twilio number" })).toBeVisible();
+  await phone.getByRole("button", { name: "Spruce Health" }).click();
   await expect(phone.getByRole("button", { name: "Copy the message" })).toBeVisible();
   await expect(phone.getByRole("button", { name: "Connect" })).toBeDisabled();
   const cal = page.getByRole("region", { name: "Consult calendar" });
@@ -57,6 +60,7 @@ test("Front Desk shows sample callers, filters, Up next and both Connect cards",
 test("a bad Spruce token gets a plain fix, read out as an alert", async ({ page }) => {
   await page.goto("/front-desk");
   const phone = page.getByRole("region", { name: "Practice phone" });
+  await phone.getByRole("button", { name: "Spruce Health" }).click();
   await phone.getByLabel("Spruce token").fill("short");
   await phone.getByRole("button", { name: "Connect" }).click();
   await expect(phone.getByText(/too short/)).toBeVisible();
@@ -89,7 +93,7 @@ test("Settings › Connections lists the phone and Cal.com cards after Google", 
   expect(at("Google")).toBeGreaterThanOrEqual(0);
   expect(at("Practice phone")).toBeGreaterThan(at("Google"));
   expect(at("Cal.com")).toBeGreaterThan(at("Practice phone"));
-  await expect(page.getByRole("region", { name: "Practice phone" }).getByLabel("Spruce token")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Practice phone" }).getByRole("region", { name: "Set up your Twilio number" })).toBeVisible();
   expect(await axe(page)).toEqual([]);
 });
 
