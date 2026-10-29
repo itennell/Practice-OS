@@ -38,3 +38,19 @@ export async function checkInstagramJpeg(jpeg: Buffer): Promise<string[]> {
   if (meta.space !== "srgb") problems.push(`The image colors are ${meta.space}, not sRGB.`);
   return problems;
 }
+
+/**
+ * The 4:5 post as a 1080 x 1080 square, for anyone who wants the square grid
+ * look: the whole picture, centered on a soft blurred fill of itself, so the
+ * headline is never cut off.
+ */
+export async function toSquareJpeg(post: Buffer): Promise<Buffer> {
+  const side = POST_WIDTH;
+  const fill = await sharp(post).resize(side, side, { fit: "cover" }).blur(40).modulate({ brightness: 1.04 }).toBuffer();
+  const front = await sharp(post).resize({ height: side, width: Math.round((side * POST_WIDTH) / POST_HEIGHT), fit: "inside" }).toBuffer();
+  return sharp(fill)
+    .composite([{ input: front, gravity: "center" }])
+    .toColorspace("srgb")
+    .jpeg({ quality: 90, mozjpeg: true, chromaSubsampling: "4:4:4" })
+    .toBuffer();
+}

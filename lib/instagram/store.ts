@@ -1,14 +1,17 @@
 // Instagram posts in practice_os.posts (migration 015), and the one way a post
 // reaches Dana: a pending instagram_post approval.
 import { queueApproval } from "../approvals";
+import { guard, REFUSAL } from "../aeon/guard";
 import { audit } from "../audit";
 import { db } from "../db";
 import { loadPracticeSettings } from "../gfe/store";
+import { alertCrisis, checkCrisis, CRISIS_REPLY } from "../safety";
 import type { ChatFn, CriticResult } from "./critic";
 import { designPost, type GraphicDeps } from "./graphic";
 import { GOALS, instagramDeclined, loadInstagramPrefs, weekTopics } from "./onboarding";
 import { PILLAR_BY_ID, type PillarId } from "./pillars";
-import { writeRequested, writeWeek, type Draft, type PracticeFacts } from "./write";
+import { gateTopic, type Angle } from "./topic-gate";
+import { writeRequested, writeSeveral, writeWeek, type Draft, type PracticeFacts } from "./write";
 
 export async function practiceFacts(): Promise<PracticeFacts> {
   const [p] = await db()<
@@ -167,11 +170,15 @@ export async function planWeek(by: string, opts: { chat?: ChatFn; graphic?: Grap
 export type RequestResult =
   | { outcome: "blocked"; why: string }
   | { outcome: "declined"; why: string }
+  /** Her topic is advice (or a client story, review, promise): nothing written, the nearest logistics angle offered. */
+  | { outcome: "off_topic"; why: string; angle: Angle }
   | { outcome: "queued" | "rewritten" | "blocked_after_rewrite"; post: SavedPost; headline: string; why: string | null };
 
 /** One post she asked for. A request about a client is never written as asked. */
 export async function requestPost(by: string, request: string, pillar: PillarId | null, opts: { chat?: ChatFn; graphic?: GraphicDeps } = {}): Promise<RequestResult> {
   if (await instagramDeclined()) return { outcome: "declined", why: DECLINED };
+  const gate = await checkRequest(request, by);
+  if (gate) return gate;
   const facts = await practiceFacts();
   const out = await writeRequested(facts, request, pillar, { chat: opts.chat });
   if (out.kind === "hard_stop") {
@@ -182,4 +189,101 @@ export async function requestPost(by: string, request: string, pillar: PillarId 
   if (post.status === "blocked") return { outcome: "blocked_after_rewrite", post, headline: out.draft.headline, why: blockedSummary(out.draft.critic) };
   const why = out.requestBlocked ? blockedSummary(out.requestBlocked) : null;
   return { outcome: why || out.draft.rewritten ? "rewritten" : "queued", post, headline: out.draft.headline, why };
+}
+
+/**
+ * Her typed topic, checked before any Muse call or web search: the crisis check
+ * (the fixed 988 reply and the urgent alert, like chat), the PHI guard (no client
+ * names or details leave the app), then the logistics-only topic gate.
+ */
+async function checkRequest(request: string, by: string): Promise<Extract<RequestResult, { outcome: "blocked" | "off_topic" }> | null> {
+  const crisis = checkCrisis(request);
+  if (crisis.crisis) {
+    await audit({ actor: "safety", action: "crisis_reply", subjectType: "post", details: { category: crisis.category, by } });
+    await alertCrisis({ source: "media", category: crisis.category, by });
+    return { outcome: "blocked", why: CRISIS_REPLY };
+  }
+  const check = await guard(request, "message");
+  if (!check.ok) {
+    await audit({ actor: "safety", action: "phi_refused", subjectType: "post", details: { kind: check.kind, by } });
+    return { outcome: "blocked", why: REFUSAL[check.kind] };
+  }
+  const gate = gateTopic(request);
+  if (gate.ok) return null;
+  await audit({ actor: "aeon", action: gate.hardStop ? "instagram_request_refused" : "instagram_request_redirected", subjectType: "post", details: { rules: [gate.rule] } });
+  return gate.hardStop ? { outcome: "blocked", why: gate.why } : { outcome: "off_topic", why: gate.why, angle: gate.angle };
+}
+
+export type SeveralResult =
+  | Extract<RequestResult, { outcome: "blocked" | "declined" | "off_topic" }>
+  | { outcome: "planned"; saved: SavedPost[]; blocked: number };
+
+/** Plan several: 2 or 3 posts on what she typed, each checked, drawn and queued for her approval. */
+export async function planSeveral(by: string, request: string, count: 2 | 3, opts: { chat?: ChatFn; graphic?: GraphicDeps } = {}): Promise<SeveralResult> {
+  if (await instagramDeclined()) return { outcome: "declined", why: DECLINED };
+  const gate = await checkRequest(request, by);
+  if (gate) return gate;
+  const facts = await practiceFacts();
+  const drafts = await writeSeveral(facts, request, count, { chat: opts.chat });
+  const saved: SavedPost[] = [];
+  for (const d of drafts) saved.push(await saveDraft(d, { by, facts, graphic: opts.graphic && { chat: opts.chat, ...opts.graphic } }));
+  return { outcome: "planned", saved, blocked: saved.filter((s) => s.status === "blocked").length };
+}
+
+export type RetryResult = { ok: true; approvalId: string } | { ok: false; status: number; why: string };
+
+/**
+ * Retry a post whose picture didn't finish (or that never reached her approvals):
+ * draw the picture again from its saved words and queue a fresh approval. Blocked
+ * and ready posts are never retried.
+ */
+export async function retryPost(by: string, postId: string, opts: { graphic?: GraphicDeps } = {}): Promise<RetryResult> {
+  if (await instagramDeclined()) return { ok: false, status: 409, why: DECLINED };
+  // Claim the post in one statement, so two Retries can't both queue an approval. Only a
+  // failed post, an unsent draft or a draft with no approval qualifies; never a declined,
+  // blocked, ready or waiting one. A claim older than 5 minutes (a crash) can be taken again.
+  const [p] = await db()<{ id: string; topic: PillarId | "other"; caption: string; headline: string | null; alt_text: string | null; status: string; has_image: boolean }[]>`
+    update practice_os.posts p
+       set graphic_check = coalesce(p.graphic_check, '{}'::jsonb) || jsonb_build_object('retrying', now())
+     where p.id = ${postId}
+       and p.status in ('failed', 'draft', 'pending_approval')
+       and (p.approval_id is null or exists (select 1 from practice_os.approvals a where a.id = p.approval_id and a.status = 'failed'))
+       and (p.graphic_check->>'retrying' is null or (p.graphic_check->>'retrying')::timestamptz < now() - interval '5 minutes')
+    returning p.id, p.topic, p.caption, p.headline, p.alt_text, p.status, p.image_jpeg is not null as has_image`;
+  if (!p) {
+    const [exists] = await db()`select 1 from practice_os.posts where id = ${postId}`;
+    return exists ? { ok: false, status: 409, why: "This post doesn't need a retry." } : { ok: false, status: 404, why: "That post isn't here any more." };
+  }
+  try {
+    const facts = await practiceFacts();
+    const headline = p.headline ?? "Post";
+    // A finished draft keeps its picture; only a failed or missing one is drawn again.
+    if (p.status === "draft" && p.has_image) return await queueAgain(by, p.id, headline, p.caption, p.alt_text);
+    const graphic = await designPost(
+      PILLAR_BY_ID.get(p.topic === "other" ? "first_session" : p.topic)!,
+      { headline, practiceName: facts.practiceName, licenseLine: facts.licenseLine },
+      { neverShow: facts.voice?.neverShow, ...opts.graphic },
+    );
+    await db()`
+      update practice_os.posts
+         set image_jpeg = ${graphic.jpeg}, graphic_check = ${db().json({ ...graphic.check, tries: graphic.tries, retrying: new Date().toISOString() } as never)}
+       where id = ${p.id}`;
+    return await queueAgain(by, p.id, headline, p.caption, p.alt_text, graphic.check.ok ? "passed" : graphic.check.problems.join(" "));
+  } finally {
+    await db()`update practice_os.posts set graphic_check = graphic_check - 'retrying' where id = ${p.id}`;
+  }
+}
+
+async function queueAgain(by: string, id: string, headline: string, caption: string, altText: string | null, pictureCheck?: string): Promise<RetryResult> {
+  await db()`update practice_os.posts set status = 'pending_approval', failed_reason = null, approval_id = null where id = ${id}`;
+  const approvalId = await queueApproval({
+    kind: "instagram_post",
+    title: `Instagram post: ${headline}`,
+    preview: { body: caption, headline, alt_text: altText, image: `/api/instagram/posts/${id}/image`, ...(pictureCheck ? { picture_check: pictureCheck } : {}) },
+    payload: { post_id: id },
+    createdBy: by,
+  });
+  await db()`update practice_os.posts set approval_id = ${approvalId} where id = ${id} and approval_id is null`;
+  await audit({ actor: "clinician", action: "instagram_post_retried", subjectType: "post", subjectId: id, details: { approval_id: approvalId } });
+  return { ok: true, approvalId };
 }

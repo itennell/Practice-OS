@@ -902,7 +902,7 @@ export const TOOLS: AeonTool[] = [
     run: async (_input, ctx) => {
       const r = await instagram.planWeek(ctx.by, { chat: ctx.chat });
       if (r.declined) return text({ written: false, why: instagram.DECLINED });
-      return text({ week_of: r.week, waiting_for_approval: r.saved.length - r.blocked, blocked: r.blocked, see: "/instagram" });
+      return text({ week_of: r.week, waiting_for_approval: r.saved.length - r.blocked, blocked: r.blocked, see: "/media/instagram" });
     },
   }),
 
@@ -923,13 +923,14 @@ export const TOOLS: AeonTool[] = [
     run: async ({ request, pillar }, ctx) => {
       const r = await instagram.requestPost(ctx.by, request, pillar ?? null, { chat: ctx.chat });
       if (r.outcome === "blocked" || r.outcome === "declined") return text({ written: false, why: r.why });
+      if (r.outcome === "off_topic") return text({ written: false, why: r.why, offer_instead: r.angle.label });
       return text({
         written: r.outcome !== "blocked_after_rewrite",
         headline: r.headline,
         approval_id: r.post.approvalId,
         changed_from_her_request: r.outcome === "rewritten",
         why: r.why,
-        see: "/instagram",
+        see: "/media/instagram",
       });
     },
   }),
@@ -1023,6 +1024,7 @@ export const TOOLS: AeonTool[] = [
       const r = await coach.draftIdea(ctx.by, { number: idea, id: idea_id }, { chat: ctx.chat });
       if (!r.found) return text({ written: false, why: r.why });
       if (r.outcome === "blocked" || r.outcome === "declined") return text({ written: false, why: r.why });
+      if (r.outcome === "off_topic") return text({ written: false, why: r.why, offer_instead: r.angle.label });
       if (r.outcome === "already_drafted") {
         return text({ written: false, already_drafted: true, idea: r.idea.number, headline: r.headline, approval_id: r.post.approvalId, why: "She already has a draft of this idea; it's in Approvals or on the Instagram page." });
       }

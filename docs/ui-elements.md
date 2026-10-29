@@ -80,6 +80,7 @@ Every UI piece Isaiah picked for Practice-OS, where it goes, and how to build it
 | UI-034 | Empty state | GLB | Empty lists | must | built | Calm redesign (own build) | `components/shared/empty-state.tsx` (`EmptyState`) |
 | UI-035 | Ask Aeon button (Aeon one tap away) | SHL | Every page but the chat | must | built | Calm redesign (own build) | `components/shared/ask-aeon-button.tsx` (`AskAeonButton`) |
 | UI-036 | Page header | GLB | Top of every page | must | built | Calm redesign (own build) | `components/ui.tsx` (`PageHeader`) |
+| UI-037 | Slider (pick a number) | GLB | Forms | must | built | shadcn/ui (MIT) on Base UI | `components/shared/slider.tsx` (`Slider`) |
 
 ## Build notes
 

@@ -1,15 +1,16 @@
 "use client";
 
-import { Copy, Download, ExternalLink } from "lucide-react";
+import { Copy, Download } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import type { ApprovalView } from "@/lib/approvals";
 import type { PostView } from "@/lib/instagram/store";
-import { ApprovalsInbox } from "../approvals-inbox";
+import { Slider } from "../shared/slider";
 import { TextField } from "../shared/settings-controls";
-import { StatusPill, type Status } from "../shared/status-mark";
+import { StatusPill } from "../shared/status-mark";
 import { ThoughtLine } from "../shared/thought-line";
 import { Button, ButtonLink, GlassCard } from "../ui";
+import { PostPreview, type PreviewProfile } from "./post-preview";
+import { postState, STATE } from "./post-state";
 
 const PILLAR_LABEL: Record<PostView["pillar"], string> = {
   first_session: "Your first session",
@@ -20,20 +21,9 @@ const PILLAR_LABEL: Record<PostView["pillar"], string> = {
   other: "Other",
 };
 
-function postStatus(p: PostView): { status: Status; label: string } {
-  if (p.status === "ready" || (p.approvalStatus === "done" && p.status !== "published")) return { status: "done", label: "Ready to post" };
-  if (p.status === "published") return { status: "done", label: "Posted" };
-  if (p.status === "blocked") return { status: "declined", label: "Blocked" };
-  if (p.status === "failed" || p.approvalStatus === "failed") return { status: "failed", label: "Didn't post" };
-  if (p.status === "publishing" || p.approvalStatus === "running") return { status: "running", label: "Posting…" };
-  if (p.approvalStatus === "rejected") return { status: "declined", label: "Declined" };
-  if (p.approvalStatus === "done") return { status: "done", label: "Checked (test mode)" };
-  return { status: "pending", label: "Waiting for you" };
-}
-
 /** How to post it herself: Aeon writes, she posts (publishing is cut for now). */
 const POST_STEPS = [
-  "Tap Save picture, and keep it on your phone.",
+  "Save the picture, and keep it on your phone.",
   "Tap Copy caption.",
   "Open the Instagram app and tap +.",
   "Pick the picture, then paste the caption.",
@@ -42,14 +32,15 @@ const POST_STEPS = [
 
 function ReadyToPost({ post }: { post: PostView }) {
   const [copied, setCopied] = useState<"" | "yes" | "no">("");
+  const image = `/api/instagram/posts/${post.id}/image?download=1`;
   return (
-    <div className="flex flex-col gap-3 rounded-[16px] border border-[var(--hairline)] p-4">
+    <div className="flex flex-col gap-3 border-t border-[var(--hairline)] p-4">
       <p className="font-medium">Ready for you to post yourself</p>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-col gap-2">
         <Button
           type="button"
           variant="primary"
-          className="w-full sm:w-auto"
+          className="w-full"
           onClick={() =>
             navigator.clipboard
               .writeText(post.caption)
@@ -60,15 +51,22 @@ function ReadyToPost({ post }: { post: PostView }) {
           <Copy aria-hidden size={18} /> Copy caption
         </Button>
         {post.hasImage && (
-          <ButtonLink variant="quiet" className="w-full sm:w-auto" href={`/api/instagram/posts/${post.id}/image?download=1`} download>
-            <Download aria-hidden size={18} /> Save picture
-          </ButtonLink>
+          <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2">
+            <ButtonLink variant="quiet" className="w-full" href={image} download>
+              <Download aria-hidden size={18} /> Picture 4:5
+              <span className="sr-only"> (for the feed, JPEG)</span>
+            </ButtonLink>
+            <ButtonLink variant="quiet" className="w-full" href={`${image}&shape=square`} download>
+              <Download aria-hidden size={18} /> Square picture
+              <span className="sr-only"> (JPEG)</span>
+            </ButtonLink>
+          </div>
         )}
       </div>
       <p role="status" aria-live="polite" className={copied ? "text-small" : "sr-only"}>
-        {copied === "yes" ? "Caption copied." : copied === "no" ? "Couldn't copy. Open Read the caption and copy it from there." : ""}
+        {copied === "yes" ? "Caption copied." : copied === "no" ? "Couldn't copy. Tap more on the caption, then select it and copy it." : ""}
       </p>
-      <ol className="flex list-decimal flex-col gap-1 pl-6 text-[var(--fg)]">
+      <ol className="flex list-decimal flex-col gap-1 pl-6 text-small text-[var(--fg)]">
         {POST_STEPS.map((step) => (
           <li key={step}>{step}</li>
         ))}
@@ -77,148 +75,243 @@ function ReadyToPost({ post }: { post: PostView }) {
   );
 }
 
-function PostCard({ post, approval }: { post: PostView; approval: ApprovalView | undefined }) {
-  const s = postStatus(post);
+function Decide({ post, onDone }: { post: PostView; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  async function decide(action: "approve" | "decline") {
+    setBusy(true);
+    setProblem(null);
+    try {
+      const res = await fetch(`/api/approvals/${post.approvalId}/${action}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) setProblem(data.error ?? "That didn't work. Try again.");
+    } catch {
+      setProblem("Couldn't reach Practice-OS. Check that the app is running, then try again.");
+    } finally {
+      setBusy(false);
+      onDone();
+    }
+  }
+  return (
+    <div className="flex flex-col gap-2 border-t border-[var(--hairline)] p-4">
+      <p className="text-small text-[var(--fg-muted)]">Nothing is posted. Approve it, and it&apos;s ready for you to post yourself.</p>
+      <div className="grid grid-cols-2 gap-2">
+        <Button variant="accent" disabled={busy} onClick={() => decide("approve")}>
+          Approve
+        </Button>
+        <Button variant="quiet" disabled={busy} onClick={() => decide("decline")}>
+          Decline
+        </Button>
+      </div>
+      {problem && (
+        <p role="alert" className="text-small font-medium" style={{ color: "var(--danger-fg)" }}>
+          {problem}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function Retry({ post, onDone, draft = false }: { post: PostView; onDone: () => void; draft?: boolean }) {
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  async function retry() {
+    setBusy(true);
+    setProblem(null);
+    try {
+      const res = await fetch(`/api/instagram/posts/${post.id}/retry`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) setProblem(data.error ?? "Aeon couldn't finish the picture. Try again.");
+    } catch {
+      setProblem("Couldn't reach Practice-OS. Check that the app is running, then try again.");
+    } finally {
+      setBusy(false);
+      onDone();
+    }
+  }
+  return (
+    <div className="flex flex-col gap-2 border-t border-[var(--hairline)] p-4">
+      {draft ? (
+        <p className="text-small text-[var(--fg-muted)]">A draft. Send it to your approvals when you&apos;re ready; nothing is posted.</p>
+      ) : (
+        <p className="font-medium" style={{ color: "var(--danger-fg)" }}>
+          {post.failedReason ?? "Aeon couldn't finish this post. Try again."}
+        </p>
+      )}
+      <Button variant="accent" className="w-full" disabled={busy} onClick={retry}>
+        {draft ? (busy ? "Sending…" : "Send for approval") : busy ? "Trying again…" : "Retry"}
+      </Button>
+      {problem && (
+        <p role="alert" className="text-small font-medium" style={{ color: "var(--danger-fg)" }}>
+          {problem}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function PostCard({ post, profile, onChange }: { post: PostView; profile: PreviewProfile; onChange: () => void }) {
+  const state = postState(post);
+  const s = STATE[state];
   const headingId = `post-${post.id}`;
   return (
-    <li aria-labelledby={headingId} className="flex flex-col gap-4 rounded-[24px] border border-[var(--hairline)] bg-[var(--glass-strong)] p-5">
-      <div className="flex flex-col gap-4 sm:flex-row">
-        {post.hasImage ? (
-          // eslint-disable-next-line @next/next/no-img-element -- a private, per-post JPEG from our own route
-          <img
-            src={`/api/instagram/posts/${post.id}/image`}
-            alt={post.altText ?? ""}
-            width={216}
-            height={270}
-            className="aspect-[4/5] w-full max-w-[216px] shrink-0 rounded-[16px] border border-[var(--hairline)] object-cover"
-          />
-        ) : null}
-        <div className="flex min-w-0 flex-1 flex-col gap-2">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="label-caps text-[var(--fg-muted)]">{PILLAR_LABEL[post.pillar]}</p>
-              <h3 id={headingId} className="text-section font-semibold leading-snug">
-                {post.headline ?? "Post"}
-              </h3>
-            </div>
-            <StatusPill status={s.status}>{s.label}</StatusPill>
-          </div>
-          {post.status === "blocked" && post.blockedReason && (
-            <p className="max-w-[60ch] font-medium" style={{ color: "var(--danger-fg)" }}>
-              {post.blockedReason}
-            </p>
-          )}
-          {post.failedReason && post.status === "failed" && (
-            <p className="max-w-[60ch] font-medium" style={{ color: "var(--danger-fg)" }}>
-              {post.failedReason}
-            </p>
-          )}
-          <details className="group">
-            <summary className="inline-flex h-touch cursor-pointer items-center font-medium text-[var(--link)] underline-offset-4 hover:underline">
-              Read the caption
-            </summary>
-            <p className="max-w-[60ch] whitespace-pre-line pt-2 text-[var(--fg)]">{post.caption}</p>
-          </details>
-          {post.status === "ready" && <ReadyToPost post={post} />}
-          {post.permalink && (
-            <ButtonLink variant="quiet" href={post.permalink} target="_blank" rel="noreferrer" className="w-fit">
-              View on Instagram <ExternalLink aria-hidden size={16} />
-              <span className="sr-only">(opens in a new tab)</span>
-            </ButtonLink>
-          )}
-        </div>
+    <li aria-labelledby={`${headingId}-t`} className="flex min-w-0 flex-col gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+        <h3 id={`${headingId}-t`} className="min-w-0 font-semibold leading-snug">
+          <span className="sr-only">{PILLAR_LABEL[post.pillar]}: </span>
+          {post.headline ?? "Post"}
+        </h3>
+        <StatusPill status={s.status}>{s.label}</StatusPill>
       </div>
-      {approval && approval.status === "pending" && <ApprovalsInbox initial={[approval]} ids={[approval.id]} />}
+      {post.status === "blocked" ? (
+        <div className="flex flex-col gap-2 rounded-[20px] border border-[var(--hairline)] bg-[var(--glass-strong)] p-4">
+          <p className="label-caps text-[var(--fg-muted)]">{PILLAR_LABEL[post.pillar]}</p>
+          <p className="max-w-[60ch] font-medium" style={{ color: "var(--danger-fg)" }}>
+            {post.blockedReason ?? "The safety check held this one back."}
+          </p>
+        </div>
+      ) : (
+        <PostPreview
+          profile={profile}
+          imageSrc={post.hasImage ? `/api/instagram/posts/${post.id}/image` : null}
+          altText={post.altText}
+          caption={post.caption}
+          headingId={headingId}
+        >
+          {(state === "retry" || state === "draft") && <Retry post={post} onDone={onChange} draft={state === "draft"} />}
+          {state === "waiting" && <Decide post={post} onDone={onChange} />}
+          {post.status === "ready" && <ReadyToPost post={post} />}
+        </PostPreview>
+      )}
     </li>
   );
 }
 
-export function InstagramBoard({ initialPosts, initialApprovals }: { initialPosts: PostView[]; initialApprovals: ApprovalView[] }) {
+type Offer = { why: string; angle: { label: string; pillar: string } };
+type Message = { tone: "ok" | "problem"; text: string };
+
+/** What the routes answer, in her words. */
+function say(kind: "write" | "plan", data: Record<string, unknown>): { message: Message | null; offer: Offer | null; clear: boolean } {
+  const o = data.outcome;
+  if (o === "off_topic") return { message: null, offer: { why: String(data.why), angle: data.angle as Offer["angle"] }, clear: false };
+  if (o === "blocked") return { message: { tone: "problem", text: `Aeon didn't write this one. ${data.why}` }, offer: null, clear: false };
+  if (kind === "plan") {
+    const saved = (data.saved as unknown[]).length;
+    const blocked = Number(data.blocked ?? 0);
+    return { message: { tone: "ok", text: `${saved - blocked} posts are ready for you to look at${blocked ? `; ${blocked} were held back by the safety check` : ""}.` }, offer: null, clear: true };
+  }
+  if (o === "rewritten") return { message: { tone: "ok", text: `Aeon wrote a different post instead: "${data.headline}". ${data.why ?? "The first draft didn't pass the safety check."}` }, offer: null, clear: true };
+  if (o === "blocked_after_rewrite") return { message: { tone: "problem", text: `Aeon couldn't write a safe version. ${data.why}` }, offer: null, clear: false };
+  return { message: { tone: "ok", text: `"${data.headline}" is ready for you to look at.` }, offer: null, clear: true };
+}
+
+export function InstagramBoard({ initialPosts, profile }: { initialPosts: PostView[]; profile: PreviewProfile }) {
   const router = useRouter();
   const [, startRefresh] = useTransition();
-  const [working, setWorking] = useState<null | "plan" | "ask">(null);
+  const [working, setWorking] = useState<null | "write" | "plan">(null);
   const [ask, setAsk] = useState("");
-  const [message, setMessage] = useState<{ tone: "ok" | "problem"; text: string } | null>(null);
-  const approvals = new Map(initialApprovals.map((a) => [a.id, a]));
+  const [count, setCount] = useState(3);
+  const [message, setMessage] = useState<Message | null>(null);
+  const [offer, setOffer] = useState<Offer | null>(null);
+  const refresh = () => startRefresh(() => router.refresh());
 
-  async function run(kind: "plan" | "ask") {
+  async function run(kind: "write" | "plan", request = ask, pillar: string | null = null) {
     setMessage(null);
+    setOffer(null);
     setWorking(kind);
     try {
-      const res =
-        kind === "plan"
-          ? await fetch("/api/instagram/plan", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })
-          : await fetch("/api/instagram/posts", {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({ request: ask }),
-            });
+      const res = await fetch(kind === "plan" ? "/api/instagram/plan" : "/api/instagram/posts", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(kind === "plan" ? { request, count } : { request, pillar }),
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setMessage({ tone: "problem", text: data.error ?? "Something went wrong. Try again." });
-      } else if (kind === "plan") {
-        setMessage({ tone: "ok", text: `${data.saved.length - data.blocked} posts are ready for you to look at${data.blocked ? `; ${data.blocked} were blocked by the safety check` : ""}.` });
-      } else if (data.outcome === "blocked") {
-        setMessage({ tone: "problem", text: `Aeon didn't write this one. ${data.why}` });
-      } else if (data.outcome === "rewritten") {
-        setMessage({ tone: "ok", text: `Aeon wrote a different post instead: "${data.headline}". ${data.why ?? "The first draft didn't pass the safety check."}` });
-        setAsk("");
-      } else if (data.outcome === "blocked_after_rewrite") {
-        setMessage({ tone: "problem", text: `Aeon couldn't write a safe version. ${data.why}` });
       } else {
-        setMessage({ tone: "ok", text: `"${data.headline}" is ready for you to look at.` });
-        setAsk("");
+        const r = say(kind, data);
+        setMessage(r.message);
+        setOffer(r.offer);
+        if (r.clear) setAsk("");
       }
     } catch {
       setMessage({ tone: "problem", text: "Couldn't reach Practice-OS. Check that the app is running, then try again." });
     } finally {
       setWorking(null);
-      startRefresh(() => router.refresh());
+      refresh();
     }
   }
 
-  const ready = initialPosts.filter((p) => p.status === "ready").length;
-  const waiting = initialPosts.filter((p) => p.approvalStatus === "pending").length;
+  const ready = initialPosts.filter((p) => postState(p) === "ready").length;
+  const waiting = initialPosts.filter((p) => postState(p) === "waiting").length;
+  const canAsk = working === null && ask.trim().length >= 3;
 
   return (
     <>
       <GlassCard className="flex flex-col gap-5 p-6 md:p-8">
-        <p className="max-w-[60ch] text-[var(--fg-muted)]">Aeon writes your posts. You post them yourself in the Instagram app.</p>
-        <div className="flex flex-col gap-3">
-          <h2 className="text-section font-semibold">Plan this week</h2>
-          <p className="max-w-[60ch] text-[var(--fg-muted)]">
-            Aeon writes five posts, one for each topic, checks each one for safety and makes its picture. This takes a few
-            minutes. You approve each post on its own.
-          </p>
-          <Button variant="primary" className="w-fit" disabled={working !== null} onClick={() => run("plan")}>
-            Plan this week
-          </Button>
-        </div>
         <form
-          className="flex flex-col gap-3"
+          className="flex flex-col gap-4"
           onSubmit={(e) => {
             e.preventDefault();
-            if (ask.trim().length >= 3) run("ask");
+            if (canAsk) run("write");
           }}
         >
           <TextField
-            label="Or ask for one post"
-            description="For example: a post about how superbills work."
+            label="What should the post be about?"
+            description="For example: how superbills work, or what to bring to a first session."
             value={ask}
             onChange={(e) => setAsk(e.target.value)}
             maxLength={600}
             disabled={working !== null}
-            compact
           />
-          <Button type="submit" variant="quiet" className="w-fit" disabled={working !== null || ask.trim().length < 3}>
-            Write this post
-          </Button>
+          <div className="flex flex-wrap items-end gap-x-6 gap-y-4">
+            <Button type="submit" variant="primary" className="w-full sm:w-auto" disabled={!canAsk}>
+              Write this post
+            </Button>
+            <div className="flex w-full flex-wrap items-end gap-3 sm:w-auto">
+              <Slider
+                label="Posts"
+                value={count}
+                onValueChange={setCount}
+                min={2}
+                max={3}
+                valueText={(n) => `${n} posts`}
+                disabled={working !== null}
+                compact
+                className="flex-1 sm:w-40 sm:flex-none"
+              />
+              <Button type="button" variant="quiet" disabled={!canAsk} onClick={() => run("plan")}>
+                Plan several
+              </Button>
+            </div>
+          </div>
         </form>
         {working && (
-          <ThoughtLine
-            working
-            label={working === "plan" ? "Aeon is writing and drawing this week's posts…" : "Aeon is writing your post…"}
-          />
+          <ThoughtLine working label={working === "plan" ? `Aeon is writing and drawing ${count} posts…` : "Aeon is writing your post…"} />
+        )}
+        {offer && (
+          <div className="flex flex-col gap-3 rounded-[16px] border border-[var(--hairline)] p-4">
+            <p className="font-medium">{offer.why}</p>
+            <p className="text-[var(--fg-muted)]">Here&apos;s the closest post about how your practice works:</p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="accent"
+                onClick={() => {
+                  setAsk(offer.angle.label);
+                  run("write", offer.angle.label, offer.angle.pillar);
+                }}
+              >
+                Write &ldquo;{offer.angle.label}&rdquo;
+              </Button>
+              <Button variant="quiet" onClick={() => setOffer(null)}>
+                Write something else
+              </Button>
+            </div>
+          </div>
         )}
         <p role="status" aria-live="polite" className={message ? "font-medium" : "sr-only"} style={message?.tone === "problem" ? { color: "var(--danger-fg)" } : undefined}>
           {message?.text ?? ""}
@@ -235,11 +328,11 @@ export function InstagramBoard({ initialPosts, initialApprovals }: { initialPost
           </p>
         </div>
         {initialPosts.length === 0 ? (
-          <p className="text-[var(--fg-muted)]">No posts yet. Press Plan this week, or ask for one post.</p>
+          <p className="text-[var(--fg-muted)]">No posts yet. Type what a post should be about, then press Write this post.</p>
         ) : (
-          <ul className="flex flex-col gap-4">
+          <ul className="grid grid-cols-1 gap-6 md:grid-cols-2">
             {initialPosts.map((p) => (
-              <PostCard key={p.id} post={p} approval={p.approvalId ? approvals.get(p.approvalId) : undefined} />
+              <PostCard key={p.id} post={p} profile={profile} onChange={refresh} />
             ))}
           </ul>
         )}
