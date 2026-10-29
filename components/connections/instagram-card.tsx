@@ -12,6 +12,7 @@ import { StatusPill } from "@/components/shared/status-mark";
 import { notify } from "@/components/shared/toaster";
 import { Button } from "@/components/ui";
 import type { LiveCheck } from "@/lib/instagram/account";
+import { instagramConnectView } from "@/lib/connect/instagram-card-view";
 import { ConnectionCardFrame } from "./card-frame";
 import { ConnectButton } from "./connect-button";
 import type { ConnectionStatus } from "./registry";
@@ -43,6 +44,7 @@ export function InstagramCard({ status }: { status: ConnectionStatus }) {
   };
 
   const connected = check.state === "connected";
+  const view = instagramConnectView(check.state, status.notReady);
   return (
     <ConnectionCardFrame
       icon={<Camera className="size-5" />}
@@ -58,13 +60,14 @@ export function InstagramCard({ status }: { status: ConnectionStatus }) {
             {check.reason}
           </p>
         )}
-        {check.state === "not_connected" && (
+        {view.notReady && <p className="text-small text-[var(--fg-muted)]">{view.notReady}</p>}
+        {check.state === "not_connected" && !view.notReady && (
           <p className="text-small text-[var(--fg-muted)]">
             You&rsquo;ll sign in on Instagram&rsquo;s own page. It needs an Instagram professional (business or creator) account.
           </p>
         )}
       </div>
-      {!connected && check.state !== "checking" && (
+      {view.showConnect && (
         <ConnectButton provider="instagram" variant="accent">
           {check.state === "not_connected" ? "Connect Instagram" : "Connect again"}
         </ConnectButton>

@@ -19,6 +19,6 @@ export async function POST(request: Request, ctx: RouteContext<"/api/connect/[pr
     return Response.redirect(authUrl, 303);
   } catch (err) {
     console.error(`connect ${provider} start:`, err instanceof Error ? err.message : err);
-    return back(err instanceof ConnectError ? err.message : `Couldn't start the ${provider === "google" ? "Google" : "Instagram"} sign-in. Check the setup in INSTALL.md.`);
+    return back(err instanceof ConnectError ? err.message : `Couldn't start the ${provider === "google" ? "Google" : "Instagram"} sign-in. Try again in a minute.`);
   }
 }

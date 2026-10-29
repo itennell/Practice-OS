@@ -5,6 +5,7 @@ import { createHash, randomBytes } from "node:crypto";
 import postgres from "postgres";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { begin, callback, deleteImage, uploadImage, type Blobs, type RelayEnv } from "../relay/lib/handlers";
+import { relayHealth } from "../relay/lib/health";
 
 const url = process.env.DATABASE_URL;
 const sql = url ? postgres(url, { max: 1, onnotice: () => {} }) : null;
@@ -25,6 +26,7 @@ beforeAll(() => {
 });
 afterEach(async () => {
   vi.unstubAllGlobals();
+  (await import("../lib/connect/instagram")).resetInstagramReadiness();
   if (sql) await sql`delete from practice_os.connections where provider in ('google', 'instagram', 'muse')`;
 });
 afterAll(async () => {
@@ -34,6 +36,8 @@ afterAll(async () => {
 
 const idToken = (email: string) => `x.${Buffer.from(JSON.stringify({ email })).toString("base64url")}.y`;
 const jsonRes = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+/** The relay's /api/health for a fully set-up relay. */
+const readyHealth = () => jsonRes(relayHealth({ ...relayEnv, CRON_SECRET: "c", BLOB_READ_WRITE_TOKEN: "b" }));
 
 describe.skipIf(!url)("Google Connect", () => {
   it("sends her to Google with PKCE and the loopback return, and saves the sign-in encrypted", async () => {
@@ -131,6 +135,7 @@ describe.skipIf(!url)("Instagram Connect through the relay", () => {
 
     // The app's server calls the relay's begin; route that to the real handler.
     vi.stubGlobal("fetch", async (input: string | URL, init?: RequestInit) => {
+      if (String(input).endsWith("/api/health")) return readyHealth();
       expect(String(input)).toBe("https://relay.example.test/api/connect/instagram/begin");
       return begin(new Request(String(input), init), relayEnv, { now: Date.now });
     });
@@ -175,7 +180,9 @@ describe.skipIf(!url)("Instagram Connect through the relay", () => {
 
   it("records a cancelled sign-in and saves nothing", async () => {
     const { startConnect, finishConnect } = await import("../lib/connect");
-    vi.stubGlobal("fetch", async (input: string | URL, init?: RequestInit) => begin(new Request(String(input), init), relayEnv, { now: Date.now }));
+    vi.stubGlobal("fetch", async (input: string | URL, init?: RequestInit) =>
+      String(input).endsWith("/api/health") ? readyHealth() : begin(new Request(String(input), init), relayEnv, { now: Date.now }),
+    );
     const { authUrl } = await startConnect("instagram", { origin: ORIGIN });
     const res = await callback(
       new Request(`https://r/cb?error=access_denied&error_reason=user_denied&state=${encodeURIComponent(new URL(authUrl).searchParams.get("state")!)}`),
