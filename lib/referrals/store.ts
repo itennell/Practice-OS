@@ -6,7 +6,7 @@ import { audit } from "../audit";
 import { practiceToday } from "../compliance/store";
 import { db } from "../db";
 import { nearbyZips, zipCenters, zipDistance } from "./geo";
-import { fetchProviders, providerByNpi, SPECIALTY_BY_ID, type Provider, type SpecialtyId } from "./nppes";
+import { fetchProviders, looksResidential, providerByNpi, SPECIALTY_BY_ID, type Provider, type SpecialtyId } from "./nppes";
 import { focusFrom, providerTier, SCORE_VERSION, tierFor, type Focus } from "./tier";
 import { STAGES, STAGE_LABEL, type Stage } from "./stages";
 
@@ -165,9 +165,9 @@ export async function rescoreOldCards(
   max = 25,
 ): Promise<number> {
   const rows = await sql<
-    { id: string; npi: string | null; taxonomy: string | null; npi_type: "individual" | "organization" | null; phone: string | null; state: string | null; distance_miles: number | null }[]
+    { id: string; npi: string | null; taxonomy: string | null; npi_type: "individual" | "organization" | null; phone: string | null; state: string | null; address: string | null; distance_miles: number | null }[]
   >`
-    select id, npi, taxonomy, npi_type, phone, state, distance_miles::float8 as distance_miles
+    select id, npi, taxonomy, npi_type, phone, state, address, distance_miles::float8 as distance_miles
       from practice_os.referral_sources where score_version <> ${SCORE_VERSION} limit ${max}`;
   if (rows.length === 0) return 0;
   const { focus, state } = await practiceFacts(sql);
@@ -176,7 +176,10 @@ export async function rescoreOldCards(
     const p = row.npi ? await lookup(row.npi).catch(() => null) : null;
     const score = p
       ? providerTier(p, ctx).score
-      : tierFor({ taxonomy: row.taxonomy, npiType: row.npi_type, phone: row.phone, state: row.state }, ctx).score;
+      : tierFor(
+          { taxonomy: row.taxonomy, npiType: row.npi_type, phone: row.phone, state: row.state, homeAddress: row.npi_type !== "organization" && looksResidential(row.address) },
+          ctx,
+        ).score;
     await sql`update practice_os.referral_sources set fit_score = ${score}, score_version = ${SCORE_VERSION} where id = ${row.id}`;
   }
   return rows.length;

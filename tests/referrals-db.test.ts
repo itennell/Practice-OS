@@ -12,6 +12,7 @@ const { closeDb, db } = await import("../lib/db");
 const { draftOutreach } = await import("../lib/referrals/outreach");
 const { addToBoard, getSource, latestLetters, moveDueFollowUps, rescoreOldCards } = await import("../lib/referrals/store");
 const { practiceToday } = await import("../lib/compliance/store");
+const { SCORE_VERSION } = await import("../lib/referrals/tier");
 const { getReferralSettings, saveReferralSettings } = await import("../lib/referrals/settings");
 const { referralsQuestions } = await import("../lib/referrals/onboarding");
 
@@ -139,7 +140,7 @@ describe.skipIf(!hasDb)("Add to board", () => {
       return {
         npi, name: `[Sample] Test ${npi}`, organization: null, practiceName: null, npiType: "individual" as const, credential: "MD",
         taxonomy: "207Q00000X", taxonomyLabel: "Family Medicine", specialty: "family_medicine" as const, specialtyLabel: "Family medicine",
-        address: "100 W Example St", city: "Chicago", state: "IL", zip: "60614", phone: null, fax: null, official: null, lastUpdated: null,
+        address: "100 W Example St", city: "Chicago", state: "IL", zip: "60614", phone: null, homeAddress: false, fax: null, official: null, lastUpdated: null,
       };
     };
     const { added, missing } = await addToBoard(
@@ -160,7 +161,7 @@ describe.skipIf(!hasDb)("score versions", () => {
     await db()`update practice_os.referral_sources set score_version = 1, fit_score = 3 where id = ${id}`;
     await rescoreOldCards(db(), async () => null, 500);
     const card = (await getSource(id))!;
-    expect(card.score_version).toBe(2);
+    expect(card.score_version).toBe(SCORE_VERSION);
     expect(card.fit_score).toBeGreaterThan(3);
   });
 });

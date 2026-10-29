@@ -7,6 +7,7 @@ import { notify } from "@/components/shared/toaster";
 import { SettingSelect } from "@/components/shared/settings-controls";
 import { StatusPill } from "@/components/shared/status-mark";
 import { Button } from "@/components/ui";
+import { looksResidential } from "@/lib/referrals/nppes";
 import { STAGES, STAGE_LABEL, type Stage } from "@/lib/referrals/stages";
 import type { LetterState, ReferralSource } from "@/lib/referrals/store";
 import type { TierResult } from "@/lib/referrals/tier";
@@ -185,8 +186,9 @@ function Card({
         <p className="flex items-start gap-1.5 text-small text-[var(--fg-muted)]">
           <MapPin aria-hidden size={14} className="mt-0.5 shrink-0" />
           <span>
-            {card.address}
-            {card.zip ? `, ${card.zip}` : ""}
+            {card.npi_type !== "organization" && looksResidential(card.address)
+              ? `Address may be a home address; call first${card.zip ? ` (${card.zip})` : ""}`
+              : `${card.address}${card.zip ? `, ${card.zip}` : ""}`}
           </span>
         </p>
       )}
