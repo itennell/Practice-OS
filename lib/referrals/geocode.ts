@@ -38,7 +38,7 @@ export function parseCensusLine(line: string): { id: string; point: Point | null
 type Post = (body: FormData) => Promise<string>;
 
 const censusPost: Post = async (body) => {
-  const res = await fetch(CENSUS_BATCH, { method: "POST", body, signal: AbortSignal.timeout(45_000) });
+  const res = await fetch(CENSUS_BATCH, { method: "POST", body, signal: AbortSignal.timeout(30_000) });
   if (!res.ok) throw new Error(`The Census geocoder answered ${res.status}.`);
   return res.text();
 };
@@ -56,7 +56,7 @@ export async function geocodeAddresses(addresses: Address[], opts: { post?: Post
     if (points.has(key)) out.set(key, points.get(key)!);
     else if (!todo.some((t) => addressKey(t) === key)) todo.push(a);
   }
-  const batch = todo.slice(0, opts.max ?? 1500);
+  const batch = todo.slice(0, opts.max ?? 600);
   if (batch.length === 0) return out;
   const csv = batch.map((a, i) => [String(i), a.street, a.city, a.state, a.zip].map(csvCell).join(",")).join("\n");
   const form = new FormData();

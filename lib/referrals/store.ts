@@ -208,15 +208,18 @@ export function specialtyLabel(id: SpecialtyId): string {
   return SPECIALTY_BY_ID.get(id)!.label;
 }
 
-export type LetterState = { approvalId: string; status: string; dryRun: boolean | null };
+export type LetterState = { approvalId: string; status: string; subject: string | null; letter: string | null };
 
 /** The latest introduction letter for each card, so the board can say where it stands. */
 export async function latestLetters(sql: postgres.Sql = db()): Promise<Record<string, LetterState>> {
-  const rows = await sql<{ source_id: string; id: string; status: string; dry_run: boolean | null }[]>`
+  // An edit made while approving is in the result; otherwise the letter as Muse wrote it.
+  const rows = await sql<{ source_id: string; id: string; status: string; subject: string | null; letter: string | null }[]>`
     select distinct on (payload ->> 'referral_source_id')
-           payload ->> 'referral_source_id' as source_id, id, status, (result ->> 'dry_run')::boolean as dry_run
+           payload ->> 'referral_source_id' as source_id, id, status,
+           coalesce(result #>> '{letter,subject}', payload ->> 'subject') as subject,
+           coalesce(result #>> '{letter,body}', payload ->> 'letter') as letter
       from practice_os.approvals
      where kind = 'referral_letter' and payload ? 'referral_source_id'
      order by payload ->> 'referral_source_id', created_at desc`;
-  return Object.fromEntries(rows.map((r) => [r.source_id, { approvalId: r.id, status: r.status, dryRun: r.dry_run }]));
+  return Object.fromEntries(rows.map((r) => [r.source_id, { approvalId: r.id, status: r.status, subject: r.subject, letter: r.letter }]));
 }

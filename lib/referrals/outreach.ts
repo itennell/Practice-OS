@@ -2,7 +2,8 @@
 // code then checks it. Nothing of value may be tied to a referral (AGENTS.md:
 // no fees, gifts or anything of value), so a letter that mentions money, gifts
 // or rewards is refused. The letter waits in her approvals as referral_letter;
-// lib/executors/referral_letter.ts turns an approved one into a Gmail draft.
+// she copies it from the board card and sends it from her own email; approving
+// it (lib/executors/referral_letter.ts) moves the card to Contacted.
 import { queueApproval } from "../approvals";
 import { memoryMarkdown, relevantMemories } from "../aeon/memory";
 import { soul } from "../aeon/soul";
@@ -89,11 +90,10 @@ export async function draftOutreach(sourceId: string, opts: { by: string; note?:
   const source = await getSource(sourceId);
   if (!source) throw new Error("That referral source isn't on the board.");
   const { subject, letter } = await writeLetter(source, opts);
-  const to = process.env.TEST_INBOX_EMAIL ? "your test inbox" : "your test inbox (not set yet)";
   const approvalId = await queueApproval({
     kind: "referral_letter",
     title: `Intro letter to ${source.name}`,
-    preview: { body: letter, subject, provider: source.name, specialty: source.specialty, delivery: `Gmail draft to ${to}. You press send.` },
+    preview: { body: letter, subject, provider: source.name, specialty: source.specialty, delivery: "Copy it from the Referrals board and send it from your own email. Aeon sends nothing." },
     payload: { referral_source_id: source.id, subject, letter },
     createdBy: opts.by,
   });

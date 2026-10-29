@@ -159,11 +159,18 @@ export async function searchArea(
     );
   }
 
-  const located = await (deps.geocode ?? geocodeAddresses)(
-    providers.map((p) => ({ street: p.address, city: p.city, state: p.state, zip: p.zip })),
-  );
   const works = linkGroups(providers);
   const officePoint = ctx.office ?? (ctx.officeZip ? (centers[ctx.officeZip] ?? null) : null);
+  // The geocoder takes a few hundred addresses at a time, so the likely best go first.
+  const rough = (p: Provider) => {
+    const c = centers[p.zip];
+    const miles = officePoint && c ? haversineMiles(officePoint, c) : null;
+    return tierFor({ taxonomy: p.taxonomy, npiType: p.npiType }, { miles, focus: ctx.focus }).score;
+  };
+  const byPromise = [...providers].sort((a, b) => rough(b) - rough(a));
+  const located = await (deps.geocode ?? geocodeAddresses)(
+    byPromise.map((p) => ({ street: p.address, city: p.city, state: p.state, zip: p.zip })),
+  );
 
   const out: AreaProvider[] = [];
   for (const p of providers) {
