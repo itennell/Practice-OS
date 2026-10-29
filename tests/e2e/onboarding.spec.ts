@@ -21,13 +21,17 @@ function freshInstall() {
 async function seriousViolations(page: Page) {
   // Let colour transitions (a chip just tapped) finish, so axe reads the settled colours.
   // Endless animations (Aeon breathing, Liquid Ether) never finish, so they're left out.
+  // Only running ones (a paused animation never finishes), and never longer than 1.5s.
   await page.evaluate(() =>
-    Promise.all(
-      document
-        .getAnimations()
-        .filter((a) => Number.isFinite(Number(a.effect?.getComputedTiming().endTime)))
-        .map((a) => a.finished.catch(() => undefined)),
-    ),
+    Promise.race([
+      Promise.all(
+        document
+          .getAnimations()
+          .filter((a) => a.playState === "running" && Number.isFinite(Number(a.effect?.getComputedTiming().endTime)))
+          .map((a) => a.finished.catch(() => undefined)),
+      ),
+      new Promise((done) => setTimeout(done, 1500)),
+    ]),
   );
   const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
   return results.violations
