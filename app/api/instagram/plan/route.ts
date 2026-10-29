@@ -7,6 +7,7 @@ const body = z
   .object({
     request: z.string().trim().min(3).max(600),
     count: z.union([z.literal(2), z.literal(3)]),
+    research_id: z.string().uuid().optional(),
   })
   .strict();
 
@@ -21,7 +22,7 @@ export async function POST(request: Request) {
   const parsed = body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "Tell Aeon what the posts should be about." }, { status: 400 });
   try {
-    const r = await planSeveral("aeon:instagram", parsed.data.request, parsed.data.count);
+    const r = await planSeveral("aeon:instagram", parsed.data.request, parsed.data.count, { researchId: parsed.data.research_id });
     if (r.outcome === "declined") return Response.json({ error: r.why }, { status: 409 });
     return Response.json(r);
   } catch (err) {

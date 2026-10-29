@@ -908,7 +908,7 @@ export const TOOLS: AeonTool[] = [
     title: "Draft one Instagram post",
     description:
       "Writes one Instagram post she asked for, in her words, then checks it and makes its picture; it waits for her approval. " +
-      "Posts cover practice logistics only. If she asks about a client, a review or anything clinical, Aeon writes a logistics post instead and says why; " +
+      "Posts cover practice logistics only. If she asks about a client, a review or anything clinical, nothing is written: tell her why and offer the logistics angle it returns (offer_instead); " +
       "suicide or self-harm topics are refused. Pass her request as she said it.",
     input: {
       request: z.string().trim().min(3).max(600),
@@ -927,6 +927,32 @@ export const TOOLS: AeonTool[] = [
         approval_id: r.post.approvalId,
         changed_from_her_request: r.outcome === "rewritten",
         why: r.why,
+        see: "/instagram",
+      });
+    },
+  }),
+
+  tool({
+    name: "research_post_topic",
+    title: "Research a post topic",
+    description:
+      "Before writing a post about a topic she names, finds what therapists post about it, which hooks and formats work and why, with source links: " +
+      "three small web searches run at once, then 2-3 logistics angles. Show her the short summary and the angles with their links, and ask which one to write. " +
+      "Never searches Instagram itself. Advice topics are refused with the nearest logistics angle (offer_instead).",
+    input: { topic: z.string().trim().min(3).max(300) },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: false },
+    label: "Researched a post topic",
+    changesData: true,
+    run: async ({ topic }) => {
+      const r = await instagram.researchPost(topic);
+      if (r.outcome === "blocked" || r.outcome === "declined") return text({ researched: false, why: r.why });
+      if (r.outcome === "off_topic") return text({ researched: false, why: r.why, offer_instead: r.angle.label });
+      const { research } = r;
+      return text({
+        summary: research.summary,
+        from_the_web: research.source === "web",
+        angles: research.angles.map((a, i) => ({ number: i + 1, title: a.title, hook: a.hook, format: a.format, why: a.why, links: a.sources })),
+        next: "Ask which angle to write; then draft_instagram_post with that angle's title and hook as the request.",
         see: "/instagram",
       });
     },

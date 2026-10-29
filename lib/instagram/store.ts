@@ -8,6 +8,7 @@ import type { ChatFn, CriticResult } from "./critic";
 import { designPost, type GraphicDeps } from "./graphic";
 import { GOALS, instagramDeclined, loadInstagramPrefs, weekTopics } from "./onboarding";
 import { PILLAR_BY_ID, type PillarId } from "./pillars";
+import { research, type Research, type SearchFn } from "./research";
 import { gateTopic, type Angle } from "./topic-gate";
 import { writeRequested, writeSeveral, writeWeek, type Draft, type PracticeFacts } from "./write";
 
@@ -173,7 +174,12 @@ export type RequestResult =
   | { outcome: "queued" | "rewritten" | "blocked_after_rewrite"; post: SavedPost; headline: string; why: string | null };
 
 /** One post she asked for. A request about a client is never written as asked. */
-export async function requestPost(by: string, request: string, pillar: PillarId | null, opts: { chat?: ChatFn; graphic?: GraphicDeps } = {}): Promise<RequestResult> {
+export async function requestPost(
+  by: string,
+  request: string,
+  pillar: PillarId | null,
+  opts: { chat?: ChatFn; graphic?: GraphicDeps; researchId?: string } = {},
+): Promise<RequestResult> {
   if (await instagramDeclined()) return { outcome: "declined", why: DECLINED };
   const gate = await checkRequest(request);
   if (gate) return gate;
@@ -184,6 +190,7 @@ export async function requestPost(by: string, request: string, pillar: PillarId 
     return { outcome: "blocked", why: blockedSummary(out.critic) };
   }
   const post = await saveDraft(out.draft, { by, facts, graphic: opts.graphic && { chat: opts.chat, ...opts.graphic } });
+  await linkResearch([post.id], opts.researchId);
   if (post.status === "blocked") return { outcome: "blocked_after_rewrite", post, headline: out.draft.headline, why: blockedSummary(out.draft.critic) };
   const why = out.requestBlocked ? blockedSummary(out.requestBlocked) : null;
   return { outcome: why || out.draft.rewritten ? "rewritten" : "queued", post, headline: out.draft.headline, why };
@@ -202,7 +209,12 @@ export type SeveralResult =
   | { outcome: "planned"; saved: SavedPost[]; blocked: number };
 
 /** Plan several: 2 or 3 posts on what she typed, each checked, drawn and queued for her approval. */
-export async function planSeveral(by: string, request: string, count: 2 | 3, opts: { chat?: ChatFn; graphic?: GraphicDeps } = {}): Promise<SeveralResult> {
+export async function planSeveral(
+  by: string,
+  request: string,
+  count: 2 | 3,
+  opts: { chat?: ChatFn; graphic?: GraphicDeps; researchId?: string } = {},
+): Promise<SeveralResult> {
   if (await instagramDeclined()) return { outcome: "declined", why: DECLINED };
   const gate = await checkRequest(request);
   if (gate) return gate;
@@ -210,5 +222,25 @@ export async function planSeveral(by: string, request: string, count: 2 | 3, opt
   const drafts = await writeSeveral(facts, request, count, { chat: opts.chat });
   const saved: SavedPost[] = [];
   for (const d of drafts) saved.push(await saveDraft(d, { by, facts, graphic: opts.graphic && { chat: opts.chat, ...opts.graphic } }));
+  await linkResearch(saved.map((x) => x.id), opts.researchId);
   return { outcome: "planned", saved, blocked: saved.filter((s) => s.status === "blocked").length };
+}
+
+/** Points posts at the research behind them (migration 020). */
+async function linkResearch(postIds: string[], researchId: string | undefined) {
+  if (!researchId || !postIds.length) return;
+  await db()`update practice_os.posts set research_id = ${researchId} where id = any(${postIds}::uuid[])`;
+}
+
+export type ResearchResult =
+  | Extract<RequestResult, { outcome: "blocked" | "declined" | "off_topic" }>
+  | { outcome: "researched"; research: Research };
+
+/** Research first: the topic gate, then three small web searches and 2-3 angles she picks from. */
+export async function researchPost(topic: string, opts: { search?: SearchFn; chat?: ChatFn } = {}): Promise<ResearchResult> {
+  if (await instagramDeclined()) return { outcome: "declined", why: DECLINED };
+  const gate = await checkRequest(topic);
+  if (gate) return gate;
+  const [p] = await db()<{ is_sample: boolean }[]>`select is_sample from practice_os.clinician_profile limit 1`;
+  return { outcome: "researched", research: await research(topic, { ...opts, isSample: p?.is_sample ?? false }) };
 }

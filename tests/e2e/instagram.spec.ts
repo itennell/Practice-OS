@@ -115,6 +115,25 @@ test("An advice topic is explained and the nearest logistics post is offered", a
   await axe(page);
 });
 
+test("Research first: a short summary and angles with their links, then she picks one", async ({ page }) => {
+  await page.goto("/instagram");
+  await page.getByLabel("What should the post be about?").fill("what to bring to a first session");
+  await page.getByRole("button", { name: "Plan several" }).click();
+  const panel = page.getByRole("region", { name: "What other therapists post about this" });
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText("Therapists keep these posts plain");
+  const angles = panel.getByRole("listitem").filter({ has: page.getByRole("heading", { level: 3 }) });
+  await expect(angles).toHaveCount(2);
+  await expect(angles.first()).toContainText("Nervous about a first session?");
+  const links = angles.first().getByRole("list", { name: "Sources" }).getByRole("link");
+  await expect(links.first()).toHaveAttribute("href", /^https:\/\/example\.com\//);
+  await expect(links.first()).toHaveAttribute("target", "_blank");
+  await expect(panel.getByRole("link", { name: /instagram\.com/ })).toHaveCount(0);
+  await expect(angles.first().getByRole("button", { name: "Plan 3 from this: What your first session looks like" })).toBeVisible();
+  await expect(panel.getByRole("button", { name: "Plan them as I typed it" })).toBeVisible();
+  await axe(page);
+});
+
 test("Keyboard reaches every action, and text at 200% still fits", async ({ page }) => {
   await page.goto("/instagram");
   await page.getByLabel("What should the post be about?").fill("how superbills work");

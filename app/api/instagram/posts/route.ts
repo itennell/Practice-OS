@@ -13,6 +13,7 @@ const body = z
   .object({
     request: z.string().trim().min(3).max(600),
     pillar: z.enum(["first_session", "fees_superbills", "how_to_book", "meet_the_clinician", "office_telehealth"]).nullable().default(null),
+    research_id: z.string().uuid().optional(),
   })
   .strict();
 
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
   const parsed = body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "Tell Aeon what the post should be about." }, { status: 400 });
   try {
-    const r = await requestPost("aeon:instagram", parsed.data.request, parsed.data.pillar);
+    const r = await requestPost("aeon:instagram", parsed.data.request, parsed.data.pillar, { researchId: parsed.data.research_id });
     if (r.outcome === "declined") return Response.json({ error: r.why }, { status: 409 });
     return Response.json(r);
   } catch (err) {
