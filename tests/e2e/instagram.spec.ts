@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import postgres from "postgres";
 import sharp from "sharp";
@@ -137,6 +137,50 @@ test("Research first: a short summary and angles with their links, then she pick
   await expect(angles.first().getByRole("button", { name: "Plan 3 from this: What your first session looks like" })).toBeVisible();
   await expect(panel.getByRole("button", { name: "Plan them as I typed it" })).toBeVisible();
   await axe(page);
+});
+
+test("Make a reel from a ready post: edit words, order and length, then download a real MP4", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.goto("/media/instagram");
+  const ready = page.getByRole("listitem").filter({ hasText: "What a session costs" }).first();
+  await ready.getByRole("button", { name: "Make a reel" }).click();
+  const editor = ready.getByRole("region", { name: "Your reel" });
+  await expect(editor).toBeVisible();
+  await expect(editor.getByText("Upload and edit your own video: coming later.")).toBeVisible();
+  await expect(editor.getByText("Slide 1: Your post picture")).toBeVisible();
+  const book = editor.getByLabel(/How to book$/);
+  await expect(book).toHaveValue(/./);
+
+  // Advice typed into a slide is refused before any video is made.
+  const point = editor.getByLabel("Slide 2: Point");
+  await point.fill("Try box breathing before your session");
+  await editor.getByRole("button", { name: "Download reel (MP4)" }).click();
+  await expect(editor.getByRole("alert")).toContainText("Posts stay on logistics");
+
+  // Her edits: words, order and length.
+  await point.fill("Sessions are $175 for 50 minutes");
+  await editor.getByRole("button", { name: "Move slide 2 down" }).click();
+  await expect(editor.getByLabel("Slide 3: Point")).toHaveValue("Sessions are $175 for 50 minutes");
+  const length = editor.getByRole("slider", { name: "Length" });
+  await length.focus();
+  for (let i = 0; i < 5; i++) await page.keyboard.press("ArrowLeft");
+  await expect(length).toHaveAttribute("aria-valuetext", "10 seconds");
+  await axe(page);
+
+  const [file] = await Promise.all([page.waitForEvent("download", { timeout: 90_000 }), editor.getByRole("button", { name: "Download reel (MP4)" }).click()]);
+  expect(file.suggestedFilename()).toMatch(/^instagram-reel-.*\.mp4$/);
+  const probe = JSON.parse(
+    execFileSync("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name,width,height:format=duration", "-of", "json", (await file.path())!], { encoding: "utf8" }),
+  );
+  expect(probe.streams[0]).toMatchObject({ codec_name: "h264", width: 1080, height: 1920 });
+  expect(Number(probe.format.duration)).toBeGreaterThan(9.5);
+  expect(Number(probe.format.duration)).toBeLessThan(10.5);
+  await expect(editor.getByText("Your reel is saved in Downloads.")).toBeVisible();
+  // Her edits were saved with the reel.
+  await page.reload();
+  const again = page.getByRole("listitem").filter({ hasText: "What a session costs" }).first();
+  await again.getByRole("button", { name: "Make a reel" }).click();
+  await expect(again.getByLabel("Slide 3: Point")).toHaveValue("Sessions are $175 for 50 minutes");
 });
 
 test("A post whose picture didn't finish stays on the board with a plain message and Retry; counts match the labels", async ({ page }) => {

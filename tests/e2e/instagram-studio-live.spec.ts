@@ -1,13 +1,15 @@
 import { expect, test } from "@playwright/test";
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import sharp from "sharp";
 
 // The Instagram studio end to end against live Muse (writer, safety check, picture
 // and picture check). Runs only with PLAYWRIGHT_LIVE=1 and MODEL_API_KEY set (the
-// config otherwise blanks the key for the test server). Run with PLAYWRIGHT_LIVE=1 so the test server keeps the key. Takes several minutes.
+// config otherwise blanks the key for the test server). Takes several minutes.
 
 test.skip(process.env.PLAYWRIGHT_LIVE !== "1" || !process.env.MODEL_API_KEY, "live run only: PLAYWRIGHT_LIVE=1 and a Muse key");
 
-test("Write one post, then plan 3; each waits for her approval as a preview", async ({ page }) => {
+test("Write one post, plan 3, approve one, then download its JPEG and MP4", async ({ page }) => {
   test.setTimeout(1_200_000);
   execSync("npm run db:reset", { stdio: "ignore" });
   await page.goto("/media/instagram");
@@ -36,4 +38,22 @@ test("Write one post, then plan 3; each waits for her approval as a preview", as
   // New posts come first; the four newest each wait with Approve / Decline under the preview.
   for (let i = 0; i < 4; i++) await expect(posts.nth(i).getByRole("button", { name: "Approve" })).toBeVisible();
   await expect(page.getByRole("button", { name: "more of the caption" }).first()).toBeVisible();
+
+  // Approve the newest post, then take it home: the picture and a reel.
+  const first = posts.first();
+  await first.getByRole("button", { name: "Approve" }).click();
+  await expect(first.getByRole("button", { name: "Copy caption" })).toBeVisible({ timeout: 30_000 });
+  const [jpeg] = await Promise.all([page.waitForEvent("download"), first.getByRole("link", { name: /Picture 4:5/ }).click()]);
+  const meta = await sharp(readFileSync((await jpeg.path())!)).metadata();
+  expect([meta.format, meta.width, meta.height]).toEqual(["jpeg", 1080, 1350]);
+  await first.getByRole("button", { name: "Make a reel" }).click();
+  const editor = first.getByRole("region", { name: "Your reel" });
+  await expect(editor).toBeVisible({ timeout: 120_000 });
+  const [mp4] = await Promise.all([page.waitForEvent("download", { timeout: 120_000 }), editor.getByRole("button", { name: "Download reel (MP4)" }).click()]);
+  const probe = JSON.parse(execFileSync("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name,width,height:format=duration", "-of", "json", (await mp4.path())!], { encoding: "utf8" }));
+  expect(probe.streams[0]).toMatchObject({ codec_name: "h264", width: 1080, height: 1920 });
+  if (process.env.STUDIO_PROOF_DIR) {
+    await jpeg.saveAs(`${process.env.STUDIO_PROOF_DIR}/live-post.jpg`);
+    await mp4.saveAs(`${process.env.STUDIO_PROOF_DIR}/live-reel.mp4`);
+  }
 });
