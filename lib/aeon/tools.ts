@@ -398,24 +398,30 @@ export const TOOLS: AeonTool[] = [
     name: "file_upload",
     title: "Add a business document",
     description:
-      "Reads one business document from a file on this computer (PDF, Word .docx or plain text): a payer contract, fee schedule, licensing board letter, " +
+      "Reads one business document from Practice-OS's inbox folder on this computer (PRACTICE_OS_DATA_DIR/inbox; PDF, Word .docx or plain text): a payer contract, fee schedule, licensing board letter, " +
       "malpractice face sheet, W-9 or CE certificate. Checks it for crisis words, client records and client details before any model reads it; refuses client records. " +
       "Keeps it in Practice-OS, sorts it, and puts anything it changes in her records (a new deadline, a payer date, CE hours) in her approvals. Returns its card.",
-    input: { path: z.string().trim().min(1).max(1000).describe("The file's full path on this computer.") },
+    input: { path: z.string().trim().min(1).max(1000).describe("The file's name in the inbox folder, or its full path inside it.") },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     label: "Read and kept your document",
     changesData: true,
     mcpOnly: true,
     run: async ({ path: filePath }, ctx) => {
-      const { lstat, readFile } = await import("node:fs/promises");
-      const { isAbsolute } = await import("node:path");
+      const { lstat, readFile, realpath } = await import("node:fs/promises");
+      const path = await import("node:path");
       const { fileUpload } = await import("../uploads/file");
       const { MAX_BYTES } = await import("../uploads/read");
-      if (!isAbsolute(filePath)) return { content: [{ type: "text", text: "Give the file's full path." }], isError: true };
-      const info = await lstat(filePath).catch(() => null);
-      if (!info?.isFile()) return { content: [{ type: "text", text: "No file at that path." }], isError: true };
+      const { inboxDir } = await import("../uploads/store");
+      // Only files in the inbox folder, never a link: so no caller can reach .env, keys or anything else on the computer.
+      const inbox = await realpath(inboxDir()).catch(() => null);
+      if (!inbox) return { content: [{ type: "text", text: `Put the file in ${inboxDir()} first.` }], isError: true };
+      const wanted = path.resolve(inbox, filePath);
+      const info = await lstat(wanted).catch(() => null);
+      if (!info?.isFile() || info.isSymbolicLink()) return { content: [{ type: "text", text: `No file with that name in ${inboxDir()}.` }], isError: true };
+      const real = await realpath(wanted);
+      if (path.dirname(real) !== inbox) return { content: [{ type: "text", text: `Only files directly in ${inboxDir()} can be added.` }], isError: true };
       if (info.size > MAX_BYTES) return { content: [{ type: "text", text: "That file is over 10 MB." }], isError: true };
-      const outcome = await fileUpload(new Uint8Array(await readFile(filePath)), { by: ctx.by });
+      const outcome = await fileUpload(new Uint8Array(await readFile(real)), { by: ctx.by });
       if (!outcome.ok) return { content: [{ type: "text", text: outcome.text }], isError: outcome.reason !== "unreadable" ? undefined : true };
       return withCards({ said: outcome.text, approval_id: outcome.approvalId, duplicate: outcome.duplicate }, [outcome.card]);
     },
@@ -1015,6 +1021,8 @@ export async function guardResult(result: ToolResult): Promise<ToolResult> {
 export async function runTool(name: string, args: unknown, ctx: ToolContext): Promise<ToolResult> {
   const tool = TOOLS_BY_NAME.get(name);
   if (!tool) return { content: [{ type: "text", text: `No tool named ${name}.` }], isError: true };
+  // An MCP-only tool (file_upload reads a file on this computer) never runs for the chat or anyone else.
+  if (tool.mcpOnly && !ctx.by.startsWith("mcp:")) return { content: [{ type: "text", text: `${name} works only over MCP. In the chat she adds a file with the + button.` }], isError: true };
   const parsed = z.object(tool.input).safeParse(args ?? {});
   const changes = typeof tool.changesData === "function" ? (parsed.success ? tool.changesData(parsed.data as never) : true) : tool.changesData;
   if (ctx.viewOnly && changes) return { content: [{ type: "text", text: VIEW_ONLY }], isError: true };

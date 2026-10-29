@@ -16,6 +16,9 @@ export function dataDir(): string {
   return process.env.PRACTICE_OS_DATA_DIR || path.join(process.cwd(), ".data");
 }
 
+/** Where an MCP client drops a file for file_upload: the only folder that tool reads. */
+export const inboxDir = () => path.join(dataDir(), "inbox");
+
 export type StoredDocument = {
   id: string;
   kind: DocKind;
@@ -49,23 +52,40 @@ export async function listStoredDocuments(limit = 50, sql: postgres.Sql = db()):
   return sql<StoredDocument[]>`select * from practice_os.documents order by created_at desc limit ${limit}`.catch(() => []);
 }
 
-/** Writes the file first, then the row; a row never points at a file that isn't there. */
+/**
+ * Saves the row, then the file; if the file can't be written the row is removed,
+ * so a row never points at a missing file. The same file added twice at once
+ * meets the sha256 unique index: the second one gets the first one's row.
+ */
 export async function keepDocument(
   input: { bytes: Uint8Array; mime: Mime; kind: DocKind; title: string; summary: string; payer: string | null; createdBy: string },
   sql: postgres.Sql = db(),
-): Promise<StoredDocument> {
+): Promise<{ doc: StoredDocument; duplicate: boolean }> {
+  const hash = sha256(input.bytes);
   const [{ id }] = await sql<{ id: string }[]>`select gen_random_uuid()::text as id`;
   const storedAs = `documents/${id}.${EXT[input.mime]}`;
-  const folder = path.join(dataDir(), "documents");
-  await mkdir(folder, { recursive: true, mode: 0o700 });
-  await chmod(folder, 0o700);
-  await writeFile(path.join(dataDir(), storedAs), input.bytes, { mode: 0o600, flag: "wx" });
-  const [row] = await sql<StoredDocument[]>`
-    insert into practice_os.documents (id, kind, title, mime, size_bytes, sha256, stored_as, summary, payer, created_by)
-    values (${id}, ${input.kind}, ${input.title}, ${input.mime}, ${input.bytes.length}, ${sha256(input.bytes)}, ${storedAs},
-            ${input.summary || null}, ${input.payer}, ${input.createdBy})
-    returning *`;
-  return row;
+  let row: StoredDocument;
+  try {
+    [row] = await sql<StoredDocument[]>`
+      insert into practice_os.documents (id, kind, title, mime, size_bytes, sha256, stored_as, summary, payer, created_by)
+      values (${id}, ${input.kind}, ${input.title}, ${input.mime}, ${input.bytes.length}, ${hash}, ${storedAs},
+              ${input.summary || null}, ${input.payer}, ${input.createdBy})
+      returning *`;
+  } catch (err) {
+    const existing = (err as { code?: string }).code === "23505" ? await findByHash(hash, sql) : null;
+    if (existing) return { doc: existing, duplicate: true };
+    throw err;
+  }
+  try {
+    const folder = path.join(dataDir(), "documents");
+    await mkdir(folder, { recursive: true, mode: 0o700 });
+    await chmod(folder, 0o700);
+    await writeFile(path.join(dataDir(), storedAs), input.bytes, { mode: 0o600, flag: "wx" });
+  } catch (err) {
+    await sql`delete from practice_os.documents where id = ${id}`;
+    throw err;
+  }
+  return { doc: row, duplicate: false };
 }
 
 export async function setApproval(id: string, approvalId: string, sql: postgres.Sql = db()): Promise<void> {

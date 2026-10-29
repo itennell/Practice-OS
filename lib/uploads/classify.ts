@@ -32,7 +32,8 @@ export const TARGETS = [
 ] as const;
 export type Target = (typeof TARGETS)[number];
 
-export type Fact = { target: Target; label: string; date: ISODate | null; number: number | null; quote: string };
+/** ref: for CE hours, the certificate number (or the provider and completion date) as printed, so the same certificate never counts twice. */
+export type Fact = { target: Target; label: string; date: ISODate | null; number: number | null; quote: string; ref: string | null };
 export type Classified = { kind: DocKind; title: string; summary: string; payer: string | null; facts: Fact[] };
 
 const SCHEMA = {
@@ -50,13 +51,14 @@ const SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["target", "label", "date", "number", "quote"],
+        required: ["target", "label", "date", "number", "quote", "ref"],
         properties: {
           target: { type: "string", enum: [...TARGETS] },
           label: { type: "string", description: "What it is in a few words, e.g. 'Recredentialing application due'." },
           date: { type: ["string", "null"], description: "YYYY-MM-DD when the fact is a date." },
           number: { type: ["number", "null"], description: "The number when the fact is hours." },
           quote: { type: "string", description: "The exact words from the document this fact comes from, copied character for character, at most 300 characters." },
+          ref: { type: ["string", "null"], description: "For ce_hours: the certificate number exactly as printed, or else the provider's name and completion date as printed. Otherwise null." },
         },
       },
     },
@@ -90,13 +92,22 @@ export function vetFacts(raw: unknown, text: string, today: ISODate): Classified
     const date = typeof x.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(x.date) && !Number.isNaN(Date.parse(x.date)) ? x.date : null;
     const number = typeof x.number === "number" && Number.isFinite(x.number) ? x.number : null;
     const target = x.target as Target;
+    const ref = str(x.ref, 120);
     if (target === "ce_hours") {
-      if (number === null || number <= 0 || number > 60) continue;
+      // Hours count once per certificate: its number (or provider and date) must be printed on it.
+      if (number === null || number <= 0 || number > 60 || ref.length < 4 || !haystack.includes(squash(ref))) continue;
     } else {
       // A date fact: from a year ago to ten years out, and the year must appear in the quote.
       if (!date || date < addDays(today, -366) || date > addDays(today, 3653) || !quote.includes(date.slice(0, 4))) continue;
     }
-    facts.push({ target, label: str(x.label, 120) || target.replace(/_/g, " "), date: target === "ce_hours" ? null : date, number: target === "ce_hours" ? number : null, quote });
+    facts.push({
+      target,
+      label: str(x.label, 120) || target.replace(/_/g, " "),
+      date: target === "ce_hours" ? null : date,
+      number: target === "ce_hours" ? number : null,
+      quote,
+      ref: target === "ce_hours" ? ref : null,
+    });
   }
   return {
     kind,
