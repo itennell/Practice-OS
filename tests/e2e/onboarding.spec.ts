@@ -169,6 +169,7 @@ test("A new clinician sets up the whole practice, and the home page lists what s
 });
 
 test("She can stop and pick up where she left off", async ({ page }) => {
+  test.setTimeout(120_000); // five screens, each with axe and the local client-detail guard
   freshInstall();
   await page.goto("/onboarding");
   await step(page, /What's your name\?/, () => page.getByLabel("Your name").fill("Dana Reyes"));
