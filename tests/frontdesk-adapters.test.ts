@@ -118,6 +118,10 @@ describe("Cal.com adapter", () => {
     const body = JSON.parse(post.body!);
     expect(body.attendee.name).toBe("Phone consult FD-1042");
     expect(body.attendee.email).toBeUndefined();
+    // With her own Cal.com email saved, the booking carries hers (her event requires one), never the caller's.
+    const f2 = fakeFetch(routes);
+    await calcomAdapter({ ...cfg, ownerEmail: "dana@example.com" }, f2.impl).book(slot, "FD-1042");
+    expect(JSON.parse(f2.calls.find((c) => c.method === "POST")!.body!).attendee).toEqual({ name: "Phone consult FD-1042", timeZone: "America/Chicago", language: "en", email: "dana@example.com" });
     expect(post.headers["cal-api-version"]).toBe("2026-02-25");
   });
 
@@ -131,9 +135,9 @@ describe("Cal.com adapter", () => {
     expect(f.calls.at(-1)!.url).toContain("/bookings/bk_fake_2/cancel");
   });
 
-  it("check() names the event type, or asks her to pick it again", async () => {
+  it("check() names the event type, or asks her to paste her key again", async () => {
     expect((await calcomAdapter(cfg, fakeFetch(routes).impl).check()).ok).toBe(true);
-    expect(await calcomAdapter({ ...cfg, eventTypeId: 9 }, fakeFetch(routes).impl).check()).toEqual({ ok: false, fix: expect.stringContaining("Pick it again") });
+    expect(await calcomAdapter({ ...cfg, eventTypeId: 9 }, fakeFetch(routes).impl).check()).toEqual({ ok: false, fix: expect.stringContaining("Paste your Cal.com key again") });
   });
 });
 
