@@ -59,9 +59,10 @@ const QUEUEABLE_KINDS = APPROVAL_KINDS.filter((k) => k !== "aeon_action") as [Ex
 /**
  * Saving or forgetting a memory never waits for her tap, in any mode. Nor do the
  * Instagram writers: they save ideas or drafts that wait for her approval anyway.
+ * Nor do the Media writers: their drafts stay on her computer until she pastes them.
  * They still count as changes, so the view-only demo copy refuses them (no writes, no Muse).
  */
-const ALWAYS_RUNS = new Set(["remember", "forget", "post_ideas", "weekly_plan", "draft_post", "plan_instagram_week", "draft_instagram_post"]);
+const ALWAYS_RUNS = new Set(["remember", "forget", "post_ideas", "weekly_plan", "draft_post", "plan_instagram_week", "draft_instagram_post", "directory_profile", "website_help"]);
 
 export type ToolResult = {
   content: { type: "text"; text: string }[];
@@ -1090,6 +1091,121 @@ export const TOOLS: AeonTool[] = [
       const { offerTimes } = await import("../frontdesk/offers");
       const out = await offerTimes(inquiry_id, { purpose: "book", createdBy: "aeon" });
       return { ...text(out), structuredContent: out };
+    },
+  }),
+
+  // ---- Media (lib/media): directory profiles and her website. Aeon writes, she
+  // pastes; nothing is sent anywhere, so the drafts save without waiting for a tap.
+  tool({
+    name: "directory_profile",
+    title: "Write her Psychology Today profile",
+    description:
+      "Writes every text box of her Psychology Today profile (and the same words for other directories) from her saved facts and a few answers in her own words. " +
+      "Use when she asks for help with her Psychology Today profile, a directory listing, or her bio. " +
+      "If it returns questions, ask them one or two at a time in plain words, then call again with her answers. " +
+      "Each box fits Psychology Today's limit and is checked: no advice, client stories, testimonials, promises or rankings. " +
+      "Tell her to read each box and make it hers before she pastes it (Psychology Today asks that AI text be personalized), and that the Media page has a Copy button for each box.",
+    input: {
+      focus: z.string().max(200).optional().describe("What people most often come to her for, in her words."),
+      approach: z.string().max(200).optional().describe("How she likes to work, in her words."),
+      first_session: z.string().max(200).optional().describe("What a first session with her is like."),
+      why: z.string().max(200).optional().describe("Why she does this work."),
+      languages: z.string().max(80).optional().describe("Languages besides English, if any."),
+      years_in_practice: z.number().int().min(0).max(70).optional(),
+      free_consult_minutes: z.union([z.literal(0), z.literal(15), z.literal(20), z.literal(30)]).optional().describe("0 if she offers no free consult."),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: false },
+    label: "Wrote your Psychology Today profile",
+    changesData: true,
+    run: async (input: { focus?: string; approach?: string; first_session?: string; why?: string; languages?: string; years_in_practice?: number; free_consult_minutes?: 0 | 15 | 20 | 30 }, ctx) => {
+      const facts = await import("../media/facts");
+      const profile = await import("../media/profile");
+      const given = Object.fromEntries(
+        Object.entries({ focus: input.focus, approach: input.approach, firstSession: input.first_session, why: input.why, languages: input.languages, yearsInPractice: input.years_in_practice, freeConsultMinutes: input.free_consult_minutes }).filter(([, v]) => v !== undefined),
+      );
+      try {
+        if (Object.keys(given).length) await facts.saveMediaAnswers(given);
+      } catch (err) {
+        if (err instanceof facts.AnswerRefused || err instanceof z.ZodError) return text({ written: false, why: err instanceof z.ZodError ? err.issues[0]?.message : err.message });
+        throw err;
+      }
+      const f = await facts.loadMediaFacts();
+      const missing = facts.missingAnswers(f.answers);
+      if (missing.length) return text({ written: false, ask_her: facts.QUESTIONS.filter((q) => missing.includes(q.id)).map((q) => q.ask), why: "These need her own words; ask them, then call again." });
+      const d = await profile.draftProfile(f, { chat: ctx.chat });
+      await profile.saveProfileDraft(d);
+      return text({
+        written: true,
+        search_card_preview: d.cardPreview,
+        boxes: d.fields.map((x) => ({ box: x.label, characters: `${x.text.length} of ${x.limit}`, text: x.text, paste_where: x.pasteWhere, notes: x.findings.map((n) => n.message) })),
+        tick_in_editor: d.picks.map((p) => `${p.label}: ${p.value}`),
+        next: "Show the search card preview and say the boxes are on the Media page with a Copy button each. She reads each one and makes it hers before pasting it into psychologytoday.com.",
+      });
+    },
+  }),
+
+  tool({
+    name: "other_directories",
+    title: "Other places to list her practice",
+    description:
+      "Other directories and listings besides Psychology Today (Google Business Profile, GoodTherapy, Zencare, TherapyDen, Open Path, Headway, Alma, Grow, Inclusive Therapists, Therapy for Black Girls, Latinx Therapy): " +
+      "cost, who each is for, and how her profile words change for each. Use when she asks where else to list herself or about one of them. Facts checked 2026-10-29; say prices may change.",
+    input: { directory: z.string().max(60).optional().describe("One directory she named, if any.") },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+    label: "Looked up other directories",
+    changesData: false,
+    run: async ({ directory }: { directory?: string }) => {
+      const { DIRECTORIES } = await import("../media/schema");
+      const { loadProfileDraft, directoryVersions } = await import("../media/profile");
+      const d = await loadProfileDraft();
+      const versions = d ? new Map(directoryVersions(d).map((v) => [v.id, v.text])) : null;
+      const want = directory?.toLowerCase();
+      const list = DIRECTORIES.filter((x) => !want || x.name.toLowerCase().includes(want) || x.id === want);
+      return text({
+        checked: "2026-10-29",
+        directories: list.map((x) => ({ name: x.name, cost: x.cost, for_who: x.forWho, how_her_words_change: x.difference, source: x.sources[0], ...(versions?.get(x.id) && x.id === "google" ? { google_description: versions.get(x.id) } : {}) })),
+        ...(d ? {} : { note: "Her Psychology Today profile isn't written yet; directory_profile writes it, and these reuse it." }),
+      });
+    },
+  }),
+
+  tool({
+    name: "website_help",
+    title: "Help with her practice website",
+    description:
+      "Her practice website. If she has one: saves the address and gives a short checklist (booking link, fees, consult offer, same name/address/phone as her listings, license title, no health form, 988 line, accessibility). " +
+      "If she doesn't: the recommended way to make one (Squarespace Core, paid yearly) as plain steps, and with write_pages it writes the words for her five pages and the practice details block for Google. " +
+      "Use when she asks about a website, making one, or what to put on it. Meta has no website builder; say so if asked.",
+    input: {
+      url: z.string().max(200).optional().describe("Her website address, if she gives one."),
+      write_pages: z.boolean().optional().describe("Write the words for her five pages."),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: false },
+    label: "Helped with your website",
+    changesData: (input: { url?: string; write_pages?: boolean }) => Boolean(input.url || input.write_pages),
+    run: async ({ url, write_pages }: { url?: string; write_pages?: boolean }, ctx) => {
+      const facts = await import("../media/facts");
+      const site = await import("../media/website");
+      const { WEBSITE } = await import("../media/schema");
+      let saved: string | null = null;
+      if (url) {
+        try {
+          saved = await site.saveWebsiteUrl(url);
+        } catch (err) {
+          return text({ saved: false, why: err instanceof Error ? err.message : String(err) });
+        }
+      }
+      const f = await facts.loadMediaFacts();
+      const has = Boolean(saved ?? f.website);
+      const pages = write_pages ? await site.draftSite(f, { chat: ctx.chat }) : null;
+      if (pages) await site.saveSiteCopy(pages);
+      return text({
+        has_website: has,
+        website: saved ?? f.website,
+        ...(has ? { checklist: WEBSITE.checklist.map((c) => c.label) } : { recommended: `${WEBSITE.default.name}: ${WEBSITE.default.cost}. ${WEBSITE.default.why}`, steps: site.SETUP_STEPS, meta: WEBSITE.meta.note }),
+        ...(pages ? { pages: pages.pages.map((p) => ({ page: p.label, text: p.text })), next: "The words and the practice details block are on the Media page, Website tab, with a Copy button each." } : {}),
+        hipaa: WEBSITE.hipaa,
+      });
     },
   }),
 ];
