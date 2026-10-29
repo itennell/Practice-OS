@@ -193,13 +193,14 @@ export async function searchArea(
   };
   const byPromise = [...providers].sort((a, b) => rough(b) - rough(a));
   const located = await (deps.geocode ?? geocodeAddresses)(
-    byPromise.map((p) => ({ street: p.address, city: p.city, state: p.state, zip: p.zip })),
+    // A home-looking address is never placed at street level: it stays at the ZIP center.
+    byPromise.filter((p) => !p.homeAddress).map((p) => ({ street: p.address, city: p.city, state: p.state, zip: p.zip })),
     { timeoutMs: deadline + 25_000 - now() },
   );
 
   const out: AreaProvider[] = [];
   for (const p of providers) {
-    const exact = located.get(addressKey({ street: p.address, city: p.city, state: p.state, zip: p.zip })) ?? null;
+    const exact = p.homeAddress ? null : (located.get(addressKey({ street: p.address, city: p.city, state: p.state, zip: p.zip })) ?? null);
     const point = exact ?? centers[p.zip];
     if (!point) continue;
     const distanceMiles = officePoint ? Math.round(haversineMiles(officePoint, point) * 10) / 10 : null;

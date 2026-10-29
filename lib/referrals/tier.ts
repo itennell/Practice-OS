@@ -14,7 +14,7 @@
 // they see the same people, and a provider who only sees people she doesn't
 // (a pediatrician for an adults-only practice) is always "Later".
 import research from "../../docs/research/referral-tiers.json";
-import { specialtyForCode, SPECIALTY_BY_ID, type Provider, type SpecialtyId } from "./nppes";
+import { looksResidential, specialtyForCode, SPECIALTY_BY_ID, type Provider, type SpecialtyId } from "./nppes";
 
 export type Tier = "first" | "next" | "later";
 export const TIERS: Tier[] = ["first", "next", "later"];
@@ -157,6 +157,8 @@ export type TierInput = {
   state?: string | null;
   /** A group at the same address in the NPI Registry, for a person. Shown, not scored. */
   worksAt?: string | null;
+  /** The practice location looks like a home (lib/referrals/nppes.ts looksResidential). */
+  homeAddress?: boolean;
 };
 
 export type TierContext = { miles: number | null; focus: Focus[]; approximate?: boolean; clinicianState?: string | null; today?: Date };
@@ -206,8 +208,12 @@ export function tierFor(p: TierInput, ctx: TierContext): TierResult {
     reasons.push(where.endsWith("mi") ? `${where} from your office` : where);
   }
 
-  // A person to write to.
-  if (p.npiType === "individual") {
+  // A person to write to. A home address can't take a letter to a practice,
+  // so it counts as low as a front desk: call first.
+  if (p.homeAddress) {
+    score += WEIGHTS.reachable.groupOnly;
+    reasons.push("the address looks like a home, so call before you write");
+  } else if (p.npiType === "individual") {
     score += WEIGHTS.reachable.individual;
     reasons.push("you can write to them by name, not a front desk");
   } else if (p.official) {
@@ -236,24 +242,26 @@ export function tierFor(p: TierInput, ctx: TierContext): TierResult {
   if (p.state && ctx.clinicianState && p.state.toUpperCase() === ctx.clinicianState.toUpperCase()) score += WEIGHTS.inState;
 
   score = Math.min(100, Math.round(score));
-  const tier: Tier = mismatch ? "later" : tierOf(score);
+  // A home address can't be the first letter you send: at best "Warm up next", after a call.
+  let tier: Tier = mismatch ? "later" : tierOf(score);
+  if (tier === "first" && p.homeAddress) tier = "next";
   return { tier, score, reasons, specialty };
 }
 
 /** The tier of a provider straight from NPPES. */
 export function providerTier(p: Provider, ctx: TierContext, worksAt: string | null = null): TierResult {
   return tierFor(
-    { taxonomy: p.taxonomy, npiType: p.npiType, name: p.name, official: p.official, phone: p.phone, fax: p.fax, lastUpdated: p.lastUpdated, state: p.state, worksAt },
+    { taxonomy: p.taxonomy, npiType: p.npiType, name: p.name, official: p.official, phone: p.phone, fax: p.fax, lastUpdated: p.lastUpdated, state: p.state, worksAt, homeAddress: p.homeAddress },
     ctx,
   );
 }
 
 /**
  * Which scoring wrote a card's fit_score. 1 was the first fit formula (before
- * 2026-10-29); 2 is these research weights. Bump it when the weights change,
+ * 2026-10-29); 2 is these research weights; 3 scores a home-looking address lower. Bump it when the weights change,
  * and old cards are scored again (lib/referrals/store.ts rescoreOldCards).
  */
-export const SCORE_VERSION = 2;
+export const SCORE_VERSION = 3;
 
 /**
  * A board card: its reasons from what the board keeps, and its tier from the
@@ -267,13 +275,18 @@ export function boardTier(
     npi_type: "individual" | "organization" | null;
     phone: string | null;
     state: string | null;
+    address: string | null;
     fit_score: number | null;
     score_version: number | null;
     distance_miles: number | null;
   },
   ctx: Omit<TierContext, "miles">,
 ): TierResult {
-  const r = tierFor({ taxonomy: card.taxonomy, npiType: card.npi_type, phone: card.phone, state: card.state }, { ...ctx, miles: card.distance_miles });
+  const homeAddress = card.npi_type !== "organization" && looksResidential(card.address);
+  const r = tierFor(
+    { taxonomy: card.taxonomy, npiType: card.npi_type, phone: card.phone, state: card.state, homeAddress },
+    { ...ctx, miles: card.distance_miles },
+  );
   const mismatch = r.reasons.some((x) => x.startsWith("mostly sees"));
   if (card.fit_score === null || card.score_version !== SCORE_VERSION || mismatch) return r;
   return { ...r, score: card.fit_score, tier: tierOf(card.fit_score) };
