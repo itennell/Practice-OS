@@ -115,6 +115,45 @@ test("An advice topic is explained and the nearest logistics post is offered", a
   await axe(page);
 });
 
+test("A post whose picture didn't finish stays on the board with a plain message and Retry; counts match the labels", async ({ page }) => {
+  const sql = postgres(process.env.DATABASE_URL!, { max: 1 });
+  try {
+    const [a] = await sql`
+      insert into practice_os.approvals (kind, title, preview, payload, status, created_by, is_sample)
+      values ('instagram_post', '[Sample] Instagram post: Parking near the office', '{}', '{}', 'pending', 'aeon:instagram', true) returning id`;
+    const [p] = await sql`
+      insert into practice_os.posts (topic, caption, headline, status, approval_id, week_of, is_sample)
+      values ('office_telehealth', ${"[Sample] Street parking is free after 6.\n\nDana Reyes, LCPC (fictional demo practice)"}, '[Sample] Parking near the office',
+              'pending_approval', ${a.id}, current_date, true) returning id`;
+    await sql`update practice_os.approvals set payload = ${sql.json({ post_id: p.id })} where id = ${a.id}`;
+    // A draft that never reached her approvals.
+    await sql`
+      insert into practice_os.posts (topic, caption, headline, status, week_of, is_sample)
+      values ('how_to_book', '[Sample] Book from the link in bio.', '[Sample] Booking, unfinished', 'pending_approval', current_date, true)`;
+  } finally {
+    await sql.end();
+  }
+  await page.goto("/instagram");
+  // Header counts and card labels agree: 2 waiting (How to book, Parking), the unfinished draft is not counted.
+  await expect(page.getByText("2 waiting for you · 1 ready to post")).toBeVisible();
+  const unfinished = page.getByRole("listitem").filter({ hasText: "[Sample] Booking, unfinished" }).first();
+  await expect(unfinished.getByText("Didn't finish")).toBeVisible();
+  await expect(unfinished.getByRole("button", { name: "Retry" })).toBeVisible();
+
+  const parking = page.getByRole("listitem").filter({ hasText: "[Sample] Parking near the office" }).first();
+  await parking.getByRole("button", { name: "Approve" }).click();
+  await expect(parking.getByText("Aeon couldn't finish the picture. Try again.")).toBeVisible();
+  await expect(parking.getByText("Didn't finish")).toBeVisible();
+  await expect(parking.getByRole("button", { name: "Retry" })).toBeVisible();
+  await expect(page.getByText("1 waiting for you · 1 ready to post")).toBeVisible();
+  await axe(page);
+
+  // Approvals says the same plain thing.
+  await page.goto("/approvals");
+  await page.getByRole("button", { name: "All" }).click();
+  await expect(page.getByText("Aeon couldn't finish the picture. Try again.").first()).toBeVisible();
+});
+
 test("Keyboard reaches every action, and text at 200% still fits", async ({ page }) => {
   await page.goto("/instagram");
   await page.getByLabel("What should the post be about?").fill("how superbills work");
