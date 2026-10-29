@@ -186,7 +186,7 @@ async function standInChat(): Promise<{ choices: { message: { content: string } 
   } as never;
 }
 
-// ---- Saved research (migration 020) ------------------------------------------------
+// ---- Saved research (migration 021) ------------------------------------------------
 
 const toResearch = (r: { id: string; topic: string; summary: string; angles: ResearchAngle[]; sources: ResearchLink[]; source: "web" | "fixed" }): Research => ({
   id: r.id,
