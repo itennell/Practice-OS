@@ -1,9 +1,11 @@
 import { audit } from "../audit";
 import { deleteConnection, getConnection, saveConnection } from "../connections";
 import { db } from "../db";
-import { calcomAdapter, listCalcomEventTypes, type CalcomEventType } from "./calendar/calcom";
+import { autoConnectCalcom } from "./calendar/calcom-setup";
+import { shortSlotLabel } from "./calendar/zone";
+import { saveFrontDeskSetup } from "./setup";
 import { calendarSettings, getCalendarAdapter, type CalcomMeta } from "./calendar";
-import { CalendarError, type CalendarProvider } from "./calendar/types";
+import { type CalendarProvider } from "./calendar/types";
 import { getPhoneAdapter, PHONE_PROVIDER, type PhoneMeta } from "./phone";
 import { spruceAdapter } from "./phone/spruce";
 import { twilioFromEnv } from "./phone/twilio";
@@ -49,28 +51,33 @@ export async function calendarStatus(): Promise<ConnectStatus & { provider: Cale
   return { connected: true, provider: cal.provider, check: await cal.check(), eventTypeLabel: (conn?.meta as Partial<CalcomMeta>)?.eventTypeLabel };
 }
 
-/** Step 1 of the Cal.com card: the key works and these are her event types. */
-export async function calcomEventTypes(apiKey: string): Promise<{ ok: true; types: CalcomEventType[] } | { ok: false; fix: string }> {
-  try {
-    const types = await listCalcomEventTypes(apiKey.trim());
-    if (types.length === 0) return { ok: false, fix: "Your Cal.com account has no event types yet. Make a 15-minute consult in Cal.com, then try again." };
-    return { ok: true, types };
-  } catch (e) {
-    return { ok: false, fix: e instanceof CalendarError ? e.fix : "Couldn't reach Cal.com. Check your internet, then try again." };
-  }
-}
+export type CalcomConnectResult =
+  | { ok: true; label: string; eventTypeLabel: string; created: boolean; nextOpen: string | null }
+  | { ok: false; fix: string };
 
-/** Step 2: save the key and the consult event type, and make Cal.com her Front Desk calendar. */
-export async function connectCalcom(apiKey: string, eventTypeId: number): Promise<CheckResult> {
-  const s = await calendarSettings();
-  const check = await calcomAdapter({ apiKey: apiKey.trim(), eventTypeId, timeZone: s.timeZone }).check();
-  if (!check.ok) return check;
-  const types = await listCalcomEventTypes(apiKey.trim()).catch(() => []);
-  const meta: CalcomMeta = { eventTypeId, eventTypeLabel: types.find((t) => t.id === eventTypeId)?.title };
-  await saveConnection({ provider: "calcom", accountLabel: check.label, accessToken: apiKey.trim(), refreshToken: null, scopes: [], expiresAt: null, meta });
+/**
+ * One paste: check the key, find or make her 15-minute consult, save it
+ * encrypted, make Cal.com her Front Desk calendar, and read the next open time.
+ */
+export async function connectCalcomAuto(apiKey: string, fetchImpl?: typeof fetch): Promise<CalcomConnectResult> {
+  const saved = await getConnection("calcom").catch(() => null);
+  const savedId = (saved?.meta as Partial<CalcomMeta> | undefined)?.eventTypeId;
+  const out = await autoConnectCalcom(apiKey, { savedEventTypeId: typeof savedId === "number" ? savedId : null, fetchImpl });
+  if (!out.ok) return out;
+  const meta: CalcomMeta = { eventTypeId: out.eventType.id, eventTypeLabel: out.eventType.title };
+  await saveConnection({ provider: "calcom", accountLabel: out.eventType.title, accessToken: apiKey.trim(), refreshToken: null, scopes: [], expiresAt: null, meta });
   await chooseCalendar("calcom");
-  await audit({ actor: "clinician", action: "calendar_connected", subjectType: "connection", subjectId: "calcom", details: { eventTypeId } });
-  return check;
+  const minutes = out.eventType.lengthInMinutes;
+  if (Number.isInteger(minutes) && minutes >= 10 && minutes <= 60) await saveFrontDeskSetup({ consultMinutes: minutes }, "calcom_connect");
+  await audit({ actor: "clinician", action: "calendar_connected", subjectType: "connection", subjectId: "calcom", details: { eventTypeId: out.eventType.id, created: out.created } });
+  const tz = (await calendarSettings()).timeZone;
+  return {
+    ok: true,
+    label: out.eventType.title,
+    eventTypeLabel: out.eventType.title,
+    created: out.created,
+    nextOpen: out.nextSlot ? shortSlotLabel(out.nextSlot.start, tz) : null,
+  };
 }
 
 export async function chooseCalendar(provider: CalendarProvider | null): Promise<void> {

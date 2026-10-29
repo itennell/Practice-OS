@@ -134,13 +134,7 @@ async function FrontDesk({ searchParams }: { searchParams: PageProps<"/front-des
         <PhoneCard initial={{ connected: phone.connected, label: phone.check?.ok ? phone.check.label : undefined, fix: phone.check && !phone.check.ok ? phone.check.fix : undefined, devLine: phone.devLine }} />
         <CalendarCard
           initial={{
-            provider: calendar.provider,
             calcom: { connected: calcom, label: calcom && calendar.check?.ok ? calendar.check.label : undefined, fix: calcom && calendar.check && !calendar.check.ok ? calendar.check.fix : undefined },
-            google: {
-              connected: calendar.provider === "google" && calendar.connected,
-              label: calendar.check?.ok ? calendar.check.label : undefined,
-              fix: calendar.check && !calendar.check.ok ? calendar.check.fix : undefined,
-            },
           }}
         />
       </div>

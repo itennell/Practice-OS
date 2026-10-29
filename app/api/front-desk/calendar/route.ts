@@ -1,12 +1,12 @@
 import { z } from "zod";
 import { canDecide } from "@/lib/admin-guard";
-import { calcomEventTypes, chooseCalendar, connectCalcom, disconnectCalcom } from "@/lib/frontdesk/connect";
+import { chooseCalendar, connectCalcomAuto, disconnectCalcom } from "@/lib/frontdesk/connect";
 
-// The calendar Connect cards. Cal.com: paste the key, pick the consult type, live check.
-// Google: the sign-in itself is desktop-app's Connect Google; this only records her choice.
+// The Cal.com Connect card: one pasted key, then Practice-OS checks it, finds or
+// makes her consult, saves it and reads the next open time (lib/frontdesk/connect.ts).
+// "choose" records her calendar (Cal.com only for now; Google comes later).
 const Body = z.discriminatedUnion("step", [
-  z.object({ step: z.literal("calcom_types"), apiKey: z.string().min(1).max(500) }),
-  z.object({ step: z.literal("calcom_save"), apiKey: z.string().min(1).max(500), eventTypeId: z.number().int().positive() }),
+  z.object({ step: z.literal("calcom_auto"), apiKey: z.string().min(1).max(500) }),
   z.object({ step: z.literal("choose"), provider: z.enum(["calcom", "google"]) }),
 ]);
 
@@ -15,12 +15,8 @@ export async function POST(request: Request) {
   const parsed = Body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ ok: false, fix: "Paste your Cal.com key first." }, { status: 400 });
   const b = parsed.data;
-  if (b.step === "calcom_types") {
-    const out = await calcomEventTypes(b.apiKey);
-    return Response.json(out, { status: out.ok ? 200 : 422 });
-  }
-  if (b.step === "calcom_save") {
-    const out = await connectCalcom(b.apiKey, b.eventTypeId);
+  if (b.step === "calcom_auto") {
+    const out = await connectCalcomAuto(b.apiKey);
     return Response.json(out, { status: out.ok ? 200 : 422 });
   }
   await chooseCalendar(b.provider);

@@ -1,31 +1,40 @@
 import { CalendarError, type CalendarAdapter, type CheckResult, type Slot } from "./types";
 
 // Cal.com API v2 (cal.com/docs/api-reference/v2), the clinician's own account.
-// She pastes an API key (Settings > Developer > API keys) and picks her consult
-// event type. Each endpoint pins its cal-api-version, as the docs require.
+// She pastes an API key (Settings > Developer > API keys); calcom-setup.ts finds
+// or makes her consult event type. Each endpoint pins its cal-api-version, as
+// the docs require ("Not passing the correct value will default to an older version").
 
 export const CALCOM_API = "https://api.cal.com/v2";
-const V = { eventTypes: "2024-06-14", slots: "2024-09-04", bookings: "2026-02-25" } as const;
+export const CALCOM_VERSIONS = { eventTypes: "2026-06-12", schedules: "2024-06-11", slots: "2024-09-04", bookings: "2026-02-25" } as const;
+const V = CALCOM_VERSIONS;
+
+/** Cal.com's API, or a local fixture server in end-to-end tests (CALCOM_API_BASE, http://127.0.0.1 only). */
+export function calcomBase(): string {
+  const test = process.env.CALCOM_API_BASE;
+  return test && /^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(test) ? test : CALCOM_API;
+}
 
 export type CalcomConfig = { apiKey: string; eventTypeId: number; timeZone: string };
 export type CalcomEventType = { id: number; title: string; slug: string; lengthInMinutes: number };
 
 type Envelope<T> = { status: string; data: T };
 
-async function calcomCall<T>(apiKey: string, version: string, path: string, init: RequestInit = {}, fetchImpl: typeof fetch = fetch): Promise<T> {
-  const res = await fetchImpl(`${CALCOM_API}${path}`, {
+export async function calcomCall<T>(apiKey: string, version: string | null, path: string, init: RequestInit = {}, fetchImpl: typeof fetch = fetch): Promise<T> {
+  const res = await fetchImpl(`${calcomBase()}${path}`, {
     ...init,
     headers: {
       Authorization: `Bearer ${apiKey}`,
-      "cal-api-version": version,
+      ...(version ? { "cal-api-version": version } : {}),
       ...(init.body ? { "Content-Type": "application/json" } : {}),
       ...(init.headers ?? {}),
     },
     signal: AbortSignal.timeout(20_000),
   });
-  if (res.status === 401 || res.status === 403) {
-    throw new CalendarError(`Cal.com refused the key (${res.status})`, "Cal.com turned this key down. Make a new one in Cal.com > Settings > Developer > API keys and paste all of it.", res.status);
+  if (res.status === 401) {
+    throw new CalendarError(`Cal.com refused the key (${res.status})`, "That key didn't work. Copy it again from Cal.com and paste all of it.", res.status);
   }
+  if (res.status === 403) throw new CalendarError("Cal.com said no (403)", "Cal.com didn't allow that with this key. Make a new key in Cal.com and paste it again.", 403);
   if (!res.ok) throw new CalendarError(`Cal.com answered HTTP ${res.status}`, "Cal.com didn't answer. Try again in a minute.", res.status);
   return ((await res.json()) as Envelope<T>).data;
 }

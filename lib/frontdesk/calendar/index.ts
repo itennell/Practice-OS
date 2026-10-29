@@ -42,7 +42,8 @@ async function googleToken(): Promise<string> {
 export async function getCalendarAdapter(): Promise<CalendarAdapter | null> {
   const s = await calendarSettings();
   if (s.provider === "google") return googleAdapter({ getToken: googleToken, timeZone: s.timeZone, hours: s.hours, consultMinutes: s.consultMinutes });
-  if (s.provider === "calcom") {
+  // Cal.com is the calendar for now: a saved Cal.com connection counts even before she picks.
+  if (s.provider === "calcom" || s.provider === null) {
     const conn = await getConnection("calcom").catch(() => null);
     const meta = conn?.meta as Partial<CalcomMeta> | undefined;
     if (!conn?.accessToken || typeof meta?.eventTypeId !== "number") return null;
