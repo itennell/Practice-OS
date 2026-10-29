@@ -6,7 +6,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { closeDb, db } from "../lib/db";
 import type { ChatFn } from "../lib/instagram/critic";
 import { PILLARS } from "../lib/instagram/pillars";
+import { REFUSAL } from "../lib/aeon/guard";
 import { listPosts, planSeveral, planWeek, practiceFacts, requestPost } from "../lib/instagram/store";
+import { CRISIS_REPLY } from "../lib/safety";
 
 const hasDb = Boolean(process.env.DATABASE_URL);
 let LICENSE = "";
@@ -103,6 +105,19 @@ describe.skipIf(!hasDb)("Instagram posts", () => {
     expect(ok.outcome).toBe("queued");
   });
 
+  it("a client name in the box is refused by the PHI guard before any model call", async () => {
+    const { chat, seen } = stubModels();
+    const before = (await listPosts()).length;
+    const r = await requestPost("test", "a post about how Kevin Ortiz did at his first session", null, { chat, graphic });
+    expect(r).toEqual({ outcome: "blocked", why: REFUSAL.client_name });
+    const several = await planSeveral("test", "posts about Kevin Ortiz and his fees", 2, { chat, graphic });
+    expect(several).toMatchObject({ outcome: "blocked" });
+    expect(seen).toEqual([]);
+    expect((await listPosts()).length).toBe(before);
+    const [a] = await db()<{ n: number }[]>`select count(*)::int as n from practice_os.audit_log where action = 'phi_refused' and subject_type = 'post'`;
+    expect(a.n).toBeGreaterThanOrEqual(2);
+  });
+
   it("plans several: 3 posts on her topic, each waiting for approval", async () => {
     const { chat } = stubModels();
     const r = await planSeveral("test", "superbills and out-of-network costs", 3, { chat, graphic });
@@ -125,8 +140,11 @@ describe.skipIf(!hasDb)("Instagram posts", () => {
     const before = (await listPosts()).length;
     const r = await requestPost("test", "a post for suicide prevention month", null, { chat, graphic });
     expect(r).toMatchObject({ outcome: "blocked" });
-    expect(r.outcome === "blocked" && r.why).toMatch(/988/);
+    expect(r.outcome === "blocked" && r.why).toBe(CRISIS_REPLY);
     expect(seen).toEqual([]);
+    // Like chat: the crisis reply and the alert are both audited.
+    const actions = (await db()<{ action: string }[]>`select action from practice_os.audit_log where action in ('crisis_reply', 'crisis_detected') and subject_type in ('post', 'media')`).map((x) => x.action);
+    expect(actions).toEqual(expect.arrayContaining(["crisis_reply", "crisis_detected"]));
     expect((await listPosts()).length).toBe(before);
   });
 });

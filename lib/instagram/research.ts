@@ -27,6 +27,10 @@ export type Research = {
   source: "web" | "fixed";
 };
 
+/** Links, emails and prompt-injection phrasing in angle words (web text, so untrusted). */
+const UNSAFE_WEB_TEXT =
+  /https?:|www\.|\b[\w-]+\.(com|org|net|io|co|ai)\b|@[\w-]+\.|\b(ignore|disregard|forget)\b.*\b(instructions?|rules?|above|previous)\b|\b(system prompt|you are an? (ai|assistant|model)|as an ai)\b/i;
+
 export type SearchFn = (feature: string, input: string) => Promise<GroundedAnswer>;
 
 /** Hosts whose pages are never used: Instagram's terms forbid scraping it, and Meta's other apps the same. */
@@ -103,6 +107,8 @@ export function checkAngles(raw: RawAngle[], numbered: ResearchLink[]): Research
     if (found.length) continue;
     // Numbers she didn't give (a % back, a price) and template placeholders never reach her post.
     if (/%|\$\s?\d|\[[^\]]*\]|\{[^}]*\}/.test(`${a.title}\n${a.hook}`)) continue;
+    // Web text never carries links or instructions into her post: no URLs or emails, and nothing that talks to a model.
+    if (UNSAFE_WEB_TEXT.test(`${a.title}\n${a.hook}\n${a.why}`)) continue;
     const sources = [...new Set(a.source_numbers)]
       .map((n) => numbered[n - 1]?.url)
       .filter((u): u is string => Boolean(u && usableLink(u)))

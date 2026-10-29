@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   const parsed = body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "Tell Aeon what the post should be about." }, { status: 400 });
   try {
-    const r = await researchPost(parsed.data.topic);
+    const r = await researchPost("aeon:instagram", parsed.data.topic);
     if (r.outcome === "declined") return Response.json({ error: r.why }, { status: 409 });
     return Response.json(r);
   } catch (err) {

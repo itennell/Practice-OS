@@ -11,6 +11,14 @@ describe("gateTopic", () => {
     "help with managing depression",
     "what to do when you feel anxious",
     "coping skills for teens",
+    "What helps with anxiety",
+    "what works for grief",
+    "tips for sleeping better",
+    "tips for burnout",
+    "how to avoid burnout",
+    "how to prevent burnout",
+    "mindfulness for anxiety",
+    "meditation for stress",
   ])("advice: %s", (request) => {
     const g = gateTopic(request);
     expect(g.ok).toBe(false);

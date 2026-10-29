@@ -26,8 +26,8 @@ export default defineConfig({
     env: {
       CALCOM_API_BASE: "http://127.0.0.1:3299",
       PLAYWRIGHT_CALCOM_STANDIN: "1",
-      // Instagram research uses fixed notes with example.com links unless a live run sets PLAYWRIGHT_RESEARCH_STANDIN=0.
-      PLAYWRIGHT_RESEARCH_STANDIN: process.env.PLAYWRIGHT_RESEARCH_STANDIN ?? "1",
+      // Instagram research uses fixed notes with example.com links, except on a live run (PLAYWRIGHT_LIVE=1).
+      PLAYWRIGHT_RESEARCH_STANDIN: process.env.PLAYWRIGHT_RESEARCH_STANDIN ?? (process.env.PLAYWRIGHT_LIVE === "1" ? "0" : "1"),
       DRY_RUN: "true",
       FRONT_DESK_POLL: "off",
       ...Object.fromEntries(

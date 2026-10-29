@@ -30,13 +30,18 @@ const SUBJECTS: [RegExp, string][] = [
 
 // "How do I / ways to / tips for … work through / cope with / get over …": asking
 // for help with a feeling, not about how the practice works.
-const HELP_VERB = String.raw`(work(ing)? through|get(ting)? (through|over|past|rid of)|cop(e|ing)|manag(e|ing)|deal(ing)? with|handl(e|ing)|overcom(e|ing)|heal(ing)?|beat(ing)?|stop(ping)?|calm(ing)?( down)?|reduc(e|ing)|eas(e|ing)|fix(ing)?|feel(ing)? better|improv(e|ing)|live with|recover from)`;
+const HELP_VERB = String.raw`(work(ing)? through|get(ting)? (through|over|past|rid of)|cop(e|ing)|manag(e|ing)|deal(ing)? with|handl(e|ing)|overcom(e|ing)|heal(ing)?|beat(ing)?|stop(ping)?|calm(ing)?( down)?|reduc(e|ing)|eas(e|ing)|fix(ing)?|feel(ing)? better|improv(e|ing)|live with|recover from|avoid(ing)?|prevent(ing)?)`;
 const ASKING_HELP = new RegExp(
-  String.raw`\b((how|ways|tips|steps|strategies|tools|things you can do) (to|for|on|i can|you can|do i|do you|can i|can you)|help (with|for)|what to do (about|when|if))\b.*\b${HELP_VERB}\b|\b${HELP_VERB} (your |my |with |the )?(anxi|depress|grie|trauma|panic|stress|anger|sad|feelings|emotions|thoughts|worr|insomnia|sleep)`,
+  String.raw`\b((how|ways|tips|steps|strategies|tools|things you can do) (to|for|on|i can|you can|do i|do you|can i|can you)|help (with|for)|what to do (about|when|if))\b.*\b${HELP_VERB}\b|\b${HELP_VERB} (your |my |with |the )?(anxi|depress|grie|trauma|panic|stress|anger|sad|feelings|emotions|thoughts|worr|insomnia|sleep|burn ?out)`,
   "i",
 );
 const WHEN_YOU_FEEL = /\b(when|if) (you|i|we|they)('re| are|'m| am| feel| get| start to feel)( so| really| very)? (anxious|sad|depressed|overwhelmed|stressed|lonely|angry|hopeless|panick|numb|stuck|burn)/i;
-const TIPS_ABOUT = /\b(tips|advice|exercises?|techniques?|hacks?|tricks?)\b.*\b(anxi|depress|grie|trauma|panic|stress|anger|feelings|emotions|sleep|self[- ]esteem)/i;
+const FEELINGS = String.raw`(anxi|depress|grie|trauma|panic|stress|anger|sad|feelings|emotions|sleep|insomnia|self[- ]esteem|burn ?out|loneli|worr)`;
+const TIPS_ABOUT = new RegExp(String.raw`\b(tips|advice|exercises?|techniques?|hacks?|tricks?)\b.*\b${FEELINGS}`, "i");
+// "What helps with anxiety", "what works for grief".
+const WHAT_HELPS = new RegExp(String.raw`\bwhat (helps|works|can help|might help)\b.*\b${FEELINGS}`, "i");
+// A practice or technique aimed at a feeling: "mindfulness for anxiety".
+const TECHNIQUE_FOR = new RegExp(String.raw`\b(mindfulness|meditation|breath(ing|work)|journal(ing)?|grounding|self[- ]care|yoga|affirmations?)\b.*\b${FEELINGS}`, "i");
 
 /** The subject of her request, if it names one ("anxiety"). */
 export function subjectOf(request: string): string | null {
@@ -61,7 +66,7 @@ const OFFER: Partial<Record<CriticRule, (subject: string | null) => string>> = {
 export function gateTopic(request: string): TopicGate {
   const found = codeCritic(request, { licenseLine: "", feesCents: [] }).findings.map((f) => f.rule);
   if (found.includes("self_harm")) return { ok: false, hardStop: true, rule: "self_harm", why: RULE_TEXT.self_harm };
-  const advice = ASKING_HELP.test(request) || TIPS_ABOUT.test(request) || WHEN_YOU_FEEL.test(request);
+  const advice = [ASKING_HELP, TIPS_ABOUT, WHEN_YOU_FEEL, WHAT_HELPS, TECHNIQUE_FOR].some((re) => re.test(request));
   const rule = (["client_story", "testimonial", "outcome_promise", "method_detail", "advice"] as CriticRule[]).find(
     (r) => found.includes(r) || (r === "advice" && advice),
   );
