@@ -9,6 +9,8 @@ import { StatusPill } from "@/components/shared/status-mark";
 import { Button } from "@/components/ui";
 import { STAGES, STAGE_LABEL, type Stage } from "@/lib/referrals/stages";
 import type { LetterState, ReferralSource } from "@/lib/referrals/store";
+import type { TierResult } from "@/lib/referrals/tier";
+import { TierBadge } from "./tier-badge";
 
 // The Referrals board (Isaiah's pipeline, AGENTS.md > Referrals). Cards move by
 // drag and drop, or by the "Move to" menu on every card, which is the way for
@@ -57,12 +59,14 @@ function LetterLine({ letter }: { letter: LetterState | undefined }) {
 
 function Card({
   card,
+  tier,
   letter,
   drafting,
   onMove,
   onDraft,
 }: {
   card: ReferralSource;
+  tier: TierResult | undefined;
   letter: LetterState | undefined;
   drafting: boolean;
   onMove: (stage: Stage) => void;
@@ -84,20 +88,14 @@ function Card({
       }}
       className="flex cursor-grab flex-col gap-2 rounded-[20px] border border-[var(--hairline)] bg-[var(--glass-strong)] p-4 active:cursor-grabbing"
     >
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <h3 id={headingId} className="min-w-0 font-semibold leading-snug break-words">
           {card.name}
         </h3>
-        {card.fit_score !== null && (
-          <span
-            className="shrink-0 rounded-full border border-[var(--hairline)] px-2.5 py-0.5 text-small font-semibold"
-            aria-label={`Fit score ${card.fit_score} out of 100`}
-          >
-            Fit {card.fit_score}
-          </span>
-        )}
+        {tier && <TierBadge tier={tier.tier} />}
       </div>
       <p className="text-small text-[var(--fg-muted)]">{meta.join(" · ")}</p>
+      {tier && <p className="text-small text-[var(--fg-muted)]">Why: {tier.reasons.slice(1).join("; ")}.</p>}
       {card.address && (
         <p className="flex items-start gap-1.5 text-small text-[var(--fg-muted)]">
           <MapPin aria-hidden size={14} className="mt-0.5 shrink-0" />
@@ -194,7 +192,15 @@ function Column({
   );
 }
 
-export function ReferralBoard({ initial, letters: initialLetters }: { initial: ReferralSource[]; letters: Record<string, LetterState> }) {
+export function ReferralBoard({
+  initial,
+  letters: initialLetters,
+  tiers,
+}: {
+  initial: ReferralSource[];
+  letters: Record<string, LetterState>;
+  tiers: Record<string, TierResult>;
+}) {
   const [cards, setCards] = useState(initial);
   const [letters, setLetters] = useState(initialLetters);
   const [drafting, setDrafting] = useState<string | null>(null);
@@ -259,6 +265,7 @@ export function ReferralBoard({ initial, letters: initialLetters }: { initial: R
                   <Card
                     key={c.id}
                     card={c}
+                    tier={tiers[c.id]}
                     letter={letters[c.id]}
                     drafting={drafting === c.id}
                     onMove={(s) => move(c.id, s)}

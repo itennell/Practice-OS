@@ -158,6 +158,21 @@ export function tierFor(p: TierInput, ctx: { miles: number | null; focus: Focus[
   return { tier, score, reasons, specialty };
 }
 
+/**
+ * "Reach out first" is a short list: at most `max` per search, the best scores
+ * (the list comes in sorted). A strong fit past that is "Next", and says so.
+ */
+export const FIRST_MAX = 12;
+export function capFirst<T extends { tier: TierResult }>(sorted: T[], max = FIRST_MAX): T[] {
+  let firsts = 0;
+  return sorted.map((p) => {
+    if (p.tier.tier !== "first") return p;
+    firsts++;
+    if (firsts <= max) return p;
+    return { ...p, tier: { ...p.tier, tier: "next" as const, reasons: [...p.tier.reasons, `a strong fit, after your top ${max} in this search`] } };
+  });
+}
+
 /** The short line on a card: "Pediatrics · 0.8 mi · matches your teens focus". */
 export function shortReasons(label: string | null, r: TierResult, miles: number | null, approximate = false): string {
   const fit = r.reasons.find((x) => x.startsWith("matches your") || x.startsWith("mostly sees"));

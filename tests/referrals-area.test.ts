@@ -14,7 +14,7 @@ import {
   type NppesResponse,
   type NppesResult,
 } from "../lib/referrals/nppes";
-import { focusFrom, tierFor } from "../lib/referrals/tier";
+import { capFirst, focusFrom, tierFor } from "../lib/referrals/tier";
 
 // Real NPPES replies recorded 2026-10-29 (tests/fixtures/nppes-area.json, fields the app reads only).
 type Recorded = { query: { taxonomy_description: string; postal_code: string }; results: NppesResult[] };
@@ -164,6 +164,16 @@ describe("tiers (plain code, with reasons)", () => {
   });
 });
 
+describe("Reach out first stays a short list", () => {
+  it("keeps the top 12 and moves the rest to Next with a reason", () => {
+    const strong = tierFor({ taxonomy: "207Q00000X", npiType: "organization" }, { miles: 0.2, focus: ["adults"] });
+    const capped = capFirst(Array.from({ length: 15 }, (_, i) => ({ npi: String(i), tier: strong })));
+    expect(capped.filter((p) => p.tier.tier === "first")).toHaveLength(12);
+    expect(capped[12].tier).toMatchObject({ tier: "next" });
+    expect(capped[12].tier.reasons.at(-1)).toBe("a strong fit, after your top 12 in this search");
+  });
+});
+
 describe("area search, golden run on the recorded 60614 replies", () => {
   const ctx: PracticeContext = { office: null, officeZip: "60614", state: "IL", focus: ["adults"] };
 
@@ -194,6 +204,7 @@ describe("area search, golden run on the recorded 60614 replies", () => {
     expect(ps.filter((p) => p.tier.specialty === "pediatrics").every((p) => p.tier.tier === "later")).toBe(true);
     const counts = Object.fromEntries(["first", "next", "later"].map((t) => [t, ps.filter((p) => p.tier.tier === t).length]));
     expect(counts.first).toBeGreaterThan(0);
+    expect(counts.first).toBeLessThanOrEqual(12);
     expect(counts.next).toBeGreaterThan(0);
     expect(counts.later).toBeGreaterThan(0);
   });

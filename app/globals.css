@@ -104,6 +104,16 @@
   --status-failed-bg: #fce9e6;
   --status-rejected-fg: #55534d;
   --status-rejected-bg: #efeee9;
+  /* Referral tiers: badge text on its tint, and the map pin colour. */
+  --tier-first-fg: #4a37b5;
+  --tier-first-bg: #ebe7fb;
+  --tier-next-fg: #1f4e9c;
+  --tier-next-bg: #e4edfb;
+  --tier-later-fg: #55534d;
+  --tier-later-bg: #efeee9;
+  --pin-first: #5b47c9;
+  --pin-next: #2e5cc8;
+  --pin-later: #7d7a72;
   --danger-fg: #a1261b;
   /* Danger pill (Confirm dialog): solid red with white text in light. */
   --danger-bg: #a1261b;
@@ -190,6 +200,15 @@
     --status-failed-bg: rgb(255 174 163 / 0.12);
     --status-rejected-fg: #cfcdc5;
     --status-rejected-bg: rgb(255 255 255 / 0.08);
+    --tier-first-fg: #c4b9ff;
+    --tier-first-bg: rgb(142 124 248 / 0.16);
+    --tier-next-fg: #a9c6ff;
+    --tier-next-bg: rgb(91 155 240 / 0.14);
+    --tier-later-fg: #cfcdc5;
+    --tier-later-bg: rgb(255 255 255 / 0.08);
+    --pin-first: #8e7cf8;
+    --pin-next: #5b9bf0;
+    --pin-later: #a19e95;
     --danger-fg: #ffaea3;
     --danger-bg: rgb(255 174 163 / 0.16);
     --danger-on: #ffaea3;
@@ -433,4 +452,24 @@ textarea {
 /* "Larger text" (onboarding, Session A): every size is in rem, so this scales the whole app. */
 :root[data-text-size="large"] {
   font-size: 125%;
+}
+
+/* Referrals map (components/referrals/referral-map.tsx): 44px zoom buttons, a
+   visible focus ring on the map itself, and attribution in the app's text. */
+.referral-map .maplibregl-ctrl-group button {
+  width: 44px;
+  height: 44px;
+}
+.referral-map .maplibregl-canvas:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -3px;
+}
+.referral-map .maplibregl-ctrl-attrib {
+  font-size: 12px;
+  color: #1f1e1d;
+  background: rgb(255 255 255 / 0.85);
+}
+.referral-map .maplibregl-ctrl-attrib a {
+  color: #1f1e1d;
+  text-decoration: underline;
 }
