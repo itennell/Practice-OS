@@ -14,7 +14,7 @@ import {
   type NppesResponse,
   type NppesResult,
 } from "../lib/referrals/nppes";
-import { focusFrom, tierFor } from "../lib/referrals/tier";
+import { capFirst, focusFrom, SPECIALTY_POINTS, TIER_LABEL, tierFor } from "../lib/referrals/tier";
 
 // Real NPPES replies recorded 2026-10-29 (tests/fixtures/nppes-area.json, fields the app reads only).
 type Recorded = { query: { taxonomy_description: string; postal_code: string }; results: NppesResult[] };
@@ -131,36 +131,70 @@ describe("tiers (plain code, with reasons)", () => {
     expect(focusFrom("")).toEqual([]);
   });
 
+  const today = new Date("2026-10-29");
+  const ped = {
+    taxonomy: "208000000X",
+    npiType: "individual" as const,
+    phone: "773-555-0100",
+    fax: "773-555-0101",
+    lastUpdated: "2025-06-01",
+    state: "IL",
+  };
+  const ctx = { miles: 0.8, focus: ["teens" as const], clinicianState: "IL", today };
+
+  it("takes its points and tier lines from docs/research/referral-tiers.json", () => {
+    expect(TIER_LABEL).toEqual({ first: "Reach out first", next: "Warm up next", later: "Later" });
+    expect(SPECIALTY_POINTS).toMatchObject({ family_medicine: 35, pediatrics: 33, psychiatry: 30 });
+  });
+
   it("puts a nearby pediatrician first for a teens practice, with the reasons", () => {
-    const r = tierFor({ taxonomy: "208000000X", npiType: "individual" }, { miles: 0.8, focus: ["teens"] });
+    const r = tierFor(ped, ctx);
+    // specialty 33 + distance 25-5*0.8=21 + named person 15 + phone 6 + fax 4 + fresh 10 + Illinois 5
     expect(r).toEqual({
       tier: "first",
-      score: 36 + 25 + 23 + 3,
+      score: 94,
       specialty: "pediatrics",
       reasons: [
-        "pediatricians are often the first stop for a child's or teen's mental health",
+        "Pediatrics offices see people who need talk therapy and often have no one to send them to",
         "matches your teens focus",
         "0.8 mi from your office",
+        "you can write to them by name, not a front desk",
+        "office phone and fax on file",
       ],
     });
   });
 
   it("puts a pediatrician Later for an adults-only practice, and says why", () => {
-    const r = tierFor({ taxonomy: "208000000X", npiType: "organization" }, { miles: 0.2, focus: ["adults"] });
+    const r = tierFor(ped, { ...ctx, focus: ["adults"] });
     expect(r.tier).toBe("later");
     expect(r.reasons).toContain("mostly sees children and teens and families, not who you help");
   });
 
-  it("weighs distance, group practices and unknowns", () => {
-    const near = tierFor({ taxonomy: "207Q00000X", npiType: "organization" }, { miles: 1, focus: ["adults"] });
-    const far = tierFor({ taxonomy: "207Q00000X", npiType: "organization" }, { miles: 12, focus: ["adults"] });
-    expect(near.score - far.score).toBe(23 - 0);
-    expect(near.reasons).toContain("a clinic or group, so one letter reaches several clinicians");
-    const atGroup = tierFor({ taxonomy: "207Q00000X", npiType: "individual", worksAt: "Lakeview Clinic" }, { miles: 1, focus: [] });
-    expect(atGroup.reasons).toContain("works at Lakeview Clinic");
+  it("weighs distance, a named contact at a group, contact details, record age and state", () => {
+    const near = tierFor(ped, { ...ctx, miles: 1 });
+    const far = tierFor(ped, { ...ctx, miles: 6 });
+    expect(near.score - far.score).toBe(20);
+    const group = tierFor({ ...ped, npiType: "organization", official: "Ann Lee" }, ctx);
+    expect(group.score).toBe(94 - 15 + 8);
+    expect(group.reasons).toContain("a group; you can write to Ann Lee by name");
+    const desk = tierFor({ ...ped, npiType: "organization" }, ctx);
+    expect(desk.score).toBe(94 - 15 + 3);
+    const old = tierFor({ ...ped, lastUpdated: "2012-03-01", phone: null, fax: null, state: "WI" }, ctx);
+    expect(old.score).toBe(94 - 10 - 10 - 5);
+    expect(old.reasons).toContain("record last updated 2012; confirm they still practice before writing");
     const unknown = tierFor({ taxonomy: null, npiType: null }, { miles: null, focus: [] });
-    expect(unknown).toMatchObject({ tier: "later", specialty: null });
+    expect(unknown).toMatchObject({ tier: "later", specialty: null, score: 18 + 8 + 3 });
     expect(unknown.reasons).toContain("distance unknown");
+  });
+});
+
+describe("Reach out first stays a short list", () => {
+  it("keeps the top 12 and moves the rest down with a reason", () => {
+    const strong = tierFor({ taxonomy: "207Q00000X", npiType: "individual" }, { miles: 0.2, focus: ["adults"] });
+    const capped = capFirst(Array.from({ length: 15 }, (_, i) => ({ npi: String(i), tier: { ...strong, tier: "first" as const } })));
+    expect(capped.filter((p) => p.tier.tier === "first")).toHaveLength(12);
+    expect(capped[12].tier).toMatchObject({ tier: "next" });
+    expect(capped[12].tier.reasons.at(-1)).toBe("a strong fit, after your top 12 in this search");
   });
 });
 

@@ -28,7 +28,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606143394",
-       "telephone_number": "773-975-8813"
+       "telephone_number": "773-975-8813",
+       "fax_number": "773-880-4588"
       },
       {
        "address_1": "111 E CHESTNUT",
@@ -37,10 +38,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "60611",
-       "telephone_number": "773-975-8813"
+       "telephone_number": "773-975-8813",
+       "fax_number": "773-880-4588"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "363LP0200X",
@@ -74,10 +75,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606143363",
-       "telephone_number": "773-327-3966"
+       "telephone_number": "773-327-3966",
+       "fax_number": "773-327-3937"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "363LP0200X",
@@ -104,7 +105,8 @@
        "city": "EVANSTON",
        "state": "IL",
        "postal_code": "60202",
-       "telephone_number": "773-880-4259"
+       "telephone_number": "773-880-4259",
+       "fax_number": "773-975-8707"
       },
       {
        "address_1": "2300 CHILDRENS PLAZA",
@@ -112,10 +114,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "60614",
-       "telephone_number": "773-880-8277"
+       "telephone_number": "773-880-8277",
+       "fax_number": "773-975-8707"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2080P0204X",
@@ -142,7 +144,8 @@
        "city": "OAK LAWN",
        "state": "IL",
        "postal_code": "604532656",
-       "telephone_number": "708-684-5580"
+       "telephone_number": "708-684-5580",
+       "fax_number": "708-684-4068"
       },
       {
        "address_1": "29373 NETWORK PL",
@@ -151,15 +154,6 @@
        "state": "IL",
        "postal_code": "606733717",
        "telephone_number": "847-390-5900"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "2300 N CHILDRENS PLZ",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606143363",
-       "telephone_number": "773-880-3681"
       }
      ],
      "taxonomies": [
@@ -193,7 +187,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "607073312",
-       "telephone_number": "773-880-4000"
+       "telephone_number": "773-880-4000",
+       "fax_number": "773-880-8111"
       },
       {
        "address_1": "2300 N CHILDRENS PLZ",
@@ -201,10 +196,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606143363",
-       "telephone_number": "773-880-4553"
+       "telephone_number": "773-880-4553",
+       "fax_number": "773-880-8111"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "363LP0200X",
@@ -240,86 +235,6 @@
        "state": "IL",
        "postal_code": "606112991",
        "telephone_number": "773-880-4553"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "1870 SILVER CROSS BLVD STE 210",
-       "city": "NEW LENOX",
-       "state": "IL",
-       "postal_code": "604518646",
-       "telephone_number": "312-227-4100"
-      },
-      {
-       "address_1": "1131 TECHNY RD",
-       "city": "NORTHBROOK",
-       "state": "IL",
-       "postal_code": "600625503",
-       "telephone_number": "312-227-4100"
-      },
-      {
-       "address_1": "900 N WESTMORELAND RD STE 110",
-       "city": "LAKE FOREST",
-       "state": "IL",
-       "postal_code": "600451688",
-       "telephone_number": "312-227-4100"
-      },
-      {
-       "address_1": "880 W CENTRAL RD STE 6400",
-       "city": "ARLINGTON HEIGHTS",
-       "state": "IL",
-       "postal_code": "600052378",
-       "telephone_number": "312-227-4100"
-      },
-      {
-       "address_1": "1895 ARBOR GLEN BLVD",
-       "city": "SCHAUMBURG",
-       "state": "IL",
-       "postal_code": "601953114",
-       "telephone_number": "312-227-4100"
-      },
-      {
-       "address_1": "3722 TOUHY AVE",
-       "city": "SKOKIE",
-       "state": "IL",
-       "postal_code": "600763941",
-       "telephone_number": "312-227-4100"
-      },
-      {
-       "address_1": "2301 ENTERPRISE DR",
-       "city": "WESTCHESTER",
-       "state": "IL",
-       "postal_code": "601545802",
-       "telephone_number": "312-227-4100"
-      },
-      {
-       "address_1": "1475 E BELVIDERE RD, PAVILION C",
-       "address_2": "SUITE 285",
-       "city": "GRAYSLAKE",
-       "state": "IL",
-       "postal_code": "60030",
-       "telephone_number": "312-227-4100"
-      },
-      {
-       "address_1": "10350 HALIGUS RD STE 110",
-       "city": "HUNTLEY",
-       "state": "IL",
-       "postal_code": "601429526",
-       "telephone_number": "312-227-4100"
-      },
-      {
-       "address_1": "2515 N CLARK ST STE 900",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606142730",
-       "telephone_number": "312-227-4100"
-      },
-      {
-       "address_1": "25 N WINFIELD RD",
-       "city": "WINFIELD",
-       "state": "IL",
-       "postal_code": "601901379",
-       "telephone_number": "312-227-4100"
       }
      ],
      "taxonomies": [
@@ -358,7 +273,6 @@
        "telephone_number": "773-880-4000"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "363LP0200X",
@@ -396,7 +310,6 @@
        "telephone_number": "773-880-3213"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "363LP0200X",
@@ -423,7 +336,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606143394",
-       "telephone_number": "773-880-3935"
+       "telephone_number": "773-880-3935",
+       "fax_number": "773-880-8264"
       },
       {
        "address_1": "2300 CHILDRENS PLAZA",
@@ -434,7 +348,6 @@
        "telephone_number": "773-880-3800"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2080P0204X",
@@ -469,30 +382,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606132010",
-       "telephone_number": "773-388-1600"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "467 W DEMING PL",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606141881",
-       "telephone_number": "800-543-7362"
-      },
-      {
-       "address_1": "1440 N DAYTON ST",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606422644",
-       "telephone_number": "312-227-6800"
-      },
-      {
-       "address_1": "225 E CHICAGO AVE",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606112991",
-       "telephone_number": "800-543-7362"
+       "telephone_number": "773-388-1600",
+       "fax_number": "773-388-8936"
       }
      ],
      "taxonomies": [
@@ -532,22 +423,6 @@
        "telephone_number": "312-227-6331"
       }
      ],
-     "practiceLocations": [
-      {
-       "address_1": "225 E CHICAGO AVE",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606112991",
-       "telephone_number": "800-543-7362"
-      },
-      {
-       "address_1": "9939 SOUTHWEST HWY",
-       "city": "OAK LAWN",
-       "state": "IL",
-       "postal_code": "604533767",
-       "telephone_number": "708-424-0900"
-      }
-     ],
      "taxonomies": [
       {
        "code": "363LP0200X",
@@ -585,15 +460,6 @@
        "telephone_number": "720-777-1234"
       }
      ],
-     "practiceLocations": [
-      {
-       "address_1": "2300 N CHILDRENS PLZ",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606143363",
-       "telephone_number": "773-880-4000"
-      }
-     ],
      "taxonomies": [
       {
        "code": "363LP0200X",
@@ -628,15 +494,6 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606112991"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "225 E CHICAGO AVE",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606112991",
-       "telephone_number": "312-227-3601"
       }
      ],
      "taxonomies": [
@@ -680,7 +537,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606112991",
-       "telephone_number": "800-543-7365"
+       "telephone_number": "800-543-7365",
+       "fax_number": "312-227-9406"
       },
       {
        "address_1": "2515 N CLARK ST",
@@ -689,15 +547,6 @@
        "state": "IL",
        "postal_code": "606142730",
        "telephone_number": "800-543-7362"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "225 E CHICAGO AVE",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606112991",
-       "telephone_number": "800-543-7365"
       }
      ],
      "taxonomies": [
@@ -726,7 +575,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606112991",
-       "telephone_number": "312-227-6552"
+       "telephone_number": "312-227-6552",
+       "fax_number": "312-227-9405"
       },
       {
        "address_1": "225 E CHICAGO AVE",
@@ -736,15 +586,6 @@
        "state": "IL",
        "postal_code": "606112991",
        "telephone_number": "312-227-6000"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "2515 N CLARK ST STE 900",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606142730",
-       "telephone_number": "312-227-8800"
       }
      ],
      "taxonomies": [
@@ -788,29 +629,6 @@
        "telephone_number": "773-366-2027"
       }
      ],
-     "practiceLocations": [
-      {
-       "address_1": "250 E SUPERIOR ST",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606112914",
-       "telephone_number": "312-926-2000"
-      },
-      {
-       "address_1": "2515 N CLARK ST",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606142730",
-       "telephone_number": "312-227-6460"
-      },
-      {
-       "address_1": "1870 SILVER CROSS BLVD STE 100",
-       "city": "NEW LENOX",
-       "state": "IL",
-       "postal_code": "604518640",
-       "telephone_number": "312-227-3620"
-      }
-     ],
      "taxonomies": [
       {
        "code": "363LP0200X",
@@ -849,7 +667,6 @@
        "telephone_number": "773-880-4378"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "363LP0200X",
@@ -888,7 +705,6 @@
        "telephone_number": "773-572-7313"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2080P0204X",
@@ -924,23 +740,6 @@
        "state": "MA",
        "postal_code": "021155724",
        "telephone_number": "617-355-6000"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "2300 N CHILDRENS PLZ",
-       "address_2": "EMERGENCY DEPARTMENT",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606143363",
-       "telephone_number": "773-880-3800"
-      },
-      {
-       "address_1": "1775 DEMPSTER ST",
-       "city": "PARK RIDGE",
-       "state": "IL",
-       "postal_code": "600681143",
-       "telephone_number": "847-723-5150"
       }
      ],
      "taxonomies": [
@@ -991,7 +790,6 @@
        "telephone_number": "717-413-2325"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "363LP0200X",
@@ -1019,7 +817,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "60614",
-       "telephone_number": "773-388-8661"
+       "telephone_number": "773-388-8661",
+       "fax_number": "773-281-4237"
       },
       {
        "address_1": "2300 CHILDRENS PLAZA",
@@ -1028,10 +827,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "60614",
-       "telephone_number": "773-880-4551"
+       "telephone_number": "773-880-4551",
+       "fax_number": "773-281-4237"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "208000000X",
@@ -1074,7 +873,6 @@
        "telephone_number": "773-880-4000"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "363LP0200X",
@@ -1110,7 +908,6 @@
        "telephone_number": "314-277-9140"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "363LP0200X",
@@ -1137,7 +934,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606143585",
-       "telephone_number": "312-227-6418"
+       "telephone_number": "312-227-6418",
+       "fax_number": "312-227-9409"
       },
       {
        "address_1": "225 E CHICAGO AVE",
@@ -1145,10 +943,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606112991",
-       "telephone_number": "312-227-6418"
+       "telephone_number": "312-227-6418",
+       "fax_number": "312-227-9409"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "363LP0200X",
@@ -1186,7 +984,6 @@
        "telephone_number": "773-880-3816"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "363LP0200X",
@@ -1223,36 +1020,6 @@
        "telephone_number": "630-987-9697"
       }
      ],
-     "practiceLocations": [
-      {
-       "address_1": "25 N WINFIELD RD",
-       "city": "WINFIELD",
-       "state": "IL",
-       "postal_code": "601901379",
-       "telephone_number": "630-933-2340"
-      },
-      {
-       "address_1": "2515 N CLARK ST",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606142730",
-       "telephone_number": "800-543-7362"
-      },
-      {
-       "address_1": "1131 TECHNY RD",
-       "city": "NORTHBROOK",
-       "state": "IL",
-       "postal_code": "600625503",
-       "telephone_number": "312-227-7600"
-      },
-      {
-       "address_1": "3722 TOUHY AVE",
-       "city": "SKOKIE",
-       "state": "IL",
-       "postal_code": "600763941",
-       "telephone_number": "312-227-5600"
-      }
-     ],
      "taxonomies": [
       {
        "code": "363LP0200X",
@@ -1280,7 +1047,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "60614",
-       "telephone_number": "773-880-4949"
+       "telephone_number": "773-880-4949",
+       "fax_number": "773-880-8626"
       },
       {
        "address_1": "2300 CHILDRENS PLAZA BOX # 20",
@@ -1289,10 +1057,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "60614",
-       "telephone_number": "773-880-4949"
+       "telephone_number": "773-880-4949",
+       "fax_number": "773-880-8626"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "208000000X",
@@ -1329,7 +1097,8 @@
        "city": "NAPERVILLE",
        "state": "IL",
        "postal_code": "605645802",
-       "telephone_number": "630-420-4275"
+       "telephone_number": "630-420-4275",
+       "fax_number": "630-420-8957"
       },
       {
        "address_1": "4043 S ROUTE 59",
@@ -1337,16 +1106,8 @@
        "city": "NAPERVILLE",
        "state": "IL",
        "postal_code": "605645802",
-       "telephone_number": "630-420-4275"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "2300 N CHILDRENS PLZ",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606143363",
-       "telephone_number": "773-880-4000"
+       "telephone_number": "630-420-4275",
+       "fax_number": "630-420-8957"
       }
      ],
      "taxonomies": [
@@ -1386,7 +1147,6 @@
        "telephone_number": "773-582-5200"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "163WP2201X",
@@ -1429,7 +1189,6 @@
        "telephone_number": "312-227-6260"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "363LP0200X",
@@ -1457,7 +1216,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "60614",
-       "telephone_number": "773-880-4187"
+       "telephone_number": "773-880-4187",
+       "fax_number": "773-880-8226"
       },
       {
        "address_1": "2300 N CHILDRENS PLZ",
@@ -1466,10 +1226,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606143363",
-       "telephone_number": "773-880-4187"
+       "telephone_number": "773-880-4187",
+       "fax_number": "773-880-8226"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2080P0208X",
@@ -1497,7 +1257,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "60614",
-       "telephone_number": "773-880-8245"
+       "telephone_number": "773-880-8245",
+       "fax_number": "773-880-8267"
       },
       {
        "address_1": "2300 CHILDRENS PLAZA",
@@ -1506,10 +1267,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "60614",
-       "telephone_number": "773-880-8245"
+       "telephone_number": "773-880-8245",
+       "fax_number": "773-880-8267"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2080P0204X",
@@ -1544,23 +1305,8 @@
        "city": "WILMETTE",
        "state": "IL",
        "postal_code": "600911085",
-       "telephone_number": "224-226-9420"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "2300 N CHILDRENS PLZ",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606143363",
-       "telephone_number": "773-880-3800"
-      },
-      {
-       "address_1": "4440 W 95TH ST",
-       "city": "OAK LAWN",
-       "state": "IL",
-       "postal_code": "604532600",
-       "telephone_number": "708-684-5695"
+       "telephone_number": "224-226-9420",
+       "fax_number": "847-256-2140"
       }
      ],
      "taxonomies": [
@@ -1620,7 +1366,6 @@
        "telephone_number": "773-880-4000"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "163WN0002X",
@@ -1652,7 +1397,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606186301",
-       "telephone_number": "773-832-0297"
+       "telephone_number": "773-832-0297",
+       "fax_number": "773-327-3937"
       },
       {
        "address_1": "2300 N CHILDRENS PLZ",
@@ -1661,10 +1407,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606143363",
-       "telephone_number": "773-327-3966"
+       "telephone_number": "773-327-3966",
+       "fax_number": "773-327-3937"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "363LP0200X",
@@ -1703,15 +1449,6 @@
        "telephone_number": "800-543-7365"
       }
      ],
-     "practiceLocations": [
-      {
-       "address_1": "225 E CHICAGO AVE",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606112991",
-       "telephone_number": "312-543-7365"
-      }
-     ],
      "taxonomies": [
       {
        "code": "363LP0200X",
@@ -1748,10 +1485,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "616143394",
-       "telephone_number": "773-975-8818"
+       "telephone_number": "773-975-8818",
+       "fax_number": "773-975-8671"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "363LP0200X",
@@ -1778,7 +1515,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606142898",
-       "telephone_number": "312-227-6450"
+       "telephone_number": "312-227-6450",
+       "fax_number": "312-227-9441"
       },
       {
        "address_1": "225 E CHICAGO AVE",
@@ -1789,7 +1527,6 @@
        "telephone_number": "312-227-6110"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "208000000X",
@@ -1837,7 +1574,6 @@
        "telephone_number": "312-227-4000"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "363LP0200X",
@@ -1874,7 +1610,6 @@
        "telephone_number": "773-880-8180"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "363LP0200X",
@@ -1924,7 +1659,6 @@
        "telephone_number": "978-466-2000"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "207VH0002X",
@@ -1952,7 +1686,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606149267",
-       "telephone_number": "773-348-8032"
+       "telephone_number": "773-348-8032",
+       "fax_number": "773-348-8042"
       },
       {
        "address_1": "2507 N HALSTED ST",
@@ -1961,10 +1696,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606149267",
-       "telephone_number": "773-348-8032"
+       "telephone_number": "773-348-8032",
+       "fax_number": "773-348-8042"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "207VM0101X",
@@ -1990,7 +1725,9 @@
      "basic": {
       "status": "A",
       "organization_name": "ABLE PSYCHIATRY LLC",
-      "last_updated": "2023-11-13"
+      "last_updated": "2023-11-13",
+      "authorized_official_first_name": "ABDULLAH",
+      "authorized_official_last_name": "SALLAJ"
      },
      "addresses": [
       {
@@ -2000,7 +1737,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "60614",
-       "telephone_number": "773-906-4546"
+       "telephone_number": "773-906-4546",
+       "fax_number": "773-304-4549"
       },
       {
        "address_1": "561 W DIVERSEY PKWY STE 215",
@@ -2008,10 +1746,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606141682",
-       "telephone_number": "773-906-4546"
+       "telephone_number": "773-906-4546",
+       "fax_number": "773-304-4549"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2084P0800X",
@@ -2050,7 +1788,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "60614",
-       "telephone_number": "312-440-8853"
+       "telephone_number": "312-440-8853",
+       "fax_number": "312-440-8863"
       },
       {
        "address_1": "3405 N. KENNICOTT AVENUE",
@@ -2059,10 +1798,10 @@
        "city": "ARLINGTON HEIGHTS",
        "state": "IL",
        "postal_code": "60004",
-       "telephone_number": "847-483-0303"
+       "telephone_number": "847-483-0303",
+       "fax_number": "847-483-0305"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2084P0800X",
@@ -2099,15 +1838,6 @@
        "telephone_number": "626-744-5230"
       }
      ],
-     "practiceLocations": [
-      {
-       "address_1": "2202 N HALSTED ST STE 1",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606143625",
-       "telephone_number": "312-447-9460"
-      }
-     ],
      "taxonomies": [
       {
        "code": "2084P0800X",
@@ -2133,7 +1863,9 @@
      "basic": {
       "status": "A",
       "organization_name": "AMERICAN HOLISTIC PSYCHIATRY SC",
-      "last_updated": "2010-03-24"
+      "last_updated": "2010-03-24",
+      "authorized_official_first_name": "MOHAMMAD",
+      "authorized_official_last_name": "JAVED"
      },
      "addresses": [
       {
@@ -2143,7 +1875,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606149234",
-       "telephone_number": "630-290-2079"
+       "telephone_number": "630-290-2079",
+       "fax_number": "773-857-1837"
       },
       {
        "address_1": "1857 W DIVERSEY PKWY",
@@ -2152,10 +1885,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606149234",
-       "telephone_number": "630-290-2079"
+       "telephone_number": "630-290-2079",
+       "fax_number": "773-857-1837"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2084P0800X",
@@ -2183,7 +1916,8 @@
        "city": "DAMASCUS",
        "state": "MD",
        "postal_code": "208722079",
-       "telephone_number": "301-569-2648"
+       "telephone_number": "301-569-2648",
+       "fax_number": "301-517-9032"
       },
       {
        "address_1": "23410 WOODFIELD RD",
@@ -2192,29 +1926,6 @@
        "state": "MD",
        "postal_code": "208823014",
        "telephone_number": "919-450-7997"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "200 ERLWOOD WAY APT 202",
-       "city": "DURHAM",
-       "state": "NC",
-       "postal_code": "277045912",
-       "telephone_number": "919-450-7997"
-      },
-      {
-       "address_1": "40 SKOKIE BLVD STE 200",
-       "city": "NORTHBROOK",
-       "state": "IL",
-       "postal_code": "600621615",
-       "telephone_number": "866-729-1012"
-      },
-      {
-       "address_1": "1840 N CLYBOURN AVE STE 520",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606147923",
-       "telephone_number": "866-729-1012"
       }
      ],
      "taxonomies": [
@@ -2242,7 +1953,9 @@
      "basic": {
       "status": "A",
       "organization_name": "ARIEL DAVID, M.D., S.C.",
-      "last_updated": "2008-05-23"
+      "last_updated": "2008-05-23",
+      "authorized_official_first_name": "ARIEL",
+      "authorized_official_last_name": "DAVID"
      },
      "addresses": [
       {
@@ -2252,7 +1965,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606141850",
-       "telephone_number": "773-935-5335"
+       "telephone_number": "773-935-5335",
+       "fax_number": "773-929-3463"
       },
       {
        "address_1": "2500 N LAKEVIEW AVE",
@@ -2260,10 +1974,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606141846",
-       "telephone_number": "773-935-5335"
+       "telephone_number": "773-935-5335",
+       "fax_number": "773-929-3463"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2084P0800X",
@@ -2290,7 +2004,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606145742",
-       "telephone_number": "312-335-3881"
+       "telephone_number": "312-335-3881",
+       "fax_number": "312-335-3884"
       },
       {
        "address_1": "241 W CONCORD LN",
@@ -2298,10 +2013,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606145742",
-       "telephone_number": "312-335-3881"
+       "telephone_number": "312-335-3881",
+       "fax_number": "312-335-3884"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2084P0800X",
@@ -2317,7 +2032,9 @@
      "basic": {
       "status": "A",
       "organization_name": "BRIGHTLAND HEALTH LLC",
-      "last_updated": "2019-08-31"
+      "last_updated": "2019-08-31",
+      "authorized_official_first_name": "MATTHEW",
+      "authorized_official_last_name": "ROBIN"
      },
      "addresses": [
       {
@@ -2326,7 +2043,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606141412",
-       "telephone_number": "312-796-7121"
+       "telephone_number": "312-796-7121",
+       "fax_number": "888-523-4767"
       },
       {
        "address_1": "800 W DIVERSEY PKWY STE 200",
@@ -2334,10 +2052,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606141412",
-       "telephone_number": "312-796-7121"
+       "telephone_number": "312-796-7121",
+       "fax_number": "888-523-4767"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2084P0800X",
@@ -2382,7 +2100,6 @@
        "telephone_number": "440-823-6398"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2084P0800X",
@@ -2398,7 +2115,9 @@
      "basic": {
       "status": "A",
       "organization_name": "COGNITOMANCY PLLC",
-      "last_updated": "2024-10-15"
+      "last_updated": "2024-10-15",
+      "authorized_official_first_name": "SULAIMAN",
+      "authorized_official_last_name": "FAROOQUI"
      },
      "addresses": [
       {
@@ -2418,7 +2137,6 @@
        "telephone_number": "815-690-9392"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2084P0800X",
@@ -2434,7 +2152,9 @@
      "basic": {
       "status": "A",
       "organization_name": "DEFINED LJ, INC",
-      "last_updated": "2023-09-29"
+      "last_updated": "2023-09-29",
+      "authorized_official_first_name": "KENNETH",
+      "authorized_official_last_name": "MUNNERLYN"
      },
      "addresses": [
       {
@@ -2454,7 +2174,6 @@
        "telephone_number": "123-722-6977"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "261QM0801X",
@@ -2502,7 +2221,6 @@
        "telephone_number": "815-489-4105"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2084N0400X",
@@ -2537,15 +2255,6 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606112991"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "225 E CHICAGO AVE",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606112991",
-       "telephone_number": "312-227-3601"
       }
      ],
      "taxonomies": [
@@ -2589,7 +2298,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606142104",
-       "telephone_number": "773-425-4963"
+       "telephone_number": "773-425-4963",
+       "fax_number": "773-880-3374"
       },
       {
        "address_1": "2300 CHILDRENS PLAZA",
@@ -2601,7 +2311,6 @@
        "telephone_number": "773-880-4352"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2084N0402X",
@@ -2628,7 +2337,8 @@
        "city": "EVANSTON",
        "state": "IL",
        "postal_code": "602023735",
-       "telephone_number": "224-307-8550"
+       "telephone_number": "224-307-8550",
+       "fax_number": "847-491-0380"
       },
       {
        "address_1": "2020 N CLYBOURN AVE",
@@ -2636,10 +2346,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606144004",
-       "telephone_number": "773-404-5277"
+       "telephone_number": "773-404-5277",
+       "fax_number": "773-404-8278"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2084N0400X",
@@ -2684,7 +2394,6 @@
        "telephone_number": "773-880-3256"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2084P0800X",
@@ -2711,7 +2420,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606141827",
-       "telephone_number": "847-864-1271"
+       "telephone_number": "847-864-1271",
+       "fax_number": "773-692-7413"
       },
       {
        "address_1": "2626 N LAKEVIEW AVE APT 3408",
@@ -2719,10 +2429,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606141827",
-       "telephone_number": "847-864-1271"
+       "telephone_number": "847-864-1271",
+       "fax_number": "773-692-7413"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2084P0800X",
@@ -2762,7 +2472,6 @@
        "telephone_number": "312-623-8006"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2084P0800X",
@@ -2789,7 +2498,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606112991",
-       "telephone_number": "312-227-3540"
+       "telephone_number": "312-227-3540",
+       "fax_number": "312-227-9644"
       },
       {
        "address_1": "225 E CHICAGO AVE",
@@ -2798,57 +2508,6 @@
        "state": "IL",
        "postal_code": "606112991",
        "telephone_number": "617-816-8621"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "2301 ENTERPRISE DR",
-       "city": "WESTCHESTER",
-       "state": "IL",
-       "postal_code": "601545802",
-       "telephone_number": "800-543-7362"
-      },
-      {
-       "address_1": "1895 ARBOR GLEN BLVD",
-       "city": "SCHAUMBURG",
-       "state": "IL",
-       "postal_code": "601953114",
-       "telephone_number": "800-543-7362"
-      },
-      {
-       "address_1": "1475 E BELVIDERE RD",
-       "city": "GRAYSLAKE",
-       "state": "IL",
-       "postal_code": "600302012",
-       "telephone_number": "800-543-7362"
-      },
-      {
-       "address_1": "800 W CENTRAL RD",
-       "city": "ARLINGTON HEIGHTS",
-       "state": "IL",
-       "postal_code": "600052349",
-       "telephone_number": "800-543-7362"
-      },
-      {
-       "address_1": "2515 N CLARK ST",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606142730",
-       "telephone_number": "800-543-7362"
-      },
-      {
-       "address_1": "250 E SUPERIOR ST",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606112914",
-       "telephone_number": "800-543-7362"
-      },
-      {
-       "address_1": "1900 SILVER CROSS BLVD",
-       "city": "NEW LENOX",
-       "state": "IL",
-       "postal_code": "604519509",
-       "telephone_number": "800-543-7362"
       }
      ],
      "taxonomies": [
@@ -2866,7 +2525,9 @@
      "basic": {
       "status": "A",
       "organization_name": "GOLDEN HOUR PSYCHIATRY, PLLC",
-      "last_updated": "2023-10-11"
+      "last_updated": "2023-10-11",
+      "authorized_official_first_name": "BERNARD",
+      "authorized_official_last_name": "VONDERHAAR"
      },
      "addresses": [
       {
@@ -2886,7 +2547,6 @@
        "telephone_number": "312-210-0474"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2084P0800X",
@@ -2913,7 +2573,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606133099",
-       "telephone_number": "773-975-6775"
+       "telephone_number": "773-975-6775",
+       "fax_number": "847-433-8294"
       },
       {
        "address_1": "PO BOX 14537",
@@ -2921,16 +2582,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606140537",
-       "telephone_number": "847-433-8297"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "2900 N LAKE SHORE DR",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606576274",
-       "telephone_number": "773-665-3000"
+       "telephone_number": "847-433-8297",
+       "fax_number": "847-433-8294"
       }
      ],
      "taxonomies": [
@@ -2969,7 +2622,6 @@
        "telephone_number": "312-796-7121"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2084P0800X",
@@ -2997,7 +2649,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606143673",
-       "telephone_number": "773-325-7779"
+       "telephone_number": "773-325-7779",
+       "fax_number": "773-325-4535"
       },
       {
        "address_1": "2250 N SHEFFIELD AVE",
@@ -3006,10 +2659,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606143673",
-       "telephone_number": "773-325-7779"
+       "telephone_number": "773-325-7779",
+       "fax_number": "773-325-4535"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2084P0800X",
@@ -3049,7 +2702,6 @@
        "telephone_number": "773-880-4835"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2084P0800X",
@@ -3089,23 +2741,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606144015",
-       "telephone_number": "888-428-7890"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "1653 W CONGRESS PKWY",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606123833",
-       "telephone_number": "312-942-2099"
-      },
-      {
-       "address_1": "225 E CHICAGO AVE # 10",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "60611",
-       "telephone_number": "312-942-2099"
+       "telephone_number": "888-428-7890",
+       "fax_number": "877-428-7891"
       }
      ],
      "taxonomies": [
@@ -3128,7 +2765,9 @@
      "basic": {
       "status": "A",
       "organization_name": "JURA ADAMS, M.D., LTD.",
-      "last_updated": "2020-08-22"
+      "last_updated": "2020-08-22",
+      "authorized_official_first_name": "JURA",
+      "authorized_official_last_name": "ADAMS"
      },
      "addresses": [
       {
@@ -3138,7 +2777,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "60614",
-       "telephone_number": "847-483-0303"
+       "telephone_number": "847-483-0303",
+       "fax_number": "847-483-0305"
       },
       {
        "address_1": "3405 N. KENNICOTT AVENUE",
@@ -3147,10 +2787,10 @@
        "city": "ARLINGTON HEIGHTS",
        "state": "IL",
        "postal_code": "60004",
-       "telephone_number": "847-483-0303"
+       "telephone_number": "847-483-0303",
+       "fax_number": "847-483-0305"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2084P0800X",
@@ -3177,7 +2817,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606144365",
-       "telephone_number": "312-612-9667"
+       "telephone_number": "312-612-9667",
+       "fax_number": "312-872-7660"
       },
       {
        "address_1": "2001 N HALSTED ST STE 304",
@@ -3185,10 +2826,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606144365",
-       "telephone_number": "312-612-9667"
+       "telephone_number": "312-612-9667",
+       "fax_number": "312-872-7660"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2084P0800X",
@@ -3224,10 +2865,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "60614",
-       "telephone_number": "773-880-3179"
+       "telephone_number": "773-880-3179",
+       "fax_number": "773-880-3374"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2084N0402X",
@@ -3243,7 +2884,9 @@
      "basic": {
       "status": "A",
       "organization_name": "LAKEVIEW PSYCHIATRY & COUNSELING",
-      "last_updated": "2020-08-22"
+      "last_updated": "2020-08-22",
+      "authorized_official_first_name": "PETRIT",
+      "authorized_official_last_name": "NDRIO"
      },
      "addresses": [
       {
@@ -3253,7 +2896,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606141840",
-       "telephone_number": "847-331-5220"
+       "telephone_number": "847-331-5220",
+       "fax_number": "773-528-2832"
       },
       {
        "address_1": "2650 N LAKEVIEW AVE",
@@ -3262,10 +2906,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606141840",
-       "telephone_number": "847-331-5220"
+       "telephone_number": "847-331-5220",
+       "fax_number": "773-528-2832"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2084P0800X",
@@ -3293,7 +2937,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "60614",
-       "telephone_number": "773-880-4352"
+       "telephone_number": "773-880-4352",
+       "fax_number": "773-880-3374"
       },
       {
        "address_1": "2300 CHILDRENS PLAZA",
@@ -3302,10 +2947,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "60614",
-       "telephone_number": "773-880-4352"
+       "telephone_number": "773-880-4352",
+       "fax_number": "773-880-3374"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2084N0402X",
@@ -3321,7 +2966,9 @@
      "basic": {
       "status": "A",
       "organization_name": "LILY MEDICAL PC",
-      "last_updated": "2026-07-28"
+      "last_updated": "2026-07-28",
+      "authorized_official_first_name": "ANNA",
+      "authorized_official_last_name": "MCCORMICK"
      },
      "addresses": [
       {
@@ -3337,15 +2984,6 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606143427",
-       "telephone_number": "773-324-1172"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "307 N MICHIGAN AVE STE 1008",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606015310",
        "telephone_number": "773-324-1172"
       }
      ],
@@ -3383,10 +3021,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606144892",
-       "telephone_number": "773-253-9002"
+       "telephone_number": "773-253-9002",
+       "fax_number": "773-253-9002"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2084P0800X",
@@ -3422,7 +3060,6 @@
        "telephone_number": "847-864-3738"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2084P0800X",
@@ -3438,7 +3075,9 @@
      "basic": {
       "status": "A",
       "organization_name": "MARTIN N PAISNER, M.D.",
-      "last_updated": "2020-08-22"
+      "last_updated": "2020-08-22",
+      "authorized_official_first_name": "MARTIN",
+      "authorized_official_last_name": "PAISNER"
      },
      "addresses": [
       {
@@ -3447,7 +3086,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606142406",
-       "telephone_number": "773-975-0897"
+       "telephone_number": "773-975-0897",
+       "fax_number": "773-871-8690"
       },
       {
        "address_1": "4840 N MARINE DR",
@@ -3458,7 +3098,6 @@
        "telephone_number": "773-975-0897"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2084P0800X",
@@ -3497,7 +3136,6 @@
        "telephone_number": "574-870-1377"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2084P0800X",
@@ -3533,50 +3171,6 @@
        "state": "IL",
        "postal_code": "606141524",
        "telephone_number": "312-722-6977"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "700 S PARK ST STE A",
-       "city": "MADISON",
-       "state": "WI",
-       "postal_code": "537151830",
-       "telephone_number": "608-260-2900"
-      },
-      {
-       "address_1": "603 7TH ST S STE 400",
-       "city": "ST PETERSBURG",
-       "state": "FL",
-       "postal_code": "337014734",
-       "telephone_number": "727-893-6435"
-      },
-      {
-       "address_1": "85 E US HIGHWAY 6",
-       "city": "VALPARAISO",
-       "state": "IN",
-       "postal_code": "463838947",
-       "telephone_number": "219-476-7777"
-      },
-      {
-       "address_1": "5454 HOHMAN AVE",
-       "city": "HAMMOND",
-       "state": "IN",
-       "postal_code": "463201931",
-       "telephone_number": "219-932-2300"
-      },
-      {
-       "address_1": "100 MCGREGOR ST",
-       "city": "MANCHESTER",
-       "state": "NH",
-       "postal_code": "031023730",
-       "telephone_number": "603-663-5310"
-      },
-      {
-       "address_1": "360 STATION DR STE 300",
-       "city": "CRYSTAL LAKE",
-       "state": "IL",
-       "postal_code": "600148003",
-       "telephone_number": "815-455-1800"
       }
      ],
      "taxonomies": [
@@ -3630,7 +3224,8 @@
        "city": "NEW YORK",
        "state": "NY",
        "postal_code": "100654870",
-       "telephone_number": "212-746-3278"
+       "telephone_number": "212-746-3278",
+       "fax_number": "212-746-8137"
       },
       {
        "address_1": "505 E 70TH ST FL 3",
@@ -3638,17 +3233,8 @@
        "city": "NEW YORK",
        "state": "NY",
        "postal_code": "100214872",
-       "telephone_number": "212-746-3278"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "2300 CHILDREN'S PLAZA, BOX 29",
-       "address_2": "CHILDREN'S MEMORIAL EPILEPSY CENTER",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606143363",
-       "telephone_number": "773-883-6159"
+       "telephone_number": "212-746-3278",
+       "fax_number": "212-746-8137"
       }
      ],
      "taxonomies": [
@@ -3666,7 +3252,9 @@
      "basic": {
       "status": "A",
       "organization_name": "NEW FOCUS HEALTH CARE",
-      "last_updated": "2008-08-08"
+      "last_updated": "2008-08-08",
+      "authorized_official_first_name": "LYNNE",
+      "authorized_official_last_name": "JANJKY"
      },
      "addresses": [
       {
@@ -3675,7 +3263,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606148147",
-       "telephone_number": "312-330-3323"
+       "telephone_number": "312-330-3323",
+       "fax_number": "312-819-0170"
       },
       {
        "address_1": "151 N MICHIGAN AVE",
@@ -3684,10 +3273,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606017538",
-       "telephone_number": "312-330-3323"
+       "telephone_number": "312-330-3323",
+       "fax_number": "312-819-0170"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2084P0800X",
@@ -3724,15 +3313,6 @@
        "telephone_number": "312-227-4484"
       }
      ],
-     "practiceLocations": [
-      {
-       "address_1": "2515 N CLARK ST",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606142730",
-       "telephone_number": "800-543-7362"
-      }
-     ],
      "taxonomies": [
       {
        "code": "2084N0402X",
@@ -3759,7 +3339,8 @@
        "city": "HIGHLAND PARK",
        "state": "IL",
        "postal_code": "600351067",
-       "telephone_number": "847-433-0057"
+       "telephone_number": "847-433-0057",
+       "fax_number": "847-432-2174"
       },
       {
        "address_1": "918R W FULLERTON AVE",
@@ -3767,10 +3348,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "60614",
-       "telephone_number": "773-975-0897"
+       "telephone_number": "773-975-0897",
+       "fax_number": "773-871-8690"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2084P0800X",
@@ -3796,7 +3377,9 @@
      "basic": {
       "status": "A",
       "organization_name": "ABBIE KELLEY, LLC",
-      "last_updated": "2021-04-23"
+      "last_updated": "2021-04-23",
+      "authorized_official_first_name": "ABBIE",
+      "authorized_official_last_name": "KELLEY"
      },
      "addresses": [
       {
@@ -3816,7 +3399,6 @@
        "telephone_number": "773-413-9523"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "101YP2500X",
@@ -3838,7 +3420,9 @@
      "basic": {
       "status": "A",
       "organization_name": "ABBIE KELLEY, LLC",
-      "last_updated": "2021-04-23"
+      "last_updated": "2021-04-23",
+      "authorized_official_first_name": "ABBIE",
+      "authorized_official_last_name": "KELLEY"
      },
      "addresses": [
       {
@@ -3859,7 +3443,6 @@
        "telephone_number": "773-413-9523"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "101YM0800X",
@@ -3902,7 +3485,6 @@
        "telephone_number": "773-256-8566"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "101YP2500X",
@@ -3939,7 +3521,6 @@
        "telephone_number": "773-697-8839"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "101Y00000X",
@@ -3976,7 +3557,6 @@
        "telephone_number": "773-413-9523"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "101YM0800X",
@@ -3992,7 +3572,9 @@
      "basic": {
       "status": "A",
       "organization_name": "ALAINA BERCILLA, COUNSELING AND CONSULTATION PLLC",
-      "last_updated": "2025-07-08"
+      "last_updated": "2025-07-08",
+      "authorized_official_first_name": "ALAINA",
+      "authorized_official_last_name": "BERCILLA"
      },
      "addresses": [
       {
@@ -4011,7 +3593,6 @@
        "telephone_number": "773-417-9035"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "101YM0800X",
@@ -4049,7 +3630,6 @@
        "telephone_number": "312-761-4747"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "101YP2500X",
@@ -4085,15 +3665,6 @@
        "telephone_number": "773-888-1681"
       }
      ],
-     "practiceLocations": [
-      {
-       "address_1": "2001 W NORTH AVE",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606475413",
-       "telephone_number": "773-888-1681"
-      }
-     ],
      "taxonomies": [
       {
        "code": "101YP2500X",
@@ -4121,7 +3692,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606425441",
-       "telephone_number": "312-757-0043"
+       "telephone_number": "312-757-0043",
+       "fax_number": "312-226-9082"
       },
       {
        "address_1": "2325 N ORCHARD ST",
@@ -4130,15 +3702,6 @@
        "state": "IL",
        "postal_code": "606143303",
        "telephone_number": "312-914-0801"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "307 N MICHIGAN AVE",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606015311",
-       "telephone_number": "312-757-0043"
       }
      ],
      "taxonomies": [
@@ -4178,15 +3741,6 @@
        "telephone_number": "312-533-1266"
       }
      ],
-     "practiceLocations": [
-      {
-       "address_1": "820 W JACKSON BLVD STE 550",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "60607",
-       "telephone_number": "210-240-1987"
-      }
-     ],
      "taxonomies": [
       {
        "code": "101YP2500X",
@@ -4220,15 +3774,6 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606475174",
-       "telephone_number": "918-230-5189"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "2755 N PINE GROVE AVE",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606146109",
        "telephone_number": "918-230-5189"
       }
      ],
@@ -4269,7 +3814,6 @@
        "telephone_number": "414-239-0534"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "101YP2500X",
@@ -4312,7 +3856,6 @@
        "telephone_number": "773-413-9523"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "101YP2500X",
@@ -4348,7 +3891,6 @@
        "postal_code": "606143439"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "103TC1900X",
@@ -4389,7 +3931,6 @@
        "postal_code": "606148944"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "101YP2500X",
@@ -4405,7 +3946,9 @@
      "basic": {
       "status": "A",
       "organization_name": "ANNE M. APPEL, LLC",
-      "last_updated": "2015-06-22"
+      "last_updated": "2015-06-22",
+      "authorized_official_first_name": "ANNE",
+      "authorized_official_last_name": "APPEL"
      },
      "addresses": [
       {
@@ -4426,7 +3969,6 @@
        "telephone_number": "312-379-9306"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "101YP2500X",
@@ -4442,7 +3984,9 @@
      "basic": {
       "status": "A",
       "organization_name": "ANNELIESE KRANZ LCPC LLC",
-      "last_updated": "2024-06-12"
+      "last_updated": "2024-06-12",
+      "authorized_official_first_name": "ANNELIESE",
+      "authorized_official_last_name": "KRANZ"
      },
      "addresses": [
       {
@@ -4459,15 +4003,6 @@
        "city": "EVANSTON",
        "state": "IL",
        "postal_code": "60201",
-       "telephone_number": "717-385-9214"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "2502 N CLARK ST STE 216",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606141850",
        "telephone_number": "717-385-9214"
       }
      ],
@@ -4509,7 +4044,6 @@
        "telephone_number": "517-740-8884"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "101YP2500X",
@@ -4536,7 +4070,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606147965",
-       "telephone_number": "312-280-1166"
+       "telephone_number": "312-280-1166",
+       "fax_number": "312-668-8624"
       },
       {
        "address_1": "1731 N MARCEY ST STE 535",
@@ -4544,10 +4079,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606147965",
-       "telephone_number": "312-280-1166"
+       "telephone_number": "312-280-1166",
+       "fax_number": "312-668-8624"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "101YM0800X",
@@ -4568,7 +4103,9 @@
      "basic": {
       "status": "A",
       "organization_name": "ASHLEY JESSEN, LLC",
-      "last_updated": "2018-05-29"
+      "last_updated": "2018-05-29",
+      "authorized_official_first_name": "ASHLEY",
+      "authorized_official_last_name": "JESSEN"
      },
      "addresses": [
       {
@@ -4588,7 +4125,6 @@
        "telephone_number": "847-910-5519"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "101YP2500X",
@@ -4626,7 +4162,6 @@
        "telephone_number": "872-262-0459"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "101YM0800X",
@@ -4663,7 +4198,6 @@
        "telephone_number": "773-250-1769"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "101YM0800X",
@@ -4700,7 +4234,6 @@
        "telephone_number": "773-672-9815"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "101YM0800X",
@@ -4740,15 +4273,6 @@
        "state": "IL",
        "postal_code": "606141201",
        "telephone_number": "802-922-4860"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "1801 W WARNER AVE STE 101",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606131891",
-       "telephone_number": "312-940-2190"
       }
      ],
      "taxonomies": [
@@ -4791,7 +4315,6 @@
        "telephone_number": "773-888-1681"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "101YP2500X",
@@ -4826,16 +4349,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606142415",
-       "telephone_number": "440-785-7802"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "500 N MICHIGAN AVE STE 600",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606113754",
-       "telephone_number": "550-785-7802"
+       "telephone_number": "440-785-7802",
+       "fax_number": "440-785-7802"
       }
      ],
      "taxonomies": [
@@ -4875,7 +4390,6 @@
        "telephone_number": "248-515-5564"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "101YP2500X",
@@ -4903,7 +4417,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606402746",
-       "telephone_number": "773-612-6848"
+       "telephone_number": "773-612-6848",
+       "fax_number": "773-883-3968"
       },
       {
        "address_1": "550 W WEBSTER AVE",
@@ -4915,7 +4430,6 @@
        "telephone_number": "773-612-6848"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "101YP2500X",
@@ -4943,7 +4457,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606261790",
-       "telephone_number": "312-593-0870"
+       "telephone_number": "312-593-0870",
+       "fax_number": "872-241-9175"
       },
       {
        "address_1": "1731 N MARCEY ST",
@@ -4952,10 +4467,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606145373",
-       "telephone_number": "312-280-1166"
+       "telephone_number": "312-280-1166",
+       "fax_number": "312-280-1199"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "101YM0800X",
@@ -4993,7 +4508,6 @@
        "telephone_number": "773-857-2041"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "101YM0800X",
@@ -5031,7 +4545,6 @@
        "telephone_number": "630-347-7180"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "101Y00000X",
@@ -5066,15 +4579,6 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606113182",
-       "telephone_number": "312-640-7740"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "500 DAVIS ST STE 815",
-       "city": "EVANSTON",
-       "state": "IL",
-       "postal_code": "602014655",
        "telephone_number": "312-640-7740"
       }
      ],
@@ -5116,7 +4620,6 @@
        "telephone_number": "847-272-5111"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "101YM0800X",
@@ -5153,7 +4656,6 @@
        "telephone_number": "873-222-7590"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "101YP2500X",
@@ -5188,10 +4690,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606147955",
-       "telephone_number": "312-618-4867"
+       "telephone_number": "312-618-4867",
+       "fax_number": "312-280-1199"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "101YP2500X",
@@ -5228,7 +4730,6 @@
        "postal_code": "606146808"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "101Y00000X",
@@ -5271,7 +4772,6 @@
        "telephone_number": "312-324-4502"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "101YM0800X",
@@ -5308,7 +4808,6 @@
        "telephone_number": "773-423-8447"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "101YM0800X",
@@ -5346,7 +4845,6 @@
        "telephone_number": "773-281-7200"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "101YM0800X",
@@ -5384,7 +4882,6 @@
        "telephone_number": "773-580-0787"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "101YP2500X",
@@ -5429,22 +4926,6 @@
        "city": "VALPARAISO",
        "state": "IN",
        "postal_code": "463858167"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "200 3RD CT SE",
-       "city": "DEMOTTE",
-       "state": "IN",
-       "postal_code": "463107400",
-       "telephone_number": "219-987-5586"
-      },
-      {
-       "address_1": "836 W WELLINGTON AVE",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606575147",
-       "telephone_number": "773-975-1600"
       }
      ],
      "taxonomies": [
@@ -5493,15 +4974,6 @@
        "telephone_number": "773-672-9790"
       }
      ],
-     "practiceLocations": [
-      {
-       "address_1": "2900 N LAKE SHORE DR",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606575640",
-       "telephone_number": "773-665-3000"
-      }
-     ],
      "taxonomies": [
       {
        "code": "2083P0901X",
@@ -5543,7 +5015,6 @@
        "telephone_number": "847-570-5020"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "207R00000X",
@@ -5576,7 +5047,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606573143",
-       "telephone_number": "773-935-1199"
+       "telephone_number": "773-935-1199",
+       "fax_number": "773-935-1219"
       },
       {
        "address_1": "3017 N ASHLAND AVE APT 1NRW",
@@ -5584,24 +5056,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606573142",
-       "telephone_number": "773-935-1199"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "6170 JOLIET RD",
-       "address_2": "STE 1",
-       "city": "COUNTRYSIDE",
-       "state": "IL",
-       "postal_code": "605253983",
-       "telephone_number": "773-935-1199"
-      },
-      {
-       "address_1": "4633 N CLARK ST",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606404619",
-       "telephone_number": "773-275-7500"
+       "telephone_number": "773-935-1199",
+       "fax_number": "773-935-1219"
       }
      ],
      "taxonomies": [
@@ -5640,7 +5096,6 @@
        "postal_code": "606144547"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "207Q00000X",
@@ -5656,7 +5111,9 @@
      "basic": {
       "status": "A",
       "organization_name": "BAAL PERAZIM WELLNESS AND HEALTH SERVICES PC",
-      "last_updated": "2026-05-13"
+      "last_updated": "2026-05-13",
+      "authorized_official_first_name": "MAURICE",
+      "authorized_official_last_name": "BROWNLEE"
      },
      "addresses": [
       {
@@ -5665,7 +5122,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606575084",
-       "telephone_number": "773-296-2400"
+       "telephone_number": "773-296-2400",
+       "fax_number": "773-296-1097"
       },
       {
        "address_1": "2835 N SHEFFIELD AVE STE 500",
@@ -5673,24 +5131,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606575084",
-       "telephone_number": "773-296-2400"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "1823 W",
-       "address_2": "47TH ST",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606093843",
-       "telephone_number": "773-296-2400"
-      },
-      {
-       "address_1": "3916 N BROADWAY ST",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606136107",
-       "telephone_number": "773-296-2400"
+       "telephone_number": "773-296-2400",
+       "fax_number": "773-296-1097"
       }
      ],
      "taxonomies": [
@@ -5742,17 +5184,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606143049",
-       "telephone_number": "773-880-0320"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "2800 N SHERIDAN RD",
-       "address_2": "SUITE 101",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606576156",
-       "telephone_number": "773-281-7835"
+       "telephone_number": "773-880-0320",
+       "fax_number": "312-204-5501"
       }
      ],
      "taxonomies": [
@@ -5781,7 +5214,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606575785",
-       "telephone_number": "312-926-3627"
+       "telephone_number": "312-926-3627",
+       "fax_number": "312-694-1880"
       },
       {
        "address_1": "1333 W BELMONT AVE STE 200",
@@ -5789,10 +5223,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606575785",
-       "telephone_number": "312-926-3627"
+       "telephone_number": "312-926-3627",
+       "fax_number": "312-694-1885"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "207Q00000X",
@@ -5831,10 +5265,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606575785",
-       "telephone_number": "312-926-3627"
+       "telephone_number": "312-926-3627",
+       "fax_number": "312-694-1885"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "207Q00000X",
@@ -5871,7 +5305,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606575191",
-       "telephone_number": "773-472-3704"
+       "telephone_number": "773-472-3704",
+       "fax_number": "608-835-1090"
       },
       {
        "address_1": "2835 N SHEFFIELD AVE STE 104",
@@ -5879,17 +5314,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606575191",
-       "telephone_number": "773-472-3704"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "753 N MAIN ST",
-       "address_2": "DEAN MEDICAL CENTER",
-       "city": "OREGON",
-       "state": "WI",
-       "postal_code": "535751003",
-       "telephone_number": "608-835-2222"
+       "telephone_number": "773-472-3704",
+       "fax_number": "608-835-1090"
       }
      ],
      "taxonomies": [
@@ -5934,7 +5360,6 @@
        "telephone_number": "847-390-5900"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "207Q00000X",
@@ -5966,7 +5391,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606405704",
-       "telephone_number": "312-744-1203"
+       "telephone_number": "312-744-1203",
+       "fax_number": "312-744-1308"
       },
       {
        "address_1": "6500 N CLARK ST",
@@ -5974,23 +5400,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606264097",
-       "telephone_number": "773-388-1600"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "845 W WILSON AVE",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606405704",
-       "telephone_number": "312-744-1203"
-      },
-      {
-       "address_1": "811 W WELLINGTON AVE",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606575123",
-       "telephone_number": "773-871-1461"
+       "telephone_number": "773-388-1600",
+       "fax_number": "773-388-8936"
       }
      ],
      "taxonomies": [
@@ -6040,7 +5451,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606575081",
-       "telephone_number": "773-472-3704"
+       "telephone_number": "773-472-3704",
+       "fax_number": "312-563-3170"
       },
       {
        "address_1": "2835 N SHEFFIELD AVE",
@@ -6049,10 +5461,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606575081",
-       "telephone_number": "773-472-3704"
+       "telephone_number": "773-472-3704",
+       "fax_number": "312-563-3170"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "207Q00000X",
@@ -6097,7 +5509,6 @@
        "telephone_number": "847-309-1473"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "207Q00000X",
@@ -6124,7 +5535,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606573012",
-       "telephone_number": "773-244-0441"
+       "telephone_number": "773-244-0441",
+       "fax_number": "773-244-0906"
       },
       {
        "address_1": "3002 N ASHLAND AVE",
@@ -6132,10 +5544,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606573012",
-       "telephone_number": "773-244-0441"
+       "telephone_number": "773-244-0441",
+       "fax_number": "773-244-0906"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "207Q00000X",
@@ -6170,30 +5582,8 @@
        "city": "HINSDALE",
        "state": "IL",
        "postal_code": "605213635",
-       "telephone_number": "630-789-8890"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "40 S CLAY ST STE 210",
-       "city": "HINSDALE",
-       "state": "IL",
-       "postal_code": "60521",
-       "telephone_number": "630-789-8890"
-      },
-      {
-       "address_1": "2900 N LAKE SHORE DR",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606575640",
-       "telephone_number": "773-665-3300"
-      },
-      {
-       "address_1": "40 S CLAY ST STE 210",
-       "city": "HINSDALE",
-       "state": "IL",
-       "postal_code": "60521",
-       "telephone_number": "630-789-8890"
+       "telephone_number": "630-789-8890",
+       "fax_number": "630-789-8892"
       }
      ],
      "taxonomies": [
@@ -6239,7 +5629,6 @@
        "telephone_number": "312-337-1982"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "207Q00000X",
@@ -6267,7 +5656,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606141798",
-       "telephone_number": "312-623-2625"
+       "telephone_number": "312-623-2625",
+       "fax_number": "773-289-0685"
       },
       {
        "address_1": "3023 N CLARK ST # 200",
@@ -6275,10 +5665,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606575200",
-       "telephone_number": "312-623-2625"
+       "telephone_number": "312-623-2625",
+       "fax_number": "773-289-0685"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "207QA0505X",
@@ -6294,7 +5684,9 @@
      "basic": {
       "status": "A",
       "organization_name": "BUCHER MEDICAL SERVICES SC",
-      "last_updated": "2025-05-16"
+      "last_updated": "2025-05-16",
+      "authorized_official_first_name": "GARY",
+      "authorized_official_last_name": "BUCHER"
      },
      "addresses": [
       {
@@ -6303,7 +5695,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606147738",
-       "telephone_number": "312-623-2625"
+       "telephone_number": "312-623-2625",
+       "fax_number": "773-289-0685"
       },
       {
        "address_1": "3023 N CLARK ST STE 200",
@@ -6311,10 +5704,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606575200",
-       "telephone_number": "312-623-2625"
+       "telephone_number": "312-623-2625",
+       "fax_number": "773-289-0685"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "207QA0505X",
@@ -6347,7 +5740,8 @@
        "city": "ELMHURST",
        "state": "IL",
        "postal_code": "601265659",
-       "telephone_number": "331-221-5701"
+       "telephone_number": "331-221-5701",
+       "fax_number": "331-221-3893"
       },
       {
        "address_1": "133 E BRUSH HILL RD STE 205",
@@ -6355,16 +5749,8 @@
        "city": "ELMHURST",
        "state": "IL",
        "postal_code": "601265659",
-       "telephone_number": "331-221-5701"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "836 W WELLINGTON AVE",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606575147",
-       "telephone_number": "773-975-1600"
+       "telephone_number": "331-221-5701",
+       "fax_number": "331-221-3893"
       }
      ],
      "taxonomies": [
@@ -6398,7 +5784,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606577335",
-       "telephone_number": "872-226-9199"
+       "telephone_number": "872-226-9199",
+       "fax_number": "773-509-9006"
       },
       {
        "address_1": "4941 N KEDZIE AVE",
@@ -6406,10 +5793,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606255009",
-       "telephone_number": "773-509-9099"
+       "telephone_number": "773-509-9099",
+       "fax_number": "773-509-9006"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "173000000X",
@@ -6450,15 +5837,6 @@
        "state": "IL",
        "postal_code": "606546065",
        "telephone_number": "312-219-2231"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "2900 N LAKE SHORE DR",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606575640",
-       "telephone_number": "773-665-3000"
       }
      ],
      "taxonomies": [
@@ -6503,15 +5881,6 @@
        "telephone_number": "773-296-2400"
       }
      ],
-     "practiceLocations": [
-      {
-       "address_1": "2835 N SHEFFIELD AVE STE 500",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606575084",
-       "telephone_number": "773-296-2400"
-      }
-     ],
      "taxonomies": [
       {
        "code": "390200000X",
@@ -6532,7 +5901,9 @@
      "basic": {
       "status": "A",
       "organization_name": "CHICAGO FAMILY WELLNESS, SC",
-      "last_updated": "2010-11-26"
+      "last_updated": "2010-11-26",
+      "authorized_official_first_name": "FRANCISCO",
+      "authorized_official_last_name": "SANCHEZ"
      },
      "addresses": [
       {
@@ -6552,7 +5923,6 @@
        "telephone_number": "773-404-0515"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "207Q00000X",
@@ -6568,7 +5938,9 @@
      "basic": {
       "status": "A",
       "organization_name": "CHICAGO HEADACHE CENTER AND RESEARCH INSTITUTE LLC",
-      "last_updated": "2023-09-06"
+      "last_updated": "2023-09-06",
+      "authorized_official_first_name": "BRADLEY",
+      "authorized_official_last_name": "TORPHY"
      },
      "addresses": [
       {
@@ -6577,7 +5949,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606576185",
-       "telephone_number": "773-935-1000"
+       "telephone_number": "773-935-1000",
+       "fax_number": "773-938-0500"
       },
       {
        "address_1": "3000 N HALSTED ST STE 601",
@@ -6585,10 +5958,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606579269",
-       "telephone_number": "773-935-1000"
+       "telephone_number": "773-935-1000",
+       "fax_number": "773-935-1000"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "207Q00000X",
@@ -6604,7 +5977,9 @@
      "basic": {
       "status": "A",
       "organization_name": "CHICAGOLAND COMPLETE HEALTHCARE LLC",
-      "last_updated": "2018-05-10"
+      "last_updated": "2018-05-10",
+      "authorized_official_first_name": "BARRY",
+      "authorized_official_last_name": "SUMMERS"
      },
      "addresses": [
       {
@@ -6613,7 +5988,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606579268",
-       "telephone_number": "773-935-5985"
+       "telephone_number": "773-935-5985",
+       "fax_number": "773-935-5478"
       },
       {
        "address_1": "3000 N HALSTED ST STE 401",
@@ -6621,16 +5997,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606579268",
-       "telephone_number": "773-935-5985"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "1431 N WESTERN AVE STE 201",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606227712",
-       "telephone_number": "773-935-5985"
+       "telephone_number": "773-935-5985",
+       "fax_number": "773-935-5478"
       }
      ],
      "taxonomies": [
@@ -6680,7 +6048,6 @@
        "telephone_number": "773-665-6851"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "207Q00000X",
@@ -6718,7 +6085,6 @@
        "telephone_number": "718-483-1270"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "207QA0000X",
@@ -6756,7 +6122,6 @@
        "telephone_number": "847-769-8319"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "207Q00000X",
@@ -6772,7 +6137,9 @@
      "basic": {
       "status": "A",
       "organization_name": "CORREA MEDICAL GROUP S.C.",
-      "last_updated": "2020-08-22"
+      "last_updated": "2020-08-22",
+      "authorized_official_first_name": "EDUARDO",
+      "authorized_official_last_name": "CORREA"
      },
      "addresses": [
       {
@@ -6792,7 +6159,6 @@
        "telephone_number": "773-248-8644"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "207Q00000X",
@@ -6830,15 +6196,6 @@
        "telephone_number": "312-666-3494"
       }
      ],
-     "practiceLocations": [
-      {
-       "address_1": "1333 W BELMONT AVE STE 200",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606575785",
-       "telephone_number": "312-926-3627"
-      }
-     ],
      "taxonomies": [
       {
        "code": "207Q00000X",
@@ -6871,7 +6228,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606017540",
-       "telephone_number": "312-946-8847"
+       "telephone_number": "312-946-8847",
+       "fax_number": "312-946-8704"
       },
       {
        "address_1": "2800 N SHERIDAN RD",
@@ -6880,17 +6238,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606576163",
-       "telephone_number": "773-755-2600"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "2845 N SHERIDAN ROAD",
-       "address_2": "SUITE 907",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606577227",
-       "telephone_number": "773-755-2600"
+       "telephone_number": "773-755-2600",
+       "fax_number": "773-880-0403"
       }
      ],
      "taxonomies": [
@@ -6913,7 +6262,9 @@
      "basic": {
       "status": "A",
       "organization_name": "DEBRA A. O'CONNOR LTD",
-      "last_updated": "2020-08-22"
+      "last_updated": "2020-08-22",
+      "authorized_official_first_name": "AMANDA",
+      "authorized_official_last_name": "PULAK"
      },
      "addresses": [
       {
@@ -6935,7 +6286,6 @@
        "telephone_number": "773-472-3704"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "207Q00000X",
@@ -6975,7 +6325,6 @@
        "telephone_number": "773-472-3704"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "207Q00000X",
@@ -7010,15 +6359,6 @@
        "state": "OR",
        "postal_code": "974012240",
        "telephone_number": "541-242-4812"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "2900 N LAKE SHORE DR",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606575640",
-       "telephone_number": "773-665-6730"
       }
      ],
      "taxonomies": [
@@ -7060,16 +6400,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606573014",
-       "telephone_number": "773-687-7000"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "5140 N CALIFORNIA AVE",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606253645",
-       "telephone_number": "773-293-5331"
+       "telephone_number": "773-687-7000",
+       "fax_number": "773-687-7488"
       }
      ],
      "taxonomies": [
@@ -7098,7 +6430,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606576254",
-       "telephone_number": "773-975-1971"
+       "telephone_number": "773-975-1971",
+       "fax_number": "773-975-1971"
       },
       {
        "address_1": "4656 W TOUHY AVE",
@@ -7106,10 +6439,10 @@
        "city": "LINCOLNWOOD",
        "state": "IL",
        "postal_code": "607121656",
-       "telephone_number": "847-972-2202"
+       "telephone_number": "847-972-2202",
+       "fax_number": "847-512-4353"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "207LP2900X",
@@ -7157,7 +6490,6 @@
        "telephone_number": "312-996-2000"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "207Q00000X",
@@ -7184,7 +6516,8 @@
        "city": "CHARLOTTESVILLE",
        "state": "VA",
        "postal_code": "229080816",
-       "telephone_number": "434-924-5348"
+       "telephone_number": "434-924-5348",
+       "fax_number": "434-244-9474"
       },
       {
        "address_1": "PO BOX 749112",
@@ -7192,29 +6525,6 @@
        "city": "ATLANTA",
        "state": "GA",
        "postal_code": "303749112"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "2900 N LAKE SHORE DR",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606575640",
-       "telephone_number": "630-991-6071"
-      },
-      {
-       "address_1": "4323 S PULASKI RD",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606324008",
-       "telephone_number": "312-698-9043"
-      },
-      {
-       "address_1": "1215 LEE ST BOX 800499",
-       "city": "CHARLOTTESVILLE",
-       "state": "VA",
-       "postal_code": "229080816",
-       "telephone_number": "434-924-5348"
       }
      ],
      "taxonomies": [
@@ -7237,7 +6547,9 @@
      "basic": {
       "status": "A",
       "organization_name": "FAMILY PHYSICIANS OF LAKEVIEW",
-      "last_updated": "2010-09-14"
+      "last_updated": "2010-09-14",
+      "authorized_official_first_name": "SARA BRAUNSTEIN",
+      "authorized_official_last_name": "BRAUNSTEIN"
      },
      "addresses": [
       {
@@ -7257,7 +6569,6 @@
        "telephone_number": "773-244-0441"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "207Q00000X",
@@ -7276,12 +6587,1610 @@
   },
   {
    "query": {
-    "taxonomy_description": "Clinical Social Worker",
+    "taxonomy_description": "Social Worker",
     "postal_code": "60610",
     "limit": 40
    },
-   "result_count": null,
-   "results": []
+   "result_count": 40,
+   "results": [
+    {
+     "number": "1588220305",
+     "enumeration_type": "NPI-1",
+     "basic": {
+      "status": "A",
+      "first_name": "ADELE",
+      "last_name": "ACKERT",
+      "last_updated": "2023-11-15"
+     },
+     "addresses": [
+      {
+       "address_1": "2214 ARDEN PL",
+       "address_purpose": "MAILING",
+       "city": "JOLIET",
+       "state": "IL",
+       "postal_code": "604355402",
+       "telephone_number": "815-213-0592"
+      },
+      {
+       "address_1": "1560 WALL ST STE 204",
+       "address_purpose": "LOCATION",
+       "city": "NAPERVILLE",
+       "state": "IL",
+       "postal_code": "605631146",
+       "telephone_number": "630-491-9749"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "104100000X",
+       "desc": "Social Worker",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1932273430",
+     "enumeration_type": "NPI-1",
+     "basic": {
+      "status": "A",
+      "first_name": "THERESA",
+      "last_name": "ALBINI",
+      "credential": "MSW",
+      "last_updated": "2007-07-08"
+     },
+     "addresses": [
+      {
+       "address_1": "1307 S WABASH AVE",
+       "address_2": "UNIT 501",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606052620"
+      },
+      {
+       "address_1": "300 N STATE ST",
+       "address_2": "SUITE 3707",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606104814",
+       "telephone_number": "312-222-0575"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1932906781",
+     "enumeration_type": "NPI-1",
+     "basic": {
+      "status": "A",
+      "first_name": "GINA",
+      "last_name": "ALEXANDRES",
+      "last_updated": "2025-02-28"
+     },
+     "addresses": [
+      {
+       "address_1": "1130 N DEARBORN ST",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606102756",
+       "telephone_number": "330-518-5002"
+      },
+      {
+       "address_1": "3000 N HALSTED ST STE 803",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606576185",
+       "telephone_number": "312-376-1665",
+       "fax_number": "312-626-2390"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1336096171",
+     "enumeration_type": "NPI-1",
+     "basic": {
+      "status": "A",
+      "first_name": "SAMER",
+      "last_name": "ALHATO",
+      "credential": "LSW",
+      "last_updated": "2026-03-27"
+     },
+     "addresses": [
+      {
+       "address_1": "213 W INSTITUTE PL STE 500",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606108792",
+       "telephone_number": "312-549-8029"
+      },
+      {
+       "address_1": "213 W INSTITUTE PL STE 500",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606108792",
+       "telephone_number": "312-549-8029"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "104100000X",
+       "desc": "Social Worker",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1427648120",
+     "enumeration_type": "NPI-1",
+     "basic": {
+      "status": "A",
+      "first_name": "SAMANTHA",
+      "last_name": "ALLWEISS",
+      "credential": "LCSW",
+      "last_updated": "2021-01-26"
+     },
+     "addresses": [
+      {
+       "address_1": "25 E WASHINGTON ST STE 1025",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606021710",
+       "telephone_number": "312-569-0285"
+      },
+      {
+       "address_1": "247 W SCOTT ST APT 305",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606105978",
+       "telephone_number": "847-975-2591"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1215180815",
+     "enumeration_type": "NPI-1",
+     "basic": {
+      "status": "A",
+      "first_name": "DEBRA",
+      "last_name": "ALPER",
+      "credential": "LCSW",
+      "last_updated": "2023-02-13"
+     },
+     "addresses": [
+      {
+       "address_1": "1122 N DEARBORN ST APT 8B",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606105061",
+       "telephone_number": "773-931-7220"
+      },
+      {
+       "address_1": "47 W DIVISION ST # 376",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606102954",
+       "telephone_number": "773-931-7220"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1700635570",
+     "enumeration_type": "NPI-2",
+     "basic": {
+      "status": "A",
+      "organization_name": "ALUNA THERAPY PLLC",
+      "last_updated": "2026-02-10",
+      "authorized_official_first_name": "LYLA",
+      "authorized_official_last_name": "WAKUT"
+     },
+     "addresses": [
+      {
+       "address_1": "213 W INSTITUTE PL STE 500",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606108792"
+      },
+      {
+       "address_1": "213 W INSTITUTE PL STE 500",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606108792",
+       "telephone_number": "312-857-4017"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1588087589",
+     "enumeration_type": "NPI-2",
+     "basic": {
+      "status": "A",
+      "organization_name": "AMANDA WHETSTONE, LCSW LLC",
+      "last_updated": "2014-03-17",
+      "authorized_official_first_name": "AMANDA",
+      "authorized_official_last_name": "WHETSTONE"
+     },
+     "addresses": [
+      {
+       "address_1": "1360 N LAKE SHORE DR",
+       "address_2": "#1007",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606102181",
+       "telephone_number": "419-704-1334"
+      },
+      {
+       "address_1": "1360 N LAKE SHORE DR",
+       "address_2": "#1007",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606102181"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1033895420",
+     "enumeration_type": "NPI-1",
+     "basic": {
+      "status": "A",
+      "first_name": "OLIVIA",
+      "last_name": "ANDRES",
+      "credential": "LCSW, PMH-C",
+      "last_updated": "2023-06-22"
+     },
+     "addresses": [
+      {
+       "address_1": "939 N ORLEANS ST APT 2B",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606103001",
+       "telephone_number": "419-699-5948"
+      },
+      {
+       "address_1": "939 N ORLEANS ST APT 2B",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606103001",
+       "telephone_number": "419-699-5948"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "101YM0800X",
+       "desc": "Counselor, Mental Health",
+       "primary": false
+      },
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1235205204",
+     "enumeration_type": "NPI-1",
+     "basic": {
+      "status": "A",
+      "first_name": "CHERYL",
+      "last_name": "ARATA",
+      "credential": "LCSW",
+      "last_updated": "2007-07-08"
+     },
+     "addresses": [
+      {
+       "address_1": "1453 W WALTON ST",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606225311",
+       "telephone_number": "773-350-7700"
+      },
+      {
+       "address_1": "413 W NORTH AVE",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606101117",
+       "telephone_number": "773-350-7700"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1508954785",
+     "enumeration_type": "NPI-1",
+     "basic": {
+      "status": "A",
+      "first_name": "ANGELA",
+      "last_name": "ATWATER",
+      "credential": "LCSW",
+      "last_updated": "2009-10-18"
+     },
+     "addresses": [
+      {
+       "address_1": "1165 N CLARK ST",
+       "address_2": "SUITE 413",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606102702",
+       "telephone_number": "773-456-9080"
+      },
+      {
+       "address_1": "2312 W NORTH AVE",
+       "address_2": "#4E",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606476264",
+       "telephone_number": "773-456-9080"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1265812002",
+     "enumeration_type": "NPI-1",
+     "basic": {
+      "status": "A",
+      "first_name": "CHRISTOPHER",
+      "last_name": "BALMACEDA",
+      "credential": "LCSW",
+      "last_updated": "2016-01-05"
+     },
+     "addresses": [
+      {
+       "address_1": "1030 N CLARK ST",
+       "address_2": "SUITE 303",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606105467"
+      },
+      {
+       "address_1": "1030 N CLARK ST",
+       "address_2": "SUITE 303",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606105467",
+       "telephone_number": "312-291-1689"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1558036731",
+     "enumeration_type": "NPI-1",
+     "basic": {
+      "status": "A",
+      "first_name": "HOLLY",
+      "last_name": "BARRATT",
+      "credential": "LSW",
+      "last_updated": "2021-08-10"
+     },
+     "addresses": [
+      {
+       "address_1": "1400 N LAKE SHORE DR APT 7J",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606106617",
+       "telephone_number": "815-261-8013"
+      },
+      {
+       "address_1": "2625 W TOUHY AVE",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606453186",
+       "telephone_number": "773-973-5333"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "104100000X",
+       "desc": "Social Worker",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1194946574",
+     "enumeration_type": "NPI-1",
+     "basic": {
+      "status": "A",
+      "first_name": "DENIA",
+      "last_name": "BARRETT",
+      "credential": "MSW",
+      "last_updated": "2012-10-25"
+     },
+     "addresses": [
+      {
+       "address_1": "1030 N. CLARK",
+       "address_2": "SUITE 303",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "60610",
+       "telephone_number": "216-849-8858",
+       "fax_number": "216-321-9594"
+      },
+      {
+       "address_1": "1030 N. CLARK",
+       "address_2": "SUITE 303",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "60610",
+       "telephone_number": "216-849-8858",
+       "fax_number": "216-321-9594"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1003621921",
+     "enumeration_type": "NPI-1",
+     "basic": {
+      "status": "A",
+      "first_name": "JEAN",
+      "last_name": "BAX",
+      "last_updated": "2025-02-10"
+     },
+     "addresses": [
+      {
+       "address_1": "820 N ORLEANS ST STE 350",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606103145",
+       "telephone_number": "312-809-0298",
+       "fax_number": "866-687-0879"
+      },
+      {
+       "address_1": "820 N ORLEANS ST STE 350",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606103145",
+       "telephone_number": "312-809-0298",
+       "fax_number": "866-687-0879"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1639576507",
+     "enumeration_type": "NPI-1",
+     "basic": {
+      "status": "A",
+      "first_name": "AMANDA",
+      "last_name": "BESINGER",
+      "credential": "L.C.S.W.",
+      "last_updated": "2019-05-21"
+     },
+     "addresses": [
+      {
+       "address_1": "820 N ORLEANS ST STE 206",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606103144",
+       "telephone_number": "312-809-0298"
+      },
+      {
+       "address_1": "820 N ORLEANS ST STE 206",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606103144",
+       "telephone_number": "312-809-0298"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "104100000X",
+       "desc": "Social Worker",
+       "primary": false
+      },
+      {
+       "code": "222Q00000X",
+       "desc": "Developmental Therapist",
+       "primary": false
+      },
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1770271058",
+     "enumeration_type": "NPI-1",
+     "basic": {
+      "status": "A",
+      "first_name": "JEANETTE",
+      "last_name": "BLEDSOE",
+      "last_updated": "2024-04-25"
+     },
+     "addresses": [
+      {
+       "address_1": "820 N ORLEANS ST STE 350",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606103145",
+       "telephone_number": "312-809-0298"
+      },
+      {
+       "address_1": "820 N ORLEANS ST STE 350",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606103145",
+       "telephone_number": "312-809-0298"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "104100000X",
+       "desc": "Social Worker",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1104464791",
+     "enumeration_type": "NPI-2",
+     "basic": {
+      "status": "A",
+      "organization_name": "BLOOMPOINTS, PLLC",
+      "last_updated": "2026-06-02",
+      "authorized_official_first_name": "DAVID",
+      "authorized_official_last_name": "LEWIS"
+     },
+     "addresses": [
+      {
+       "address_1": "213 W INSTITUTE PL STE 500",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606108792",
+       "telephone_number": "312-219-4136",
+       "fax_number": "312-883-0617"
+      },
+      {
+       "address_1": "213 W INSTITUTE PL STE 500",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606108792",
+       "telephone_number": "312-481-8521"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1518333137",
+     "enumeration_type": "NPI-1",
+     "basic": {
+      "status": "A",
+      "first_name": "STEFANIE",
+      "last_name": "BONNELL",
+      "credential": "LCSW",
+      "last_updated": "2026-10-23"
+     },
+     "addresses": [
+      {
+       "address_1": "PO BOX 10868",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606100868",
+       "telephone_number": "312-834-3054",
+       "fax_number": "219-926-3524"
+      },
+      {
+       "address_1": "PO BOX 10868",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606100868",
+       "telephone_number": "312-834-3054",
+       "fax_number": "219-926-3524"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1306536222",
+     "enumeration_type": "NPI-1",
+     "basic": {
+      "status": "A",
+      "first_name": "ELLISON",
+      "last_name": "BONNER",
+      "last_updated": "2023-05-12"
+     },
+     "addresses": [
+      {
+       "address_1": "2 W DELAWARE PL UNIT 1204",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606103406",
+       "telephone_number": "630-299-6916"
+      },
+      {
+       "address_1": "1552 W FULLERTON AVE STE 100",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606149018",
+       "telephone_number": "773-270-5600"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1851936595",
+     "enumeration_type": "NPI-1",
+     "basic": {
+      "status": "A",
+      "first_name": "MICHELLE",
+      "last_name": "BROWN",
+      "credential": "LCSW",
+      "last_updated": "2021-06-21"
+     },
+     "addresses": [
+      {
+       "address_1": "5105 S HARPER AVE UNIT 609",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606154156",
+       "telephone_number": "224-392-5703",
+       "fax_number": "630-839-8697"
+      },
+      {
+       "address_1": "5105 S HARPER AVE UNIT 609",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606154156",
+       "telephone_number": "224-392-5703"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1245200690",
+     "enumeration_type": "NPI-1",
+     "basic": {
+      "status": "A",
+      "first_name": "ALAN",
+      "last_name": "BURRALL",
+      "credential": "LCSW",
+      "last_updated": "2026-07-13"
+     },
+     "addresses": [
+      {
+       "address_1": "345 N. LASALLE",
+       "address_2": "#1008",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "60610",
+       "telephone_number": "312-467-0032",
+       "fax_number": "312-467-0318"
+      },
+      {
+       "address_1": "345 N. LASALLE",
+       "address_2": "#1008",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "60610",
+       "telephone_number": "312-467-0032",
+       "fax_number": "312-467-0318"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1285417451",
+     "enumeration_type": "NPI-1",
+     "basic": {
+      "status": "A",
+      "first_name": "SAMANTHA",
+      "last_name": "CAMPBELL",
+      "credential": "MSW, LSW",
+      "last_updated": "2023-08-21"
+     },
+     "addresses": [
+      {
+       "address_1": "1534 N HUDSON AVE APT 1N",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606105834"
+      },
+      {
+       "address_1": "2000 N RACINE AVE STE 3300",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606147008",
+       "telephone_number": "773-413-9523"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "104100000X",
+       "desc": "Social Worker",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1568813939",
+     "enumeration_type": "NPI-1",
+     "basic": {
+      "status": "A",
+      "first_name": "ROBERT",
+      "last_name": "CARTY",
+      "credential": "LCSW, CADC, CCJP",
+      "last_updated": "2016-06-28"
+     },
+     "addresses": [
+      {
+       "address_1": "867 N DEARBORN ST",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606103310",
+       "telephone_number": "312-631-7952",
+       "fax_number": "312-943-3530"
+      },
+      {
+       "address_1": "867 N DEARBORN ST",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606103310",
+       "telephone_number": "312-631-7952",
+       "fax_number": "312-943-3530"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "101YA0400X",
+       "desc": "Counselor, Addiction (Substance Use Disorder)",
+       "primary": false
+      },
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1699220012",
+     "enumeration_type": "NPI-1",
+     "basic": {
+      "status": "A",
+      "first_name": "KATIE",
+      "last_name": "CATALANO",
+      "credential": "LCSW",
+      "last_updated": "2026-02-25"
+     },
+     "addresses": [
+      {
+       "address_1": "213 W INSTITUTE PL STE 500",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606108792",
+       "telephone_number": "312-219-4345"
+      },
+      {
+       "address_1": "213 W INSTITUTE PL STE 500",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606108792",
+       "telephone_number": "312-219-4345"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1063394013",
+     "enumeration_type": "NPI-1",
+     "basic": {
+      "status": "A",
+      "first_name": "ANALISA",
+      "last_name": "CHIEFFO",
+      "credential": "LSW",
+      "last_updated": "2025-07-23"
+     },
+     "addresses": [
+      {
+       "address_1": "3285 N ARLINGTON HEIGHTS RD STE 201",
+       "address_purpose": "LOCATION",
+       "city": "ARLINGTON HEIGHTS",
+       "state": "IL",
+       "postal_code": "600041564",
+       "telephone_number": "847-398-0499"
+      },
+      {
+       "address_1": "665 W DIVISION ST APT 3",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606103530",
+       "telephone_number": "563-484-9105"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1447172275",
+     "enumeration_type": "NPI-1",
+     "basic": {
+      "status": "A",
+      "first_name": "ELIZABETH",
+      "last_name": "CHURCHILL",
+      "credential": "LSW",
+      "last_updated": "2026-07-25"
+     },
+     "addresses": [
+      {
+       "address_1": "2336 IROQUOIS RD",
+       "address_purpose": "MAILING",
+       "city": "WILMETTE",
+       "state": "IL",
+       "postal_code": "600911367",
+       "telephone_number": "312-479-2544"
+      },
+      {
+       "address_1": "1500 N CLYBOURN AVE UNIT C105",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606102295",
+       "telephone_number": "312-242-1665"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "104100000X",
+       "desc": "Social Worker",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1710896063",
+     "enumeration_type": "NPI-1",
+     "basic": {
+      "status": "A",
+      "first_name": "HANNAH",
+      "last_name": "CLAGUE",
+      "last_updated": "2026-09-03"
+     },
+     "addresses": [
+      {
+       "address_1": "213 W INSTITUTE PL STE 500",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606108792",
+       "telephone_number": "773-316-8412"
+      },
+      {
+       "address_1": "5647 N WAYNE AVE APT 2N",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606600078",
+       "telephone_number": "734-864-2763"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1982424271",
+     "enumeration_type": "NPI-1",
+     "basic": {
+      "status": "A",
+      "first_name": "DAVID",
+      "last_name": "CLANCY",
+      "credential": "LLMSW, MPH",
+      "last_updated": "2024-10-12"
+     },
+     "addresses": [
+      {
+       "address_1": "1000 N LA SALLE DR APT 610",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606102679",
+       "telephone_number": "248-697-8883"
+      },
+      {
+       "address_1": "1000 N LA SALLE DR APT 610",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606102679",
+       "telephone_number": "248-697-8883"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1962932988",
+     "enumeration_type": "NPI-2",
+     "basic": {
+      "status": "A",
+      "organization_name": "CLEARWATER COUNSELING CHICAGO",
+      "last_updated": "2025-04-10",
+      "authorized_official_first_name": "ALICIA",
+      "authorized_official_last_name": "ROSENBERG"
+     },
+     "addresses": [
+      {
+       "address_1": "1165 N CLARK ST STE 305",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606107862",
+       "telephone_number": "312-880-9913",
+       "fax_number": "877-787-9891"
+      },
+      {
+       "address_1": "1165 N CLARK ST STE 305",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606107862",
+       "telephone_number": "312-880-9913",
+       "fax_number": "844-787-9891"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "101Y00000X",
+       "desc": "Counselor",
+       "primary": false
+      },
+      {
+       "code": "101YM0800X",
+       "desc": "Counselor, Mental Health",
+       "primary": true
+      },
+      {
+       "code": "104100000X",
+       "desc": "Social Worker",
+       "primary": false
+      },
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": false
+      },
+      {
+       "code": "363LF0000X",
+       "desc": "Nurse Practitioner, Family",
+       "primary": false
+      },
+      {
+       "code": "363LP0808X",
+       "desc": "Nurse Practitioner, Psych/Mental Health",
+       "primary": false
+      },
+      {
+       "code": "390200000X",
+       "desc": "Student in an Organized Health Care Education/Training Program",
+       "primary": false
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1578310231",
+     "enumeration_type": "NPI-1",
+     "basic": {
+      "status": "A",
+      "first_name": "STEFANIE",
+      "last_name": "COBB",
+      "credential": "MSW",
+      "last_updated": "2025-11-03"
+     },
+     "addresses": [
+      {
+       "address_1": "820 N ORLEANS ST STE 350",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606103145",
+       "telephone_number": "312-809-0298",
+       "fax_number": "866-687-0879"
+      },
+      {
+       "address_1": "1333 N KINGSBURY ST STE 303",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606422687",
+       "telephone_number": "312-809-0298",
+       "fax_number": "866-687-0879"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "104100000X",
+       "desc": "Social Worker",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1114110673",
+     "enumeration_type": "NPI-1",
+     "basic": {
+      "status": "A",
+      "first_name": "DAVID",
+      "last_name": "COHEN",
+      "credential": "LCSW, CADC",
+      "last_updated": "2020-05-13"
+     },
+     "addresses": [
+      {
+       "address_1": "2644 30TH ST STE 100",
+       "address_purpose": "LOCATION",
+       "city": "SANTA MONICA",
+       "state": "CA",
+       "postal_code": "904053051",
+       "telephone_number": "310-314-6200"
+      },
+      {
+       "address_1": "1212 N LAKE SHORE DR",
+       "address_2": "17BN",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606102371",
+       "telephone_number": "312-882-1212"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1790834448",
+     "enumeration_type": "NPI-2",
+     "basic": {
+      "status": "A",
+      "organization_name": "CORNERSTONE COUNSELING CENTER OF CHICAGO",
+      "last_updated": "2025-09-11",
+      "authorized_official_first_name": "E.",
+      "authorized_official_last_name": "FRANCIS-THORNTON"
+     },
+     "addresses": [
+      {
+       "address_1": "1111 N WELLS ST STE 400",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606107632",
+       "telephone_number": "312-573-8860",
+       "fax_number": "312-255-0362"
+      },
+      {
+       "address_1": "1111 N WELLS ST STE 400",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606107632",
+       "telephone_number": "312-573-8860",
+       "fax_number": "312-255-0362"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "101YP2500X",
+       "desc": "Counselor, Professional",
+       "primary": false
+      },
+      {
+       "code": "103TC0700X",
+       "desc": "Psychologist, Clinical",
+       "primary": false
+      },
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": true
+      }
+     ],
+     "other_names": [
+      {
+       "organization_name": "CENTER FOR LIFE SKILLS",
+       "type": "Former Legal Business Name",
+       "code": "4"
+      }
+     ]
+    },
+    {
+     "number": "1558585026",
+     "enumeration_type": "NPI-2",
+     "basic": {
+      "status": "A",
+      "organization_name": "CORNERSTONE COUNSELING CENTER OF CHICAGO",
+      "last_updated": "2025-09-11",
+      "authorized_official_first_name": "E. SUSANNE",
+      "authorized_official_last_name": "FRANCIS-THORNTON"
+     },
+     "addresses": [
+      {
+       "address_1": "1111 N WELLS ST STE 400",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606107632",
+       "telephone_number": "312-573-8860",
+       "fax_number": "312-255-0362"
+      },
+      {
+       "address_1": "1111 N WELLS ST STE 400",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606107632",
+       "telephone_number": "312-573-8860",
+       "fax_number": "312-255-0362"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "103T00000X",
+       "desc": "Psychologist",
+       "primary": false
+      },
+      {
+       "code": "103T00000X",
+       "desc": "Psychologist",
+       "primary": false
+      },
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": false
+      },
+      {
+       "code": "101YP2500X",
+       "desc": "Counselor, Professional",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1659245355",
+     "enumeration_type": "NPI-2",
+     "basic": {
+      "status": "A",
+      "organization_name": "COURTNEY REMACLE LCSW, PLLC",
+      "last_updated": "2026-05-14",
+      "authorized_official_first_name": "COURTNEY",
+      "authorized_official_last_name": "REMACLE"
+     },
+     "addresses": [
+      {
+       "address_1": "213 W INSTITUTE PL STE 500",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606108792",
+       "telephone_number": "312-715-7926"
+      },
+      {
+       "address_1": "213 W INSTITUTE PL STE 500",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606108792",
+       "telephone_number": "312-715-7926"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1730669185",
+     "enumeration_type": "NPI-1",
+     "basic": {
+      "status": "A",
+      "first_name": "RYAN",
+      "last_name": "COYLE",
+      "credential": "LCSW",
+      "last_updated": "2025-04-03"
+     },
+     "addresses": [
+      {
+       "address_1": "1165 N CLARK ST STE 305",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606107862",
+       "telephone_number": "312-880-9913"
+      },
+      {
+       "address_1": "999 N OGDEN ST APT 507",
+       "address_purpose": "MAILING",
+       "city": "DENVER",
+       "state": "CO",
+       "postal_code": "802182844",
+       "telephone_number": "847-751-0379"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": false
+      },
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1629996756",
+     "enumeration_type": "NPI-2",
+     "basic": {
+      "status": "A",
+      "organization_name": "CRAFTED CARE COUNSELING, PLLC",
+      "last_updated": "2026-07-07",
+      "authorized_official_first_name": "JESSICA",
+      "authorized_official_last_name": "PONTIS"
+     },
+     "addresses": [
+      {
+       "address_1": "213 W INSTITUTE PL STE 500",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606108792"
+      },
+      {
+       "address_1": "213 W INSTITUTE PL STE 500",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606108792",
+       "telephone_number": "724-480-7941"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1447464037",
+     "enumeration_type": "NPI-2",
+     "basic": {
+      "status": "A",
+      "organization_name": "CRISIS SOLUTIONS INC",
+      "last_updated": "2020-08-22",
+      "authorized_official_first_name": "DOROTHY",
+      "authorized_official_last_name": "MAYER"
+     },
+     "addresses": [
+      {
+       "address_1": "70 WEST BURTON PLACE",
+       "address_2": "#1901",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606101472",
+       "telephone_number": "312-280-9005",
+       "fax_number": "312-280-9052"
+      },
+      {
+       "address_1": "70 WEST BURTON PLACE",
+       "address_2": "#1901",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606101472",
+       "telephone_number": "312-280-9005",
+       "fax_number": "312-280-9052"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1326781824",
+     "enumeration_type": "NPI-1",
+     "basic": {
+      "status": "A",
+      "first_name": "MALLORY",
+      "last_name": "CYBULSKI",
+      "credential": "LCSW",
+      "last_updated": "2026-05-29"
+     },
+     "addresses": [
+      {
+       "address_1": "213 W INSTITUTE PL STE 500",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606108792",
+       "telephone_number": "708-305-3452"
+      },
+      {
+       "address_1": "213 W INSTITUTE PL STE 500",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606108792",
+       "telephone_number": "708-305-3452"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    },
+    {
+     "number": "1124745989",
+     "enumeration_type": "NPI-1",
+     "basic": {
+      "status": "A",
+      "first_name": "LIZA",
+      "last_name": "DAROFF",
+      "credential": "LCSW",
+      "last_updated": "2026-02-25"
+     },
+     "addresses": [
+      {
+       "address_1": "833 N CLARK ST UNIT 2707",
+       "address_purpose": "MAILING",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606103424",
+       "telephone_number": "872-208-0178"
+      },
+      {
+       "address_1": "833 N CLARK ST UNIT 2707",
+       "address_purpose": "LOCATION",
+       "city": "CHICAGO",
+       "state": "IL",
+       "postal_code": "606103424",
+       "telephone_number": "872-208-0178"
+      }
+     ],
+     "taxonomies": [
+      {
+       "code": "251B00000X",
+       "desc": "Case Management",
+       "primary": false
+      },
+      {
+       "code": "1041C0700X",
+       "desc": "Social Worker, Clinical",
+       "primary": true
+      }
+     ],
+     "other_names": []
+    }
+   ]
   },
   {
    "query": {
@@ -7309,7 +8218,8 @@
        "city": "SAINT LOUIS",
        "state": "MO",
        "postal_code": "631101002",
-       "telephone_number": "314-514-3500"
+       "telephone_number": "314-514-3500",
+       "fax_number": "314-878-7678"
       },
       {
        "address_1": "PO BOX 7412011",
@@ -7317,10 +8227,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606742011",
-       "telephone_number": "314-514-3500"
+       "telephone_number": "314-514-3500",
+       "fax_number": "314-878-7678"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "363LP0200X",
@@ -7348,7 +8258,8 @@
        "city": "SAINT LOUIS",
        "state": "MO",
        "postal_code": "631101002",
-       "telephone_number": "314-454-6018"
+       "telephone_number": "314-454-6018",
+       "fax_number": "844-621-4392"
       },
       {
        "address_1": "PO BOX 7412011",
@@ -7356,10 +8267,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606742011",
-       "telephone_number": "314-454-6018"
+       "telephone_number": "314-454-6018",
+       "fax_number": "844-621-4392"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "363LP0200X",
@@ -7396,15 +8307,6 @@
        "postal_code": "200102916"
       }
      ],
-     "practiceLocations": [
-      {
-       "address_1": "5841 S MARYLAND AVE # MC1052",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606371443",
-       "telephone_number": "773-702-6760"
-      }
-     ],
      "taxonomies": [
       {
        "code": "2080P0204X",
@@ -7435,7 +8337,8 @@
        "city": "INDIANAPOLIS",
        "state": "IN",
        "postal_code": "462025109",
-       "telephone_number": "317-944-2143"
+       "telephone_number": "317-944-2143",
+       "fax_number": "317-944-3107"
       },
       {
        "address_1": "PO BOX 778912",
@@ -7443,10 +8346,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606778912",
-       "telephone_number": "317-777-6435"
+       "telephone_number": "317-777-6435",
+       "fax_number": "317-777-6644"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "363LP0200X",
@@ -7482,10 +8385,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606127232",
-       "telephone_number": "312-996-7416"
+       "telephone_number": "312-996-7416",
+       "fax_number": "312-413-8778"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "208000000X",
@@ -7528,7 +8431,6 @@
        "telephone_number": "312-227-6080"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2080P0204X",
@@ -7544,7 +8446,9 @@
      "basic": {
       "status": "A",
       "organization_name": "ADOLESCENT AND YOUNG ADULT PLACE LTD",
-      "last_updated": "2010-12-03"
+      "last_updated": "2010-12-03",
+      "authorized_official_first_name": "MARGO",
+      "authorized_official_last_name": "BELL"
      },
      "addresses": [
       {
@@ -7564,7 +8468,6 @@
        "telephone_number": "312-859-2491"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2080A0000X",
@@ -7592,7 +8495,8 @@
        "city": "SAINT LOUIS",
        "state": "MO",
        "postal_code": "631101002",
-       "telephone_number": "314-454-2076"
+       "telephone_number": "314-454-2076",
+       "fax_number": "314-747-8953"
       },
       {
        "address_1": "PO BOX 7412011",
@@ -7600,10 +8504,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606742011",
-       "telephone_number": "314-454-2076"
+       "telephone_number": "314-454-2076",
+       "fax_number": "314-747-8953"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "208000000X",
@@ -7641,7 +8545,8 @@
        "city": "OAK BROOK",
        "state": "IL",
        "postal_code": "605232213",
-       "telephone_number": "630-954-6700"
+       "telephone_number": "630-954-6700",
+       "fax_number": "630-954-1555"
       },
       {
        "address_1": "900 JORIE BLVD",
@@ -7650,16 +8555,8 @@
        "city": "OAK BROOK",
        "state": "IL",
        "postal_code": "605232213",
-       "telephone_number": "630-954-6700"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "2233 W DIVISION ST",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606228151",
-       "telephone_number": "312-770-2000"
+       "telephone_number": "630-954-6700",
+       "fax_number": "630-954-1555"
       }
      ],
      "taxonomies": [
@@ -7708,7 +8605,6 @@
        "postal_code": "606112991"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "208000000X",
@@ -7741,7 +8637,8 @@
        "city": "SAINT LOUIS",
        "state": "MO",
        "postal_code": "631101002",
-       "telephone_number": "314-454-2076"
+       "telephone_number": "314-454-2076",
+       "fax_number": "314-747-8953"
       },
       {
        "address_1": "PO BOX 7412011",
@@ -7749,10 +8646,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606742011",
-       "telephone_number": "314-454-2076"
+       "telephone_number": "314-454-2076",
+       "fax_number": "314-747-8953"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2080P0204X",
@@ -7789,7 +8686,8 @@
        "city": "INDIANAPOLIS",
        "state": "IN",
        "postal_code": "462025109",
-       "telephone_number": "317-944-7260"
+       "telephone_number": "317-944-7260",
+       "fax_number": "317-948-0860"
       },
       {
        "address_1": "PO BOX 719094",
@@ -7797,10 +8695,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606779318",
-       "telephone_number": "317-777-6435"
+       "telephone_number": "317-777-6435",
+       "fax_number": "317-777-6644"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "208000000X",
@@ -7853,7 +8751,6 @@
        "telephone_number": "800-543-7362"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "363LP0200X",
@@ -7880,7 +8777,8 @@
        "city": "LOUISVILLE",
        "state": "KY",
        "postal_code": "402021831",
-       "telephone_number": "502-629-6000"
+       "telephone_number": "502-629-6000",
+       "fax_number": "502-629-5865"
       },
       {
        "address_1": "PO BOX 776879",
@@ -7891,7 +8789,6 @@
        "telephone_number": "502-588-9490"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "363LP0200X",
@@ -7939,7 +8836,6 @@
        "telephone_number": "804-441-1833"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "363LP0200X",
@@ -7971,7 +8867,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606742011",
-       "telephone_number": "314-454-6000"
+       "telephone_number": "314-454-6000",
+       "fax_number": "314-747-3338"
       },
       {
        "address_1": "1 CHILDRENS PL",
@@ -7980,10 +8877,10 @@
        "city": "SAINT LOUIS",
        "state": "MO",
        "postal_code": "631101002",
-       "telephone_number": "314-454-6000"
+       "telephone_number": "314-454-6000",
+       "fax_number": "314-747-3338"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "363LP0222X",
@@ -8024,15 +8921,6 @@
        "state": "IL",
        "postal_code": "604675210",
        "telephone_number": "708-691-4958"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "705 RILEY HOSPITAL DR RM 5867",
-       "city": "INDIANAPOLIS",
-       "state": "IN",
-       "postal_code": "462025109",
-       "telephone_number": "317-944-4034"
       }
      ],
      "taxonomies": [
@@ -8080,7 +8968,6 @@
        "postal_code": "605275965"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2080P0204X",
@@ -8117,7 +9004,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606343921",
-       "telephone_number": "773-782-2800"
+       "telephone_number": "773-782-2800",
+       "fax_number": "773-782-5042"
       },
       {
        "address_1": "6416 W BELMONT AVE",
@@ -8125,16 +9013,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606343921",
-       "telephone_number": "773-782-2800"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "3600 W FULLERTON AVE",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606472319",
-       "telephone_number": "773-782-2800"
+       "telephone_number": "773-782-2800",
+       "fax_number": "773-782-5042"
       }
      ],
      "taxonomies": [
@@ -8163,7 +9043,8 @@
        "city": "LOUISVILLE",
        "state": "KY",
        "postal_code": "402074725",
-       "telephone_number": "502-896-2500"
+       "telephone_number": "502-896-2500",
+       "fax_number": "502-896-2527"
       },
       {
        "address_1": "PO BOX 776879",
@@ -8174,7 +9055,6 @@
        "telephone_number": "502-588-9490"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "363LP0200X",
@@ -8190,7 +9070,9 @@
      "basic": {
       "status": "A",
       "organization_name": "AMA PEDIATRIC THERAPY INC",
-      "last_updated": "2025-02-06"
+      "last_updated": "2025-02-06",
+      "authorized_official_first_name": "ALISON",
+      "authorized_official_last_name": "FREIER"
      },
      "addresses": [
       {
@@ -8208,15 +9090,6 @@
        "state": "IL",
        "postal_code": "606015815",
        "telephone_number": "734-612-9092"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "5050 N BROADWAY ST STE 112",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606404383",
-       "telephone_number": "773-492-5690"
       }
      ],
      "taxonomies": [
@@ -8255,7 +9128,9 @@
      "basic": {
       "status": "A",
       "organization_name": "AMANGO AUTISM CORRELATION FUNCTIONAL BEHAVIOR INTERVENTION INC",
-      "last_updated": "2022-01-02"
+      "last_updated": "2022-01-02",
+      "authorized_official_first_name": "GLADYS",
+      "authorized_official_last_name": "GYABAAH"
      },
      "addresses": [
       {
@@ -8269,22 +9144,6 @@
       {
        "address_1": "1129 HOMESTEAD RD APT 2A",
        "address_purpose": "MAILING",
-       "city": "LA GRANGE PARK",
-       "state": "IL",
-       "postal_code": "605265413",
-       "telephone_number": "773-867-0635"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "6111 W GIDDINGS ST APT 1",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606304540",
-       "telephone_number": "773-867-0635"
-      },
-      {
-       "address_1": "1129 HOMESTEAD RD APT 2A",
        "city": "LA GRANGE PARK",
        "state": "IL",
        "postal_code": "605265413",
@@ -8398,7 +9257,6 @@
        "telephone_number": "210-467-2324"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "363LP0200X",
@@ -8436,7 +9294,6 @@
        "telephone_number": "773-702-1150"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2080P0204X",
@@ -8468,7 +9325,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606742011",
-       "telephone_number": "314-454-2341"
+       "telephone_number": "314-454-2341",
+       "fax_number": "314-454-4345"
       },
       {
        "address_1": "1225 GRAHAM RD",
@@ -8477,10 +9335,10 @@
        "city": "FLORISSANT",
        "state": "MO",
        "postal_code": "630318012",
-       "telephone_number": "314-454-2341"
+       "telephone_number": "314-454-2341",
+       "fax_number": "314-454-4345"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "208000000X",
@@ -8512,7 +9370,8 @@
        "city": "LOUISVILLE",
        "state": "KY",
        "postal_code": "402021821",
-       "telephone_number": "502-629-6000"
+       "telephone_number": "502-629-6000",
+       "fax_number": "502-629-5991"
       },
       {
        "address_1": "PO BOX 776879",
@@ -8523,7 +9382,6 @@
        "telephone_number": "502-588-9490"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "208000000X",
@@ -8560,7 +9418,8 @@
        "city": "LOUISVILLE",
        "state": "KY",
        "postal_code": "402193848",
-       "telephone_number": "502-964-4357"
+       "telephone_number": "502-964-4357",
+       "fax_number": "502-966-5948"
       },
       {
        "address_1": "PO BOX 776351",
@@ -8568,10 +9427,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606776351",
-       "telephone_number": "502-588-9490"
+       "telephone_number": "502-588-9490",
+       "fax_number": "502-272-5116"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "363L00000X",
@@ -8603,7 +9462,8 @@
        "city": "LOUISVILLE",
        "state": "KY",
        "postal_code": "402021902",
-       "telephone_number": "502-882-9237"
+       "telephone_number": "502-882-9237",
+       "fax_number": "502-893-3900"
       },
       {
        "address_1": "PO BOX 776879",
@@ -8611,16 +9471,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606776879",
-       "telephone_number": "502-588-9490"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "6500 PRESTON HWY",
-       "city": "LOUISVILLE",
-       "state": "KY",
-       "postal_code": "402191820",
-       "telephone_number": "502-893-5502"
+       "telephone_number": "502-588-9490",
+       "fax_number": "502-272-5116"
       }
      ],
      "taxonomies": [
@@ -8662,7 +9514,6 @@
        "telephone_number": "312-926-7028"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "363LP0200X",
@@ -8690,7 +9541,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "60612",
-       "telephone_number": "312-996-7416"
+       "telephone_number": "312-996-7416",
+       "fax_number": "312-996-8204"
       },
       {
        "address_1": "1801 W TAYLOR STREET",
@@ -8699,10 +9551,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "60612",
-       "telephone_number": "312-996-7416"
+       "telephone_number": "312-996-7416",
+       "fax_number": "312-413-0243"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "363LP0200X",
@@ -8739,7 +9591,6 @@
        "telephone_number": "630-803-4455"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "363LP0222X",
@@ -8779,10 +9630,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606895325",
-       "telephone_number": "616-975-1845"
+       "telephone_number": "616-975-1845",
+       "fax_number": "616-285-0846"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "207L00000X",
@@ -8832,7 +9683,6 @@
        "telephone_number": "800-543-7362"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "390200000X",
@@ -8872,16 +9722,8 @@
        "city": "OAK LAWN",
        "state": "IL",
        "postal_code": "604533054",
-       "telephone_number": "708-684-5437"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "4440 W 95TH ST",
-       "city": "OAK LAWN",
-       "state": "IL",
-       "postal_code": "604532600",
-       "telephone_number": "708-684-4261"
+       "telephone_number": "708-684-5437",
+       "fax_number": "708-876-1569"
       }
      ],
      "taxonomies": [
@@ -8910,7 +9752,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606779318",
-       "telephone_number": "317-777-6435"
+       "telephone_number": "317-777-6435",
+       "fax_number": "317-777-6644"
       },
       {
        "address_1": "1002 WISHARD BLVD",
@@ -8918,10 +9761,10 @@
        "city": "INDIANAPOLIS",
        "state": "IN",
        "postal_code": "462024163",
-       "telephone_number": "317-944-4842"
+       "telephone_number": "317-944-4842",
+       "fax_number": "317-948-0126"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "2080P0006X",
@@ -8955,30 +9798,8 @@
        "city": "MADISON",
        "state": "WI",
        "postal_code": "537920001",
-       "telephone_number": "608-262-2398"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "4602 EASTPARK BLVD",
-       "city": "MADISON",
-       "state": "WI",
-       "postal_code": "537182002",
-       "telephone_number": "608-440-6252"
-      },
-      {
-       "address_1": "25 N WINFIELD RD",
-       "city": "WINFIELD",
-       "state": "IL",
-       "postal_code": "601901379",
-       "telephone_number": "630-933-1602"
-      },
-      {
-       "address_1": "225 E CHICAGO AVE",
-       "city": "CHICAGO",
-       "state": "IL",
-       "postal_code": "606112991",
-       "telephone_number": "312-227-4000"
+       "telephone_number": "608-262-2398",
+       "fax_number": "608-262-9999"
       }
      ],
      "taxonomies": [
@@ -9022,7 +9843,8 @@
        "city": "LOUISVILLE",
        "state": "KY",
        "postal_code": "402021821",
-       "telephone_number": "502-629-6000"
+       "telephone_number": "502-629-6000",
+       "fax_number": "502-272-5116"
       },
       {
        "address_1": "PO BOX 776879",
@@ -9030,16 +9852,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606776879",
-       "telephone_number": "502-588-9490"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "744 1ST ST",
-       "city": "MACON",
-       "state": "GA",
-       "postal_code": "31201",
-       "telephone_number": "478-633-7600"
+       "telephone_number": "502-588-9490",
+       "fax_number": "502-272-5116"
       }
      ],
      "taxonomies": [
@@ -9094,15 +9908,6 @@
        "telephone_number": "773-573-7993"
       }
      ],
-     "practiceLocations": [
-      {
-       "address_1": "4400 W 95TH ST",
-       "city": "OAK LAWN",
-       "state": "IL",
-       "postal_code": "604532654",
-       "telephone_number": "708-684-7100"
-      }
-     ],
      "taxonomies": [
       {
        "code": "363LP0200X",
@@ -9130,7 +9935,8 @@
        "city": "SAINT LOUIS",
        "state": "MO",
        "postal_code": "631101002",
-       "telephone_number": "314-454-6095"
+       "telephone_number": "314-454-6095",
+       "fax_number": "314-884-6008"
       },
       {
        "address_1": "PO BOX 7412011",
@@ -9138,10 +9944,10 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606742011",
-       "telephone_number": "314-454-6095"
+       "telephone_number": "314-454-6095",
+       "fax_number": "314-884-6008"
       }
      ],
-     "practiceLocations": [],
      "taxonomies": [
       {
        "code": "363LP0200X",
@@ -9168,7 +9974,8 @@
        "city": "CHICAGO",
        "state": "IL",
        "postal_code": "606776879",
-       "telephone_number": "502-588-9490"
+       "telephone_number": "502-588-9490",
+       "fax_number": "502-272-5116"
       },
       {
        "address_1": "411 E CHESTNUT ST # STREET1",
@@ -9176,16 +9983,8 @@
        "city": "LOUISVILLE",
        "state": "KY",
        "postal_code": "402021713",
-       "telephone_number": "502-588-3440"
-      }
-     ],
-     "practiceLocations": [
-      {
-       "address_1": "2330 POST ST STE 219",
-       "city": "SAN FRANCISCO",
-       "state": "CA",
-       "postal_code": "941153465",
-       "telephone_number": "415-353-2002"
+       "telephone_number": "502-588-3440",
+       "fax_number": "502-588-3441"
       }
      ],
      "taxonomies": [

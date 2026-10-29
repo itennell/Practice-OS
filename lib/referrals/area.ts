@@ -9,7 +9,7 @@ import { geocodeAddresses, geocodePlace, addressKey, type Point } from "./geocod
 import { haversineMiles, zipCenters } from "./geo";
 import { searchProviders, SPECIALTY_BY_ID, type Provider, type SpecialtyId } from "./nppes";
 import { getReferralSettings } from "./settings";
-import { focusFrom, tierFor, TIERS, type Focus, type TierResult } from "./tier";
+import { focusFrom, providerTier, TIERS, type Focus, type TierResult } from "./tier";
 
 type Centers = Record<string, Point>;
 
@@ -179,7 +179,7 @@ export async function searchArea(
       precision: exact ? "address" : "zip",
       distanceMiles,
       worksAt,
-      tier: tierFor({ taxonomy: p.taxonomy, npiType: p.npiType, worksAt }, { miles: distanceMiles, focus: ctx.focus, approximate: !exact || !ctx.office }),
+      tier: providerTier(p, { miles: distanceMiles, focus: ctx.focus, approximate: !exact || !ctx.office, clinicianState: ctx.state }, worksAt),
     });
   }
   out.sort(
