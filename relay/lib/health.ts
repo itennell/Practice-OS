@@ -19,7 +19,18 @@ export type RelayHealth = {
 /** The error an image upload or delete gets when the relay can't host images. */
 export const IMAGES_NOT_SET_UP = "image hosting is not set up on the relay";
 
-export function relayHealth(env: Record<string, string | undefined>): RelayHealth {
+/**
+ * The relay's own address: RELAY_URL when set, otherwise the production
+ * address Vercel gives every project (VERCEL_PROJECT_PRODUCTION_URL), so a
+ * relay made with the Deploy button works without typing its own address.
+ */
+export function ownRelayUrl(env: Record<string, string | undefined>): string | undefined {
+  if (env.RELAY_URL) return env.RELAY_URL;
+  return env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${env.VERCEL_PROJECT_PRODUCTION_URL}` : undefined;
+}
+
+export function relayHealth(raw: Record<string, string | undefined>): RelayHealth {
+  const env: Record<string, string | undefined> = { ...raw, RELAY_URL: ownRelayUrl(raw) };
   const all = [...SIGN_IN_SETTINGS, ...IMAGE_SETTINGS];
   const checks = Object.fromEntries(all.map((k) => [k, Boolean(env[k])])) as Record<RelaySetting, boolean>;
   // A 32-byte state key; anything else fails every sign-in.

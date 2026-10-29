@@ -1,45 +1,71 @@
 # Installing Practice-OS
 
-**For the AI agent doing the install** (Muse Code, Claude Code or similar). The clinician is not technical: ask her for one thing at a time, in plain words, say where to find it, and never ask her to edit a file or run a command herself. Never print a secret back to her, never commit `.env`, and stop to ask if anything here doesn't match what you see.
+**For the AI agent doing the install** (Muse Code, Claude Code, Codex or similar), when someone says "install Practice-OS from this repo".
 
-What she gets: the Practice-OS web app at http://localhost:3000, and Aeon's tools connected to her coding agent through MCP.
+The person you're helping is a therapist, not a programmer. Follow these rules the whole way through:
 
-## 1. Get the code and tools
+- Do every command yourself. Never ask her to edit a file or type a command.
+- Ask for one thing at a time, in plain words. Before you ask for an account, tell her what it costs and how long it takes.
+- **Never ask her to paste a key, password or token into this chat.** Keys go into the app (Settings › Connections), where each one is checked and stored encrypted. If she pastes one here anyway, don't repeat it, and don't write it anywhere except where this guide says.
+- Never commit `.env`. Never print a secret back.
+- If anything here doesn't match what you see, stop and ask her.
 
-1. Check Node is 20 or newer: `node --version`. If it's older or missing, help her install Node 20+ from nodejs.org.
-2. Clone the repo and install: `git clone https://github.com/itennell/Practice-OS && cd Practice-OS && npm install`.
-3. Copy the settings template: `cp .env.example .env`. You fill in `.env` from her answers; each line in `.env.example` says where the value comes from.
-4. Download Aeon's privacy checker: `npm run models:download` (about 108 MB, once; a few minutes on a slow connection). It is a small name-finder that runs on her computer and stops client names from reaching Aeon's model or the database. Tell her: "I'm downloading the privacy checker that keeps client names out of Aeon's chat. It stays on your computer." Chat refuses messages until it is in place.
+Practice-OS is free and open source. Everything runs on her own computer and her own accounts. No Practice-OS company holds her data or her keys.
 
-## 2. Accounts (ask for these one at a time)
+What she ends up with: the Practice-OS web app at http://localhost:3000, open on Aeon's onboarding interview.
 
-Required to start:
+## 1. Check the computer (about 2 minutes)
 
-| Setting | Ask her for | Where it comes from |
-|---|---|---|
-| `MODEL_API_KEY` | Her Meta Model API key, or nothing | api.meta.ai > API keys. Muse powers Aeon, the state research and the front desk. She can also paste it herself in Settings › Connections, where it is checked and kept encrypted. |
-| `DRY_RUN` | Nothing | Leave `true` until she has tested everything. |
+1. Check that Node is 20 or newer: `node --version` (any version from 20 up works). If it's older or missing, tell her: "I need to install Node, a free program Practice-OS runs on." Then install the LTS version from nodejs.org (on a Mac, Homebrew `brew install node@22` works too).
+2. Check that git is there: `git --version`. On a Mac, a missing git prompts to install Apple's command-line tools. Tell her to press **Install** and wait.
+3. Pick a folder that is **not** synced (not iCloud Drive, Desktop or Documents when those sync, Dropbox, OneDrive or Google Drive). `~/Practice-OS` in her home folder is a good choice. A synced folder can corrupt the database and would copy her keys to that service. If `~/Practice-OS` already exists, ask her whether it's an earlier copy (then `cd` into it and run `git pull`) before making a new one.
 
-Leave `DATABASE_URL` and `CONNECTIONS_ENCRYPTION_KEY` empty. Practice-OS then runs its own built-in database on her computer, in the `.data` folder, and generates the encryption key there itself. Tell her: "Your practice's data stays in one folder on this computer, and a backup is taken before every update." Only if she already wants Supabase instead: set `DATABASE_URL` and `SUPABASE_PROJECT_REF` (supabase.com > New project > Connect > Transaction pooler; use the shared pooler host, not `db.<ref>.supabase.co`, which is IPv6-only) and `CONNECTIONS_ENCRYPTION_KEY` (`openssl rand -base64 32`).
+## 2. Get the code (about 5 minutes)
 
-Google (Gmail drafts, Calendar) and Instagram connect from Settings › Connections with the company's own sign-in page. They need `GOOGLE_CLIENT_ID` (a Desktop-app client) and `RELAY_URL` (the Connect relay, docs/relay.md) in `.env`.
+1. Clone it: `git clone https://github.com/itennell/Practice-OS ~/Practice-OS && cd ~/Practice-OS`.
+2. Install: `npm install` (under a minute). Warnings about deprecated packages or install scripts are normal; don't stop for them.
+3. Copy the settings template: `cp .env.example .env`. Leave every value empty for now. The app works with an empty `.env`.
+4. Download the privacy checker: `npm run models:download` (about 108 MB, once; under a minute on a fast connection). Tell her: "I'm downloading the privacy checker that keeps client names out of Aeon's chat. It stays on your computer." Aeon's chat stays closed until it's in place.
 
-Later, only for the helpers she turns on (Front Desk: Twilio, Cal.com; Referrals: Google; Instagram: Meta app). Each is described in `.env.example`.
+## 3. The database (nothing to do)
 
-Optional for maintainers: `FIRECRAWL_URL` (a self-hosted Firecrawl) runs the live source checks in `tests/rule-sources.test.ts`. Clinicians don't need it: state research uses Muse's own web search.
+Leave `DATABASE_URL` and `CONNECTIONS_ENCRYPTION_KEY` empty. Practice-OS then runs its own built-in database on her computer, in the `.data` folder, and makes its own encryption key there. Tell her: "Your practice's records stay in one folder on this computer, and a backup is made before every update."
 
-## 3. Database
-
-1. Built-in database (no `DATABASE_URL`): nothing to do. The app creates and updates its database when it starts. It stays running after the app stops; `npm run db:stop` stops it. Never delete the `.data` folder: it is her practice. It also holds the keys that unlock her saved sign-ins and her backups (the backups in `.data/backups` are encrypted). Keep the Practice-OS folder out of synced folders (iCloud Drive, Dropbox, OneDrive, Google Drive): syncing a running database can corrupt it, and it would copy her keys to that service.
-2. Supabase (`DATABASE_URL` set): run `npm run db:migrate`. It creates the `practice_os` schema and its tables, each with row-level security on. It never touches any other schema.
-3. Optional, to look around first: `npm run db:reset` loads the fictional demo practice (Dana Reyes, Illinois). Every row is marked `[Sample]`. It replaces her practice's rows, so only run it before she starts. It only runs when `SUPABASE_PROJECT_REF` names the database: `local` for the built-in one.
+- Never delete `.data`. It holds her practice, the keys that unlock her saved sign-ins, and her encrypted backups (`.data/backups`).
+- It keeps running after the app stops. `npm run db:stop` stops it.
+- To keep the data somewhere else, set `PRACTICE_OS_DATA_DIR` in `.env` to that folder (same rule: not a synced folder). Most people never need this.
+- Supabase is optional and only for someone who already wants it. See [docs/self-hosting/README.md](docs/self-hosting/README.md#using-supabase-instead).
 
 ## 4. Start the app
 
-1. Run `npm run dev` and leave it running.
-2. Open http://localhost:3000. She works in the app from here on; you're done once she sees it.
+1. Start the app and leave it running: `npm run dev`. If your tools can't keep a terminal open, run it in the background with `nohup npm run dev > dev.log 2>&1 &`. The first start takes about 10 seconds while it sets up the database.
+2. Run `npm run doctor`. Everything marked ✓ is done. Everything marked · can wait.
+3. Open http://localhost:3000 for her. She should see Aeon's onboarding interview: Aeon's orb on the left, one question ("What's your name?") on the right. The home page sends a new practice to `/onboarding` from the browser, so if you check with curl, check http://localhost:3000/onboarding (it answers 200).
 
-## 5. Connect Aeon's tools to her agent (MCP)
+From here she works in the app. The interview asks for everything else, one question per screen, and she can skip anything and finish it later from the home page.
+
+## 5. Accounts (one at a time, only when she wants that helper)
+
+Only the Muse key is needed to start. Everything else is optional and can be set up later from **Settings › Connections**, which walks her through each one step by step with a check after every step. Offer them in this order, and say the cost and time first:
+
+| What | Needed for | Cost | Time | Guide |
+|---|---|---|---|---|
+| Muse key (Meta) | Aeon answering at all | Per use, on her own Meta account | 5 minutes | [muse.md](docs/self-hosting/muse.md) |
+| Cal.com | Front Desk offering consult times | Free plan works | 10 minutes | [calcom.md](docs/self-hosting/calcom.md) |
+| Practice phone | Front Desk answering missed calls and texts | Her phone company's price | 15 minutes, then a review that can take days | [phone.md](docs/self-hosting/phone.md) |
+| Instagram | Posting about her practice | Free for her own Meta app; the relay host depends on the plan she picks | About 30 minutes | [instagram.md](docs/self-hosting/instagram.md) |
+| Google (Gmail drafts) | Referral letters as Gmail drafts | Free | Later: not ready for self-hosting yet | [google.md](docs/self-hosting/google.md) |
+
+How to help her with each one:
+
+1. Open the matching guide above and Settings › Connections in her browser.
+2. Read her the next step from the card, in the card's own words. Don't skip ahead.
+3. When she has copied a key, tell her to paste it into the box on the card, not here. The card checks it straight away and shows a green check.
+4. Run `npm run doctor -- --json` to confirm, then move to the next one only if she wants to.
+
+Leave `DRY_RUN=true` in `.env` until she has tried everything. While it's on, nothing is really sent, posted or booked.
+
+## 6. Connect Aeon's tools to her coding agent (optional)
 
 The MCP server reads `.env` itself, so the agent config holds no secrets. Use her repo's absolute path in place of `/path/to/Practice-OS`.
 
@@ -62,19 +88,23 @@ The MCP server reads `.env` itself, so the agent config holds no secrets. Use he
 claude mcp add practice-os -s user -- npx --no-install --prefix /path/to/Practice-OS tsx /path/to/Practice-OS/mcp/server.ts
 ```
 
-Check it: ask the agent "What needs me this week?" It should call `morning_brief`.
+Check it: ask the agent "What needs me this week?" It should call `morning_brief`. Nothing is sent, posted or booked without her approval in the app.
 
-Tools: `morning_brief`, `update_facts`, `answer_setup`, `log_event`, `research_state_rules`, `recheck_rules`, `queue_approval`, `status`. Nothing is sent, posted or booked without her approval in the app.
-
-## 6. Skills
-
-Point her agent at the skills in this repo (or copy them into its skills folder):
-
-- `skills/admin/SKILL.md`: everyday practice admin with the tools above.
-- `skills/admin/state-research/SKILL.md`: if her practice is **outside Illinois**, research her state's rules. Muse searches official sites only, code keeps only rules it can verify against what Muse cited, and the rules wait in her inbox until she approves them. Each one then says "please confirm with your board" until she does. Federal and Illinois rules already ship verified.
+Skills in this repo for her agent: `skills/admin/SKILL.md` (everyday practice admin) and `skills/admin/state-research/SKILL.md` (her state's rules if she practices **outside Illinois**; the rules wait in her approvals until she confirms them).
 
 ## 7. Check it worked
 
-- `npm test` passes. It runs on a throwaway built-in database of its own, never on hers.
-- The app opens, and the Deadlines page loads.
-- The agent answers "What needs me this week?" using `morning_brief`.
+- `npm run doctor` ends with "Ready", or with "Not ready yet: Aeon's Muse key" until she pastes her key in the app. Every other line is ✓ or ·.
+- `npm test` passes. It uses a throwaway database of its own, never hers.
+- http://localhost:3000 shows the onboarding interview (or her home page, once she has finished it).
+
+## If something goes wrong
+
+| What you see | What to do |
+|---|---|
+| `npm install` fails on `sharp` or `onnxruntime` | Check Node is 20 or newer, delete `node_modules`, run `npm install` again. |
+| Port 3000 is in use | Another copy is running. Stop it, or run `npm run dev -- -p 3001` and open that address instead. |
+| You need to stop the app | Stop the `npm run dev` process (Ctrl+C, or `kill` its process id). `npm run db:stop` then stops the database. |
+| "Aeon can't answer" | The Muse key is missing or was rejected. Settings › Connections › Aeon (Meta Muse). |
+| Chat says the privacy checker is missing | Run `npm run models:download`. |
+| The database won't start | Run `npm run db:stop`, then `npm run dev` again. Never delete `.data`. |

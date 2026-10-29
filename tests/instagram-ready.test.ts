@@ -37,6 +37,11 @@ describe("relayHealth", () => {
     expect(relayHealth({ ...full, RELAY_STATE_KEY: "c2hvcnQ=" }).ready).toBe(false);
     expect(relayHealth({ ...full, RELAY_URL: "http://relay.example.test" }).ready).toBe(false);
   });
+
+  it("uses Vercel's own production address when RELAY_URL isn't set (Deploy button)", () => {
+    expect(relayHealth({ ...full, RELAY_URL: undefined }).ready).toBe(false);
+    expect(relayHealth({ ...full, RELAY_URL: undefined, VERCEL_PROJECT_PRODUCTION_URL: "practice-os-relay.vercel.app" })).toMatchObject({ ready: true, checks: { RELAY_URL: true } });
+  });
 });
 
 describe("instagram readiness", () => {
