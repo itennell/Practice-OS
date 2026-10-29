@@ -34,8 +34,9 @@ const { CRISIS_REPLY } = await import("../lib/safety");
 const SAM = "+13125550144";
 const RILEY = "+13125550145";
 const ALEX = "+13125550146";
+const DEMO = "+13125550147";
 const CLINICIAN = "+13125550199";
-const PHONES = [SAM, RILEY, ALEX];
+const PHONES = [SAM, RILEY, ALEX, DEMO];
 
 const sent: Array<{ to: string; body: string }> = [];
 const booked: string[] = [];
@@ -78,7 +79,15 @@ const vm = (from: string, transcript: string) => ({
 const text = (from: string, body: string) => ({ id: `SM_in_${++n}_${Date.now()}`, from, body, receivedAt: NOW });
 
 let savedRules: unknown;
-const savedEnv = { DRY_RUN: process.env.DRY_RUN, CLINICIAN_ALERT_PHONE: process.env.CLINICIAN_ALERT_PHONE };
+const savedEnv = {
+  DRY_RUN: process.env.DRY_RUN,
+  CLINICIAN_ALERT_PHONE: process.env.CLINICIAN_ALERT_PHONE,
+  FRONT_DESK_DEV_TWILIO: process.env.FRONT_DESK_DEV_TWILIO,
+};
+const restore = (name: keyof typeof savedEnv) => {
+  if (savedEnv[name] === undefined) delete process.env[name];
+  else process.env[name] = savedEnv[name];
+};
 
 async function cleanup() {
   await db()`delete from practice_os.approvals where payload ->> 'to' in ${db()(PHONES)} or payload ->> 'inquiry_id' in (
@@ -92,6 +101,8 @@ async function cleanup() {
 beforeAll(async () => {
   if (!localDb) return;
   process.env.DRY_RUN = "false"; // safe: every adapter here is a fake
+  // A clinician's own phone, not Isaiah's dev line: no "Practice-OS demo:" prefix (a test below turns it on).
+  process.env.FRONT_DESK_DEV_TWILIO = "false";
   process.env.CLINICIAN_ALERT_PHONE = CLINICIAN;
   [{ front_desk_rules: savedRules }] = await db()`select front_desk_rules from practice_os.settings limit 1`;
   await db()`update practice_os.settings set front_desk_rules = ${db().json({ text_missed_callers: true, book_by_text: true, send_reminders: true } as never)}, timezone = 'America/Chicago'`;
@@ -104,8 +115,9 @@ afterAll(async () => {
   setFrontDeskDeps(null);
   await cleanup();
   await db()`update practice_os.settings set front_desk_rules = ${db().json(savedRules as never)}`;
-  process.env.DRY_RUN = savedEnv.DRY_RUN;
-  process.env.CLINICIAN_ALERT_PHONE = savedEnv.CLINICIAN_ALERT_PHONE;
+  restore("DRY_RUN");
+  restore("CLINICIAN_ALERT_PHONE");
+  restore("FRONT_DESK_DEV_TWILIO");
   await closeDb();
 });
 
@@ -128,6 +140,19 @@ describe.skipIf(!localDb)("Front Desk flow (local database only)", () => {
     expect(sent).toHaveLength(1);
     expect(sent[0].to).toBe(SAM);
     expect(sent[0].body).toBe("Hi Sam, this is the AI assistant for Reyes Counseling. Open consult times: 1) Tue 10am 2) Wed 2pm 3) Thu 4pm. Reply 1, 2 or 3 to book. Reply STOP to opt out.");
+  });
+
+  it("on Isaiah's dev Twilio line the same first text starts with \"Practice-OS demo:\" (the registered campaign)", async () => {
+    process.env.FRONT_DESK_DEV_TWILIO = "true";
+    try {
+      await processVoicemail(vm(DEMO, "Hi, it's Jo, I'd like to book a consult."), phone);
+    } finally {
+      process.env.FRONT_DESK_DEV_TWILIO = "false";
+    }
+    expect(sent.at(-1)).toEqual({
+      to: DEMO,
+      body: "Practice-OS demo: Hi Jo, this is the AI assistant for Reyes Counseling. Open consult times: 1) Tue 10am 2) Wed 2pm 3) Thu 4pm. Reply 1, 2 or 3 to book. Reply STOP to opt out.",
+    });
   });
 
   it("Sam replies 2: the time is re-checked, booked by reference only, and confirmed", async () => {
