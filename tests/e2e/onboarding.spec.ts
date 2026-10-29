@@ -8,7 +8,9 @@ import { pick, typeDate } from "../helpers/controls";
 // and the 200% / 320px reflow checks. No model call: without a Muse key the follow-up
 // questions are the three fixed ones.
 
-const FRESH = ["clinician_profile", "compliance_facts", "settings", "credentialing_profile", "payer_applications", "obligations", "memories"];
+// Helper answers live here too (referral_settings; Instagram's in the profile, Front
+// Desk's on settings), so each project starts from a truly fresh install.
+const FRESH = ["clinician_profile", "compliance_facts", "settings", "credentialing_profile", "payer_applications", "obligations", "memories", "referral_settings"];
 
 function freshInstall() {
   execSync("npm run db:reset", { stdio: "ignore" });
@@ -132,8 +134,9 @@ test("A new clinician sets up the whole practice, and the home page lists what s
   await step(page, /Who would you like to hear from\?/, async () => {
     // Referrals' load() prefills its defaults; she adds one more.
     await expect(page.getByRole("button", { name: "Family medicine" })).toHaveAttribute("aria-pressed", "true");
-    await page.getByRole("button", { name: "Oncology" }).click();
-    await expect(page.getByRole("button", { name: "Oncology" })).toHaveAttribute("aria-pressed", "true");
+    const oncology = page.getByRole("button", { name: "Oncology" });
+    if ((await oncology.getAttribute("aria-pressed")) !== "true") await oncology.click();
+    await expect(oncology).toHaveAttribute("aria-pressed", "true");
   });
   // Instagram's own setup questions (lib/instagram/onboarding.ts): all five topics start picked.
   await step(page, /What should your Instagram posts be about\?/, () =>
