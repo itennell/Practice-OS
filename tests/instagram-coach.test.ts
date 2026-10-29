@@ -105,12 +105,22 @@ describe.skipIf(!hasDb)("ideas from her saved answers, then a draft", () => {
     const d = await draftIdea("test", { number: 2 }, { chat, graphic });
     expect(d.found && d.idea.hook).toBe("How paying for sessions works.");
     expect(d.found && d.outcome).toBe("queued");
-    const approvalId = d.found && d.outcome !== "blocked" ? d.post.approvalId : null;
+    const approvalId = d.found && d.outcome !== "blocked" && d.outcome !== "declined" ? d.post.approvalId : null;
     const [a] = await db()<{ kind: string; status: string }[]>`select kind, status from practice_os.approvals where id = ${approvalId}`;
     expect(a).toEqual({ kind: "instagram_post", status: "pending" });
 
     expect(await draftIdea("test", { number: 5 })).toMatchObject({ found: false });
   }, 120_000);
+
+  it("after 'Not for me' there are no ideas, no plan and no model call", async () => {
+    await instagramQuestions.save({ account: "no" });
+    const never = (() => {
+      throw new Error("no model call may happen");
+    }) as unknown as ChatFn;
+    expect(await postIdeas("test", { count: 3, chat: never })).toMatchObject({ ideas: [], declined: true });
+    expect(await postIdeas("test", { plan: true, chat: never })).toMatchObject({ ideas: [], declined: true });
+    await instagramQuestions.save({ account: "has", posts_per_week: "3" }); // "Not for me" cleared her answers
+  });
 
   it("the weekly plan gives one dated idea per post day", async () => {
     const r = await postIdeas("test", { plan: true, hasKey: false, today: "2026-10-29" });

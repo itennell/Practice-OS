@@ -14,9 +14,10 @@ import { audit } from "../audit";
 import { chat as metaChat } from "../meta";
 import { db } from "../db";
 import { codeCritic, type ChatFn } from "./critic";
+import { neverShowHits } from "./never-show";
 import { loadInstagramPrefs, type InstagramPrefs } from "./onboarding";
 import { PILLAR_BY_ID, PILLARS, type PillarId } from "./pillars";
-import { practiceFacts, requestPost, weekOf, type RequestResult } from "./store";
+import { DECLINED, practiceFacts, requestPost, weekOf, type RequestResult } from "./store";
 import type { GraphicDeps } from "./graphic";
 import { voiceLines, type PracticeFacts } from "./write";
 
@@ -37,13 +38,6 @@ export type IdeasResult = {
 
 // ---- never-show ---------------------------------------------------------------------
 
-const NEVER_WORDS: Record<string, RegExp> = {
-  face: /\b(face|faces|selfie|headshot|portrait|photo of (her|you|me|the (therapist|clinician|counselor))|smil(e|es|ing)|(therapist|clinician|counselor) (sitting|standing|smiling|at)|her picture)\b/i,
-  office: /\b(office|desk|therapy room|waiting room|couch|consult(ation)? room)\b/i,
-  family: /\b(family|kids?|children|child|son|daughter|husband|wife|partner|spouse)\b/i,
-  home: /\b(home|house|kitchen|living room|bedroom|backyard)\b/i,
-};
-
 /** A safe picture for each topic that shows none of the never-show things. */
 export const NEUTRAL_PICTURE: Record<PillarId, string> = {
   first_session: "A calm illustration of a notebook, a pen and a cup of tea.",
@@ -55,7 +49,7 @@ export const NEUTRAL_PICTURE: Record<PillarId, string> = {
 
 /** Whether a picture idea shows something she never shows (her first name counts as her face). */
 export function breaksNeverShow(picture: string, neverShow: string[], firstName?: string): boolean {
-  return neverShow.some((n) => NEVER_WORDS[n]?.test(picture) || (n === "face" && firstName && new RegExp(`\\b${firstName}\\b`, "i").test(picture)));
+  return neverShowHits(picture, neverShow, { firstName }).length > 0;
 }
 
 // ---- the fixed ideas (no Muse key, or Muse's broke the rules) ---------------------------
@@ -253,6 +247,8 @@ export async function postIdeas(
   opts: { count?: number; topic?: PillarId; plan?: boolean; chat?: ChatFn; hasKey?: boolean; today?: string } = {},
 ): Promise<IdeasResult> {
   const [prefs, facts, sample] = await Promise.all([loadInstagramPrefs(), practiceFacts(), isSample()]);
+  // She said Instagram isn't for her: no ideas, no plan, no model call.
+  if (prefs.account === "no") return { ideas: [], dropped: 0, blocked: false, source: "fixed", sample, declined: true };
   const topics = opts.topic ? [opts.topic] : prefs.topics;
   const count = opts.plan ? prefs.postsPerWeek : Math.min(5, Math.max(1, opts.count ?? Math.min(prefs.postsPerWeek, 3)));
   const w = await writeIdeas(facts, prefs, { count, topics, chat: opts.chat, hasKey: opts.hasKey });
@@ -262,7 +258,7 @@ export async function postIdeas(
   const days = opts.plan ? planDays(prefs.postsPerWeek, today) : [];
   const ideas = await saveIdeas(w.ideas, days, sample, timezone);
   await audit({ actor: "aeon", action: opts.plan ? "instagram_weekly_plan" : "instagram_ideas", subjectType: "post", details: { by, count: ideas.length, source: w.source, dropped: w.dropped } });
-  return { ideas, dropped: w.dropped, blocked: w.blocked, source: w.source, sample, declined: prefs.account === "no" };
+  return { ideas, dropped: w.dropped, blocked: w.blocked, source: w.source, sample, declined: false };
 }
 
 type IdeaRow = { id: string; topic: PillarId; headline: string; alt_text: string; critic: { idea?: { batch: string; number: number; points: string[]; cta: string } }; scheduled_for: Date | null };
@@ -299,15 +295,17 @@ export async function draftIdea(by: string, ref: { number?: number; id?: string 
   if (!idea) return { found: false, why: ref.id ? "No idea with that id." : `Her latest list has no idea number ${ref.number}. Offer to make new ideas.` };
   const request = [`Write the full post from this idea.`, `Hook: ${idea.hook}`, ...idea.points.map((p) => `Point: ${p}`), `Call to action: ${idea.cta}`].join("\n");
   const r = await requestPost(by, request, idea.topic, opts);
-  if (r.outcome !== "blocked") {
+  if (r.outcome !== "blocked" && r.outcome !== "declined") {
     await db()`
       update practice_os.posts set critic = jsonb_set(critic, '{idea,drafted_post}', to_jsonb(${r.post.id}::text), true) where id = ${idea.id}`;
   }
   return { found: true, idea, ...r };
 }
 
-export const ideasForModel = (r: IdeasResult) => ({
-  ...(r.declined ? { note: "She said Instagram isn't for her. Say so kindly before going on, and don't suggest more." } : {}),
+export const ideasForModel = (r: IdeasResult) =>
+  r.declined ? { written: false, why: DECLINED } : ideasList(r);
+
+const ideasList = (r: IdeasResult) => ({
   ...(r.sample ? { label: "Show [Sample] before each idea: this is the fictional demo practice." } : {}),
   ...(r.blocked ? { note_blocked: "Some ideas touched a topic posts never cover, so safe fixed ideas are shown instead." } : {}),
   ideas: r.ideas.map((i) => ({

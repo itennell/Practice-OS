@@ -4,7 +4,6 @@ import { Lightbulb } from "lucide-react";
 import { ListCard, ListRow } from "@/components/shared/list-card";
 import { InstagramBoard } from "@/components/instagram/instagram-board";
 import { listApprovalsById } from "@/lib/approvals";
-import { liveCheck } from "@/lib/instagram/account";
 import { latestIdeas } from "@/lib/instagram/coach";
 import { PILLAR_BY_ID } from "@/lib/instagram/pillars";
 import { listPosts } from "@/lib/instagram/store";
@@ -22,8 +21,8 @@ export default function InstagramPage() {
         <div className="flex min-w-0 flex-col gap-2">
           <h1 className="text-title break-words">Instagram</h1>
           <p className="max-w-[60ch] text-[var(--fg-muted)]">
-            Posts about how your practice works: first sessions, fees, booking, you, and where you see clients. Nothing
-            goes on Instagram until you approve it.
+            Posts about how your practice works: first sessions, fees, booking, you, and where you see clients. Aeon
+            writes them; you approve each one and post it yourself.
           </p>
         </div>
       </header>
@@ -36,9 +35,8 @@ export default function InstagramPage() {
 
 async function Board() {
   await connection(); // read the database per request, never at build time
-  const [posts, account, ideas, profile] = await Promise.all([
+  const [posts, ideas, profile] = await Promise.all([
     listPosts({ limit: 30 }),
-    liveCheck().catch(() => ({ state: "unreachable" as const, reason: "" })),
     latestIdeas().catch(() => []),
     getProfile().catch(() => null),
   ]);
@@ -59,7 +57,7 @@ async function Board() {
           ))}
         </ListCard>
       )}
-      <InstagramBoard initialPosts={posts} initialApprovals={approvals} account={account} />
+      <InstagramBoard initialPosts={posts} initialApprovals={approvals} />
     </>
   );
 }

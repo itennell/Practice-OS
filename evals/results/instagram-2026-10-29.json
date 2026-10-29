@@ -41,7 +41,7 @@
       "tool": "3/3",
       "args": "3/3",
       "got": [
-        "post_ideas {\"count\":3,\"topic\":\"fees_superbills\"}",
+        "post_ideas {\"topic\":\"fees_superbills\"}",
         "post_ideas {\"topic\":\"fees_superbills\"}",
         "post_ideas {\"topic\":\"fees_superbills\"}"
       ]
@@ -101,7 +101,7 @@
       "tool": "3/3",
       "args": "-",
       "got": [
-        "post_ideas {\"count\":3,\"topic\":\"fees_superbills\"}",
+        "post_ideas {\"topic\":\"fees_superbills\"}",
         "post_ideas {\"count\":3,\"topic\":\"fees_superbills\"}",
         "post_ideas {\"count\":3,\"topic\":\"fees_superbills\"}"
       ]

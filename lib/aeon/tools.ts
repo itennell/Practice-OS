@@ -930,7 +930,7 @@ export const TOOLS: AeonTool[] = [
   tool({
     name: "list_instagram_posts",
     title: "Instagram posts",
-    description: "Lists her recent Instagram posts with their status: waiting for her, blocked (and why), posted (with the link) or failed.",
+    description: "Lists her recent Instagram posts with their status: waiting for her, ready for her to post herself, blocked (and why) or failed.",
     input: { limit: z.number().int().min(1).max(30).default(10) },
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     label: "Checked your Instagram posts",
@@ -961,7 +961,7 @@ export const TOOLS: AeonTool[] = [
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     label: "Got the Instagram setup steps",
     changesData: false,
-    run: async () => text({ steps: ACCOUNT_STEPS, after: "When it's made, she can connect it in Settings, under Connections, or just post the drafts herself." }),
+    run: async () => text({ steps: ACCOUNT_STEPS, after: "Aeon writes the posts; she posts them herself in the Instagram app. There's nothing to connect." }),
   }),
 
   tool({
@@ -1002,7 +1002,8 @@ export const TOOLS: AeonTool[] = [
     description:
       "Turns one idea from her latest list (post_ideas or weekly_plan) into a full caption in her picked style, checks it, makes its picture, " +
       "and puts it in Approvals for her OK. Use when she picks an idea: 'draft the second one' is idea 2, 'write the first one' is idea 1. " +
-      "Her latest list is saved, so call this directly with the number; don't make new ideas or a new plan first. Posting stays optional.",
+      "Her latest list is saved, so call this directly with the number; don't make new ideas or a new plan first. Aeon never posts: " +
+      "once she approves it, it's ready for her to post herself.",
     input: {
       idea: z.number().int().min(1).max(5).optional().describe("The idea's number in her latest list."),
       idea_id: z.string().uuid().optional().describe("Or the idea's id."),
@@ -1014,14 +1015,14 @@ export const TOOLS: AeonTool[] = [
       if (!idea && !idea_id) return text({ written: false, why: "Ask which idea she wants written." });
       const r = await coach.draftIdea(ctx.by, { number: idea, id: idea_id }, { chat: ctx.chat });
       if (!r.found) return text({ written: false, why: r.why });
-      if (r.outcome === "blocked") return text({ written: false, why: r.why });
+      if (r.outcome === "blocked" || r.outcome === "declined") return text({ written: false, why: r.why });
       return text({
         written: r.outcome !== "blocked_after_rewrite",
         idea: r.idea.number,
         headline: r.headline,
         approval_id: r.post.approvalId,
         why: r.why,
-        next: "It's waiting in Approvals. Posting is optional: she can approve it, or copy the caption and post it herself.",
+        next: "It's waiting in Approvals. Once she approves it, the Instagram page has the caption to copy, the picture to save and the steps to post it herself.",
       });
     },
   }),
