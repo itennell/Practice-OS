@@ -156,6 +156,8 @@ function withCards(said: Record<string, unknown>, cards: DocumentCard[]): ToolRe
 const OPEN_CARD = "Her card in the chat opens it, already filled in; don't name a page.";
 
 async function makeGfe(input: z.infer<z.ZodObject<typeof gfeInput>>, ctx: ToolContext): Promise<ToolResult> {
+  // It saves an estimate row and an approval, so the view-only demo copy refuses it like any change.
+  if (ctx.viewOnly) return { content: [{ type: "text", text: VIEW_ONLY }], isError: true };
   const r = await gfe.draftEstimate(input, { createdBy: ctx.by });
   const [row, today] = await Promise.all([gfe.getEstimate(r.id), practiceToday()]);
   return withCards(
@@ -187,6 +189,8 @@ async function makeRelease(input: z.infer<z.ZodObject<typeof releaseInput>>): Pr
     const filled = Object.entries(fields).filter(([, v]) => v).map(([k]) => k);
     return withCards(
       {
+        // Kept for one release so outside MCP clients that read `open` keep working; the card has the same link.
+        open: `/admin?panel=release&draft=${draft}`,
         filled,
         left_for_her: ["client name", "client date of birth", ...["recipient", "purpose", "information"].filter((k) => !filled.includes(k)), "signatures"],
         next: `Tell her: I filled in what I know. Download the PDF from the card, type the client's name and birth date, and have it signed. Keep a copy in the client's record. ${OPEN_CARD}`,
@@ -209,6 +213,8 @@ async function makeCms855i(ctx: ToolContext): Promise<ToolResult> {
       form: `CMS-855I (${cms855i.CMS855I_VERSION})`,
       filled: r.filled,
       left_for_her: r.leftForYou,
+      // Kept for one release for outside MCP clients; the card has the same link.
+      download: "/api/payers/cms855i",
       faster_route: "PECOS (pecos.cms.hhs.gov) lists MFT and MHC as specialties and is usually faster than paper.",
       next: `She downloads it from the card, finishes what's left, signs and submits it herself. ${OPEN_CARD}`,
       is_sample: profile.isSample,
@@ -392,24 +398,30 @@ export const TOOLS: AeonTool[] = [
     name: "file_upload",
     title: "Add a business document",
     description:
-      "Reads one business document from a file on this computer (PDF, Word .docx or plain text): a payer contract, fee schedule, licensing board letter, " +
+      "Reads one business document from Practice-OS's inbox folder on this computer (PRACTICE_OS_DATA_DIR/inbox; PDF, Word .docx or plain text): a payer contract, fee schedule, licensing board letter, " +
       "malpractice face sheet, W-9 or CE certificate. Checks it for crisis words, client records and client details before any model reads it; refuses client records. " +
       "Keeps it in Practice-OS, sorts it, and puts anything it changes in her records (a new deadline, a payer date, CE hours) in her approvals. Returns its card.",
-    input: { path: z.string().trim().min(1).max(1000).describe("The file's full path on this computer.") },
+    input: { path: z.string().trim().min(1).max(1000).describe("The file's name in the inbox folder, or its full path inside it.") },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     label: "Read and kept your document",
     changesData: true,
     mcpOnly: true,
     run: async ({ path: filePath }, ctx) => {
-      const { lstat, readFile } = await import("node:fs/promises");
-      const { isAbsolute } = await import("node:path");
+      const { lstat, readFile, realpath } = await import("node:fs/promises");
+      const path = await import("node:path");
       const { fileUpload } = await import("../uploads/file");
       const { MAX_BYTES } = await import("../uploads/read");
-      if (!isAbsolute(filePath)) return { content: [{ type: "text", text: "Give the file's full path." }], isError: true };
-      const info = await lstat(filePath).catch(() => null);
-      if (!info?.isFile()) return { content: [{ type: "text", text: "No file at that path." }], isError: true };
+      const { inboxDir } = await import("../uploads/store");
+      // Only files in the inbox folder, never a link: so no caller can reach .env, keys or anything else on the computer.
+      const inbox = await realpath(inboxDir()).catch(() => null);
+      if (!inbox) return { content: [{ type: "text", text: `Put the file in ${inboxDir()} first.` }], isError: true };
+      const wanted = path.resolve(inbox, filePath);
+      const info = await lstat(wanted).catch(() => null);
+      if (!info?.isFile() || info.isSymbolicLink()) return { content: [{ type: "text", text: `No file with that name in ${inboxDir()}.` }], isError: true };
+      const real = await realpath(wanted);
+      if (path.dirname(real) !== inbox) return { content: [{ type: "text", text: `Only files directly in ${inboxDir()} can be added.` }], isError: true };
       if (info.size > MAX_BYTES) return { content: [{ type: "text", text: "That file is over 10 MB." }], isError: true };
-      const outcome = await fileUpload(new Uint8Array(await readFile(filePath)), { by: ctx.by });
+      const outcome = await fileUpload(new Uint8Array(await readFile(real)), { by: ctx.by });
       if (!outcome.ok) return { content: [{ type: "text", text: outcome.text }], isError: outcome.reason !== "unreadable" ? undefined : true };
       return withCards({ said: outcome.text, approval_id: outcome.approvalId, duplicate: outcome.duplicate }, [outcome.card]);
     },
@@ -1009,6 +1021,8 @@ export async function guardResult(result: ToolResult): Promise<ToolResult> {
 export async function runTool(name: string, args: unknown, ctx: ToolContext): Promise<ToolResult> {
   const tool = TOOLS_BY_NAME.get(name);
   if (!tool) return { content: [{ type: "text", text: `No tool named ${name}.` }], isError: true };
+  // An MCP-only tool (file_upload reads a file on this computer) never runs for the chat or anyone else.
+  if (tool.mcpOnly && !ctx.by.startsWith("mcp:")) return { content: [{ type: "text", text: `${name} works only over MCP. In the chat she adds a file with the + button.` }], isError: true };
   const parsed = z.object(tool.input).safeParse(args ?? {});
   const changes = typeof tool.changesData === "function" ? (parsed.success ? tool.changesData(parsed.data as never) : true) : tool.changesData;
   if (ctx.viewOnly && changes) return { content: [{ type: "text", text: VIEW_ONLY }], isError: true };

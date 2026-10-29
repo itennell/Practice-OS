@@ -4,8 +4,12 @@
 
 export const MAX_BYTES = 10 * 1024 * 1024;
 export const MAX_PAGES = 30;
-/** Most text kept from one file: enough for a contract's terms, short enough for one model call. */
+/** Most text one file may hold. Every check reads all of it; a longer file is refused, never cut. */
 export const MAX_CHARS = 60_000;
+/** A .docx is a zip: its entries may unpack to at most this much, in at most this many entries. */
+export const MAX_UNZIPPED = 25 * 1024 * 1024;
+export const MAX_ZIP_ENTRIES = 2000;
+export const TOO_LONG = "That file is too long for me to check. Send the pages that matter.";
 
 export const PDF = "application/pdf";
 export const DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
@@ -32,6 +36,39 @@ function isImage(b: Uint8Array): boolean {
   );
 }
 
+/**
+ * Reads a zip's central directory (never unpacking it) and refuses a zip bomb:
+ * more than MAX_ZIP_ENTRIES entries, more than MAX_UNZIPPED bytes unpacked, or a
+ * ZIP64 archive (which hides real sizes in an extra field).
+ */
+export function checkZipSize(bytes: Uint8Array): void {
+  const buf = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const bad = () => new UnreadableFile("I couldn't open that Word file. Save it again as .docx or PDF and send it.");
+  // End of central directory: signature 0x06054b50, within the last 64 KB + 22 bytes.
+  let eocd = -1;
+  for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65_557); i--) {
+    if (buf.readUInt32LE(i) === 0x06054b50) {
+      eocd = i;
+      break;
+    }
+  }
+  if (eocd < 0) throw bad();
+  const entries = buf.readUInt16LE(eocd + 10);
+  const cdOffset = buf.readUInt32LE(eocd + 16);
+  if (entries === 0xffff || cdOffset === 0xffffffff) throw bad();
+  if (entries > MAX_ZIP_ENTRIES) throw new UnreadableFile("That Word file is too big for me to open safely. Save it as PDF and send it.");
+  let at = cdOffset;
+  let total = 0;
+  for (let n = 0; n < entries; n++) {
+    if (at + 46 > buf.length || buf.readUInt32LE(at) !== 0x02014b50) throw bad();
+    const size = buf.readUInt32LE(at + 24);
+    if (size === 0xffffffff) throw bad();
+    total += size;
+    if (total > MAX_UNZIPPED) throw new UnreadableFile("That Word file is too big for me to open safely. Save it as PDF and send it.");
+    at += 46 + buf.readUInt16LE(at + 28) + buf.readUInt16LE(at + 30) + buf.readUInt16LE(at + 32);
+  }
+}
+
 /** The file's type from its bytes. Throws UnreadableFile with what to do instead. */
 export function sniff(bytes: Uint8Array): Mime {
   if (bytes.length === 0) throw new UnreadableFile("That file is empty.");
@@ -39,7 +76,10 @@ export function sniff(bytes: Uint8Array): Mime {
   if (ascii(bytes, 0, "%PDF-")) return PDF;
   if (starts(bytes, 0x50, 0x4b, 0x03, 0x04)) {
     // A .docx is a zip with word/document.xml inside; other zips (and .xlsx) aren't.
-    if (Buffer.from(bytes).includes("word/document.xml")) return DOCX;
+    if (Buffer.from(bytes).includes("word/document.xml")) {
+      checkZipSize(bytes);
+      return DOCX;
+    }
     throw new UnreadableFile("I can read PDFs, Word (.docx) files and plain text. Save it as one of those and send it again.");
   }
   if (starts(bytes, 0xd0, 0xcf, 0x11, 0xe0)) throw new UnreadableFile("That's an older Word file (.doc). Save it as .docx or PDF and send it again.");
@@ -84,5 +124,6 @@ export async function readText(bytes: Uint8Array, mime: Mime): Promise<string> {
   if (text.replace(/\s/g, "").length < 40) {
     throw new UnreadableFile(mime === PDF ? `That PDF looks like a scan, with no text inside. ${NOT_SUPPORTED}` : "There's almost no text in that file.");
   }
-  return text.slice(0, MAX_CHARS);
+  if (text.length > MAX_CHARS) throw new UnreadableFile(TOO_LONG);
+  return text;
 }

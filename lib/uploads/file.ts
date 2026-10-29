@@ -4,7 +4,8 @@ import { niceDate } from "../credentialing/checklist";
 import { practiceToday } from "../compliance/store";
 import { uploadedCard } from "../documents";
 import type { DocumentCard } from "../documents/card";
-import { checkCrisis } from "../safety";
+import { alertCrisis, checkCrisis } from "../safety";
+import { listPayerApplications } from "../payers/store";
 import { guard } from "../aeon/guard";
 import { DOC_KIND_LABEL, classifyByRules, classifyWithMuse, type ChatFn, type Classified, type Fact } from "./classify";
 import { CLIENT_RECORD_REFUSAL, looksLikeClientRecord } from "./client-record";
@@ -27,6 +28,10 @@ export type FileOutcome =
 
 const CRISIS_FILE =
   "This file mentions self-harm or someone in danger, so I didn't read it further. If anyone is in danger right now: call or text 988 (Suicide & Crisis Lifeline), or call 911.";
+/** Payer names match only exactly, ignoring case, spaces and punctuation ("BCBS IL" and "bcbsil"); never on a part. */
+export const payerKey = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, "");
+export const samePayer = (a: string, b: string) => payerKey(a) !== "" && payerKey(a) === payerKey(b);
+
 /** An EIN (12-3456789) or SSN (123-45-6789): never sent to the model, even when the guard lets it pass. */
 const TAX_ID = /\b\d{2}-\d{7}\b|\b\d{3}-\d{2}-\d{4}\b/;
 const GUARD_UNAVAILABLE = "My privacy check isn't working right now, so I can't read files. Try again in a minute.";
@@ -64,8 +69,12 @@ export async function fileUpload(bytes: Uint8Array, opts: { by: string; chat?: C
     throw err;
   }
 
+  // Every check reads the whole text (lib/uploads/read.ts refuses a file too long to check).
   const crisis = checkCrisis(text);
-  if (crisis.crisis) return refuse("crisis", CRISIS_FILE, opts.by, { category: crisis.category });
+  if (crisis.crisis) {
+    await alertCrisis({ source: "upload", category: crisis.category, by: opts.by });
+    return refuse("crisis", CRISIS_FILE, opts.by, { category: crisis.category });
+  }
   if (looksLikeClientRecord(text)) return refuse("client_record", CLIENT_RECORD_REFUSAL, opts.by);
 
   const checked = await guard(text, "tool_result");
@@ -83,7 +92,15 @@ export async function fileUpload(bytes: Uint8Array, opts: { by: string; chat?: C
   const today = await practiceToday();
   const sorted: Classified = private_ ? classifyByRules(text) : await classifyWithMuse(checked.ok ? checked.text : text, today, opts.chat);
 
-  const doc = await keepDocument({ bytes, mime, kind: sorted.kind, title: sorted.title, summary: sorted.summary, payer: sorted.payer, createdBy: opts.by });
+  const kept = await keepDocument({ bytes, mime, kind: sorted.kind, title: sorted.title, summary: sorted.summary, payer: sorted.payer, createdBy: opts.by });
+  if (kept.duplicate) {
+    return { ok: true, duplicate: true, approvalId: null, card: uploadedCard(kept.doc), text: `I already have this one: ${kept.doc.title}. Nothing new to add.` };
+  }
+  const doc = kept.doc;
+  // A payer fact goes to the application with exactly this payer's name, or to a new one; she sees which before approving.
+  const payerFacts = sorted.facts.some((f) => f.target === "payer_effective_on" || f.target === "payer_recredential_on");
+  const payerRow = payerFacts && sorted.payer ? (await listPayerApplications()).find((a) => samePayer(a.payer, sorted.payer!)) : undefined;
+  if (payerFacts && !sorted.payer) sorted.facts = sorted.facts.filter((f) => f.target !== "payer_effective_on" && f.target !== "payer_recredential_on");
   await audit({ actor: "aeon", action: "document_kept", subjectType: "document", subjectId: doc.id, details: { kind: doc.kind, facts: sorted.facts.length, by: opts.by } });
 
   let approvalId: string | null = null;
@@ -94,11 +111,14 @@ export async function fileUpload(bytes: Uint8Array, opts: { by: string; chat?: C
       preview: {
         body: [
           `From your ${DOC_KIND_LABEL[sorted.kind].toLowerCase()} "${sorted.title}". Approving adds these to your records; nothing is sent.`,
+          ...(payerFacts && sorted.payer
+            ? [payerRow ? `Payer dates go to your ${payerRow.payer} application.` : `Payer dates go to a new ${sorted.payer} application, marked "preparing".`]
+            : []),
           ...sorted.facts.map((f) => `- ${describe(f)}. It says: "${f.quote}"`),
         ].join("\n"),
         changes: sorted.facts.map((f) => ({ change: describe(f), quote: f.quote })),
       },
-      payload: { document_id: doc.id, payer: sorted.payer, facts: sorted.facts },
+      payload: { document_id: doc.id, payer: sorted.payer, payer_application_id: payerRow?.id ?? null, facts: sorted.facts },
       createdBy: opts.by,
     });
     await setApproval(doc.id, approvalId);

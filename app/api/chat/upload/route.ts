@@ -13,6 +13,9 @@ export const maxDuration = 120;
 
 export async function POST(request: Request) {
   if (!isLocalAppRequest(request)) return Response.json({ error: "Adding files works in Practice-OS on your own computer." }, { status: 403 });
+  // Refuse a too-big body before reading it (the form adds a little around the file).
+  const length = Number(request.headers.get("content-length") ?? NaN);
+  if (!Number.isFinite(length) || length > MAX_BYTES + 64 * 1024) return Response.json({ error: "That file is over 10 MB. Send a smaller copy." }, { status: 413 });
   const form = await request.formData().catch(() => null);
   const file = form?.get("file");
   const conversationId = form?.get("conversationId");
