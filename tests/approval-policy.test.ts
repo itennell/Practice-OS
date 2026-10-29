@@ -34,9 +34,18 @@ describe("the rule", () => {
   });
 
   it("Front Desk follows its own rule: a missed-caller text, only while the switch is on", () => {
-    expect(shouldAutoRun("sms_reply", { rule: "front_desk", rules: { text_missed_callers: true } })).toBe(true);
-    expect(shouldAutoRun("sms_reply", { rule: "front_desk", rules: { text_missed_callers: false } })).toBe(false);
-    expect(shouldAutoRun("instagram_post", { rule: "front_desk", rules: { text_missed_callers: true } })).toBe(false);
+    const on = { text_missed_callers: true, book_by_text: true, send_reminders: true };
+    const off = { text_missed_callers: false, book_by_text: false, send_reminders: false };
+    expect(shouldAutoRun("sms_reply", { rule: "front_desk", rules: on })).toBe(true);
+    expect(shouldAutoRun("sms_reply", { rule: "front_desk", rules: off })).toBe(false);
+    expect(shouldAutoRun("instagram_post", { rule: "front_desk", rules: on })).toBe(false);
+    expect(shouldAutoRun("text_consult_options", { rule: "front_desk", rules: on })).toBe(true);
+    expect(shouldAutoRun("text_consult_options", { rule: "front_desk", rules: { ...on, text_missed_callers: false } })).toBe(false);
+    for (const kind of ["consult_booking", "consult_reschedule", "consult_cancel"] as const) {
+      expect(shouldAutoRun(kind, { rule: "front_desk", rules: on })).toBe(true);
+      expect(shouldAutoRun(kind, { rule: "front_desk", rules: { ...on, book_by_text: false } })).toBe(false);
+    }
+    expect(shouldAutoRun("gfe_issue", { rule: "front_desk", rules: on })).toBe(false);
   });
 
   it("outside agents over MCP never get Bypass", () => {

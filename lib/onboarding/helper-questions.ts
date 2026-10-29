@@ -5,6 +5,7 @@
 // before save(), and never stores these answers itself.
 import { instagramQuestions } from "../instagram/onboarding";
 import { referralsQuestions } from "../referrals/onboarding";
+import { frontDeskQuestions } from "../frontdesk/onboarding";
 
 /** What onboarding already knows, so a block can skip or prefill a question. */
 export type PracticeBasics = {
@@ -43,4 +44,5 @@ export const HELPER_QUESTIONS: HelperBlock[] = [
   // One entry per helper session, e.g. referralsQuestions from lib/referrals/onboarding.ts.
   referralsQuestions,
   instagramQuestions,
+  frontDeskQuestions,
 ];

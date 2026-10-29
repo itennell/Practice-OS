@@ -50,27 +50,70 @@ export function DefaultModeSetting({ initial }: { initial: ApprovalMode }) {
   );
 }
 
-export function FrontDeskRules({ initial }: { initial: { text_missed_callers: boolean } }) {
-  const [on, setOn] = useState(initial.text_missed_callers);
+type FrontDeskRuleKey = "text_missed_callers" | "book_by_text" | "send_reminders";
+
+const FRONT_DESK_SWITCHES: Array<{
+  key: FrontDeskRuleKey;
+  label: string;
+  description: string;
+  confirmOn: { title: string; description: string; confirmLabel: string };
+}> = [
+  {
+    key: "text_missed_callers",
+    label: "Text callers I miss",
+    description:
+      "When you can't pick up, the caller gets a text with your open consult times. Logistics only, with the crisis check first. This doesn't depend on the chat mode.",
+    confirmOn: {
+      title: "Text missed callers automatically?",
+      description: "Front Desk will text each caller you miss with your open consult times, without asking you first.",
+      confirmLabel: "Turn on",
+    },
+  },
+  {
+    key: "book_by_text",
+    label: "Book when a caller picks a time",
+    description:
+      "When a caller replies 1, 2 or 3, Front Desk checks the time is still free, books it on your calendar and texts a confirmation. Reschedule and cancel work the same way.",
+    confirmOn: {
+      title: "Book consults by text automatically?",
+      description: "Front Desk will book, move or cancel a consult when the caller asks by text, without asking you first.",
+      confirmLabel: "Turn on",
+    },
+  },
+  {
+    key: "send_reminders",
+    label: "Text a reminder the day before",
+    description: "Each booked caller gets one short reminder text the day before the consult.",
+    confirmOn: {
+      title: "Send day-before reminders?",
+      description: "Front Desk will text each booked caller once, the day before their consult.",
+      confirmLabel: "Turn on",
+    },
+  },
+];
+
+export function FrontDeskRules({ initial }: { initial: Record<FrontDeskRuleKey, boolean> }) {
+  const [rules, setRules] = useState(initial);
   return (
-    <SettingSwitch
-      label="Text callers I miss"
-      description="When you can't pick up, the caller gets a text with your open consult times. Logistics only, with the crisis check first. This doesn't depend on the chat mode."
-      checked={on}
-      onCheckedChange={async (next) => {
-        setOn(next);
-        try {
-          await put("/api/settings/front-desk", { text_missed_callers: next });
-        } catch {
-          setOn(!next);
-          notify.error("Couldn't save that.", { description: "Nothing changed." });
-        }
-      }}
-      confirmOn={{
-        title: "Text missed callers automatically?",
-        description: "Front Desk will text each caller you miss with your open consult times, without asking you first.",
-        confirmLabel: "Turn on",
-      }}
-    />
+    <>
+      {FRONT_DESK_SWITCHES.map((s) => (
+        <SettingSwitch
+          key={s.key}
+          label={s.label}
+          description={s.description}
+          checked={rules[s.key]}
+          onCheckedChange={async (next) => {
+            setRules((r) => ({ ...r, [s.key]: next }));
+            try {
+              await put("/api/settings/front-desk", { [s.key]: next });
+            } catch {
+              setRules((r) => ({ ...r, [s.key]: !next }));
+              notify.error("Couldn't save that.", { description: "Nothing changed." });
+            }
+          }}
+          confirmOn={s.confirmOn}
+        />
+      ))}
+    </>
   );
 }

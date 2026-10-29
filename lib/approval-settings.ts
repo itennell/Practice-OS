@@ -1,5 +1,5 @@
 import type postgres from "postgres";
-import { DEFAULT_FRONT_DESK_RULES, isApprovalMode, type ApprovalMode, type FrontDeskRules } from "./approval-policy";
+import { DEFAULT_FRONT_DESK_RULES, FRONT_DESK_RULE_KEYS, isApprovalMode, type ApprovalMode, type FrontDeskRules } from "./approval-policy";
 import { audit } from "./audit";
 import { db } from "./db";
 
@@ -11,7 +11,9 @@ export async function loadApprovalSettings(sql: postgres.Sql = db()): Promise<{ 
   const fd = row?.front_desk_rules as Partial<FrontDeskRules> | undefined;
   return {
     mode: isApprovalMode(row?.approval_mode) ? row.approval_mode : "auto",
-    frontDesk: { ...DEFAULT_FRONT_DESK_RULES, ...(typeof fd?.text_missed_callers === "boolean" ? { text_missed_callers: fd.text_missed_callers } : {}) },
+    frontDesk: Object.fromEntries(
+      FRONT_DESK_RULE_KEYS.map((k) => [k, typeof fd?.[k] === "boolean" ? fd[k] : DEFAULT_FRONT_DESK_RULES[k]]),
+    ) as FrontDeskRules,
   };
 }
 
@@ -21,10 +23,15 @@ export async function saveDefaultMode(mode: ApprovalMode, by: string, sql: postg
   await audit({ actor: "clinician", action: "approval_mode_default_set", subjectType: "settings", details: { by, mode } }, sql);
 }
 
-export async function saveFrontDeskRules(rules: FrontDeskRules, by: string, sql: postgres.Sql = db()): Promise<void> {
-  if (typeof rules.text_missed_callers !== "boolean") throw new Error("text_missed_callers must be on or off.");
-  await sql`update practice_os.settings set front_desk_rules = ${sql.json({ text_missed_callers: rules.text_missed_callers } as never)}`;
-  await audit({ actor: "clinician", action: "front_desk_rules_set", subjectType: "settings", details: { by, ...rules } }, sql);
+/** Saves the switches she changed; the others keep their saved value. */
+export async function saveFrontDeskRules(changes: Partial<FrontDeskRules>, by: string, sql: postgres.Sql = db()): Promise<FrontDeskRules> {
+  for (const [k, v] of Object.entries(changes)) {
+    if (!(FRONT_DESK_RULE_KEYS as readonly string[]).includes(k) || typeof v !== "boolean") throw new Error(`${k} must be on or off.`);
+  }
+  const rules = { ...(await loadApprovalSettings(sql)).frontDesk, ...changes };
+  await sql`update practice_os.settings set front_desk_rules = ${sql.json(rules as never)}`;
+  await audit({ actor: "clinician", action: "front_desk_rules_set", subjectType: "settings", details: { by, ...changes } }, sql);
+  return rules;
 }
 
 /** A chat's own mode, or null when it follows the default. */

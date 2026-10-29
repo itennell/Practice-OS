@@ -28,10 +28,24 @@ export const KIND_POLICY: Record<ApprovalKind, { helper: Helper; tier: Tier }> =
   state_rules: { helper: "admin", tier: "sensitive" },
   referral_letter: { helper: "referrals", tier: "sensitive" },
   gfe_issue: { helper: "admin", tier: "clinician_only" },
+  text_consult_options: { helper: "front_desk", tier: "sensitive" },
 };
 
-export type FrontDeskRules = { text_missed_callers: boolean };
-export const DEFAULT_FRONT_DESK_RULES: FrontDeskRules = { text_missed_callers: true };
+// text_missed_callers: a missed caller gets a text with open consult times.
+// book_by_text (016): a reply of 1, 2 or 3, "reschedule" or "cancel" acts on her calendar.
+// send_reminders (016): a booked caller gets a text the day before.
+export type FrontDeskRules = { text_missed_callers: boolean; book_by_text: boolean; send_reminders: boolean };
+export const DEFAULT_FRONT_DESK_RULES: FrontDeskRules = { text_missed_callers: true, book_by_text: true, send_reminders: true };
+export const FRONT_DESK_RULE_KEYS = ["text_missed_callers", "book_by_text", "send_reminders"] as const;
+
+/** Which Front Desk rule lets each kind run on its own. */
+const FRONT_DESK_RULE_FOR: Partial<Record<ApprovalKind, keyof FrontDeskRules>> = {
+  sms_reply: "text_missed_callers",
+  text_consult_options: "text_missed_callers",
+  consult_booking: "book_by_text",
+  consult_reschedule: "book_by_text",
+  consult_cancel: "book_by_text",
+};
 
 /** Who is asking: Aeon in the chat or over MCP (a mode), or a helper running by its own rules. */
 export type Origin = { mode: ApprovalMode } | { rule: "front_desk"; rules: FrontDeskRules };
@@ -40,7 +54,10 @@ export function shouldAutoRun(kind: ApprovalKind, origin: Origin | null | undefi
   const policy = KIND_POLICY[kind];
   if (!policy || !origin) return false;
   if (policy.tier === "clinician_only" && !BAA_IN_PLACE) return false;
-  if ("rule" in origin) return kind === "sms_reply" && origin.rules.text_missed_callers;
+  if ("rule" in origin) {
+    const rule = FRONT_DESK_RULE_FOR[kind];
+    return rule !== undefined && origin.rules[rule] === true;
+  }
   if (origin.mode === "manual") return false;
   if (origin.mode === "auto") return policy.tier === "routine";
   return true;

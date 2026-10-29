@@ -87,8 +87,8 @@ insert into practice_os.messages (id, inquiry_id, direction, channel, body, crea
    '[Sample] Hi, I''m the AI assistant for Reyes Counseling. I''ll pass that question to Dana and she''ll reply by email.',
    now() - interval '1 day' + interval '1 minute', true);
 
-insert into practice_os.consult_bookings (id, inquiry_id, calcom_booking_uid, starts_at, ends_at, status, contact_name, contact_phone, is_sample) values
-  ('00000000-0000-4000-8000-000000000601', '00000000-0000-4000-8000-000000000401', 'sample-booking-1',
+insert into practice_os.consult_bookings (id, inquiry_id, calendar_provider, external_id, reference, starts_at, ends_at, status, contact_name, contact_phone, is_sample) values
+  ('00000000-0000-4000-8000-000000000601', '00000000-0000-4000-8000-000000000401', 'calcom', 'sample-booking-1', 'FD-1001',
    ((current_date + 2) + time '18:30') at time zone 'America/Chicago',
    ((current_date + 2) + time '18:45') at time zone 'America/Chicago',
    'booked', '[Sample] Sam Example', '+13125550101', true);
