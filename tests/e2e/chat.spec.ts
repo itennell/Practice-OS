@@ -23,13 +23,16 @@ async function send(page: Page, text: string) {
   await box.press("Enter");
 }
 
-test("Opens on Aeon with suggestions, this week's brief and what's waiting", async ({ page }) => {
+test("Opens on Aeon with a greeting, data-built chips and one quiet Today list", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1, name: /How can I help\?/ })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: /^(Good (morning|afternoon|evening)|Hello)\b/ })).toBeVisible();
   const suggestions = page.getByRole("list", { name: "Suggestions" }).getByRole("button");
-  await expect(suggestions).toHaveText(["What needs me this week?", "Draft a Good Faith Estimate", "Get me ready for CAQH"]);
-  await expect(page.getByRole("heading", { name: /This week/ })).toBeVisible();
-  await expect(page.getByRole("heading", { name: /Waiting for you/ })).toBeVisible();
+  // The seeded practice has approvals waiting, so the middle chip asks about them.
+  await expect(suggestions).toHaveText(["What needs me this week?", "What's waiting for my OK?", "Draft a Good Faith Estimate"]);
+  const today = page.getByRole("region", { name: /^Today/ });
+  await expect(today).toContainText(/\d+ waiting for your OK/);
+  await expect(today.getByRole("link", { name: "Review" })).toHaveAttribute("href", "/approvals");
+  await expect(page.getByRole("region", { name: "Waiting for your approval" })).toHaveCount(0);
   await expect(page.getByText(/not clinical advice/)).toBeVisible();
   expect(await seriousViolations(page)).toEqual([]);
 });

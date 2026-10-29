@@ -69,6 +69,8 @@ export type PromptBarProps = {
   disabled?: boolean;
   /** Most rows before the box scrolls. */
   maxRows?: number;
+  /** "box" (default): text on top, buttons underneath. "pill": one 56px row, the calm Home look; grows when she types more. */
+  shape?: "box" | "pill";
   className?: string;
 };
 
@@ -88,8 +90,10 @@ export function PromptBar({
   controls,
   disabled = false,
   maxRows = 6,
+  shape = "box",
   className,
 }: PromptBarProps) {
+  const pill = shape === "pill";
   const [text, setText] = useState(defaultValue);
   const [dict, setDict] = useState<DictationState>({ kind: "idle" });
   const boxRef = useRef<HTMLTextAreaElement>(null);
@@ -165,76 +169,110 @@ export function PromptBar({
     }
   };
 
+  const field = (
+    <textarea
+      ref={boxRef}
+      rows={1}
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onKeyDown={onKeyDown}
+      onCompositionStart={() => (composing.current = true)}
+      onCompositionEnd={() => (composing.current = false)}
+      placeholder={placeholder}
+      aria-label={label}
+      aria-describedby={dict.kind !== "idle" ? statusId : undefined}
+      disabled={disabled}
+      className={cn(
+        "w-full resize-none bg-transparent text-body leading-[1.5] text-[var(--fg)] outline-none! placeholder:text-[var(--fg-muted)] disabled:opacity-60",
+        pill ? "min-w-0 flex-1 self-center px-2 py-[10px] placeholder:truncate" : "px-3 pt-2.5 pb-1",
+      )}
+    />
+  );
+  const attach = onAttach && (
+    <button
+      type="button"
+      onClick={onAttach}
+      aria-label="Add photos or files"
+      disabled={disabled}
+      className="inline-flex size-11 shrink-0 items-center justify-center rounded-full text-[var(--fg-muted)] hover:bg-[var(--hairline)] hover:text-[var(--fg)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] focus-visible:outline-solid disabled:opacity-50"
+    >
+      <Plus aria-hidden size={20} />
+    </button>
+  );
+  const status = (
+    <p
+      id={statusId}
+      role={dict.kind === "error" ? "alert" : "status"}
+      className={cn(
+        "flex min-w-0 items-center gap-1.5 px-2 text-small",
+        pill ? (dict.kind === "idle" ? "sr-only" : "px-4 pb-1") : "flex-1",
+        dict.kind === "error" ? "font-medium text-[var(--danger-fg)]" : "text-[var(--fg-muted)]",
+      )}
+    >
+      {dict.kind === "working" && (
+        <>
+          <StatusMark status="running" size="1.1em" decorative />
+          <span className="shimmer-text truncate">
+            Writing<span className="hidden min-[420px]:inline"> it down</span>…
+          </span>
+        </>
+      )}
+      {dict.kind === "error" && dict.message}
+    </p>
+  );
+  const mic = dictation && (
+    <VoicePill
+      onRecorded={(wav) => void onRecorded(wav)}
+      onError={(message) => setDict({ kind: "error", message })}
+      disabled={disabled || busy || dict.kind === "working"}
+    />
+  );
+  const send = (
+    <button
+      type="submit"
+      disabled={!busy && !canSend}
+      aria-label={busy ? "Stop" : "Send"}
+      className="inline-flex size-11 shrink-0 items-center justify-center rounded-full bg-[var(--primary-bg)] text-[var(--primary-fg)] transition-colors duration-150 hover:bg-[var(--primary-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] focus-visible:outline-solid disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      <SendGlyph busy={busy} />
+    </button>
+  );
+  // The focus ring goes round the whole bar, not a square inside it.
+  const ring =
+    "has-[textarea:focus-visible]:outline-2 has-[textarea:focus-visible]:outline-offset-2 has-[textarea:focus-visible]:outline-[var(--focus-ring)] has-[textarea:focus-visible]:outline-solid";
+
+  if (pill) {
+    return (
+      <form
+        onSubmit={submit}
+        className={cn("flex w-full flex-col rounded-[28px] border border-[var(--line-strong)] bg-[var(--toast-bg)] p-1.5", ring, className)}
+      >
+        {attachments && <div className="px-2 pt-1">{attachments}</div>}
+        <div className="flex min-h-11 items-end gap-1">
+          {attach}
+          {controls && <div className="flex h-11 shrink-0 items-center">{controls}</div>}
+          {field}
+          {mic}
+          {send}
+        </div>
+        {status}
+      </form>
+    );
+  }
+
   return (
     <form
       onSubmit={submit}
-      className={cn(
-        // The focus ring goes round the whole bar, not a square inside it.
-        "tile flex w-full flex-col gap-1 rounded-[var(--radius-card-lg)] bg-[var(--toast-bg)]! p-2 has-[textarea:focus-visible]:outline-2 has-[textarea:focus-visible]:outline-offset-2 has-[textarea:focus-visible]:outline-[var(--focus-ring)] has-[textarea:focus-visible]:outline-solid",
-        className,
-      )}
+      className={cn("tile flex w-full flex-col gap-1 rounded-[var(--radius-card-lg)] bg-[var(--toast-bg)]! p-2", ring, className)}
     >
       {attachments && <div className="px-1 pt-1">{attachments}</div>}
-      <textarea
-        ref={boxRef}
-        rows={1}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={onKeyDown}
-        onCompositionStart={() => (composing.current = true)}
-        onCompositionEnd={() => (composing.current = false)}
-        placeholder={placeholder}
-        aria-label={label}
-        aria-describedby={dict.kind !== "idle" ? statusId : undefined}
-        disabled={disabled}
-        className="w-full resize-none bg-transparent px-3 pt-2.5 pb-1 text-body leading-[1.5] text-[var(--fg)] outline-none! placeholder:text-[var(--fg-muted)] disabled:opacity-60"
-      />
+      {field}
       <div className="flex items-center gap-1">
-        {onAttach && (
-          <button
-            type="button"
-            onClick={onAttach}
-            aria-label="Add photos or files"
-            disabled={disabled}
-            className="inline-flex size-11 items-center justify-center rounded-full text-[var(--fg-muted)] hover:bg-[var(--hairline)] hover:text-[var(--fg)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] focus-visible:outline-solid disabled:opacity-50"
-          >
-            <Plus aria-hidden size={20} />
-          </button>
-        )}
+        {attach}
         {controls}
-        <p
-          id={statusId}
-          role={dict.kind === "error" ? "alert" : "status"}
-          className={cn(
-            "flex min-w-0 flex-1 items-center gap-1.5 px-2 text-small",
-            dict.kind === "error" ? "font-medium text-[var(--danger-fg)]" : "text-[var(--fg-muted)]",
-          )}
-        >
-          {dict.kind === "working" && (
-            <>
-              <StatusMark status="running" size="1.1em" decorative />
-              <span className="shimmer-text truncate">
-                Writing<span className="hidden min-[420px]:inline"> it down</span>…
-              </span>
-            </>
-          )}
-          {dict.kind === "error" && dict.message}
-        </p>
-        {dictation && (
-          <VoicePill
-            onRecorded={(wav) => void onRecorded(wav)}
-            onError={(message) => setDict({ kind: "error", message })}
-            disabled={disabled || busy || dict.kind === "working"}
-          />
-        )}
-        <button
-          type="submit"
-          disabled={!busy && !canSend}
-          aria-label={busy ? "Stop" : "Send"}
-          className="inline-flex size-11 shrink-0 items-center justify-center rounded-full bg-[var(--primary-bg)] text-[var(--primary-fg)] transition-colors duration-150 hover:bg-[var(--primary-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] focus-visible:outline-solid disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <SendGlyph busy={busy} />
-        </button>
+        {status}
+        {mic}
+        {send}
       </div>
     </form>
   );

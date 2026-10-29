@@ -50,8 +50,13 @@ test("The mode pill under the chat box: Auto by default, a box of choices, Shift
   await expect(pill).toHaveAccessibleName(/Mode: Bypass/);
 });
 
+// The ask bar sits above the box once a chat is going; the empty Home shows the Today list instead.
+function seededChat() {
+  return execSync("npx tsx scripts/seed-chat.ts draft-gfe", { encoding: "utf8" }).trim().split("\n").at(-1)!;
+}
+
 test("The ask bar: Aeon needs your approval, Approve or Not now", async ({ page }) => {
-  await page.goto("/");
+  await page.goto(`/?c=${seededChat()}`);
   const bar = page.getByRole("region", { name: "Waiting for your approval" });
   await expect(bar).toContainText("Aeon needs your approval. Can Aeon get this done for you?");
   const first = await bar.locator("p").nth(1).innerText();
@@ -63,7 +68,7 @@ test("The ask bar: Aeon needs your approval, Approve or Not now", async ({ page 
 
 test("The ask bar fits the chat column beside the sidebar: its words never squeeze into one column", async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 800 });
-  await page.goto("/");
+  await page.goto(`/?c=${seededChat()}`);
   const bar = page.getByRole("region", { name: "Waiting for your approval" });
   const question = bar.getByText("Aeon needs your approval. Can Aeon get this done for you?");
   await expect(question).toBeVisible();
