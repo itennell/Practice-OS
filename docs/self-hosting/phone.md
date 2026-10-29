@@ -25,7 +25,7 @@ The app has to be running for Front Desk to answer. Voicemails left while her co
 2. Upgrade the account by adding a payment card (Console › Admin › Billing, or the **Upgrade** button). You should no longer see "Trial" at the top.
 3. Buy a toll-free number: **Phone Numbers › Manage › Buy a number**, choose **Toll-free**, then **Buy**. You should see it under **Phone Numbers › Manage › Active numbers**. Twilio may ask for a business profile first; fill it in with the practice's details.
 4. On the Console home page, find **Account Info**. Copy the **Account SID** and the **Auth Token** (press the eye to show it) and paste them into the card. Practice-OS checks them straight away and finds the toll-free number. If there's more than one number, it asks which one. Nothing on her Twilio account changes yet.
-5. Press **Send calls to my greeting and voicemail**. The card says exactly what this changes first, and **Undo** puts the number's old setting back. If she changes her greeting later, **Put my latest greeting on the number** updates it.
+5. Press **Send calls to my greeting and voicemail**. The card says exactly what this changes first, and **Undo** puts the number's old setting back. Disconnecting puts it back too. If she changes her greeting later, **Put my latest greeting on the number** updates it.
 6. Ask for texting approval: **Messaging › Regulatory compliance › Toll-free verifications** (Twilio moves this menu sometimes; searching "toll-free verification" in the Console finds it). Pick the number and fill in the form. For "use case", say the texts are appointment scheduling for people who called the practice and left a voicemail. The card shows "in review" until the carriers approve it.
 
 When the card says **Connected** with her number, Front Desk is working.
@@ -50,6 +50,8 @@ Spruce signs a HIPAA business associate agreement (BAA) on every plan, and Spruc
 ## A note on privacy
 
 Twilio signs a BAA only on its Security or Enterprise editions, through sales. Until there's a BAA, Front Desk handles scheduling logistics only, and Practice-OS keeps client details out of Aeon's memory.
+
+The voicemail page is Twilio's own hosted service, Twimlets (twimlets.com, run by Twilio). When someone calls, Twilio asks that page what to play, so the call's details (the caller's number, the number they called, and afterwards the recording's address) pass through a Twilio-run service, as they do for any Twilio number. Practice-OS itself runs no server for this. The page only holds her greeting text.
 
 ## Safety
 
