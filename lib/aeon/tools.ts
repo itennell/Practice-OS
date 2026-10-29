@@ -56,8 +56,12 @@ export type ToolContext = {
 /** aeon_action is queued only by runTool itself in Manual mode, never by an agent. */
 const QUEUEABLE_KINDS = APPROVAL_KINDS.filter((k) => k !== "aeon_action") as [Exclude<ApprovalKind, "aeon_action">, ...Exclude<ApprovalKind, "aeon_action">[]];
 
-/** Saving or forgetting a memory never waits for her tap, in any mode. */
-const ALWAYS_RUNS = new Set(["remember", "forget"]);
+/**
+ * Saving or forgetting a memory never waits for her tap, in any mode. Nor do the
+ * Instagram writers: they save ideas or drafts that wait for her approval anyway.
+ * They still count as changes, so the view-only demo copy refuses them (no writes, no Muse).
+ */
+const ALWAYS_RUNS = new Set(["remember", "forget", "post_ideas", "weekly_plan", "draft_post", "plan_instagram_week", "draft_instagram_post"]);
 
 export type ToolResult = {
   content: { type: "text"; text: string }[];
@@ -891,7 +895,7 @@ export const TOOLS: AeonTool[] = [
     input: {},
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: false },
     label: "Planned this week's posts",
-    changesData: false,
+    changesData: true,
     run: async (_input, ctx) => {
       const r = await instagram.planWeek(ctx.by, { chat: ctx.chat });
       if (r.declined) return text({ written: false, why: instagram.DECLINED });
@@ -912,7 +916,7 @@ export const TOOLS: AeonTool[] = [
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: false },
     label: "Drafted an Instagram post",
-    changesData: false,
+    changesData: true,
     run: async ({ request, pillar }, ctx) => {
       const r = await instagram.requestPost(ctx.by, request, pillar ?? null, { chat: ctx.chat });
       if (r.outcome === "blocked" || r.outcome === "declined") return text({ written: false, why: r.why });
@@ -979,7 +983,7 @@ export const TOOLS: AeonTool[] = [
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: false },
     label: "Came up with post ideas",
-    changesData: false,
+    changesData: true,
     run: async ({ count, topic }, ctx) => text(coach.ideasForModel(await coach.postIdeas(ctx.by, { count, topic, chat: ctx.chat }))),
   }),
 
@@ -993,7 +997,7 @@ export const TOOLS: AeonTool[] = [
     input: {},
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: false },
     label: "Made a posting plan",
-    changesData: false,
+    changesData: true,
     run: async (_input, ctx) => text(coach.ideasForModel(await coach.postIdeas(ctx.by, { plan: true, chat: ctx.chat }))),
   }),
 
@@ -1011,20 +1015,25 @@ export const TOOLS: AeonTool[] = [
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: false },
     label: "Drafted the post",
-    changesData: false,
+    changesData: true,
     run: async ({ idea, idea_id }, ctx) => {
       if (!idea && !idea_id) return text({ written: false, why: "Ask which idea she wants written." });
       const r = await coach.draftIdea(ctx.by, { number: idea, id: idea_id }, { chat: ctx.chat });
       if (!r.found) return text({ written: false, why: r.why });
       if (r.outcome === "blocked" || r.outcome === "declined") return text({ written: false, why: r.why });
       if (r.outcome === "off_topic") return text({ written: false, why: r.why, offer_instead: r.angle.label });
+      if (r.outcome === "already_drafted") {
+        return text({ written: false, already_drafted: true, idea: r.idea.number, headline: r.headline, approval_id: r.post.approvalId, why: "She already has a draft of this idea; it's in Approvals or on the Instagram page." });
+      }
       return text({
         written: r.outcome !== "blocked_after_rewrite",
         idea: r.idea.number,
         headline: r.headline,
         approval_id: r.post.approvalId,
         why: r.why,
-        next: "It's waiting in Approvals. Once she approves it, the Instagram page has the caption to copy, the picture to save and the steps to post it herself.",
+        ...(r.outcome !== "blocked_after_rewrite"
+          ? { next: "It's waiting in Approvals. Once she approves it, the Instagram page has the caption to copy, the picture to save and the steps to post it herself." }
+          : {}),
       });
     },
   }),

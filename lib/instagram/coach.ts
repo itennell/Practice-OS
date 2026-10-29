@@ -17,12 +17,12 @@ import { codeCritic, type ChatFn } from "./critic";
 import { neverShowHits } from "./never-show";
 import { loadInstagramPrefs, type InstagramPrefs } from "./onboarding";
 import { PILLAR_BY_ID, PILLARS, type PillarId } from "./pillars";
-import { DECLINED, practiceFacts, requestPost, weekOf, type RequestResult } from "./store";
+import { DECLINED, practiceFacts, requestPost, weekOf, type RequestResult, type SavedPost } from "./store";
 import type { GraphicDeps } from "./graphic";
 import { voiceLines, type PracticeFacts } from "./write";
 
 export type Idea = { topic: PillarId; hook: string; points: string[]; cta: string; picture: string };
-export type SavedIdea = Idea & { id: string; number: number; day: string | null };
+export type SavedIdea = Idea & { id: string; number: number; day: string | null; draftedPost?: string };
 
 export type IdeasResult = {
   ideas: SavedIdea[];
@@ -53,41 +53,49 @@ export function breaksNeverShow(picture: string, neverShow: string[], firstName?
 }
 
 // ---- the fixed ideas (no Muse key, or Muse's broke the rules) ---------------------------
+// Only facts she gave Aeon (her name, license, where she practices, her fee list);
+// anything else is a [fill in] for her to finish, never a made-up detail.
 
-export const FIXED_IDEAS: Record<PillarId, Omit<Idea, "picture">> = {
-  first_session: {
-    topic: "first_session",
-    hook: "Wondering what your first session looks like?",
-    points: ["It lasts about 50 minutes.", "We go over a few forms and what you're looking for.", "You can ask any questions about how it works."],
-    cta: "Book a free 15-minute call to get started. The link is in my bio.",
-  },
-  fees_superbills: {
-    topic: "fees_superbills",
-    hook: "Here's how paying for sessions works.",
-    points: ["My fees are on my website.", "I can give you a superbill.", "You can send it to your insurance to ask to be paid back."],
-    cta: "Questions about cost? Ask on a free 15-minute call.",
-  },
-  how_to_book: {
-    topic: "how_to_book",
-    hook: "Booking takes three steps.",
-    points: ["Tap the link in my bio.", "Pick a time for a free 15-minute call.", "We set up your first session."],
-    cta: "Pick a time today with the link in my bio.",
-  },
-  meet_the_clinician: {
-    topic: "meet_the_clinician",
-    hook: "A little about who you'd be working with.",
-    points: ["My license and where I practice.", "Who I work with.", "How to reach me."],
-    cta: "Want to talk? Book a free 15-minute call.",
-  },
-  office_telehealth: {
-    topic: "office_telehealth",
-    hook: "In person or by video: your choice.",
-    points: ["Where the office is and how to get there.", "Video sessions work from anywhere in the state."],
-    cta: "Tell me which you'd like when you book. The link is in my bio.",
-  },
-};
+const FILL = (what: string) => `[fill in: ${what}]`;
 
-const fixedIdea = (topic: PillarId): Idea => ({ ...FIXED_IDEAS[topic], picture: NEUTRAL_PICTURE[topic] });
+export function fixedIdeas(f: Pick<PracticeFacts, "clinicianName" | "credential" | "neighborhood" | "city" | "fees">): Record<PillarId, Omit<Idea, "picture">> {
+  const where = [f.neighborhood, f.city].filter(Boolean).join(", ") || FILL("where you see clients");
+  const fee = f.fees[0];
+  const money = (c: number) => `$${(c / 100).toFixed(c % 100 ? 2 : 0)}`;
+  const book = `To book: ${FILL("how people book with you")}.`;
+  return {
+    first_session: {
+      topic: "first_session",
+      hook: "Wondering what your first session looks like?",
+      points: [`How long it lasts: ${FILL("length")}.`, "We go over a few forms and what you're looking for.", "You can ask any questions about how it works."],
+      cta: book,
+    },
+    fees_superbills: {
+      topic: "fees_superbills",
+      hook: "Here's how paying for sessions works.",
+      points: [fee ? `${fee.label}: ${money(fee.cents)}.` : `My fee: ${FILL("your fee")}.`, `Insurance: ${FILL("superbills or the plans you take")}.`],
+      cta: `Questions about cost? ${book}`,
+    },
+    how_to_book: {
+      topic: "how_to_book",
+      hook: "Here's how to book a first visit.",
+      points: [`Step 1: ${FILL("first step")}.`, `Step 2: ${FILL("next step")}.`],
+      cta: book,
+    },
+    meet_the_clinician: {
+      topic: "meet_the_clinician",
+      hook: "A little about who you'd be working with.",
+      points: [`I'm ${f.clinicianName}, ${f.credential}.`, `I see clients in ${where}.`, `Who I work with: ${FILL("who you help")}.`],
+      cta: book,
+    },
+    office_telehealth: {
+      topic: "office_telehealth",
+      hook: "Where we meet.",
+      points: [`The office: ${where}.`, `Video sessions: ${FILL("whether you offer them, and where")}.`],
+      cta: book,
+    },
+  };
+}
 
 // ---- Muse --------------------------------------------------------------------------
 
@@ -163,7 +171,9 @@ export function checkIdeas(raw: unknown[], opts: { topics: PillarId[]; neverShow
 }
 
 /** Her topics in the usual order, repeated to fill `count`, for the fixed ideas. */
-function fill(kept: Idea[], topics: PillarId[], count: number): Idea[] {
+function fill(kept: Idea[], topics: PillarId[], count: number, f: PracticeFacts): Idea[] {
+  const fixed = fixedIdeas(f);
+  const fixedIdea = (topic: PillarId): Idea => ({ ...fixed[topic], picture: NEUTRAL_PICTURE[topic] });
   const out = kept.slice(0, count);
   const order = PILLARS.map((p) => p.id).filter((id) => topics.includes(id));
   for (let i = 0; out.length < count && order.length; i++) {
@@ -181,7 +191,7 @@ export async function writeIdeas(
   // A chat passed in (tests, a replayed conversation) counts as a key.
   const hasKey = opts.hasKey ?? (Boolean(opts.chat) || Boolean(process.env.MODEL_API_KEY));
   const check = { topics: opts.topics, neverShow: prefs.neverShow, firstName: f.clinicianName.split(" ")[0], feesCents: f.fees.map((x) => x.cents) };
-  if (!hasKey) return { ideas: fill([], opts.topics, opts.count), dropped: 0, blocked: false, source: "fixed" };
+  if (!hasKey) return { ideas: fill([], opts.topics, opts.count, f), dropped: 0, blocked: false, source: "fixed" };
   try {
     const res = await (opts.chat ?? metaChat)("instagram.ideas", {
       messages: [{ role: "user", content: prompt(f, prefs, opts.topics, opts.count) }],
@@ -191,12 +201,12 @@ export async function writeIdeas(
     const c = checkIdeas(parsed.ideas ?? [], check);
     if (c.blocked) {
       await audit({ actor: "aeon", action: "instagram_ideas_blocked", subjectType: "post", details: { rule: "self_harm" } });
-      return { ideas: fill([], opts.topics, opts.count), dropped: c.dropped, blocked: true, source: "fixed" };
+      return { ideas: fill([], opts.topics, opts.count, f), dropped: c.dropped, blocked: true, source: "fixed" };
     }
-    return { ideas: fill(c.kept, opts.topics, opts.count), dropped: c.dropped, blocked: false, source: c.kept.length ? "muse" : "fixed" };
+    return { ideas: fill(c.kept, opts.topics, opts.count, f), dropped: c.dropped, blocked: false, source: c.kept.length ? "muse" : "fixed" };
   } catch (err) {
     await audit({ actor: "system", action: "instagram_ideas_fallback", subjectType: "post", details: { error: err instanceof Error ? err.message : String(err) } });
-    return { ideas: fill([], opts.topics, opts.count), dropped: 0, blocked: false, source: "fixed" };
+    return { ideas: fill([], opts.topics, opts.count, f), dropped: 0, blocked: false, source: "fixed" };
   }
 }
 
@@ -261,11 +271,11 @@ export async function postIdeas(
   return { ideas, dropped: w.dropped, blocked: w.blocked, source: w.source, sample, declined: false };
 }
 
-type IdeaRow = { id: string; topic: PillarId; headline: string; alt_text: string; critic: { idea?: { batch: string; number: number; points: string[]; cta: string } }; scheduled_for: Date | null };
+type IdeaRow = { id: string; topic: PillarId; headline: string; alt_text: string; critic: { idea?: { batch: string; number: number; points: string[]; cta: string; drafted_post?: string } }; scheduled_for: Date | null };
 
 function toSaved(r: IdeaRow): SavedIdea {
   const meta = r.critic.idea!;
-  return { id: r.id, number: meta.number, topic: r.topic, hook: r.headline, points: meta.points, cta: meta.cta, picture: r.alt_text, day: r.scheduled_for ? r.scheduled_for.toISOString().slice(0, 10) : null };
+  return { id: r.id, number: meta.number, topic: r.topic, hook: r.headline, points: meta.points, cta: meta.cta, picture: r.alt_text, day: r.scheduled_for ? r.scheduled_for.toISOString().slice(0, 10) : null, draftedPost: meta.drafted_post };
 }
 
 /** Her latest list of ideas, in order (what "the second one" means). */
@@ -287,12 +297,30 @@ async function findIdea(ref: { number?: number; id?: string }): Promise<SavedIde
   return (await latestIdeas()).find((i) => i.number === ref.number) ?? null;
 }
 
-export type DraftIdeaResult = { found: false; why: string } | ({ found: true; idea: SavedIdea } & RequestResult);
+export type DraftIdeaResult =
+  | { found: false; why: string }
+  | ({ found: true; idea: SavedIdea } & RequestResult)
+  /** She asked for the same idea again: the draft she already has, not a second approval. */
+  | { found: true; idea: SavedIdea; outcome: "already_drafted"; post: SavedPost; headline: string; why: null };
 
 /** One idea as a full caption in her style: checked, drawn and waiting for her approval like any post. */
 export async function draftIdea(by: string, ref: { number?: number; id?: string }, opts: { chat?: ChatFn; graphic?: GraphicDeps } = {}): Promise<DraftIdeaResult> {
   const idea = await findIdea(ref);
   if (!idea) return { found: false, why: ref.id ? "No idea with that id." : `Her latest list has no idea number ${ref.number}. Offer to make new ideas.` };
+  if (idea.draftedPost) {
+    const [p] = await db()<{ id: string; approval_id: string | null; status: string; headline: string | null }[]>`
+      select id, approval_id, status, headline from practice_os.posts where id = ${idea.draftedPost} and status <> 'blocked'`;
+    if (p) {
+      return {
+        found: true,
+        idea,
+        outcome: "already_drafted",
+        post: { id: p.id, approvalId: p.approval_id, status: p.status as SavedPost["status"] },
+        headline: p.headline ?? idea.hook,
+        why: null,
+      };
+    }
+  }
   const request = [`Write the full post from this idea.`, `Hook: ${idea.hook}`, ...idea.points.map((p) => `Point: ${p}`), `Call to action: ${idea.cta}`].join("\n");
   const r = await requestPost(by, request, idea.topic, opts);
   if ("post" in r) {

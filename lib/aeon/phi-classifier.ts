@@ -180,9 +180,16 @@ export async function findNames(text: string): Promise<string[]> {
       let text = e.text;
       let found = located(text, slice);
       if (!found) {
-        const rest = text.split(/\s+/).filter((w) => !APP_WORDS.has(w)).join(" ");
-        if (rest !== text) {
-          if (!rest || GREETINGS.has(rest)) continue;
+        // Only when the slice really has the label glued on with punctuation ("Hook: Hi");
+        // otherwise the whole name stands ("Jenny Key" stays "Jenny Key").
+        const words = text.split(/\s+/);
+        const lead = words.findIndex((w) => !APP_WORDS.has(w));
+        const glued =
+          lead > 0 &&
+          new RegExp(`(?<![\\p{L}\\p{N}])${words.slice(0, lead).map(escape).join("\\s+")}\\s*[:\\-–—|•]+\\s*${escape(words[lead])}`, "u").test(slice);
+        if (glued) {
+          const rest = words.slice(lead).join(" ");
+          if (GREETINGS.has(rest)) continue;
           text = rest;
           found = located(rest, slice);
         }

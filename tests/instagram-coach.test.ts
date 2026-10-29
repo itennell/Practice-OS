@@ -4,7 +4,10 @@
 import sharp from "sharp";
 import { afterAll, describe, expect, it } from "vitest";
 import { closeDb, db } from "../lib/db";
-import { breaksNeverShow, checkIdeas, draftIdea, latestIdeas, NEUTRAL_PICTURE, planDays, postIdeas } from "../lib/instagram/coach";
+import { runTool } from "../lib/aeon/tools";
+import { breaksNeverShow, checkIdeas, draftIdea, fixedIdeas, latestIdeas, NEUTRAL_PICTURE, planDays, postIdeas } from "../lib/instagram/coach";
+import { designPost } from "../lib/instagram/graphic";
+import { PILLAR_BY_ID } from "../lib/instagram/pillars";
 import type { ChatFn } from "../lib/instagram/critic";
 import { DEFAULT_PREFS, instagramQuestions, saveInstagramPrefs } from "../lib/instagram/onboarding";
 import { listPosts } from "../lib/instagram/store";
@@ -45,6 +48,28 @@ describe("checking ideas in plain code", () => {
     expect(c.kept).toHaveLength(1);
     expect(c.dropped).toBe(3);
     expect(checkIdeas([idea(), idea({ hook: "September is suicide prevention month" })], { ...check, topics: [...check.topics] })).toMatchObject({ kept: [], blocked: true });
+  });
+
+  it("the fixed ideas use only facts she gave; anything else is a [fill in]", () => {
+    const f = { clinicianName: "Dana Reyes", credential: "LCPC", neighborhood: "Lincoln Park", city: "Chicago", fees: [{ label: "Session, 53 minutes or more", cents: 17500 }] };
+    const all = JSON.stringify(fixedIdeas(f));
+    expect(all).not.toMatch(/50 minutes|15-minute|link in my bio|anywhere in the state|on my website/i);
+    expect(all).toContain("Session, 53 minutes or more: $175.");
+    expect(all).toContain("I'm Dana Reyes, LCPC.");
+    expect(all).toContain("Lincoln Park, Chicago");
+    expect(all).toContain("[fill in: how people book with you]");
+    expect(JSON.stringify(fixedIdeas({ ...f, neighborhood: null, city: "", fees: [] }))).toContain("[fill in: your fee]");
+  });
+
+  it("the test picture stand-in refuses to run on the Vercel copy", async () => {
+    process.env.PLAYWRIGHT_IMAGE_STANDIN = "1";
+    process.env.VERCEL = "1";
+    try {
+      await expect(designPost(PILLAR_BY_ID.get("how_to_book")!, { headline: "How to book", practiceName: "Reyes Counseling PLLC", licenseLine: "x" })).rejects.toThrow(/tests only/);
+    } finally {
+      delete process.env.VERCEL;
+      delete process.env.PLAYWRIGHT_IMAGE_STANDIN;
+    }
   });
 
   it("plans her days at 1, 3 or 5 a week", () => {
@@ -110,6 +135,13 @@ describe.skipIf(!hasDb)("ideas from her saved answers, then a draft", () => {
     expect(a).toEqual({ kind: "instagram_post", status: "pending" });
 
     expect(await draftIdea("test", { number: 5 })).toMatchObject({ found: false });
+
+    // Asking for the same idea again gives the draft she has, not a second approval.
+    const pending = async () => Number((await db()`select count(*) as n from practice_os.approvals where kind = 'instagram_post' and status = 'pending'`)[0].n);
+    const before = await pending();
+    const again = await draftIdea("test", { number: 2 }, { chat, graphic });
+    expect(again).toMatchObject({ found: true, outcome: "already_drafted", post: { approvalId } });
+    expect(await pending()).toBe(before);
   }, 120_000);
 
   it("after 'Not for me' there are no ideas, no plan and no model call", async () => {
@@ -120,6 +152,23 @@ describe.skipIf(!hasDb)("ideas from her saved answers, then a draft", () => {
     expect(await postIdeas("test", { count: 3, chat: never })).toMatchObject({ ideas: [], declined: true });
     expect(await postIdeas("test", { plan: true, chat: never })).toMatchObject({ ideas: [], declined: true });
     await instagramQuestions.save({ account: "has", posts_per_week: "3" }); // "Not for me" cleared her answers
+  });
+
+  it("the view-only demo copy refuses every Instagram writer: no rows, no approvals, no Muse", async () => {
+    const count = async () => Number((await db()`select count(*) as n from practice_os.posts`)[0].n) + Number((await db()`select count(*) as n from practice_os.approvals`)[0].n);
+    const before = await count();
+    for (const [name, args] of [
+      ["post_ideas", { count: 3 }],
+      ["weekly_plan", {}],
+      ["draft_post", { idea: 1 }],
+      ["plan_instagram_week", {}],
+      ["draft_instagram_post", { request: "a post about how to book" }],
+    ] as const) {
+      const r = await runTool(name, args, { by: "chat:demo", viewOnly: true });
+      expect(r.isError, name).toBe(true);
+      expect(r.content[0].text, name).toMatch(/view only|demo/i);
+    }
+    expect(await count()).toBe(before);
   });
 
   it("the weekly plan gives one dated idea per post day", async () => {
