@@ -154,13 +154,21 @@ describe.skipIf(!ready)("the guards come before the model", () => {
     expect(Number(n)).toBe(0);
   });
 
-  it("holds back a reply that carries a client name", async () => {
+  it("blanks a client name in a reply and keeps the rest of the answer", async () => {
     const chat = (async () => ({
       choices: [{ message: { role: "assistant", content: "Sure, I noted that Kevin Ortiz pays on the 1st." } }],
     })) as unknown as Replay["chat"];
     const reply = await respond("When do people usually pay?", { by: "chat:test", chat });
     expect(reply).toMatchObject({ kind: "answer" });
     expect(reply.text).not.toContain("Kevin");
+    expect(reply.text).toBe("Sure, I noted that [name withheld] pays on the 1st.");
+  });
+
+  it("lets through a walk-through that names app buttons (Oct 29: \"Link Instagram\" was held back)", async () => {
+    const answer = "1. Go to the Instagram page in Practice-OS.\n2. Look for a Connect or Link Instagram button at the top.";
+    const chat = (async () => ({ choices: [{ message: { role: "assistant", content: answer } }] })) as unknown as Replay["chat"];
+    const reply = await respond("walk me through connecting instgram", { by: "chat:test", chat });
+    expect(reply).toMatchObject({ kind: "answer", text: answer });
   });
 });
 
