@@ -3,7 +3,6 @@ import { Suspense } from "react";
 import { Lightbulb } from "lucide-react";
 import { ListCard, ListRow } from "@/components/shared/list-card";
 import { InstagramBoard } from "@/components/instagram/instagram-board";
-import { listApprovalsById } from "@/lib/approvals";
 import { latestIdeas } from "@/lib/instagram/coach";
 import { instagramDeclined } from "@/lib/instagram/onboarding";
 import { PILLAR_BY_ID } from "@/lib/instagram/pillars";
@@ -12,8 +11,9 @@ import { getProfile } from "@/lib/profile";
 
 export const metadata = { title: "Instagram · Practice-OS" };
 
-// Instagram (AGENTS.md > The four helpers): this week's posts, why any were
-// blocked, what waits for her approval, and links to the ones that are live.
+// Instagram (AGENTS.md > The four helpers): the content studio. She types what a
+// post is about; each post shows as it will look in the feed, waits for her
+// approval, then she downloads it and posts it herself.
 export default function InstagramPage() {
   return (
     <div className="mx-auto flex w-full max-w-[860px] flex-col gap-6">
@@ -42,7 +42,6 @@ async function Board() {
     instagramDeclined().then((no) => (no ? [] : latestIdeas())).catch(() => []),
     getProfile().catch(() => null),
   ]);
-  const approvals = await listApprovalsById(posts.flatMap((p) => (p.approvalId ? [p.approvalId] : [])));
   const sample = profile?.is_sample ? "[Sample] " : "";
   return (
     <>
@@ -59,7 +58,14 @@ async function Board() {
           ))}
         </ListCard>
       )}
-      <InstagramBoard initialPosts={posts} initialApprovals={approvals} />
+      <InstagramBoard
+        initialPosts={posts}
+        profile={{
+          practiceName: profile?.practice_name ?? "Your practice",
+          place: profile ? [profile.neighborhood, profile.city].filter(Boolean).join(", ") || null : null,
+          isSample: Boolean(profile?.is_sample),
+        }}
+      />
     </>
   );
 }

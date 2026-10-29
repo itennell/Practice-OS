@@ -130,7 +130,7 @@ describe.skipIf(!hasDb)("ideas from her saved answers, then a draft", () => {
     const d = await draftIdea("test", { number: 2 }, { chat, graphic });
     expect(d.found && d.idea.hook).toBe("How paying for sessions works.");
     expect(d.found && d.outcome).toBe("queued");
-    const approvalId = d.found && d.outcome !== "blocked" && d.outcome !== "declined" ? d.post.approvalId : null;
+    const approvalId = d.found && "post" in d ? d.post.approvalId : null;
     const [a] = await db()<{ kind: string; status: string }[]>`select kind, status from practice_os.approvals where id = ${approvalId}`;
     expect(a).toEqual({ kind: "instagram_post", status: "pending" });
 
