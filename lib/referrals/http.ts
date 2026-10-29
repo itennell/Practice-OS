@@ -13,3 +13,14 @@ export function canChange(request: Request): boolean {
   if (process.env.VERCEL) return canDecide(request) && isSameOrigin(request);
   return isLocalAppRequest(request);
 }
+
+/**
+ * Who may run a map search: read only, but it asks outside services, so only
+ * the app's own page, as JSON. On the Vercel copy anyone past the demo
+ * password may look, from the app's own page.
+ */
+export function canSearch(request: Request): boolean {
+  if (!(request.headers.get("content-type") ?? "").toLowerCase().startsWith("application/json")) return false;
+  if (process.env.VERCEL) return isSameOrigin(request);
+  return isLocalAppRequest(request);
+}

@@ -6,22 +6,32 @@
 
 export const NPPES_URL = "https://npiregistry.cms.hhs.gov/api/";
 
-export type SpecialtyId = "family_medicine" | "internal_medicine" | "ob_gyn" | "pediatrics" | "oncology" | "therapists";
+export type SpecialtyId =
+  | "family_medicine"
+  | "internal_medicine"
+  | "ob_gyn"
+  | "pediatrics"
+  | "psychiatry"
+  | "oncology"
+  | "therapists";
 
 type Specialty = {
   id: SpecialtyId;
   label: string;
-  /** taxonomy_description values sent to NPPES. */
+  /** taxonomy_description values sent to NPPES (checked live 2026-10-29: "Clinical Social Worker" is refused, "Social Worker" works). */
   searches: string[];
-  /** A primary code that matches one of these (exactly, or by prefix ending in "*") counts. */
+  /** A primary code that matches one of these (exactly, or by prefix ending in "*") counts. Exact codes win over prefixes. */
   codes: string[];
 };
 
+// Nurse practitioners in the same field count too: a "Pediatrics" search
+// returns pediatric NPs (363LP0200X) and subspecialists (2080P0204X) as well.
 export const SPECIALTIES: Specialty[] = [
-  { id: "family_medicine", label: "Family medicine", searches: ["Family Medicine"], codes: ["207Q*"] },
-  { id: "internal_medicine", label: "Internal medicine", searches: ["Internal Medicine"], codes: ["207R00000X"] },
-  { id: "ob_gyn", label: "OB/GYN", searches: ["Obstetrics & Gynecology"], codes: ["207V00000X", "207VG0400X", "207VX0000X"] },
-  { id: "pediatrics", label: "Pediatrics", searches: ["Pediatrics"], codes: ["208000000X", "2080A0000X"] },
+  { id: "family_medicine", label: "Family medicine", searches: ["Family Medicine"], codes: ["207Q*", "363LF0000X"] },
+  { id: "internal_medicine", label: "Internal medicine", searches: ["Internal Medicine"], codes: ["207R00000X", "207RG0300X"] },
+  { id: "ob_gyn", label: "OB/GYN", searches: ["Obstetrics & Gynecology"], codes: ["207V*", "363LX0001X"] },
+  { id: "pediatrics", label: "Pediatrics", searches: ["Pediatrics"], codes: ["2080*", "363LP0200X"] },
+  { id: "psychiatry", label: "Psychiatry", searches: ["Psychiatry"], codes: ["2084P08*", "363LP0808X"] },
   {
     id: "oncology",
     label: "Oncology",
@@ -31,7 +41,7 @@ export const SPECIALTIES: Specialty[] = [
   {
     id: "therapists",
     label: "Therapist",
-    searches: ["Clinical Social Worker", "Psychologist", "Marriage & Family Therapist", "Counselor"],
+    searches: ["Social Worker", "Psychologist", "Marriage & Family Therapist", "Counselor"],
     codes: ["1041C0700X", "103T*", "106H00000X", "101YP2500X", "101YM0800X"],
   },
 ];
@@ -43,7 +53,9 @@ export const TAXONOMY_CODE = /^[0-9]{3}[0-9A-Z]{6}X$/;
 
 export function specialtyForCode(code: string): Specialty | null {
   return (
-    SPECIALTIES.find((s) => s.codes.some((c) => (c.endsWith("*") ? code.startsWith(c.slice(0, -1)) : code === c))) ?? null
+    SPECIALTIES.find((s) => s.codes.includes(code)) ??
+    SPECIALTIES.find((s) => s.codes.some((c) => c.endsWith("*") && code.startsWith(c.slice(0, -1)))) ??
+    null
   );
 }
 
@@ -72,6 +84,8 @@ export type NppesResult = {
   };
   addresses?: NppesAddress[];
   taxonomies?: NppesTaxonomy[];
+  /** "Doing Business As" and former names; type code "3" is the DBA a group puts on its sign. */
+  other_names?: { organization_name?: string; type?: string; code?: string }[];
 };
 export type NppesResponse = { result_count?: number; results?: NppesResult[]; Errors?: { description: string }[] };
 
@@ -80,9 +94,13 @@ export type Provider = {
   npi: string;
   name: string;
   organization: string | null;
+  /** The name on the door: a group's "Doing Business As" name, else its legal name. Null for a person (NPPES lists no employer). */
+  practiceName: string | null;
   npiType: "individual" | "organization";
   credential: string | null;
   taxonomy: string;
+  /** NPPES's own words for the primary taxonomy, e.g. "Social Worker, Clinical". */
+  taxonomyLabel: string;
   specialty: SpecialtyId;
   specialtyLabel: string;
   address: string;
@@ -93,8 +111,13 @@ export type Provider = {
   lastUpdated: string | null;
 };
 
-function titleCase(s: string): string {
-  return s.toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase());
+const KEEP_UPPER = new Set(["LLC", "PLLC", "PC", "SC", "LTD", "LLP", "PA", "MD", "DO", "II", "III", "IV", "USA", "UIC", "OB", "GYN", "NW", "NE", "SW", "SE"]);
+
+export function titleCase(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/\b([a-z])/g, (m) => m.toUpperCase())
+    .replace(/\b[A-Za-z]+\b/g, (w) => (KEEP_UPPER.has(w.toUpperCase()) ? w.toUpperCase() : w));
 }
 
 function cleanCredential(raw: string | undefined): string | null {
@@ -127,14 +150,17 @@ export function parseResult(r: NppesResult, want?: Set<SpecialtyId>): Provider |
   const org = r.basic.organization_name ? titleCase(r.basic.organization_name) : null;
   const name = individual ? (credential ? `${person}, ${credential}` : person) : org;
   if (!name) return null;
+  const dba = (r.other_names ?? []).find((o) => o.code === "3" && o.organization_name)?.organization_name;
 
   return {
     npi,
     name,
     organization: individual ? null : org,
+    practiceName: individual ? null : dba ? titleCase(dba) : org,
     npiType: individual ? "individual" : "organization",
     credential,
     taxonomy: primary.code,
+    taxonomyLabel: primary.desc?.trim() || spec.label,
     specialty: spec.id,
     specialtyLabel: spec.label,
     address: titleCase([loc.address_1, loc.address_2].filter(Boolean).join(", ")),
@@ -163,15 +189,20 @@ export function parseResponses(responses: NppesResponse[], want?: Set<SpecialtyI
   return [...byNpi.values()];
 }
 
-export function searchUrl(description: string, zip: string, skip = 0): string {
+/** `postal` is a 5-digit ZIP or a NPPES wildcard like "606*" (every ZIP starting 606). */
+export function searchUrl(description: string, postal: string, skip = 0): string {
   const params = new URLSearchParams({
     version: "2.1",
     taxonomy_description: description,
-    postal_code: zip,
+    postal_code: postal,
     limit: "200",
     skip: String(skip),
   });
   return `${NPPES_URL}?${params}`;
+}
+
+export function npiUrl(npi: string): string {
+  return `${NPPES_URL}?${new URLSearchParams({ version: "2.1", number: npi })}`;
 }
 
 type Fetcher = (url: string) => Promise<NppesResponse>;
@@ -182,25 +213,80 @@ const defaultFetch: Fetcher = async (url) => {
   return (await res.json()) as NppesResponse;
 };
 
-/** Every search for these specialties in these ZIPs, 200 at a time (NPPES stops at skip 1000). */
-export async function fetchProviders(
+// Polite to a free public service: the same question within 6 hours is answered
+// from memory, and at most a few questions are in flight at once.
+const CACHE_MS = 6 * 3600 * 1000;
+const CACHE_MAX = 3000;
+const cache = new Map<string, { at: number; value: Promise<NppesResponse> }>();
+
+export function cachedFetch(fetcher: Fetcher = defaultFetch, now = () => Date.now()): Fetcher {
+  return (url) => {
+    const hit = cache.get(url);
+    if (hit && now() - hit.at < CACHE_MS) return hit.value;
+    const value = fetcher(url);
+    cache.set(url, { at: now(), value });
+    value.catch(() => cache.delete(url));
+    if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value!);
+    return value;
+  };
+}
+
+export function clearNppesCache() {
+  cache.clear();
+}
+
+export type SearchResult = {
+  providers: Provider[];
+  /** NPPES questions asked (cached ones count too). */
+  requests: number;
+  /** True when a search hit NPPES's 1,200-a-search ceiling or our request budget, so the list is partial. */
+  truncated: boolean;
+};
+
+const PAGE = 200;
+const LAST_SKIP = 1000; // NPPES refuses skip above 1000
+
+/** Every search for these specialties in these ZIPs (or ZIP wildcards), 200 at a time, within a request budget. */
+export async function searchProviders(
   specialties: SpecialtyId[],
-  zips: string[],
-  fetcher: Fetcher = defaultFetch,
-): Promise<Provider[]> {
-  const jobs = specialties.flatMap((id) => SPECIALTY_BY_ID.get(id)!.searches).flatMap((d) => zips.map((z) => [d, z] as const));
+  postals: string[],
+  opts: { fetcher?: Fetcher; maxRequests?: number; concurrency?: number } = {},
+): Promise<SearchResult> {
+  const fetcher = opts.fetcher ?? cachedFetch();
+  const budget = opts.maxRequests ?? 150;
+  const jobs = specialties.flatMap((id) => SPECIALTY_BY_ID.get(id)!.searches).flatMap((d) => postals.map((z) => [d, z] as const));
   const responses: NppesResponse[] = [];
   const queue = [...jobs];
+  let requests = 0;
+  let truncated = false;
   async function worker() {
     for (let job = queue.shift(); job; job = queue.shift()) {
-      for (let skip = 0; skip <= 1000; skip += 200) {
+      for (let skip = 0; skip <= LAST_SKIP; skip += PAGE) {
+        if (requests >= budget) {
+          truncated = true;
+          return;
+        }
+        requests++;
         const res = await fetcher(searchUrl(job[0], job[1], skip));
         if (res.Errors?.length) break;
         responses.push(res);
-        if ((res.results?.length ?? 0) < 200) break;
+        if ((res.results?.length ?? 0) < PAGE) break;
+        if (skip === LAST_SKIP) truncated = true;
       }
     }
   }
-  await Promise.all(Array.from({ length: Math.min(6, jobs.length) }, worker));
-  return parseResponses(responses, new Set(specialties));
+  await Promise.all(Array.from({ length: Math.min(opts.concurrency ?? 4, jobs.length) }, worker));
+  return { providers: parseResponses(responses, new Set(specialties)), requests, truncated };
+}
+
+/** The old shape, for the chat tool and the board's Find form. */
+export async function fetchProviders(specialties: SpecialtyId[], zips: string[], fetcher?: Fetcher): Promise<Provider[]> {
+  return (await searchProviders(specialties, zips, { fetcher, maxRequests: 400 })).providers;
+}
+
+/** One provider by NPI, or null when NPPES has no active one we'd list. */
+export async function providerByNpi(npi: string, fetcher: Fetcher = cachedFetch()): Promise<Provider | null> {
+  if (!/^\d{10}$/.test(npi)) return null;
+  const res = await fetcher(npiUrl(npi));
+  return parseResponses([res])[0] ?? null;
 }
