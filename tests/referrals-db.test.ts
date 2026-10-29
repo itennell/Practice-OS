@@ -10,7 +10,7 @@ const hasDb = Boolean(process.env.DATABASE_URL);
 const { approve } = await import("../lib/approvals");
 const { closeDb, db } = await import("../lib/db");
 const { draftOutreach } = await import("../lib/referrals/outreach");
-const { addToBoard, getSource, moveDueFollowUps } = await import("../lib/referrals/store");
+const { addToBoard, getSource, moveDueFollowUps, rescoreOldCards } = await import("../lib/referrals/store");
 const { practiceToday } = await import("../lib/compliance/store");
 const { getReferralSettings, saveReferralSettings } = await import("../lib/referrals/settings");
 const { referralsQuestions } = await import("../lib/referrals/onboarding");
@@ -149,6 +149,17 @@ describe.skipIf(!hasDb)("Add to board", () => {
     expect(lookups).toBe(3);
     expect(added.map((a) => a.npi)).toEqual([ok1, ok2]);
     expect(missing).toEqual([bad]);
+  });
+});
+
+describe.skipIf(!hasDb)("score versions", () => {
+  it("scores cards from an older formula again and marks them current", async () => {
+    const id = await makeSource();
+    await db()`update practice_os.referral_sources set score_version = 1, fit_score = 3 where id = ${id}`;
+    await rescoreOldCards(db(), async () => null, 500);
+    const card = (await getSource(id))!;
+    expect(card.score_version).toBe(2);
+    expect(card.fit_score).toBeGreaterThan(3);
   });
 });
 

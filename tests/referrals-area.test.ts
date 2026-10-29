@@ -19,7 +19,7 @@ import {
   type NppesResponse,
   type NppesResult,
 } from "../lib/referrals/nppes";
-import { BUILT_IN_WEIGHTS, capFirst, focusFrom, readWeights, SPECIALTY_POINTS, TIER_LABEL, tierFor, WEIGHTS } from "../lib/referrals/tier";
+import { boardTier, BUILT_IN_WEIGHTS, capFirst, focusFrom, readWeights, SPECIALTY_POINTS, TIER_LABEL, tierFor, WEIGHTS } from "../lib/referrals/tier";
 import research from "../docs/research/referral-tiers.json";
 
 // Real NPPES replies recorded 2026-10-29 (tests/fixtures/nppes-area.json, fields the app reads only).
@@ -191,6 +191,24 @@ describe("tiers (plain code, with reasons)", () => {
     const unknown = tierFor({ taxonomy: null, npiType: null }, { miles: null, focus: [] });
     expect(unknown).toMatchObject({ tier: "later", specialty: null, score: 18 + 8 + 3 });
     expect(unknown.reasons).toContain("distance unknown");
+  });
+});
+
+describe("board cards", () => {
+  const card = { taxonomy: "207Q00000X", npi_type: "organization" as const, phone: null, state: "IL", fit_score: 81, score_version: 2, distance_miles: 0.6 };
+  it("take the tier from the score saved when found, and still say why", () => {
+    const r = boardTier(card, { focus: ["adults"], clinicianState: "IL" });
+    expect(r).toMatchObject({ tier: "first", score: 81 });
+    expect(r.reasons).toContain("0.6 mi from your office");
+    expect(boardTier({ ...card, fit_score: 55 }, { focus: [] }).tier).toBe("next");
+  });
+  it("ignore a score written by an older formula and score from what the card keeps", () => {
+    const r = boardTier({ ...card, score_version: 1, fit_score: 99 }, { focus: ["adults"], clinicianState: "IL" });
+    // family medicine 35 + 0.6 mi 22 + group with no named contact 3 + Illinois 5
+    expect(r).toMatchObject({ score: 65, tier: "next" });
+  });
+  it("keep a pediatrics card Later for an adults practice", () => {
+    expect(boardTier({ ...card, taxonomy: "208000000X", fit_score: 95 }, { focus: ["adults"] }).tier).toBe("later");
   });
 });
 

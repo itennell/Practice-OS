@@ -249,6 +249,37 @@ export function providerTier(p: Provider, ctx: TierContext, worksAt: string | nu
 }
 
 /**
+ * Which scoring wrote a card's fit_score. 1 was the first fit formula (before
+ * 2026-10-29); 2 is these research weights. Bump it when the weights change,
+ * and old cards are scored again (lib/referrals/store.ts rescoreOldCards).
+ */
+export const SCORE_VERSION = 2;
+
+/**
+ * A board card: its reasons from what the board keeps, and its tier from the
+ * score saved when it was found (that one saw the whole NPPES record: fax,
+ * named contact, record age), but only if this scoring wrote it. A "not who
+ * you help" card stays Later.
+ */
+export function boardTier(
+  card: {
+    taxonomy: string | null;
+    npi_type: "individual" | "organization" | null;
+    phone: string | null;
+    state: string | null;
+    fit_score: number | null;
+    score_version: number | null;
+    distance_miles: number | null;
+  },
+  ctx: Omit<TierContext, "miles">,
+): TierResult {
+  const r = tierFor({ taxonomy: card.taxonomy, npiType: card.npi_type, phone: card.phone, state: card.state }, { ...ctx, miles: card.distance_miles });
+  const mismatch = r.reasons.some((x) => x.startsWith("mostly sees"));
+  if (card.fit_score === null || card.score_version !== SCORE_VERSION || mismatch) return r;
+  return { ...r, score: card.fit_score, tier: tierOf(card.fit_score) };
+}
+
+/**
  * "Reach out first" is a short list: at most `max` per search, the best scores
  * (the list comes in sorted). A strong fit past that moves down a tier, and says so.
  */

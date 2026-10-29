@@ -7,7 +7,7 @@ import { practiceToday } from "../compliance/store";
 import { db } from "../db";
 import { nearbyZips, zipCenters, zipDistance } from "./geo";
 import { fetchProviders, providerByNpi, SPECIALTY_BY_ID, type Provider, type SpecialtyId } from "./nppes";
-import { focusFrom, providerTier, type Focus } from "./tier";
+import { focusFrom, providerTier, SCORE_VERSION, tierFor, type Focus } from "./tier";
 import { STAGES, STAGE_LABEL, type Stage } from "./stages";
 
 export { STAGES, STAGE_LABEL, type Stage };
@@ -30,6 +30,7 @@ export type ReferralSource = {
   stage: Stage;
   distance_miles: number | null;
   fit_score: number | null;
+  score_version: number | null;
   last_contacted_at: string | null;
   next_follow_up_on: string | null;
   notes: string | null;
@@ -134,6 +135,7 @@ export async function saveSources(found: FoundSource[], sql: postgres.Sql = db()
     phone: p.phone,
     distance_miles: p.distanceMiles,
     fit_score: p.fitScore,
+    score_version: SCORE_VERSION,
   }));
   const result = await sql`
     insert into practice_os.referral_sources ${sql(rows)}
@@ -142,6 +144,7 @@ export async function saveSources(found: FoundSource[], sql: postgres.Sql = db()
       specialty = excluded.specialty, npi_type = excluded.npi_type, credential = excluded.credential,
       address = excluded.address, city = excluded.city, state = excluded.state, zip = excluded.zip,
       phone = excluded.phone, distance_miles = excluded.distance_miles, fit_score = excluded.fit_score,
+      score_version = excluded.score_version,
       updated_at = now()
     returning id, npi`;
   const ids = new Map(result.map((r) => [r.npi as string, r.id as string]));
@@ -149,6 +152,34 @@ export async function saveSources(found: FoundSource[], sql: postgres.Sql = db()
   // The privacy guard lets her Referrals names through; let it see the new ones now.
   forgetAllowlist();
   return result.count;
+}
+
+/**
+ * Cards scored by an older formula get today's score: from NPPES by NPI when
+ * the card has one (the full record: fax, named contact, record age), else from
+ * what the card keeps. A few at a time, after the page is sent.
+ */
+export async function rescoreOldCards(
+  sql: postgres.Sql = db(),
+  lookup: (npi: string) => Promise<Provider | null> = (npi) => providerByNpi(npi),
+  max = 25,
+): Promise<number> {
+  const rows = await sql<
+    { id: string; npi: string | null; taxonomy: string | null; npi_type: "individual" | "organization" | null; phone: string | null; state: string | null; distance_miles: number | null }[]
+  >`
+    select id, npi, taxonomy, npi_type, phone, state, distance_miles::float8 as distance_miles
+      from practice_os.referral_sources where score_version <> ${SCORE_VERSION} limit ${max}`;
+  if (rows.length === 0) return 0;
+  const { focus, state } = await practiceFacts(sql);
+  for (const row of rows) {
+    const ctx = { miles: row.distance_miles, focus, clinicianState: state };
+    const p = row.npi ? await lookup(row.npi).catch(() => null) : null;
+    const score = p
+      ? providerTier(p, ctx).score
+      : tierFor({ taxonomy: row.taxonomy, npiType: row.npi_type, phone: row.phone, state: row.state }, ctx).score;
+    await sql`update practice_os.referral_sources set fit_score = ${score}, score_version = ${SCORE_VERSION} where id = ${row.id}`;
+  }
+  return rows.length;
 }
 
 /** Contacted cards whose follow-up day has come move to Follow up. */
@@ -165,7 +196,7 @@ export async function moveDueFollowUps(sql: postgres.Sql = db()): Promise<number
 }
 
 const COLUMNS = `id, npi, name, organization, taxonomy, specialty, npi_type, credential, address, city, state, zip,
-  phone, email, stage, distance_miles::float8 as distance_miles, fit_score, last_contacted_at, next_follow_up_on::text as next_follow_up_on,
+  phone, email, stage, distance_miles::float8 as distance_miles, fit_score, score_version, last_contacted_at, next_follow_up_on::text as next_follow_up_on,
   notes, is_sample`;
 
 export async function listSources(sql: postgres.Sql = db()): Promise<ReferralSource[]> {

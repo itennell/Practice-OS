@@ -1,10 +1,12 @@
-import { connection } from "next/server";
+import { after, connection } from "next/server";
 import { Suspense } from "react";
+import { AreaExplorer } from "@/components/referrals/area-explorer";
 import { ReferralBoard } from "@/components/referrals/board";
-import { ReferralSearch } from "@/components/referrals/search";
-import { GlassCard, PageHeader } from "@/components/ui";
+import { PageHeader } from "@/components/ui";
 import { DEFAULT_SPECIALTIES, getReferralSettings } from "@/lib/referrals/settings";
-import { latestLetters, listSources } from "@/lib/referrals/store";
+import { STAGE_LABEL } from "@/lib/referrals/stages";
+import { latestLetters, listSources, practiceFacts, rescoreOldCards } from "@/lib/referrals/store";
+import { boardTier, SCORE_VERSION, type TierResult } from "@/lib/referrals/tier";
 
 export const metadata = { title: "Referrals · Practice-OS" };
 
@@ -13,24 +15,39 @@ export default function ReferralsPage() {
     <>
       <PageHeader
         title="Referrals"
-        description="Doctors and clinicians near you from the free federal NPI Registry, from first letter to a real connection. Letters become Gmail drafts in your test inbox; you press send. Nothing is ever offered in return for a referral."
+        description="Doctors and clinicians near you from the free federal NPI Registry, on a map and in the order to reach out. Add the ones you like to your board, draft a letter, and send it yourself. Nothing is ever offered in return for a referral."
       />
       <Suspense fallback={<div aria-hidden className="h-96 animate-pulse rounded-[24px] bg-[var(--hairline)]" />}>
-        <Board />
+        <Referrals />
       </Suspense>
     </>
   );
 }
 
-async function Board() {
+async function Referrals() {
   await connection(); // read the database per request, never at build time
-  const [sources, letters, setup] = await Promise.all([listSources(), latestLetters(), getReferralSettings()]);
+  const [sources, letters, setup, facts] = await Promise.all([listSources(), latestLetters(), getReferralSettings(), practiceFacts()]);
+  // Cards scored by an older formula are scored again after the page is sent.
+  if (sources.some((s) => s.score_version !== SCORE_VERSION)) {
+    after(() => rescoreOldCards().catch((err) => console.error(`[referrals] rescore: ${err instanceof Error ? err.message : String(err)}`)));
+  }
+  const board = Object.fromEntries(sources.filter((s) => s.npi).map((s) => [s.npi!, { stage: STAGE_LABEL[s.stage] }]));
+  const tiers: Record<string, TierResult> = Object.fromEntries(
+    sources.map((s) => [s.id, boardTier(s, { focus: facts.focus, clinicianState: facts.state })]),
+  );
   return (
-    <>
-      <GlassCard className="p-5 md:p-6">
-        <ReferralSearch zip={setup.searchZip ?? ""} specialties={setup.specialties.length ? setup.specialties : DEFAULT_SPECIALTIES} />
-      </GlassCard>
-      <ReferralBoard initial={sources} letters={letters} />
-    </>
+    <div className="flex flex-col gap-8">
+      <AreaExplorer
+        defaultArea={setup.searchZip ?? ""}
+        specialties={setup.specialties.length ? setup.specialties : DEFAULT_SPECIALTIES}
+        board={board}
+      />
+      <section aria-labelledby="board-heading" className="flex flex-col gap-3">
+        <h2 id="board-heading" className="text-body font-semibold">
+          Your board
+        </h2>
+        <ReferralBoard initial={sources} letters={letters} tiers={tiers} />
+      </section>
+    </div>
   );
 }

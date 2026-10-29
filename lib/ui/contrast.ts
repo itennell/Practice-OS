@@ -144,6 +144,10 @@ export const PAIRS: Pair[] = [
     min: AA_TEXT,
     label: `${k} status pill`,
   })),
+  ...["first", "next", "later"].flatMap((k) => [
+    { fg: `--tier-${k}-fg`, on: ["--bg", "--glass", `--tier-${k}-bg`], min: AA_TEXT, label: `referral tier "${k}" badge` },
+    { fg: `--pin-${k}`, on: ["--bg", "--glass"], min: AA_NON_TEXT, label: `referral tier "${k}" map pin and dot` },
+  ]),
 ];
 
 PAIRS.push(

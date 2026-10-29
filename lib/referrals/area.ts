@@ -11,7 +11,7 @@ import { haversineMiles, zipCenters } from "./geo";
 import { isKnownPlace } from "./places";
 import { searchProviders, SPECIALTY_BY_ID, type Provider, type SpecialtyId } from "./nppes";
 import { getReferralSettings } from "./settings";
-import { focusFrom, providerTier, TIERS, type Focus, type TierResult } from "./tier";
+import { capFirst, focusFrom, providerTier, TIERS, type Focus, type TierResult } from "./tier";
 
 type Centers = Record<string, Point>;
 
@@ -207,15 +207,14 @@ export async function searchArea(
       tier: providerTier(p, { miles: distanceMiles, focus: ctx.focus, approximate: !exact || !ctx.office, clinicianState: ctx.state }, worksAt),
     });
   }
-  out.sort(
-    (a, b) =>
-      TIERS.indexOf(a.tier.tier) - TIERS.indexOf(b.tier.tier) ||
-      b.tier.score - a.tier.score ||
-      (a.distanceMiles ?? 99) - (b.distanceMiles ?? 99) ||
-      a.name.localeCompare(b.name),
-  );
+  const order = (a: AreaProvider, b: AreaProvider) =>
+    TIERS.indexOf(a.tier.tier) - TIERS.indexOf(b.tier.tier) ||
+    b.tier.score - a.tier.score ||
+    (a.distanceMiles ?? 99) - (b.distanceMiles ?? 99) ||
+    a.name.localeCompare(b.name);
+  const ranked = capFirst(out.sort(order)).sort(order);
   if (!officePoint) notes.push("Add your office address in setup so distances are from your door.");
-  return { label, center, zips, providers: out, requests: found.requests, notes };
+  return { label, center, zips, providers: ranked, requests: found.requests, notes };
 }
 
 /** Her office, state and who she helps, for distances and tiers. Business facts only. */
