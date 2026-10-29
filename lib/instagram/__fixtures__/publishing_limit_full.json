@@ -1,0 +1,14 @@
+{
+  "_source": "Shape from Meta's docs (developers.facebook.com/docs/instagram-platform), checked 2026-10-28. Replace with a live recording once @practiceos_ is connected.",
+  "body": {
+    "data": [
+      {
+        "quota_usage": 50,
+        "config": {
+          "quota_total": 50,
+          "quota_duration": 86400
+        }
+      }
+    ]
+  }
+}

@@ -135,6 +135,11 @@ test("A new clinician sets up the whole practice, and the home page lists what s
     await page.getByRole("button", { name: "Oncology" }).click();
     await expect(page.getByRole("button", { name: "Oncology" })).toHaveAttribute("aria-pressed", "true");
   });
+  // Instagram's own setup questions (lib/instagram/onboarding.ts): all five topics start picked.
+  await step(page, /What should your Instagram posts be about\?/, () =>
+    page.getByRole("button", { name: "Office and telehealth", pressed: true }).click(),
+  );
+  await step(page, /How many posts should Aeon plan each week\?/, () => radio(page, "3 a week"));
   await step(page, /How should I ask/, () => radio(page, /Ask me first/));
   await step(page, /miss a call/, () => radio(page, "No"));
 
