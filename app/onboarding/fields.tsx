@@ -183,20 +183,13 @@ function ChipGroup({ label, options, value, exclusive, onChange }: { label: stri
   );
 }
 
-/** One Connect card from Settings › Connections, shown inline. */
-function ConnectCard({ provider, connections }: { provider: string; connections: Record<string, ConnectionStatus> }) {
-  const card = CONNECTION_CARDS.find((c) => c.id === provider);
-  if (!card) return <p className="text-body text-[var(--fg-muted)]">You can connect it later in Settings, under Connections.</p>;
-  const { Card } = card;
-  return <Card status={connections[provider] ?? { provider, connected: false, scopes: [] }} />;
-}
-
 /** Three [Sample] captions on the same topic, from Muse when it's ready, else the fixed three. */
 function StyleField({ value, onChange, error }: { value: Record<string, unknown>; onChange: (v: unknown) => void; error?: string }) {
   const [samples, setSamples] = useState<StyleSample[] | null>(null);
   useEffect(() => {
     let live = true;
-    fetch("/api/onboarding/style-samples", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
+    // Never more than about 10 seconds on this screen: then the fixed three show.
+    fetch("/api/onboarding/style-samples", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}", signal: AbortSignal.timeout(10_000) })
       .then((r) => r.json())
       .then((d: { samples?: StyleSample[] }) => live && setSamples(d.samples?.length === 3 ? d.samples : FALLBACK_SAMPLES))
       .catch(() => live && setSamples(FALLBACK_SAMPLES));
@@ -518,7 +511,7 @@ export function Field({ screen: s, value, onChange, setupItems, stage, homeState
         <div className="flex flex-col gap-3">
           <p className="text-body">{first.focus}</p>
           <ul className="flex flex-col divide-y divide-[var(--hairline)]">
-            {HELPERS.map((h) => (
+            {HELPERS.filter((h) => !s.hide?.includes(h.id)).map((h) => (
               <li key={h.id} className="flex items-start gap-3 py-2">
                 <Orb size={28} className="mt-3" />
                 <div className="min-w-0 flex-1">
@@ -555,18 +548,15 @@ export function Field({ screen: s, value, onChange, setupItems, stage, homeState
           </div>
         );
       }
-      if (q.kind === "connect")
+      if (q.kind === "steps")
         return (
           <div className="flex flex-col gap-3">
-            {q.steps && (
-              <ol className="flex list-decimal flex-col gap-2 pl-6 text-body">
-                {q.steps.map((step) => (
-                  <li key={step}>{step}</li>
-                ))}
-              </ol>
-            )}
+            <ol className="flex list-decimal flex-col gap-2 pl-6 text-body">
+              {q.steps.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ol>
             <SettingRadio label={label} value={String(value ?? "")} onValueChange={(v) => onChange(v)} options={q.options} />
-            {value === "now" && <ConnectCard provider={q.provider} connections={connections} />}
           </div>
         );
       if (q.kind === "style") return <StyleField value={o} onChange={onChange} error={error} />;

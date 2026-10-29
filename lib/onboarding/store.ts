@@ -316,8 +316,21 @@ export async function saveAnswers(
     if (laterFor(id)?.when === value) progress.later.push(id);
   }
   if (opts.current !== undefined) progress.current = opts.current;
+  progress.current = resumeAt(progress, row, Object.keys(answers));
   await saveProgress(progress, sql);
   return { pending: false, notes, state: await loadOnboarding(sql) };
+}
+
+/**
+ * Where she picks up. An answer can remove the screen the browser said was next
+ * (Instagram "Not for me"); then it's the screen after the one she just answered,
+ * in the list as it is now.
+ */
+export function resumeAt(p: Progress, row: ProfileRow, answered: string[]): string | null {
+  const ids = screensFor(p.values, row).map((s) => s.id);
+  if (!p.current || ids.includes(p.current)) return p.current;
+  const at = Math.max(...answered.map((id) => ids.indexOf(id)));
+  return at >= 0 ? (ids[at + 1] ?? null) : null;
 }
 
 function laterFor(id: string): { when: string; ask: string } | undefined {
@@ -335,6 +348,7 @@ export async function markSkipped(id: string, how: "skip" | "later", current: st
   p.later = p.later.filter((x) => x !== id);
   (how === "skip" ? p.skipped : p.later).push(id);
   p.current = current;
+  p.current = resumeAt(p, row, [id]);
   await saveProgress(p, sql);
   return loadOnboarding(sql);
 }
@@ -604,7 +618,8 @@ async function saveOne(id: string, value: unknown, all: Record<string, unknown>,
     }
     case "website": {
       const v = z.enum(["has", "wants", "no"], { message: "Pick one of the three." }).parse(value);
-      await saveMarketing({ website: v }, sql);
+      // No website (yet): an address saved earlier no longer applies.
+      await saveMarketing(v === "has" ? { website: v } : { website: v, website_url: null }, sql);
       await rememberLine("Practice website:", `Practice website: ${WEBSITE_WORDS[v]}`, v === "no" ? "preference" : "fact");
       return null;
     }
@@ -662,6 +677,8 @@ async function saveOne(id: string, value: unknown, all: Record<string, unknown>,
     case "team": {
       const ids = HELPERS.map((h) => h.id);
       const v = z.record(z.enum(ids as [HelperId, ...HelperId[]]), z.boolean()).parse(value);
+      // "Not for me" wins over a team map saved before it (going Back to this screen).
+      if (all["instagram:account"] === "no") v.instagram = false;
       await sql`update practice_os.settings set helpers_enabled = ${sql.json({ admin: true, referrals: true, instagram: true, front_desk: true, ...v } as never)}`;
       return null;
     }

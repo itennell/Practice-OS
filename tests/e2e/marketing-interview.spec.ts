@@ -86,18 +86,13 @@ test.describe.configure({ timeout: 240_000 });
 const wide = () => !test.info().project.name.startsWith("phone");
 const menuHidden = (page: Page) => page.evaluate(() => fetch("/api/menu").then((r) => r.json()).then((d: { hidden: string[] }) => d.hidden));
 
-test("Maya posts weekly: she has an Instagram, connects it later, and picks her style", async ({ page }) => {
+test("Maya posts weekly: she has an Instagram, goes straight to her post answers, and picks her style", async ({ page }) => {
   await startAtChapter6(page, "Maya Ortiz", "middle");
   await step(page, /How do new clients find you now\?/, async () => {
     await chip(page, "Word of mouth");
     await chip(page, "Instagram or other social media");
   });
   await step(page, /Do you have an Instagram for your practice\?/, () => radio(page, "Yes, I have one"));
-  await step(page, /Do you want to connect it now\?/, async () => {
-    await radio(page, "Connect now");
-    await expect(page.locator("main").getByText(/Instagram/).first()).toBeVisible(); // the Settings › Connections card, inline
-    await radio(page, "Later");
-  });
   await step(page, /What should your posts help with\?/, () => chip(page, "Fill my open spots"));
   await step(page, /What should your posts be about\?/, async () => {
     await expect(page.getByText(/Posts won't cover: advice about mental health, client stories, or reviews from clients\./)).toBeVisible();
@@ -114,9 +109,10 @@ test("Maya posts weekly: she has an Instagram, connects it later, and picks her 
   expect(rest).not.toContain("What is your website address?");
   await expect(page.getByRole("switch", { name: /Instagram/ })).toBeChecked();
   await page.getByRole("button", { name: "Finish setup" }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/$/, { timeout: 30_000 }); // finishing saves and starts her helpers
 
-  await expect(page.getByRole("region", { name: "Still to set up" })).toContainText("Connect Instagram");
+  // Aeon writes, she posts: nothing to connect, so nothing about Instagram is left to set up.
+  await expect(page.getByRole("region", { name: "Still to set up" }).getByText(/Instagram/)).toHaveCount(0); // the card may not show at all
   expect(await menuHidden(page)).toEqual([]);
   if (wide()) await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Instagram" })).toBeVisible();
   const saved = await page.evaluate(() => fetch("/api/onboarding").then((r) => r.json()));
@@ -148,8 +144,8 @@ test("Theo has no Instagram but wants one: he gets the steps, and his website is
   // Doctors send him clients, so Referrals starts on even though he's just opening.
   await expect(page.getByRole("switch", { name: /Referrals/ })).toBeChecked();
   await page.getByRole("button", { name: "Finish setup" }).click();
-  await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole("region", { name: "Still to set up" })).toContainText("Make an Instagram business account");
+  await expect(page).toHaveURL(/\/$/, { timeout: 30_000 }); // finishing saves and starts her helpers
+  await expect(page.getByRole("region", { name: "Still to set up" })).toContainText("Make an Instagram business account", { timeout: 20_000 });
 });
 
 test("Rosa says Instagram isn't for her: no Instagram questions or reminders, ever", async ({ page }) => {
@@ -162,9 +158,9 @@ test("Rosa says Instagram isn't for her: no Instagram questions or reminders, ev
   await expect(page.getByText(/Instagram/)).toHaveCount(0); // no Instagram card
   const rest = await finishFromHere(page);
   expect(rest.filter((ask) => /Instagram|post/i.test(ask))).toEqual([]);
-  await expect(page.getByRole("switch", { name: /Instagram/ })).not.toBeChecked();
+  await expect(page.getByRole("switch", { name: /Instagram/ })).toHaveCount(0); // not offered on the team screen
   await page.getByRole("button", { name: "Finish setup" }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/$/, { timeout: 30_000 }); // finishing saves and starts her helpers
 
   const todo = page.getByRole("region", { name: "Still to set up" });
   await expect(todo).toContainText("Make a practice website");

@@ -83,7 +83,7 @@ describe.skipIf(!hasDb)("Instagram posts", () => {
     const { chat } = stubModels();
     const r = await requestPost("test", "Make a post about a client of mine who finally got her life back", null, { chat, graphic });
     expect(r.outcome).toBe("rewritten");
-    if (r.outcome === "blocked") throw new Error("unreachable");
+    if (r.outcome === "blocked" || r.outcome === "declined") throw new Error("unreachable");
     expect(r.why).toMatch(/client's story/);
     const [post] = await db()`select caption, status from practice_os.posts where id = ${r.post.id}`;
     expect(post.caption).not.toMatch(/client of mine/i);
@@ -142,7 +142,6 @@ describe.skipIf(!hasDb)("a draft after the marketing interview", () => {
     // Her answers, one screen at a time, as onboarding sends them.
     for (const a of [
       { account: "has" },
-      { connect: "later" },
       { goals: ["fill_spots", "explain_fees"] },
       { topics: ["how_to_book", "fees_superbills"] },
       { posts_per_week: "3" },
@@ -153,9 +152,17 @@ describe.skipIf(!hasDb)("a draft after the marketing interview", () => {
 
     const systems: string[] = [];
     const { chat: base } = stubModels();
+    const rewrites: string[] = [];
     const chat = (async (feature: string, params: { messages: { role: string; content: unknown }[] }) => {
-      if (feature === "instagram.write") systems.push(String(params.messages[0].content));
-      return (base as unknown as (f: string, p: unknown) => Promise<unknown>)(feature, params);
+      const res = await (base as unknown as (f: string, p: unknown) => Promise<{ choices: { message: { content: string } }[] }>)(feature, params);
+      if (feature !== "instagram.write") return res;
+      systems.push(String(params.messages[0].content));
+      const ask = String(params.messages.at(-1)?.content);
+      if (!ask.startsWith("Rewrite")) return res; // the first drafts describe her photo ("Dana smiling")
+      rewrites.push(ask);
+      const out = JSON.parse(res.choices[0].message.content) as { posts: Record<string, string>[] };
+      out.posts = out.posts.map((p) => ({ ...p, alt_text: "A calendar page and a folder, softly lit, with the headline." }));
+      return { choices: [{ message: { content: JSON.stringify(out) } }] };
     }) as unknown as ChatFn;
     let cutoutCalls = 0;
     const prompts: string[] = [];
@@ -183,6 +190,10 @@ describe.skipIf(!hasDb)("a draft after the marketing interview", () => {
     expect(systems[0]).toMatch(/Never show, describe or mention: her face or photo, her office/);
     // "My face": her photo is never cut out or placed; "My office": no office in the picture.
     expect(cutoutCalls).toBe(0);
+    // Plain code caught "Dana smiling" in the picture's description; each post was rewritten once without it.
+    expect(rewrites.length).toBe(r.saved.length);
+    expect(rewrites[0]).toMatch(/never show/);
+    expect(week.slice(0, r.saved.length).every((p) => !/Dana/.test(p.altText ?? ""))).toBe(true);
     expect(prompts[0]).toMatch(/No office rooms/);
 
     const texts = (await db()<{ text: string }[]>`select text from practice_os.memories where not archived and topic = 'marketing'`).map((m) => m.text);
@@ -202,4 +213,51 @@ describe.skipIf(!hasDb)("a draft after the marketing interview", () => {
     await db()`delete from practice_os.memories where source = 'onboarding' and topic = 'marketing'`;
     await db()`update practice_os.settings set helpers_enabled = helpers_enabled || '{"instagram": true}'::jsonb`;
   }, 180_000); // each memory passes the local client-detail guard
+});
+
+describe.skipIf(!hasDb)("after 'Not for me'", () => {
+  it("nothing about Instagram runs, lists or counts, her post answers are cleared, and switching branches starts clean", async () => {
+    const { instagramQuestions, loadInstagramPrefs, saveInstagramPrefs, DEFAULT_PREFS } = await import("../lib/instagram/onboarding");
+    const { listApprovals } = await import("../lib/approvals");
+    const { loadMenuData } = await import("../lib/ui/menu");
+
+    // "I'd like one", then "I'll do it later"; then "Yes, I have one": the old step answer doesn't carry over.
+    await instagramQuestions.save({ account: "wants" });
+    await instagramQuestions.save({ guide: "later" });
+    expect((await loadInstagramPrefs()).setup).toBe("later");
+    await instagramQuestions.save({ account: "has" });
+    expect((await loadInstagramPrefs()).setup).toBeNull();
+
+    await instagramQuestions.save({ goals: ["fill_spots"], topics: ["how_to_book"], posts_per_week: "1", never_show: ["face"], style: { pick: "warm", example: "Book a call." } });
+    const pending = (await listApprovals()).filter((a) => a.kind === "instagram_post").length;
+    expect(pending).toBeGreaterThan(0); // Dana's sample posts wait for her
+    const before = (await loadMenuData()).counts.approvals;
+
+    await instagramQuestions.save({ account: "no" });
+    expect(await loadInstagramPrefs()).toEqual({ ...DEFAULT_PREFS, account: "no" });
+    const live = (await db()<{ text: string }[]>`select text from practice_os.memories where not archived and topic = 'marketing'`).map((m) => m.text);
+    expect(live.filter((t) => /^Instagram post|^Instagram posts/.test(t))).toEqual([]);
+
+    const { chat, seen } = stubModels();
+    const r = await planWeek("test", { chat, graphic });
+    expect(r).toMatchObject({ saved: [], declined: true });
+    expect(await requestPost("test", "a post about how to book", null, { chat, graphic })).toMatchObject({ outcome: "declined" });
+    expect(seen).toEqual([]); // no model call at all
+    expect((await listApprovals()).some((a) => a.kind === "instagram_post")).toBe(false);
+    expect((await loadMenuData()).counts.approvals).toBe(before - pending);
+
+    // Going Back to "Meet your team" with an old map that has Instagram on doesn't turn it back on.
+    const { saveAnswers } = await import("../lib/onboarding/store");
+    await saveAnswers({ "instagram:account": "no" });
+    await saveAnswers({ team: { admin: true, referrals: true, instagram: true, front_desk: true } });
+    const [s] = await db()<{ on: boolean }[]>`select (helpers_enabled ->> 'instagram')::boolean as on from practice_os.settings limit 1`;
+    expect(s.on).toBe(false);
+
+    await saveInstagramPrefs(DEFAULT_PREFS);
+    await db()`
+      update practice_os.clinician_profile
+         set onboarding_answers = onboarding_answers #- '{progress,values,instagram:account}' #- '{progress,values,team}'`;
+    await db()`delete from practice_os.memories where source = 'onboarding' and topic = 'marketing'`;
+    await db()`update practice_os.settings set helpers_enabled = helpers_enabled || '{"instagram": true}'::jsonb`;
+  }, 180_000);
 });
