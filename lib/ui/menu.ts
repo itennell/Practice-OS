@@ -1,7 +1,6 @@
 import { listConversations } from "../aeon/chat";
 import { loadNeeds } from "../admin/load";
 import { db } from "../db";
-import { instagramDeclined } from "../instagram/onboarding";
 import { visibleKind } from "../approvals";
 import { getProfile } from "../profile";
 import type { MenuData } from "./menu-types";
@@ -20,12 +19,11 @@ const safe = async <T>(read: () => Promise<T>, fallback: T): Promise<T> => {
 };
 
 export async function loadMenuData(): Promise<MenuData> {
-  const [profile, waiting, needs, chats, noInstagram] = await Promise.all([
+  const [profile, waiting, needs, chats] = await Promise.all([
     safe(getProfile, null),
     safe(() => db()<{ n: number }[]>`select count(*)::int as n from practice_os.approvals where status = 'pending' and ${visibleKind()}`, [{ n: 0 }]),
     safe(loadNeeds, []),
     safe(() => listConversations(30), []),
-    safe(instagramDeclined, false),
   ]);
   return {
     clinician: profile ? { name: profile.full_name, credential: profile.credential, isSample: profile.is_sample } : null,
@@ -35,6 +33,7 @@ export async function loadMenuData(): Promise<MenuData> {
       admin: needs.filter((n) => n.tier <= 3).length,
     },
     chats: chats.map((c) => ({ id: c.id, title: c.title })),
-    hidden: noInstagram ? ["/instagram"] : [],
+    // Nothing is hidden today: Media stays for everyone, even when Instagram isn't for her.
+    hidden: [],
   };
 }
