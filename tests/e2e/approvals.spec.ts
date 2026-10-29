@@ -24,6 +24,28 @@ test("The failing note ends as Failed with its error", async ({ page }) => {
   await expect(after.getByText("Test failure requested (payload.fail is true).")).toBeVisible();
 });
 
+test("Every seeded approval works in test mode, except the one that fails on purpose", async ({ page }) => {
+  // The demo has to survive db:reset: each [Sample] approval, once approved, ends Done.
+  await page.goto("/approvals");
+  const pending = page.getByRole("listitem").filter({ has: page.getByRole("button", { name: "Approve", exact: true }) });
+  await expect(pending.first()).toBeVisible();
+  const names: string[] = [];
+  for (let n = await pending.count(); n > 0; n--) {
+    const card = pending.first();
+    const name = await card.evaluate(
+      (el) => el.getAttribute("aria-label") ?? document.getElementById(el.getAttribute("aria-labelledby") ?? "")?.textContent ?? "",
+    );
+    names.push(name);
+    await card.getByRole("button", { name: "Approve", exact: true }).click();
+    await expect(page.getByRole("listitem", { name }).getByText(/^(Done|Failed)$/)).toBeVisible({ timeout: 15_000 });
+  }
+  expect(names.length).toBeGreaterThan(3);
+  for (const name of names) {
+    const outcome = name.includes("fails on purpose") ? "Failed" : "Done";
+    await expect(page.getByRole("listitem", { name }).getByText(outcome, { exact: true }), name).toBeVisible();
+  }
+});
+
 test("Edit then approve runs the edited text", async ({ page }) => {
   await page.goto("/approvals");
   const card = page.getByRole("listitem", { name: "[Sample] Test note: hello from Aeon" });

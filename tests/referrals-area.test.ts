@@ -21,7 +21,7 @@ import {
   type NppesResult,
 } from "../lib/referrals/nppes";
 import { boardTier, SCORE_VERSION, BUILT_IN_WEIGHTS, capFirst, focusFrom, readWeights, SPECIALTY_POINTS, TIER_LABEL, tierFor, WEIGHTS } from "../lib/referrals/tier";
-import research from "../docs/research/referral-tiers.json";
+import research from "../docs/research/referral-tiers.json" with { type: "json" };
 
 // Real NPPES replies recorded 2026-10-29 (tests/fixtures/nppes-area.json, fields the app reads only).
 type Recorded = { query: { taxonomy_description: string; postal_code: string }; results: NppesResult[] };
