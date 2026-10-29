@@ -104,6 +104,15 @@ Cal.com's app is one flat near-black surface (#111 in dark, #F8F8F8 in light) wi
 - Single toggles are their own small cards: bold label, muted explanation, switch on the right.
 - Appearance uses picture radio cards (System default / Light / Dark thumbnails).
 
+## 3b. Desktop layout (UNVERIFIED: from Isaiah's desktop screenshots and Cal.com's public docs, not a live capture)
+
+The live walk could only see the 757px layout. These notes come from Isaiah's own desktop screenshots described in the orchestrator's brief (Cal.ai home, Links, an event's settings) and Cal.com's public help pages. Verify them live when a wide Chrome window is available.
+
+- **Shell:** a left sidebar list (about 220-240px) on the same near-black as the page: workspace/avatar at the top, then Home (Cal.ai), Links (event types), Bookings, Availability, Teams, Apps, Routing, Workflows, Insights; small 16px line icons with 14px labels; the current item is a faint filled rounded row; secondary items (View public page, Copy link, Settings) sit at the bottom. No section boxes, no shouting badges.
+- **Cal.ai home:** the content column is centred in the remaining width: the large "Ask Cal.ai" title, one input pill under it, three small chips under that, and nothing else on the page.
+- **Event settings (desktop):** a three-part layout. Left: a sub-nav grouped under small headings (Setup, Booking experience, Policies, AI & Automation), each group a short list of text rows with the current one filled. Middle: the settings form for the chosen row, sections split by hairlines. Right: a live booking preview of what the person booking will see, updating as settings change.
+- **Lesson for Aeon:** the live preview pattern fits Admin's side panel and the Instagram composer (show the result beside the form). The grouped sub-nav fits Settings (Practice, Connections, Approvals, Aeon) once it grows past one page.
+
 ## 4. Patterns worth taking (and what we do instead)
 
 | # | Cal.com pattern | Why it works | Take it? |

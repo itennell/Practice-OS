@@ -27,6 +27,15 @@ describe("design tokens", () => {
     expect(resolve(themeVars(css, "dark"), "--bg")).toMatchObject({ r: 0x26, g: 0x26, b: 0x24 });
   });
 
+  it("has the calm redesign tokens in both themes", () => {
+    for (const theme of ["light", "dark"] as const) {
+      const vars = themeVars(css, theme);
+      expect(resolve(vars, "--line-strong").a).toBeGreaterThan(0);
+      expect(vars["--text-display"]).toBe("2.5rem");
+      expect(vars["--radius-control"]).toBe("12px");
+    }
+  });
+
   it("every used pair meets WCAG AA in light and dark", () => {
     const failures = checkAll(css)
       .filter((r) => !r.pass)
