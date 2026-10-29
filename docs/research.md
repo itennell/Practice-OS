@@ -857,3 +857,88 @@ Sensitivity note: the current code (lib/referrals/fit.ts) already uses 40 / 30 /
 - ilga.gov blocked automated fetches, so Illinois statute text is from mirrors and law-firm summaries. Confirm 740 ILCS 92/5 penalties and the MHDDCA treatment-disclosure question with an Illinois attorney.
 - Several numbers are [search-only] (AAP survey, USPSTF, Wang 2003, EAP rates, Malowney). Do not put them in the app or on a pitch slide before opening the page.
 - Run `receipts` before any of this reaches a pitch deck.
+
+## Media presence: Psychology Today, other directories and a practice website (checked 2026-10-29)
+
+Plain English summary: Psychology Today ($29.95 a month) is the main place clients find a therapist. It has no API, so Aeon cannot post for her; Aeon writes each part of the profile and she pastes it in. Psychology Today's terms allow AI-written text only if she reviews, fact-checks and personalizes it, so Aeon asks her a few questions only she can answer and drafts only from her own facts. The most important words are the first 200 characters of her first statement box, because that is all a client sees on the search results card. The same text, adjusted, fills Google Business Profile (free) and the other directories. For a website the default is Squarespace Core ($29 a month, paid yearly). Meta has no website builder. The field data and lint rules are in `docs/research/media-presence.json`. Not legal advice.
+
+### 1. How we looked, and what we did not do
+- Psychology Today has no public API, partner program or MCP. Its clinician help center is members-only (it answers 403) ([help center](https://psychologytoday.zendesk.com/hc/en-us)).
+- Its Terms of Use (effective 23 March 2026) ban scraping and crawling "by manual or automated" means ([PT terms](https://docs.psychologytoday.com/directory/terms/en/latest)). So we did not bulk-read profiles. We read 7 public Chicago profiles one by one in a browser (LMFT, LCSW x3, LPC, LCPC, PsyD) plus the Chicago results page ([results](https://www.psychologytoday.com/us/therapists/il/chicago)). We wrote down only structure and text lengths. No therapist's name or words are in this repo.
+- The terms' content standards also say: no copying other profiles; no AI-generated material unless it has been "carefully reviewed, fact-checked, and personalized"; no "inaccurate or exaggerated claims" about skills, credentials, insurance or pricing ([PT terms, section 7](https://docs.psychologytoday.com/directory/terms/en/latest)). This shapes the builder (section 6).
+
+### 2. Anatomy of a Psychology Today profile
+Order on the page, as seen on all 7 profiles:
+1. Header: name, credential line, optional pronouns, "Verified by Psychology Today", endorsement count, Email Me / Call Me, in-person or online, address, "My website".
+2. Personal Statement: three boxes. Longest seen: 633, 360 (exactly) and 348 characters. A third-party report of the live editor (verified 2026-04-15) gives 640 / 360 / 360 ("What can I help you with?", "What's my approach?", "About me"), plus a 140-character intro to new clients and notes of 300 (finances), 300 (credentials), 400 (top specialties) and 400 (types of therapy) ([Reframe Practice](https://reframepractice.com/answers/psychology-today/therapist-bio-examples)). One intro line we saw was exactly 140, and the longest notes we saw (282, 384) sit under those limits. The old separate tagline field is gone; the first statement box does that job.
+3. "My Practice at a Glance": built by Psychology Today from her picks: "I specialize in A, B and C" (her 3 top specialties), "$X Per Session, I accept insurance", "I see individuals, couples...".
+4. Finances: individual and couple fees, sliding scale, payment methods, insurance plans (and Out of Network), then her note.
+5. Qualifications: "Licensed by State of Illinois / number" (Psychology Today verifies it), years in practice, school and graduation year, additional credentials, then her note.
+6. Specialties and Expertise: exactly 3 top specialties ([Big Fish SEO](https://www.thebigfishseo.com/blog/how-to-optimize-psychology-today-profile/)), then an issues checklist (8 to 50 ticked on the profiles we read).
+7. Endorsements: written by other Psychology Today members, not clients, and not something she writes.
+8. Client Focus: age, participants (individuals, couples, families, groups), communities ("... allied"), ethnicity, faith, languages ("I also speak").
+9. Treatment Approach: types of therapy, then her note.
+10. Location: primary location, an additional location, then nearby cities, counties, ZIPs and neighborhoods.
+11. Bottom line: "Call for a free consultation now" with her phone, when the free-consult option is on. An intro video appeared on 2 of 7 profiles; the page also links her website ([join page](https://join.psychologytoday.com/us/signup)).
+
+The search card shows her photo, name, credential, Verified badge, endorsement count, city and ZIP, phone, an Email button, and the first statement box cut to 4 lines (CSS `line-clamp: 4`, 24px lines), so roughly 200 to 300 characters depending on screen width ([results](https://www.psychologytoday.com/us/therapists/il/chicago)). Search filters: specialties, insurance, types of therapy, age, ethnicity, gender and sexuality, language, faith, price, in person or online. Every filter is a tick box, so ticking her real specialties, insurance and ages matters as much as the words.
+
+### 3. What makes a profile work (evidence is thin)
+- Research is thin. One study: 44.5% of 238 therapy patients had looked up their therapist, mostly online, mainly for professional experience ([Eichenberg and Sawyer 2016, JMIR Mental Health](https://mental.jmir.org/2016/2/e22/)). We found no study testing which profile wording gets more calls.
+- Industry guides agree on: fees and how to pay up front, a real recent photo, who she helps in plain words, what a first session is like, and how to book ([Headway](https://headway.co/resources/psychology-today-profile-tips), [Ineffable Living](https://ineffableliving.com/what-do-clients-actually-want-from-a-therapist-website/)).
+- Psychology Today shows members their profile views and contacts ([join page](https://join.psychologytoday.com/us/signup)). That is the only real-world check of whether a profile works.
+
+### 4. Other places to list herself
+| Place | Cost | For whom | API | Reuse from PT |
+|---|---|---|---|---|
+| [Google Business Profile](https://support.google.com/business/answer/3038177) | Free | Practitioners at a verified location; a solo practice brand uses "[brand]: [name]" | Yes, with approval ([prereqs](https://developers.google.com/my-business/content/prereqs)) | 750-character description ([limit](https://support.google.com/business/answer/3039617)), no URLs, prices or promotions; name with no keywords |
+| [GoodTherapy](https://www.goodtherapy.org/for-professionals/welcome-new-practice.html) | $25.95/mo or $310/yr for practices 3 years old or less | Individual therapists | None found | All three boxes joined; it suggests a longer bio |
+| [Zencare](https://therapist.zencare.co/pricing) | From $59/mo + $80 setup | Licensed therapists | None found | Statement; it films an intro video |
+| [TherapyDen](https://www.therapyden.com/faq) | Free (not in search) or $30/mo | Mental health practitioners | None found | "About You" = the boxes joined |
+| [Open Path](https://openpathcollective.org/how-open-path-works/) | Free to her; client pays $65 once; she offers $40-70 slots | Licensed or pre-licensed, existing practice ([eligibility](https://openpathcollective.org/therapist-eligibility/)) | None found | Statement only; no booking links ([FAQ](https://openpathcollective.org/faqs-from-therapists/)) |
+| [Headway](https://help.headway.co/hc/en-us/articles/54117060370068-Understanding-the-marketplace-service-fee) | Free to join; $9.99 per new-client appointment from Nov 2026 | Insurance-credentialed clinicians | None found | Statement; no fee list (Headway bills insurance) |
+| [Alma](https://helloalma.com/for-providers/insurance/) | $95/mo billed yearly | Fully licensed, credentialed under Alma | None found | Statement |
+| [Grow Therapy](https://growtherapy.com/providers/) | No membership fee seen; paid per session | Active unrestricted license plus own malpractice insurance | None found | Their team builds the profile |
+| [Inclusive Therapists](https://www.inclusivetherapists.com/join) | $22/mo yearly or $29 monthly, 90 days free | Licensed or provisionally licensed; values questions ([FAQ](https://www.inclusivetherapists.com/faq/create-profile-join-directory)) | None found | Statement plus client focus |
+| [Therapy for Black Girls](https://therapyforblackgirls.com/start-here/) | $25/mo or $300/yr | Licensed private-practice therapists, vetted | None found | Statement plus client focus |
+| [Latinx Therapy](https://latinxtherapy.com/join/) | $10 or $23/mo, or $223/yr | Committed to cultural humility; free consult required | None found | Statement; Spanish listing on Standard and up |
+
+No directory has a public posting API, so every listing is copy and paste. GoodTherapy's standard tier prices, Zencare's eligibility rules and every directory's character limits are behind logins and not confirmed.
+
+### 5. Rules for what a profile or site may say (not legal advice)
+- LCSW and clinical psychologist: every advertisement must be true and not misleading, and must include the title or initials as on the license ([225 ILCS 20/17](https://www.ilga.gov/Legislation/ILCS/Articles?ActID=1295&ChapterID=24), [225 ILCS 15/26.5](https://www.ilga.gov/Legislation/ILCS/Articles?ActID=1294&ChapterID=24)).
+- LCPC and LPC: the Counselor Act has no advertising section and no title-in-ad rule. It makes "false or misleading advertising" grounds for discipline and protects the titles ([225 ILCS 107](https://www.ilga.gov/Legislation/ILCS/Articles?ActID=1324&ChapterID=24)). The counselor rules say advertising "shall not be deceptive, misleading, or false" ([68 Ill. Adm. Code 1375.225](https://ilga.gov/agencies/JCAR/EntirePart?titlepart=06801375)). We require the designation for every license type anyway.
+- No Illinois text requires a license number, and none bans testimonials or guarantees by name.
+- The ethics codes ban soliciting testimonials from clients and require accurate credentials and no promised results: [ACA 2014 C.3, C.4](https://www.counseling.org/docs/default-source/default-document-library/ethics/2014-aca-code-of-ethics.pdf), [NASW 4.06, 4.07](https://www.socialworkers.org/About/Ethics/Code-of-Ethics/Code-of-Ethics-English/Social-Workers-Ethical-Responsibilities-as-Professionals), [APA 5.01, 5.05](https://www.apa.org/ethics/code).
+- The FTC Endorsement Guides cover reviews, typical results and paid endorsements ([16 CFR 255](https://www.ecfr.gov/current/title-16/chapter-I/subchapter-B/part-255)).
+- Plain language: [plainlanguage.gov](https://www.plainlanguage.gov/about/definitions/), [CDC everyday words](https://stacks.cdc.gov/view/cdc/37678). The "grade 8 or lower" target comes from secondary sources, so it is a warning, not a block.
+- Our lint is stricter than the law on purpose: testimonials, client stories, guarantees, superlatives, "as featured in", incentives for reviews, advice and diagnosis, crisis words, any fact not in her saved details, and anything over the field limit are blocked. Softer outcome words and "24/7" or "same-day" are warnings. The full list with citations is in the JSON.
+
+### 6. What this means for the builder
+- Aeon drafts only from her saved facts (fees, insurance, license, who she helps, location) plus 3 or 4 short answers in her own words (why this work, what a first session is like). It never invents a credential, a year, a plan or a free consult.
+- Every field fits its limit. The first box puts the hook in its first 200 characters, and a preview shows exactly what the card will show.
+- Each field says "Read it and make it yours" before the paste steps, to meet Psychology Today's rule on AI text.
+- One fact sheet feeds every listing and the website, so name, address and phone match everywhere (Google matches listings on these).
+
+### 7. Website
+| Option | Cheapest plan with her own domain | BAA | Custom code (for the Google details block) | Take it with her |
+|---|---|---|---|---|
+| [Squarespace](https://www.squarespace.com/pricing) | Basic $19/mo yearly; Core $29/mo yearly ($39 monthly); free domain year one | Covers Acuity Scheduling only ([BAA](https://support.squarespace.com/hc/en-us/articles/360028867231-Acuity-Scheduling-and-HIPAA)) | Core and up ([code](https://support.squarespace.com/hc/en-us/articles/216107348-Code-based-customizations)) | Partial export |
+| [Wix](https://support.wix.com/en/article/enabling-hipaa-compliance-for-your-wix-site) | Light ~$17.77/mo yearly | Limited, Business plans and up | [Custom code](https://support.wix.com/en/article/embedding-custom-code-on-your-site) (plan not confirmed) | No export |
+| [Framer](https://www.framer.com/help/articles/framer-hipaa-compliance/) | Basic $10/mo | No | Yes (plan not confirmed) | No native export |
+| [Webflow](https://webflow.com/pricing) | Basic $15/mo yearly | No | Yes (plan not confirmed) | Code export on paid workspaces |
+| [Brighter Vision](https://www.brightervision.com/pricing/) | Start $78/mo yearly + $100 setup; built for her | Only with a Hushmail add-on ([HIPAA](https://www.brightervision.com/hipaa/)) | Not hers to edit | She owns her content |
+| [TherapySites](https://www.therapysites.com/pricing) | Core $69/mo + $199 design | Add-on | SEO from $99/mo | Loses content they wrote |
+| [Carrd](https://carrd.com/pro) | Pro Standard $19 per year | No | Pro embeds | Not checked |
+| Own site on Vercel or GitHub Pages | Vercel Hobby is non-commercial only, so Pro at $20/mo ([Vercel](https://vercel.com/docs/limits/fair-use-guidelines)); GitHub Pages bans running an online business ([GitHub](https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits)) | No | Full | Full |
+
+- Meta has no hosted website product. Muse Spark can write site code from a prompt inside Meta AI, with no hosting or domain ([Meta](https://about.fb.com/news/2026/04/introducing-muse-spark-meta-superintelligence-labs/)).
+- HIPAA: a basic site shows phone and email only, or links to a HIPAA-ready booking tool. No contact form that asks about health.
+- Google details block: schema.org has no Psychologist or counselor type. Use `MedicalBusiness`, a `LocalBusiness` subtype, with name and address (required) plus phone, url, hours and price range, and never `review` or `aggregateRating` ([schema.org](https://schema.org/MedicalBusiness), [Google](https://developers.google.com/search/docs/appearance/structured-data/local-business)). Check it with the [Rich Results Test](https://search.google.com/test/rich-results).
+- Pages: home, about, fees, FAQ, contact ([Design for Therapists](https://www.designfortherapists.com/therapist-website-checklist-must-have-pages-for-your-private-practice-website/), [Coral EHR](https://www.coralehr.com/website-toolkit/guides/what-to-put-on-therapy-website/); vendor guides, no neutral authority found). Accessibility basics: [WCAG 2.2 quick reference](https://www.w3.org/WAI/WCAG22/quickref/), [DOJ guidance](https://www.ada.gov/resources/web-guidance/).
+
+Recommendation:
+- **Default (no site yet): Squarespace Core, paid yearly.** It has the biggest template and help library and a 14-day trial with no card, and it is the cheapest plan that takes the Google details block. Aeon writes the five pages and the block; she pastes them.
+- **Already has one:** keep it and run the checklist (booking link, fees, consult offer, same name, address and phone, designation, no health form, 988 line, accessibility basics, details block if her builder allows code).
+- **Do it yourself:** a small static site that a coding agent builds and deploys on her own Vercel Pro. Only for someone who will always have an agent to edit it. Not built in the app now; the research does not show it beats the default for her.
+- **Done for you:** Brighter Vision, if she wants no work at all.
