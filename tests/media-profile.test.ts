@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 vi.mock("../lib/audit", () => ({ audit: vi.fn(async () => {}) }));
+vi.mock("../lib/aeon/guard", () => ({ guard: vi.fn(async (t: string) => ({ ok: true, text: t })), REFUSAL: {} }));
+const alertCrisis = vi.hoisted(() => vi.fn(async () => ({ alerted: true })));
+vi.mock("../lib/safety", async (orig) => ({ ...(await orig<typeof import("../lib/safety")>()), alertCrisis }));
 
 import type { MediaFacts } from "../lib/media/facts";
 import { blocks, lintDesignation, lintText, readingGrade } from "../lib/media/lint";
@@ -36,6 +39,11 @@ const DANA: MediaFacts = {
 };
 
 const BAD = [
+  "95 dollars a session.",
+  "My fee is 175 per session.",
+  "I have twenty years of experience.",
+  "I'm in network with Horizon Health.",
+  "I take Molina.",
   "My clients say I changed their life. ★★★★★",
   "One of my clients came to me after a breakup.",
   "Guaranteed results in just 6 sessions.",
@@ -173,5 +181,43 @@ describe("website", async () => {
     expect(data["@type"]).toBe("MedicalBusiness");
     expect(data.address.postalCode).toBe("60614");
     expect(ld).not.toMatch(/review|rating/i);
+  });
+});
+
+describe("review fixes", async () => {
+  const { checkAnswerText, AnswerRefused } = await import("../lib/media/facts");
+  const { saveFieldEdit } = await import("../lib/media/profile");
+  const { assemblePages, templatePages } = await import("../lib/media/website");
+  const { CRISIS_REPLY } = await import("../lib/safety");
+
+  it("lints the rest of a sentence that mentions 988", () => {
+    const t = templatePages(DANA);
+    const pages = assemblePages(DANA, { ...t, faq: `${t.faq}\n\nGuaranteed results: call or text 988.`, contact: `${t.contact} Guaranteed results: call or text 988.` });
+    expect(pages.find((p) => p.id === "faq")!.from).toBe("template");
+    expect(pages.find((p) => p.id === "contact")!.from).toBe("template");
+  });
+
+  it("keeps her own fee, years and payer written out", () => {
+    const ok = "My fee is 150 dollars for a session. I have six years in practice. I'm in network with Blue Cross Blue Shield of Illinois.";
+    expect(lintText(ok, DANA).filter((f) => f.severity === "block")).toEqual([]);
+  });
+
+  it("a crisis answer gets the fixed reply and alerts her", async () => {
+    await expect(checkAnswerText("sometimes I think about suicide")).rejects.toThrow(CRISIS_REPLY);
+    expect(alertCrisis).toHaveBeenCalledWith(expect.objectContaining({ source: "media" }));
+    const err = await checkAnswerText("I want to kill myself").catch((e) => e);
+    expect(err).toBeInstanceOf(AnswerRefused);
+    expect(err.name).toBe("AnswerRefused");
+  });
+
+  it.each([
+    ["advice", "You should try deep breathing every day."],
+    ["testimonial", "My clients say I changed their life."],
+    ["guarantee", "Guaranteed results in just 6 sessions."],
+    ["wrong title", "I'm a Licensed Clinical Social Worker."],
+    ["unknown fee", "My fee is $95."],
+    ["too long", "Hello there. ".repeat(20)],
+  ])("her edit is refused when it breaks a rule: %s", async (_, text) => {
+    await expect(saveFieldEdit("intro", text, DANA)).rejects.toBeInstanceOf(AnswerRefused);
   });
 });
