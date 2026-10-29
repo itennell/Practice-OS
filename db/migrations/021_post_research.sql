@@ -1,4 +1,4 @@
--- 020: research before a post (Instagram studio). For the topic she types, three
+-- 021: research before a post (Instagram studio). For the topic she types, three
 -- small Muse web searches find what therapists post about it, which hooks and
 -- formats work and why; the result is a short summary and 2-3 angles with the
 -- links they came from. Saved so the same topic within a week isn't searched
