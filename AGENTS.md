@@ -11,7 +11,7 @@ An open-source AI co-owner, named Aeon, for independently licensed mental health
 ## The four helpers
 1. Admin: compliance calendar (license renewal, CE hours, CAQH re-attestation, Medicare revalidation, PLLC annual report, quarterly taxes, and employer, payroll, HIPAA and local rules), built from rules that each carry a jurisdiction, an official source URL, a quote and a last-checked date. Federal and Illinois rules ship verified; for any other state the state-research skill researches the rules, they reach the clinician as a pending approval, and they stay marked "Aeon researched, please confirm" until she confirms them. Stale rules are re-checked against their source. "How do I" guides, credentialing prep (reading payer PDF forms), Good Faith Estimates.
 2. Referrals: find local referral sources with the free NPPES NPI Registry API, track them on a pipeline board, draft outreach letters, follow-up reminders. An approved letter can be copied and sent by the clinician from her own email; Aeon never sends. In the fictional demo, letters go only to Isaiah's own test inbox.
-3. Instagram: plan, write and design posts about practice logistics; publish to @practiceos_ after approval.
+3. Instagram: plan, write and design posts about practice logistics; the clinician copies and posts them herself (publishing is cut for now).
 4. Front Desk: a practice phone number (Twilio). Missed calls go to the clinician's voicemail greeting; the voicemail is transcribed, safety-checked, and the caller gets a text with open consult times from Cal.com. Callers can text the number to book, reschedule or cancel a consult. Also a web chat for the practice website. Questions it can't answer go to the clinician.
 
 ## Design system

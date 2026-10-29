@@ -69,3 +69,6 @@ aeon/MEMORY.md
 /.data/
 /relay/node_modules/
 /relay/.vercel/
+
+# The app log when INSTALL.md starts it in the background
+/dev.log

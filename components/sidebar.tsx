@@ -102,7 +102,7 @@ function MenuBody({ data, chatId, onNavigate }: { data: MenuData; chatId: string
           <div className="flex flex-col gap-0.5">
             <p className="px-2.5 pt-1 pb-1 text-label text-[var(--menu-muted)]">Practice</p>
             <ul className="flex flex-col gap-0.5">
-              {PRACTICE.map(({ href, label, icon: Icon, count, countWord }) => {
+              {PRACTICE.filter((p) => !data.hidden?.includes(p.href)).map(({ href, label, icon: Icon, count, countWord }) => {
                 const n = count ? data.counts[count] : 0;
                 const here = isAt(pathname, href);
                 return (
