@@ -1,8 +1,9 @@
 "use client";
 
-import { Copy, Download } from "lucide-react";
+import { Copy, Download, ExternalLink } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import type { Research, ResearchAngle } from "@/lib/instagram/research";
 import type { PostView } from "@/lib/instagram/store";
 import { Slider } from "../shared/slider";
 import { TextField } from "../shared/settings-controls";
@@ -191,6 +192,78 @@ function PostCard({ post, profile, onChange }: { post: PostView; profile: Previe
   );
 }
 
+const host = (url: string) => new URL(url).hostname.replace(/^www\./, "");
+
+function ResearchPanel({
+  research,
+  kind,
+  count,
+  disabled,
+  onPick,
+  onAsTyped,
+}: {
+  research: Research;
+  kind: "write" | "plan";
+  count: number;
+  disabled: boolean;
+  onPick: (a: ResearchAngle) => void;
+  onAsTyped: () => void;
+}) {
+  return (
+    <section aria-labelledby="research-heading" className="flex flex-col gap-4 rounded-[16px] border border-[var(--hairline)] p-4">
+      <div className="flex flex-col gap-1">
+        <h2 id="research-heading" className="font-semibold">
+          What other therapists post about this
+        </h2>
+        <p className="max-w-[65ch] text-[var(--fg)]">{research.summary}</p>
+        {research.source === "fixed" && <p className="text-small text-[var(--fg-muted)]">These angles aren&apos;t from the web this time.</p>}
+      </div>
+      <p className="text-small text-[var(--fg-muted)]">Pick an angle:</p>
+      <ul className="flex flex-col gap-3">
+        {research.angles.map((a) => (
+          <li key={a.title} className="flex flex-col gap-2 rounded-[16px] bg-[var(--chip-off-bg)] p-4 shadow-[inset_0_0_0_1px_var(--hairline)]">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h3 className="font-semibold leading-snug">{a.title}</h3>
+              <span className="text-small text-[var(--fg-muted)]">{a.format}</span>
+            </div>
+            <p className="text-[var(--fg)]">&ldquo;{a.hook}&rdquo;</p>
+            <p className="text-small text-[var(--fg-muted)]">{a.why}</p>
+            {a.sources.length > 0 && (
+              <ul aria-label="Sources" className="flex flex-wrap gap-x-4 gap-y-1">
+                {a.sources.map((u) => (
+                  <li key={u}>
+                    <a
+                      href={u}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="inline-flex min-h-touch items-center gap-1 text-small text-[var(--link)] underline underline-offset-4"
+                    >
+                      {host(u)} <ExternalLink aria-hidden size={14} />
+                      <span className="sr-only">(opens in a new tab)</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <Button
+              variant="accent"
+              className="w-full sm:w-fit"
+              disabled={disabled}
+              onClick={() => onPick(a)}
+              aria-label={`${kind === "plan" ? `Plan ${count} from this` : "Write this one"}: ${a.title}`}
+            >
+              {kind === "plan" ? `Plan ${count} from this` : "Write this one"}
+            </Button>
+          </li>
+        ))}
+      </ul>
+      <Button variant="quiet" className="w-full sm:w-fit" disabled={disabled} onClick={onAsTyped}>
+        {kind === "plan" ? "Plan them as I typed it" : "Write it as I typed it"}
+      </Button>
+    </section>
+  );
+}
+
 type Offer = { why: string; angle: { label: string; pillar: string } };
 type Message = { tone: "ok" | "problem"; text: string };
 
@@ -212,22 +285,51 @@ function say(kind: "write" | "plan", data: Record<string, unknown>): { message: 
 export function InstagramBoard({ initialPosts, profile }: { initialPosts: PostView[]; profile: PreviewProfile }) {
   const router = useRouter();
   const [, startRefresh] = useTransition();
-  const [working, setWorking] = useState<null | "write" | "plan">(null);
+  const [working, setWorking] = useState<null | "write" | "plan" | "research">(null);
+  const [research, setResearch] = useState<{ data: Research; kind: "write" | "plan" } | null>(null);
   const [ask, setAsk] = useState("");
   const [count, setCount] = useState(3);
   const [message, setMessage] = useState<Message | null>(null);
   const [offer, setOffer] = useState<Offer | null>(null);
   const refresh = () => startRefresh(() => router.refresh());
 
-  async function run(kind: "write" | "plan", request = ask, pillar: string | null = null) {
+  /** Research first: what therapists post about her topic, then she picks an angle. */
+  async function look(kind: "write" | "plan") {
     setMessage(null);
     setOffer(null);
+    setResearch(null);
+    setWorking("research");
+    try {
+      const res = await fetch("/api/instagram/research", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ topic: ask }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) setMessage({ tone: "problem", text: data.error ?? "Something went wrong. Try again." });
+      else if (data.outcome === "researched") setResearch({ data: data.research, kind });
+      else {
+        const r = say(kind, data); // off_topic offers an angle; blocked says why
+        setOffer(r.offer);
+        setMessage(r.message);
+      }
+    } catch {
+      setMessage({ tone: "problem", text: "Couldn't reach Practice-OS. Check that the app is running, then try again." });
+    } finally {
+      setWorking(null);
+    }
+  }
+
+  async function run(kind: "write" | "plan", request = ask, pillar: string | null = null, pick?: { id: string; angle: number }) {
+    setMessage(null);
+    setOffer(null);
+    setResearch(null);
     setWorking(kind);
     try {
       const res = await fetch(kind === "plan" ? "/api/instagram/plan" : "/api/instagram/posts", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(kind === "plan" ? { request, count } : { request, pillar }),
+        body: JSON.stringify({ request, ...(kind === "plan" ? { count } : { pillar }), ...(pick ? { research_id: pick.id, angle: pick.angle } : {}) }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -257,7 +359,7 @@ export function InstagramBoard({ initialPosts, profile }: { initialPosts: PostVi
           className="flex flex-col gap-4"
           onSubmit={(e) => {
             e.preventDefault();
-            if (canAsk) run("write");
+            if (canAsk) look("write");
           }}
         >
           <TextField
@@ -284,14 +386,40 @@ export function InstagramBoard({ initialPosts, profile }: { initialPosts: PostVi
                 compact
                 className="flex-1 sm:w-40 sm:flex-none"
               />
-              <Button type="button" variant="quiet" disabled={!canAsk} onClick={() => run("plan")}>
+              <Button type="button" variant="quiet" disabled={!canAsk} onClick={() => look("plan")}>
                 Plan several
               </Button>
             </div>
           </div>
         </form>
         {working && (
-          <ThoughtLine working label={working === "plan" ? `Aeon is writing and drawing ${count} posts…` : "Aeon is writing your post…"} />
+          <ThoughtLine
+            working
+            label={
+              working === "research"
+                ? "Aeon is looking at what other therapists post about this…"
+                : working === "plan"
+                  ? `Aeon is writing and drawing ${count} posts…`
+                  : "Aeon is writing your post…"
+            }
+          />
+        )}
+        {research && (
+          <ResearchPanel
+            research={research.data}
+            kind={research.kind}
+            count={count}
+            disabled={working !== null}
+            onPick={(a) =>
+              run(
+                research.kind,
+                research.data.topic,
+                research.kind === "write" ? a.pillar : null,
+                research.data.id ? { id: research.data.id, angle: research.data.angles.indexOf(a) } : undefined,
+              )
+            }
+            onAsTyped={() => run(research.kind)}
+          />
         )}
         {offer && (
           <div className="flex flex-col gap-3 rounded-[16px] border border-[var(--hairline)] p-4">

@@ -23,6 +23,8 @@ export const DEMO_TABLES = [
   "compliance_rules",
   "referral_sources",
   "posts",
+  // Instagram studio (021)
+  "post_research",
   "inquiries",
   "messages",
   "consult_bookings",
