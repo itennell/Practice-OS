@@ -46,14 +46,13 @@ From here she works in the app. The interview asks for everything else, one ques
 
 ## 5. Accounts (one at a time, only when she wants that helper)
 
-Only the Muse key is needed to start. Everything else is optional and can be set up later from **Settings › Connections**, which walks her through each one step by step with a check after every step. Offer them in this order, and say the cost and time first:
+Only the Muse key is needed to start. Instagram needs no connection: Aeon writes posts with her, and she posts them herself. Everything else is optional and can be set up later from **Settings › Connections**, which walks her through each one step by step with a check after every step. Offer them in this order, and say the cost and time first:
 
 | What | Needed for | Cost | Time | Guide |
 |---|---|---|---|---|
 | Muse key (Meta) | Aeon answering at all | Per use, on her own Meta account | 5 minutes | [muse.md](docs/self-hosting/muse.md) |
 | Cal.com | Front Desk offering consult times | Free plan works | 10 minutes | [calcom.md](docs/self-hosting/calcom.md) |
-| Practice phone | Front Desk answering missed calls and texts | Her phone company's price | 15 minutes, then a review that can take days | [phone.md](docs/self-hosting/phone.md) |
-| Instagram | Posting about her practice | Free for her own Meta app; the relay host depends on the plan she picks | About 30 minutes | [instagram.md](docs/self-hosting/instagram.md) |
+| Practice phone (Twilio) | Front Desk answering voicemails and texts | About $2 a month for the number, plus a little per call and text | 20 minutes, then 3 to 15 business days before texts go out | [phone.md](docs/self-hosting/phone.md) |
 | Google (Gmail drafts) | Referral letters as Gmail drafts | Free | Later: not ready for self-hosting yet | [google.md](docs/self-hosting/google.md) |
 
 How to help her with each one:

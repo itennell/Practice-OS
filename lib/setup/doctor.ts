@@ -86,33 +86,6 @@ export function phoneCheck(saved: ConnectFacts): SetupCheck {
   return { ...base, state: "later", say: "No practice phone yet. Only Front Desk needs it.", fix: "See docs/self-hosting/phone.md." };
 }
 
-/** What the relay's GET /api/health said (relay/lib/health.ts), or why it couldn't be asked. */
-export type RelayFacts =
-  | { kind: "no-url" }
-  | { kind: "unreachable"; reason: string }
-  | { kind: "answered"; ready: boolean; images: boolean; checks: Record<string, boolean> };
-
-export function relayCheck(r: RelayFacts): SetupCheck {
-  const base = { id: "relay", label: "Instagram relay", required: false };
-  if (r.kind === "no-url") return { ...base, state: "later", say: "No Instagram relay yet. Only the Instagram helper needs it.", fix: "See docs/self-hosting/instagram.md." };
-  if (r.kind === "unreachable") return { ...base, state: "problem", say: "The relay address doesn't answer.", fix: `Check the relay address, then open it with /api/health on the end. (${r.reason})` };
-  const missing = Object.entries(r.checks).filter(([, ok]) => !ok).map(([k]) => k);
-  if (r.ready && r.images) return { ...base, state: "ok", say: "The relay is ready for sign-in and post images." };
-  return {
-    ...base,
-    state: "problem",
-    say: r.ready ? "The relay can sign in, but can't host post images yet." : "The relay is missing settings, so Instagram sign-in can't work yet.",
-    fix: `In the relay's Vercel project, add: ${missing.join(", ")}. See docs/self-hosting/instagram.md.`,
-  };
-}
-
-export function instagramCheck(saved: ConnectFacts, relay: SetupCheck): SetupCheck {
-  const base = { id: "instagram", label: "Instagram", required: false };
-  if (saved?.connected) return { ...base, state: "ok", say: `Instagram is connected${saved.accountLabel ? ` (${saved.accountLabel})` : ""}.` };
-  if (relay.state !== "ok") return { ...base, state: "later", say: "Instagram waits for the relay.", fix: relay.fix };
-  return { ...base, state: "todo", say: "The relay is ready. Instagram isn't connected yet.", fix: "Settings › Connections › Instagram › Connect Instagram." };
-}
-
 export function dryRunCheck(dryRun: boolean): SetupCheck {
   return dryRun
     ? { id: "dry-run", label: "Test mode", state: "ok", say: "Test mode is on: nothing is really sent, posted or booked.", required: false }

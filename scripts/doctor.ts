@@ -13,17 +13,14 @@ import {
   envFileCheck,
   exitCode,
   formatReport,
-  instagramCheck,
   museCheck,
   nodeCheck,
   phoneCheck,
   privacyModelCheck,
-  relayCheck,
   type ConnectFacts,
   type DatabaseFacts,
   type SetupCheck,
 } from "../lib/setup/doctor";
-import { askRelayHealth } from "../lib/setup/relay-health";
 
 const root = process.cwd();
 const hasEnvFile = existsSync(path.join(root, ".env"));
@@ -47,7 +44,6 @@ async function gather(): Promise<SetupCheck[]> {
     }
   }
   const model = existsSync(path.join(modelCacheDir(), NER_MODEL, "onnx", "model_quantized.onnx"));
-  const relay = relayCheck(await askRelayHealth(process.env.RELAY_URL));
   const checks = [
     nodeCheck(process.version),
     envFileCheck(hasEnvFile),
@@ -56,8 +52,6 @@ async function gather(): Promise<SetupCheck[]> {
     museCheck(museFromEnv, await status("muse")),
     calcomCheck(await status("calcom")),
     phoneCheck(reachable ? await status("phone") : null),
-    relay,
-    instagramCheck(await status("instagram"), relay),
     dryRunCheck(process.env.DRY_RUN !== "false"),
   ];
   if (reachable) await (await import("../lib/db")).closeDb();

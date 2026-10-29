@@ -5,16 +5,11 @@ import {
   envFileCheck,
   exitCode,
   formatReport,
-  instagramCheck,
   museCheck,
   nodeCheck,
   privacyModelCheck,
-  relayCheck,
   verdict,
 } from "../lib/setup/doctor";
-import { askRelayHealth } from "../lib/setup/relay-health";
-
-const health = (body: unknown, status = 200) => (async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch;
 
 describe("npm run doctor checks", () => {
   it("needs Node 20 or newer", () => {
@@ -38,18 +33,6 @@ describe("npm run doctor checks", () => {
 
   it("marks optional helpers as later, not as problems", () => {
     expect(calcomCheck(null).state).toBe("later");
-    expect(relayCheck({ kind: "no-url" }).state).toBe("later");
-    expect(instagramCheck(null, relayCheck({ kind: "no-url" })).state).toBe("later");
-  });
-
-  it("names the relay settings that are missing", () => {
-    const r = relayCheck({ kind: "answered", ready: true, images: false, checks: { RELAY_URL: true, BLOB_READ_WRITE_TOKEN: false, CRON_SECRET: false } });
-    expect(r.state).toBe("problem");
-    expect(r.say).toMatch(/can't host post images/);
-    expect(r.fix).toContain("BLOB_READ_WRITE_TOKEN, CRON_SECRET");
-    const ready = relayCheck({ kind: "answered", ready: true, images: true, checks: {} });
-    expect(instagramCheck(null, ready).state).toBe("todo");
-    expect(instagramCheck({ connected: true, accountLabel: "@practiceos_" }, ready).say).toContain("@practiceos_");
   });
 
   it("is ready only when every required check is ok", () => {
@@ -64,25 +47,5 @@ describe("npm run doctor checks", () => {
   it("never prints a value, only labels", () => {
     const out = formatReport([museCheck(false, { connected: true, accountLabel: "Key ending 4f2a" })]);
     expect(out).not.toMatch(/sk-|cal_|AC[0-9a-f]{8}/);
-  });
-});
-
-describe("askRelayHealth", () => {
-  it("reads a Practice-OS relay's yes/no settings", async () => {
-    const out = await askRelayHealth("https://relay.example.com/", health({ ok: true, service: "practice-os-relay", ready: true, images: false, checks: { CRON_SECRET: false } }));
-    expect(out).toEqual({ kind: "answered", ready: true, images: false, checks: { CRON_SECRET: false } });
-  });
-
-  it("refuses an address that isn't https or isn't a relay", async () => {
-    expect(await askRelayHealth("", health({}))).toEqual({ kind: "no-url" });
-    expect(await askRelayHealth("http://relay.example.com", health({}))).toMatchObject({ kind: "unreachable" });
-    expect(await askRelayHealth("https://example.com", health({ hello: 1 }))).toMatchObject({ kind: "unreachable" });
-  });
-
-  it("reports a relay that doesn't answer", async () => {
-    const down = (async () => {
-      throw new Error("fetch failed");
-    }) as unknown as typeof fetch;
-    expect(await askRelayHealth("https://relay.example.com", down)).toEqual({ kind: "unreachable", reason: "fetch failed" });
   });
 });

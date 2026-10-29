@@ -1,7 +1,6 @@
 import { del, list, put } from "@vercel/blob";
 import { reencodeImage } from "./image";
 import { exchangeCode } from "./instagram";
-import { ownRelayUrl } from "./health";
 import { IMAGE_CACHE_SECONDS, type Outside, type RelayEnv } from "./handlers";
 
 // Reads the relay's settings from Vercel's environment and wires the real outside calls.
@@ -13,7 +12,7 @@ export function relayEnv(): RelayEnv {
     return value;
   };
   return {
-    RELAY_URL: ownRelayUrl(process.env) ?? need("RELAY_URL"),
+    RELAY_URL: need("RELAY_URL"),
     RELAY_STATE_KEY: need("RELAY_STATE_KEY"),
     INSTAGRAM_APP_ID: need("INSTAGRAM_APP_ID"),
     INSTAGRAM_APP_SECRET: need("INSTAGRAM_APP_SECRET"),

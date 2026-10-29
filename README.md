@@ -18,7 +18,7 @@ The Front Desk helper texts people who call a practice line and leave a voicemai
 
 - **Admin**: compliance calendar, "how do I" guides, credentialing prep, Good Faith Estimates.
 - **Referrals**: find local referral sources (NPPES NPI Registry), track them, draft outreach letters as Gmail drafts.
-- **Instagram**: plan, write and design posts about practice logistics.
+- **Instagram**: content coaching: post ideas, hooks and drafts about practice logistics, which she posts herself.
 - **Front Desk**: a practice phone number that handles missed calls, voicemail and consult booking by text, plus a web chat.
 
 ## Why not just use a chatbot?

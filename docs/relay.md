@@ -1,5 +1,7 @@
 # The Connect relay
 
+> **Future.** Instagram posting is cut for now (2026-10-29): Aeon helps her write posts and she posts them herself, so no relay is needed. This code stays for later.
+
 `relay/` is a small Vercel project, separate from the app, with no database.
 It does three things and nothing else:
 
@@ -29,7 +31,7 @@ computer (a Desktop-app client with PKCE).
 
 | Name | What it is |
 |---|---|
-| `RELAY_URL` | Optional. The relay's own address, e.g. `https://practice-os-relay.vercel.app`. Without it the relay uses Vercel's production address (`VERCEL_PROJECT_PRODUCTION_URL`) |
+| `RELAY_URL` | The relay's own address, e.g. `https://practice-os-relay.vercel.app` |
 | `RELAY_STATE_KEY` | Made once with `openssl rand -base64 32` |
 | `INSTAGRAM_APP_ID`, `INSTAGRAM_APP_SECRET` | From the Meta app's Instagram > API setup with Instagram login |
 | `CRON_SECRET` | Made once with `openssl rand -base64 32`. Vercel sends it to the cron |
@@ -42,5 +44,5 @@ sign-in can work (the first four settings); `images` means post images can be
 hosted (`BLOB_READ_WRITE_TOKEN` and `CRON_SECRET`). The app checks `ready` before
 offering Connect Instagram; without image hosting, uploads get a plain 503.
 
-The app needs only the relay's address (`RELAY_URL` in its `.env`). Step-by-step setup with the Deploy button: [docs/self-hosting/instagram.md](self-hosting/instagram.md). Code lives in `relay/lib/handlers.ts`;
+The app needs only `RELAY_URL` in its `.env`. Code lives in `relay/lib/handlers.ts`;
 `tests/relay.test.ts` runs it without the network.
