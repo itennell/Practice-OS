@@ -10,7 +10,7 @@ test.skip(!process.env.MODEL_API_KEY, "needs a Muse key (live model calls)");
 test("Write one post, then plan 3; each waits for her approval as a preview", async ({ page }) => {
   test.setTimeout(600_000);
   execSync("npm run db:reset", { stdio: "ignore" });
-  await page.goto("/instagram");
+  await page.goto("/media/instagram");
   const box = page.getByLabel("What should the post be about?");
   await expect(page.getByText(/waiting for you ·/)).toBeVisible();
   const posts = page.locator("#posts-heading").locator("xpath=../..").locator(":scope > ul > li");
