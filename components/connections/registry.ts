@@ -12,6 +12,10 @@ export type ConnectionStatus = {
   accountLabel?: string;
   scopes: string[];
   expiresAt?: string;
+  /** Set when Connect can't work on this copy yet; the card shows it instead of the button. */
+  notReady?: string;
+  /** Phone card only (lib/frontdesk/connect.ts phoneStatus). */
+  phone?: { devLine: boolean; number?: string; note?: string; fix?: string };
 };
 
 /** A Connect card. Each helper session adds one entry; lower order shows first. */

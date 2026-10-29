@@ -8,6 +8,8 @@ import { calendarSettings, getCalendarAdapter, type CalcomMeta } from "./calenda
 import { type CalendarProvider } from "./calendar/types";
 import { getPhoneAdapter, PHONE_PROVIDER, type PhoneMeta } from "./phone";
 import { spruceAdapter } from "./phone/spruce";
+import { quickCache } from "./phone/quick-cache";
+import { textingNote, tollfreeStatus } from "./phone/tollfree";
 import { twilioFromEnv } from "./phone/twilio";
 import type { CheckResult } from "./phone/types";
 
@@ -16,10 +18,26 @@ import type { CheckResult } from "./phone/types";
 
 export type ConnectStatus = { connected: boolean; check: CheckResult | null; vendor?: string; devLine?: boolean };
 
-export async function phoneStatus(): Promise<ConnectStatus> {
+/** The phone card's facts. On the demo line, `note` says whether callers can get texts yet. */
+export type PhoneStatus = ConnectStatus & { number?: string; note?: string };
+
+// The live check runs on every Settings, onboarding and Front Desk load, so it is
+// cached like the toll-free status: only a working line is remembered, and a slow
+// phone company shows the last known state (or none) after about 3 seconds.
+const checks = quickCache<CheckResult | null>({ ttlMs: 10 * 60_000, waitMs: 3_000, keep: (c) => Boolean(c?.ok) });
+/** Forgets the cached phone check, after she connects or disconnects. */
+export function forgetPhoneCheck() {
+  checks.forget();
+}
+
+export async function phoneStatus(): Promise<PhoneStatus> {
   const phone = await getPhoneAdapter().catch(() => null);
   if (!phone) return { connected: false, check: null };
-  return { connected: true, vendor: phone.vendor, devLine: Boolean(twilioFromEnv()), check: await phone.check() };
+  const check = () => checks.get(phone.vendor, () => phone.check(), null);
+  const dev = twilioFromEnv();
+  if (!dev) return { connected: true, vendor: phone.vendor, devLine: false, check: await check() };
+  const [checked, texting] = await Promise.all([check(), tollfreeStatus(dev)]);
+  return { connected: true, vendor: phone.vendor, devLine: true, number: dev.phoneNumber, check: checked, note: textingNote(texting) ?? undefined };
 }
 
 export async function connectSpruce(token: string): Promise<CheckResult> {
@@ -34,12 +52,14 @@ export async function connectSpruce(token: string): Promise<CheckResult> {
   } catch {
     return { ok: false, fix: "Spruce answered, but Practice-OS couldn't save the token. Update Practice-OS, then try again." };
   }
+  forgetPhoneCheck();
   await audit({ actor: "clinician", action: "phone_connected", subjectType: "connection", subjectId: "phone", details: { vendor: "spruce" } });
   return check;
 }
 
 export async function disconnectPhone(): Promise<void> {
   await deleteConnection(PHONE_PROVIDER);
+  forgetPhoneCheck();
   await audit({ actor: "clinician", action: "phone_disconnected", subjectType: "connection", subjectId: "phone" });
 }
 
