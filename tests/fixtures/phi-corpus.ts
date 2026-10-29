@@ -143,4 +143,37 @@ export const PHI_CASES: PhiCase[] = [
   { text: "[Sample] Does not take Medicaid", expect: "pass", note: "demo label" },
   { text: "[Sample] Prefers Tuesday consults", expect: "pass", note: "demo label" },
   { text: "My anxiety about taxes is real, what's due?", expect: "pass", note: "her own feeling, no person ref" },
+  // Streets and institutions named after people (the second read must leave them alone).
+  { text: "Our office is on Martin Luther King Drive", expect: "pass", note: "street named after a person" },
+  { text: "The second office is at Lake Shore Drive and Belmont", expect: "pass", note: "street" },
+  { text: "Parking is on Michigan Avenue near Wacker Drive", expect: "pass", note: "streets" },
+  { text: "We moved to Milwaukee Avenue in Wicker Park", expect: "pass", note: "street and neighborhood" },
+  { text: "I rent a room near Logan Square", expect: "pass", note: "neighborhood named after a person" },
+  { text: "Mount Sinai Hospital is on California Avenue", expect: "pass", note: "hospital and street" },
+  { text: "Rush University Medical Center sends me referrals", expect: "pass", note: "institution" },
+  { text: "Referrals from Northwestern Memorial Hospital are up", expect: "pass", note: "institution" },
+  { text: "Lurie Children's Hospital has a waitlist", expect: "pass", note: "institution named after a person" },
+  { text: "Howard Brown Health takes walk-ins", expect: "pass", note: "institution named after a person" },
+  { text: "Interns come from Loyola University Chicago", expect: "pass", note: "institution" },
+  { text: "My office is near Jackson Park and Hyde Park", expect: "pass", note: "parks named after people" },
 ];
+
+/**
+ * Characters glued onto the end of a client name ("Kevin Ortiz7x"). Each must
+ * still be refused: letters, digits, punctuation, other scripts, invisible
+ * characters (zero-width, joiners, direction marks, soft hyphen, BOM), stray
+ * combining marks, odd spaces, emoji and fullwidth forms. Invisible ones are
+ * escapes so they show in review. CI once let a random test tag through.
+ */
+export const GLUED_SUFFIXES: string[] = [
+  ..."abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+  ..."!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~",
+  "é", "ñ", "ß", "ø", "ł", "ğ", "Ж", "λ", "中", "あ", "한", "ع", "א",
+  "\u200b", "\u200c", "\u200d", "\u2060", "\ufeff", "\u00ad", "\u200e", "\u202e",
+  "\u0301", "\u0308", "\u0327", "\u00a0", "\u2009",
+  "\u{1f600}", "\u{1f44d}\u{1f3fd}", "❤️", "\u{1f1fa}\u{1f1f8}", "™", "®", "°", "§", "€", "ｘ", "１",
+];
+
+/** Each suffix once, three times over, and followed by letters and digits the way a test tag is glued on. */
+export const gluedNames = (name: string): string[] =>
+  GLUED_SUFFIXES.flatMap((s) => [`${name}${s}`, `${name}${s}${s}${s}`, `${name}${s}t9q2`]);
