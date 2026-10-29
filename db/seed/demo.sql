@@ -52,14 +52,15 @@ insert into practice_os.referral_settings (id, home_zip, specialties)
 values (true, '60614', array['family_medicine', 'internal_medicine'])
 on conflict (id) do nothing;
 
-insert into practice_os.posts (id, topic, caption, status, is_sample) values
-  ('00000000-0000-4000-8000-000000000301', 'first_session',
+-- Pictures for 301 and 302 are loaded by db:reset from db/seed/posts/<id>.jpg (scripts/make-seed-posts.ts).
+insert into practice_os.posts (id, topic, headline, caption, status, is_sample) values
+  ('00000000-0000-4000-8000-000000000301', 'first_session', '[Sample] What happens at a first session',
    E'[Sample] What happens at a first session? We go over paperwork, scheduling and fees, and you can ask any questions about how sessions work.\n\nDana Reyes, LCPC (fictional demo practice)',
    'pending_approval', true),
-  ('00000000-0000-4000-8000-000000000302', 'fees_superbills',
+  ('00000000-0000-4000-8000-000000000302', 'fees_superbills', '[Sample] Superbills for out-of-network care',
    E'[Sample] Paying out of network? We can give you a superbill to send to your insurance for possible reimbursement.\n\nDana Reyes, LCPC (fictional demo practice)',
    'draft', true),
-  ('00000000-0000-4000-8000-000000000303', 'how_to_book',
+  ('00000000-0000-4000-8000-000000000303', 'how_to_book', '[Sample] How to book a free consult',
    E'[Sample] Booking a free 15-minute consult takes a minute: call or text the practice number and pick a time.\n\nDana Reyes, LCPC (fictional demo practice)',
    'idea', true);
 
@@ -138,6 +139,10 @@ insert into practice_os.approvals (id, kind, title, preview, payload, created_by
    '{"note": "[Sample] Approving this shows what a failed action looks like."}'::jsonb,
    '{"note": "[Sample] Approving this shows what a failed action looks like.", "fail": true}'::jsonb,
    'aeon', true);
+
+-- The pending post points at its approval, as saveDraft does for real drafts.
+update practice_os.posts set approval_id = '00000000-0000-4000-8000-000000000902'
+ where id = '00000000-0000-4000-8000-000000000301';
 
 -- [Sample] credentialing profile (migration 007): CAQH ProView order, no license number.
 -- The NPI passes the check digit but NPPES has no one with it; the TIN starts with 00.
