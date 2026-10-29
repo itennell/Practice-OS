@@ -194,11 +194,6 @@ function PostCard({ post, profile, onChange }: { post: PostView; profile: Previe
 
 const host = (url: string) => new URL(url).hostname.replace(/^www\./, "");
 
-/** Her pick from the research, as words for the writer. */
-export function angleRequest(topic: string, a: ResearchAngle): string {
-  return `${topic.trim()}. Angle: ${a.title}. Open with this hook or one like it: "${a.hook}". Format idea: ${a.format}.`;
-}
-
 function ResearchPanel({
   research,
   kind,
@@ -325,7 +320,7 @@ export function InstagramBoard({ initialPosts, profile }: { initialPosts: PostVi
     }
   }
 
-  async function run(kind: "write" | "plan", request = ask, pillar: string | null = null, researchId?: string) {
+  async function run(kind: "write" | "plan", request = ask, pillar: string | null = null, pick?: { id: string; angle: number }) {
     setMessage(null);
     setOffer(null);
     setResearch(null);
@@ -334,7 +329,7 @@ export function InstagramBoard({ initialPosts, profile }: { initialPosts: PostVi
       const res = await fetch(kind === "plan" ? "/api/instagram/plan" : "/api/instagram/posts", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ request, ...(kind === "plan" ? { count } : { pillar }), ...(researchId ? { research_id: researchId } : {}) }),
+        body: JSON.stringify({ request, ...(kind === "plan" ? { count } : { pillar }), ...(pick ? { research_id: pick.id, angle: pick.angle } : {}) }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -415,7 +410,14 @@ export function InstagramBoard({ initialPosts, profile }: { initialPosts: PostVi
             kind={research.kind}
             count={count}
             disabled={working !== null}
-            onPick={(a) => run(research.kind, angleRequest(research.data.topic, a), research.kind === "write" ? a.pillar : null, research.data.id ?? undefined)}
+            onPick={(a) =>
+              run(
+                research.kind,
+                research.data.topic,
+                research.kind === "write" ? a.pillar : null,
+                research.data.id ? { id: research.data.id, angle: research.data.angles.indexOf(a) } : undefined,
+              )
+            }
             onAsTyped={() => run(research.kind)}
           />
         )}
