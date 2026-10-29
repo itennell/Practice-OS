@@ -141,7 +141,7 @@ test("Research first: a short summary and angles with their links, then she pick
 
 test("Make a reel from a ready post: edit words, order and length, then download a real MP4", async ({ page }) => {
   test.setTimeout(120_000);
-  await page.goto("/instagram");
+  await page.goto("/media/instagram");
   const ready = page.getByRole("listitem").filter({ hasText: "What a session costs" }).first();
   await ready.getByRole("button", { name: "Make a reel" }).click();
   const editor = ready.getByRole("region", { name: "Your reel" });
