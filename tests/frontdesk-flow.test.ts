@@ -242,4 +242,20 @@ describe.skipIf(!localDb)("Front Desk flow (local database only)", () => {
     expect(sent.at(-1)!.body).toContain("is cancelled");
     setFrontDeskDeps({ phone: async () => phone, calendar: async () => calendar, timeZone: async () => "America/Chicago", now: () => NOW });
   });
+
+  it("two checks at once: one runs, the other sees the lock; the lock is gone when it ends", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const slow = { ...phone, listVoicemails: async () => (await gate, []), listInboundTexts: async () => [] };
+    setFrontDeskDeps({ phone: async () => slow, calendar: async () => calendar, timeZone: async () => "America/Chicago", now: () => NOW });
+    const first = checkFrontDesk();
+    await new Promise((r) => setTimeout(r, 200)); // the first one holds the lock while it waits on the phone company
+    expect(await checkFrontDesk()).toEqual({ ran: false, reason: "locked" });
+    release();
+    expect(await first).toMatchObject({ ran: true });
+    const [{ n }] = await db()`select count(*)::int as n from pg_locks where locktype = 'advisory'`;
+    expect(n).toBe(0);
+    expect(await checkFrontDesk()).toMatchObject({ ran: true });
+    setFrontDeskDeps({ phone: async () => phone, calendar: async () => calendar, timeZone: async () => "America/Chicago", now: () => NOW });
+  });
 });
