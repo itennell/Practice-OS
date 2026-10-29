@@ -6,7 +6,7 @@ import { db } from "../db";
 import { loadPracticeSettings } from "../gfe/store";
 import type { ChatFn, CriticResult } from "./critic";
 import { designPost, type GraphicDeps } from "./graphic";
-import { loadInstagramPrefs, weekTopics } from "./onboarding";
+import { GOALS, loadInstagramPrefs, weekTopics } from "./onboarding";
 import { PILLAR_BY_ID, type PillarId } from "./pillars";
 import { writeRequested, writeWeek, type Draft, type PracticeFacts } from "./write";
 
@@ -15,7 +15,7 @@ export async function practiceFacts(): Promise<PracticeFacts> {
     { full_name: string; credential: string; practice_name: string; neighborhood: string | null; city: string; license_line: string; is_sample: boolean }[]
   >`select full_name, credential, practice_name, neighborhood, city, license_line, is_sample from practice_os.clinician_profile limit 1`;
   if (!p) throw new Error("Finish setting up your practice first, so Aeon knows what to write.");
-  const { fees } = await loadPracticeSettings();
+  const [{ fees }, prefs] = await Promise.all([loadPracticeSettings(), loadInstagramPrefs()]);
   return {
     clinicianName: p.full_name,
     credential: p.credential,
@@ -24,6 +24,12 @@ export async function practiceFacts(): Promise<PracticeFacts> {
     city: p.city,
     licenseLine: p.license_line,
     fees: fees.map((f) => ({ label: f.label, cents: f.cents })),
+    voice: {
+      style: prefs.style,
+      example: prefs.example,
+      goals: prefs.goals.map((g) => GOALS.find((x) => x.value === g)!.label),
+      neverShow: prefs.neverShow,
+    },
   };
 }
 
@@ -56,7 +62,7 @@ export async function saveDraft(draft: Draft, opts: { by: string; week?: string;
   const graphic = await designPost(
     PILLAR_BY_ID.get(draft.pillar)!,
     { headline: draft.headline, practiceName: opts.facts.practiceName, licenseLine: opts.facts.licenseLine },
-    opts.graphic,
+    { neverShow: opts.facts.voice?.neverShow, ...opts.graphic },
   );
   const [row] = await db()<{ id: string }[]>`
     insert into practice_os.posts (topic, caption, headline, alt_text, image_jpeg, status, critic, graphic_check, week_of)

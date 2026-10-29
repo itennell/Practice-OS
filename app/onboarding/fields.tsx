@@ -1,6 +1,7 @@
 "use client";
 
 import { Plus } from "lucide-react";
+import { useEffect, useState } from "react";
 import { CONNECTION_CARDS, type ConnectionStatus } from "@/components/connections/registry";
 import { DateField } from "@/components/shared/date-field";
 import { SettingRadio, SettingSelect, SettingSwitch, TextAreaField, TextField } from "@/components/shared/settings-controls";
@@ -8,6 +9,7 @@ import { Button, chipClass, Orb } from "@/components/ui";
 import { STATES } from "@/lib/compliance/states";
 import { firstFor, HELPERS, type Screen, type Stage } from "@/lib/onboarding/chapters";
 import type { SetupItem } from "@/lib/onboarding/store";
+import { FALLBACK_SAMPLES, type StyleSample } from "@/lib/instagram/style-samples";
 
 // One control per kind of answer, built only from the shared controls
 // (docs/ui-elements.md). Each takes the current value and reports a new one.
@@ -62,13 +64,19 @@ export function emptyValue(s: Screen, stage: Stage | null, homeState: string | n
     case "who":
       return { chips: [], work: [], text: "" };
     case "team": {
+      if (s.defaults) return { ...s.defaults };
       const first = new Set<string>(["admin", ...firstFor(stage).helpers]);
       return Object.fromEntries(HELPERS.map((h) => [h.id, first.has(h.id)]));
     }
     case "yesno":
       return null;
-    case "helper":
-      return s.helper?.question.kind === "choices" && s.helper.question.multi ? [] : s.helper?.question.kind === "yesno" ? null : "";
+    case "chips":
+      return [];
+    case "helper": {
+      const q = s.helper?.question;
+      if (q?.kind === "style") return { pick: "", example: "" };
+      return q?.kind === "choices" && q.multi ? [] : q?.kind === "yesno" ? null : "";
+    }
     default:
       return "";
   }
@@ -108,7 +116,10 @@ export function isAnswered(s: Screen, v: unknown): boolean {
     case "team":
     case "slot":
       return true;
+    case "chips":
+      return Array.isArray(v) && v.length > 0;
     case "helper":
+      if (s.helper?.question.kind === "style") return Boolean(o.pick || String(o.example ?? "").trim());
       return Array.isArray(v) ? v.length > 0 : typeof v === "boolean" || Boolean(String(v ?? "").trim());
     default:
       return Boolean(String(v ?? "").trim());
@@ -155,6 +166,66 @@ function ChipToggle({ on, onClick, children }: { on: boolean; onClick: () => voi
 }
 
 const toggle = (list: string[], item: string) => (list.includes(item) ? list.filter((x) => x !== item) : [...list, item]);
+/** Like toggle, but the "none of these" / "not sure" chip clears the others, and any other chip clears it. */
+const toggleWith = (list: string[], item: string, exclusive?: string) =>
+  !exclusive ? toggle(list, item) : item === exclusive ? (list.includes(item) ? [] : [item]) : toggle(list.filter((x) => x !== exclusive), item);
+
+function ChipGroup({ label, options, value, exclusive, onChange }: { label: string; options: { value: string; label: string }[]; value: unknown; exclusive?: string; onChange: (v: string[]) => void }) {
+  const picked = (Array.isArray(value) ? value : []) as string[];
+  return (
+    <div className="flex flex-wrap gap-2" role="group" aria-label={label}>
+      {options.map((x) => (
+        <ChipToggle key={x.value} on={picked.includes(x.value)} onClick={() => onChange(toggleWith(picked, x.value, exclusive))}>
+          {x.label}
+        </ChipToggle>
+      ))}
+    </div>
+  );
+}
+
+/** One Connect card from Settings › Connections, shown inline. */
+function ConnectCard({ provider, connections }: { provider: string; connections: Record<string, ConnectionStatus> }) {
+  const card = CONNECTION_CARDS.find((c) => c.id === provider);
+  if (!card) return <p className="text-body text-[var(--fg-muted)]">You can connect it later in Settings, under Connections.</p>;
+  const { Card } = card;
+  return <Card status={connections[provider] ?? { provider, connected: false, scopes: [] }} />;
+}
+
+/** Three [Sample] captions on the same topic, from Muse when it's ready, else the fixed three. */
+function StyleField({ value, onChange, error }: { value: Record<string, unknown>; onChange: (v: unknown) => void; error?: string }) {
+  const [samples, setSamples] = useState<StyleSample[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    fetch("/api/onboarding/style-samples", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
+      .then((r) => r.json())
+      .then((d: { samples?: StyleSample[] }) => live && setSamples(d.samples?.length === 3 ? d.samples : FALLBACK_SAMPLES))
+      .catch(() => live && setSamples(FALLBACK_SAMPLES));
+    return () => {
+      live = false;
+    };
+  }, []);
+  return (
+    <div className="flex flex-col gap-3">
+      {samples ? (
+        <SettingRadio
+          label="Each one says how to book a first visit"
+          value={String(value.pick ?? "")}
+          onValueChange={(v) => onChange({ ...value, pick: v })}
+          options={samples.map((x) => ({ value: x.id, label: x.label, description: `[Sample] ${x.text}` }))}
+        />
+      ) : (
+        <p className="text-body text-[var(--fg-muted)]">Aeon is writing three samples for you…</p>
+      )}
+      <TextAreaField
+        label="Or paste a post or bio you like (optional)"
+        value={String(value.example ?? "")}
+        onChange={(e) => onChange({ ...value, example: e.target.value })}
+        maxLength={600}
+        error={error}
+      />
+    </div>
+  );
+}
 
 export function Field({ screen: s, value, onChange, setupItems, stage, homeState, connections, error }: FieldProps) {
   const o = (value ?? {}) as Record<string, unknown>;
@@ -406,11 +477,27 @@ export function Field({ screen: s, value, onChange, setupItems, stage, homeState
         </div>
       );
     }
+    case "chips":
+      return <ChipGroup label={s.ask} options={s.options ?? []} value={value} exclusive={s.exclusive} onChange={onChange} />;
+    case "url":
+      return (
+        <TextField
+          label="Website address"
+          type="url"
+          inputMode="url"
+          autoComplete="url"
+          placeholder="For example, reyescounseling.com"
+          value={String(value ?? "")}
+          onChange={(e) => onChange(e.target.value)}
+          maxLength={200}
+          error={error}
+        />
+      );
     case "followups":
       return <TextAreaField label="Your answer" value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} maxLength={400} error={error} />;
     case "connect": {
       // The Muse key has its own screen in chapter 1.
-      const cards = CONNECTION_CARDS.filter((c) => c.id !== "muse").sort((a, b) => a.order - b.order);
+      const cards = CONNECTION_CARDS.filter((c) => c.id !== "muse" && !s.hide?.includes(c.id)).sort((a, b) => a.order - b.order);
       if (cards.length === 0) {
         return <p className="text-body text-[var(--fg-muted)]">Nothing to connect yet. When your tools are ready, you can connect them in Settings.</p>;
       }
@@ -452,20 +539,37 @@ export function Field({ screen: s, value, onChange, setupItems, stage, homeState
     case "helper": {
       const q = s.helper!.question;
       if (q.kind === "choices") {
-        if (q.multi) {
-          const picked = (Array.isArray(value) ? value : []) as string[];
-          return (
-            <div className="flex flex-wrap gap-2" role="group" aria-label={s.ask}>
-              {q.options.map((x) => (
-                <ChipToggle key={x.value} on={picked.includes(x.value)} onClick={() => onChange(toggle(picked, x.value))}>
-                  {x.label}
-                </ChipToggle>
-              ))}
+        const control = q.multi ? (
+          <ChipGroup label={s.ask} options={q.options} value={value} exclusive={q.exclusive} onChange={onChange} />
+        ) : (
+          <SettingRadio label={label} value={String(value ?? "")} onValueChange={(v) => onChange(v)} options={q.options} />
+        );
+        if (!q.note) return control;
+        return (
+          <div className="flex flex-col gap-4">
+            {control}
+            <div className="rounded-[20px] border border-[var(--hairline)] p-4 text-body">
+              <p>{q.note.will}</p>
+              <p className="mt-2">{q.note.wont}</p>
             </div>
-          );
-        }
-        return <SettingRadio label={label} value={String(value ?? "")} onValueChange={(v) => onChange(v)} options={q.options} />;
+          </div>
+        );
       }
+      if (q.kind === "connect")
+        return (
+          <div className="flex flex-col gap-3">
+            {q.steps && (
+              <ol className="flex list-decimal flex-col gap-2 pl-6 text-body">
+                {q.steps.map((step) => (
+                  <li key={step}>{step}</li>
+                ))}
+              </ol>
+            )}
+            <SettingRadio label={label} value={String(value ?? "")} onValueChange={(v) => onChange(v)} options={q.options} />
+            {value === "now" && <ConnectCard provider={q.provider} connections={connections} />}
+          </div>
+        );
+      if (q.kind === "style") return <StyleField value={o} onChange={onChange} error={error} />;
       if (q.kind === "yesno") return <SettingRadio label={label} value={yn(value)} onValueChange={(v) => onChange(v === "yes")} options={YES_NO} />;
       if (q.kind === "text")
         return <TextAreaField label="Your answer" value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} maxLength={q.maxLength ?? 400} error={error} />;

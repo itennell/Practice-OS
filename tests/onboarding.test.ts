@@ -24,6 +24,9 @@ const base: Ctx = {
   medicare: "none",
   medicaid: null,
   officeZip: "60614",
+  findClients: [],
+  website: null,
+  instagram: null,
 };
 const ids = (c: Ctx) => flatten(c).map((s) => s.id);
 
@@ -59,14 +62,16 @@ describe("onboarding chapters", () => {
     expect(flatten({ ...base, insurance: "some" }).find((s) => s.id === "medicaid")?.dateAsk).toMatch(/IMPACT/);
   });
 
-  it("stays at 25 to 35 questions for typical practices", () => {
+  // Chapter 6 opens on how clients find her and her website (the marketing interview);
+  // Instagram's own screens are a helper block and aren't counted here.
+  it("stays at 25 to 37 questions for typical practices", () => {
     for (const c of [base, { ...base, insurance: "some" as const, medicare: "enrolled" as const, medicaid: true }, { ...base, state: "TX", credential: "LMFT" as const }])  {
       const n = flatten(c).length;
       expect(n).toBeGreaterThanOrEqual(25);
-      expect(n).toBeLessThanOrEqual(35);
+      expect(n).toBeLessThanOrEqual(37);
     }
     // The longest case: an Illinois psychologist who takes insurance gets two psychologist-only questions.
-    expect(flatten({ ...base, credential: "Psychologist", insurance: "some", medicare: "enrolled", medicaid: true }).length).toBeLessThanOrEqual(36);
+    expect(flatten({ ...base, credential: "Psychologist", insurance: "some", medicare: "enrolled", medicaid: true }).length).toBeLessThanOrEqual(38);
   });
 
   it("fills in her license type", () => {

@@ -36,6 +36,11 @@ const readDraft = () => {
     return null;
   }
 };
+/** Screens whose control shows the error itself, under the box she typed in. */
+const OWN_ERROR = new Set(["name", "text", "phone", "npi", "ein", "number", "contact", "ce", "address", "malpractice", "office_days", "fees", "payers", "who", "followups", "url"]);
+const showsOwnError = (s: Screen) =>
+  OWN_ERROR.has(s.kind) || (s.kind === "helper" && ["text", "zip", "number", "style"].includes(s.helper?.question.kind ?? ""));
+
 type Status = { kind: "idle" } | { kind: "saving" } | { kind: "error"; text: string } | { kind: "crisis"; text: string };
 
 /** Opens on ?q=<question> (the home page's "Still to set up" links), or where she left off. */
@@ -184,8 +189,12 @@ function OnboardingFlow({ initial, connections, startAt }: Props & { startAt?: s
     const data = await post({ answers, current: nextId });
     if (!data) return;
     setNote(data.notes?.join(" ") ?? "");
-    if (isLast) return finish();
-    go(nextId, data.state ? withFollowups(data.state.screens) : screens);
+    // An answer can add or remove the screens after it (Instagram "Not for me"), so the
+    // next screen comes from the new list.
+    const list = data.state ? withFollowups(data.state.screens) : screens;
+    const at = list.findIndex((s) => s.id === screen.id);
+    if (at >= 0 ? at === list.length - 1 : isLast) return finish();
+    go(at >= 0 ? list[at + 1].id : nextId, list);
   }
 
   function withFollowups(list: Screen[]): Screen[] {
@@ -296,7 +305,7 @@ function OnboardingFlow({ initial, connections, startAt }: Props & { startAt?: s
               {status.text}
             </p>
           )}
-          {status.kind === "error" && !["name", "text", "phone", "npi", "ein", "number", "contact", "ce", "address", "malpractice", "office_days", "fees", "payers", "who", "followups", "helper"].includes(screen.kind) && (
+          {status.kind === "error" && !showsOwnError(screen) && (
             <p className="text-small font-medium text-[var(--danger-fg)]">{status.text}</p>
           )}
           {note && <p className="text-small text-[var(--fg-muted)]">{note}</p>}

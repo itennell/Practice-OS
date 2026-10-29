@@ -113,7 +113,7 @@ describe.skipIf(!hasDb)("onboarding answers", () => {
     await expect(instagramQuestions.save({ topics: ["how_to_book", "nope"] })).rejects.toThrow(/from the list/);
     await expect(instagramQuestions.save({ topics: [] })).rejects.toThrow(/at least one/);
     await instagramQuestions.save({ topics: ["how_to_book", "fees_superbills", "first_session"], posts_per_week: "3" });
-    expect(await instagramQuestions.load()).toEqual({ topics: ["how_to_book", "fees_superbills", "first_session"], posts_per_week: "3" });
+    expect(await instagramQuestions.load()).toMatchObject({ topics: ["how_to_book", "fees_superbills", "first_session"], posts_per_week: "3" });
 
     const { chat } = stubModels();
     const r = await planWeek("test", { chat, graphic });
@@ -131,7 +131,75 @@ describe.skipIf(!hasDb)("onboarding saves one question at a time", () => {
     const { instagramQuestions, loadInstagramPrefs, saveInstagramPrefs, DEFAULT_PREFS } = await import("../lib/instagram/onboarding");
     await instagramQuestions.save({ topics: ["how_to_book"] });
     await instagramQuestions.save({ posts_per_week: "1" });
-    expect(await loadInstagramPrefs()).toEqual({ topics: ["how_to_book"], postsPerWeek: 1 });
+    expect(await loadInstagramPrefs()).toMatchObject({ topics: ["how_to_book"], postsPerWeek: 1 });
     await saveInstagramPrefs(DEFAULT_PREFS);
   });
+});
+
+describe.skipIf(!hasDb)("a draft after the marketing interview", () => {
+  it("uses her picked style, topics and never-show list, and Aeon remembers them", async () => {
+    const { instagramQuestions, instagramDeclined, saveInstagramPrefs, DEFAULT_PREFS } = await import("../lib/instagram/onboarding");
+    // Her answers, one screen at a time, as onboarding sends them.
+    for (const a of [
+      { account: "has" },
+      { connect: "later" },
+      { goals: ["fill_spots", "explain_fees"] },
+      { topics: ["how_to_book", "fees_superbills"] },
+      { posts_per_week: "3" },
+      { never_show: ["face", "office"] },
+      { style: { pick: "plain", example: "Book online any time. Evenings open." } },
+    ])
+      await instagramQuestions.save(a);
+
+    const systems: string[] = [];
+    const { chat: base } = stubModels();
+    const chat = (async (feature: string, params: { messages: { role: string; content: unknown }[] }) => {
+      if (feature === "instagram.write") systems.push(String(params.messages[0].content));
+      return (base as unknown as (f: string, p: unknown) => Promise<unknown>)(feature, params);
+    }) as unknown as ChatFn;
+    let cutoutCalls = 0;
+    const prompts: string[] = [];
+    const r = await planWeek("test", {
+      chat,
+      graphic: {
+        cutout: async () => {
+          cutoutCalls++;
+          return null;
+        },
+        background: async (prompt: string) => {
+          prompts.push(prompt);
+          return graphic.background();
+        },
+      },
+    });
+
+    // Only her two topics, each in her plain style, with her goals and limits.
+    const week = await listPosts({ week: r.week });
+    expect(new Set(week.slice(0, r.saved.length).map((p) => p.pillar))).toEqual(new Set(["how_to_book", "fees_superbills"]));
+    expect(systems[0]).toMatch(/Voice: plain and direct/);
+    expect(systems[0]).not.toMatch(/warm and welcoming/);
+    expect(systems[0]).toContain("Book online any time.");
+    expect(systems[0]).toMatch(/help with: Fill my open spots; Explain my fees and insurance/);
+    expect(systems[0]).toMatch(/Never show, describe or mention: her face or photo, her office/);
+    // "My face": her photo is never cut out or placed; "My office": no office in the picture.
+    expect(cutoutCalls).toBe(0);
+    expect(prompts[0]).toMatch(/No office rooms/);
+
+    const texts = (await db()<{ text: string }[]>`select text from practice_os.memories where not archived and topic = 'marketing'`).map((m) => m.text);
+    expect(texts).toEqual(expect.arrayContaining(["Instagram post style: plain.", "Instagram posts never show: my face, my office."]));
+    const [s1] = await db()<{ on: boolean }[]>`select (helpers_enabled ->> 'instagram')::boolean as on from practice_os.settings limit 1`;
+    expect(s1.on).toBe(true);
+
+    // Changing her mind to "Not for me" turns the helper off and replaces the memory.
+    await instagramQuestions.save({ account: "no" });
+    expect(await instagramDeclined()).toBe(true);
+    const [s2] = await db()<{ on: boolean }[]>`select (helpers_enabled ->> 'instagram')::boolean as on from practice_os.settings limit 1`;
+    expect(s2.on).toBe(false);
+    const ig = (await db()<{ text: string }[]>`select text from practice_os.memories where not archived and text like 'Instagram:%'`).map((m) => m.text);
+    expect(ig).toEqual(["Instagram: Doesn't want Instagram for the practice. Never suggest Instagram or posts."]);
+
+    await saveInstagramPrefs(DEFAULT_PREFS);
+    await db()`delete from practice_os.memories where source = 'onboarding' and topic = 'marketing'`;
+    await db()`update practice_os.settings set helpers_enabled = helpers_enabled || '{"instagram": true}'::jsonb`;
+  }, 180_000); // each memory passes the local client-detail guard
 });
