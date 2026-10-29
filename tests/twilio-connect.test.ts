@@ -94,3 +94,84 @@ describe("phone card for her own Twilio line", () => {
     for (const { title } of steps) expect(title.split(/[.!?](\s|$)/).filter((x) => x?.trim())).toHaveLength(1);
   });
 });
+
+describe("leaving her number as she found it", () => {
+  const PREV = { voice_url: "https://demo.twilio.com/welcome/voice/", voice_method: "POST" };
+  const list = { match: "GET IncomingPhoneNumbers.json", json: { incoming_phone_numbers: [number("PNtf", "+18885550100")] } };
+
+  it("disconnecting with voicemail on puts the old call setting back first", async () => {
+    const { turnOnTwilioVoicemail, disconnectPhone } = await import("../lib/frontdesk/connect");
+    await connectTwilio({ accountSid: SID, authToken: TOKEN }, fakeFetch([list, { match: "GET IncomingPhoneNumbers/PNtf.json", json: PREV }]).impl);
+    await turnOnTwilioVoicemail(fakeFetch([{ match: "GET IncomingPhoneNumbers/PNtf.json", json: PREV }, { match: "POST IncomingPhoneNumbers/PNtf.json", json: {} }]).impl);
+
+    // Twilio down: nothing is forgotten, so Undo is still possible.
+    const down = fakeFetch([{ match: "POST IncomingPhoneNumbers/PNtf.json", status: 500, json: {} }]);
+    expect(await disconnectPhone(down.impl)).toMatchObject({ ok: false, fix: expect.stringMatching(/stays connected/) });
+    expect((await ownTwilioConfig())?.voicemailOn).toBe(true);
+
+    const up = fakeFetch([{ match: "POST IncomingPhoneNumbers/PNtf.json", json: {} }]);
+    expect(await disconnectPhone(up.impl)).toMatchObject({ ok: true });
+    expect(new URLSearchParams(up.calls[0].body!).get("VoiceUrl")).toBe(PREV.voice_url);
+    expect(await ownTwilioConfig()).toBeNull();
+  });
+
+  it("never keeps Practice-OS voicemail as the old setting when she reconnects a number already on it", async () => {
+    const { turnOnTwilioVoicemail, undoTwilioVoicemail, disconnectPhone } = await import("../lib/frontdesk/connect");
+    const echo = { voice_url: voicemailUrl("Hi"), voice_method: "GET" };
+    await connectTwilio({ accountSid: SID, authToken: TOKEN }, fakeFetch([list, { match: "GET IncomingPhoneNumbers/PNtf.json", json: echo }]).impl);
+    expect(await ownTwilioConfig()).toMatchObject({ voicemailOn: true, previousVoiceUrl: null });
+    // Turning it on again (a new greeting) still keeps no echo address as "previous".
+    await turnOnTwilioVoicemail(fakeFetch([{ match: "POST IncomingPhoneNumbers/PNtf.json", json: {} }]).impl);
+    expect((await ownTwilioConfig())?.previousVoiceUrl).toBeNull();
+    const undo = fakeFetch([{ match: "POST IncomingPhoneNumbers/PNtf.json", json: {} }]);
+    await undoTwilioVoicemail(undo.impl);
+    expect(new URLSearchParams(undo.calls[0].body!).get("VoiceUrl")).toBe("");
+    await disconnectPhone(fakeFetch([]).impl);
+  });
+
+  it("keeps nothing and changes nothing when Twilio refuses the change", async () => {
+    const { turnOnTwilioVoicemail, disconnectPhone } = await import("../lib/frontdesk/connect");
+    await connectTwilio({ accountSid: SID, authToken: TOKEN }, fakeFetch([list, { match: "GET IncomingPhoneNumbers/PNtf.json", json: PREV }]).impl);
+    const refused = fakeFetch([{ match: "GET IncomingPhoneNumbers/PNtf.json", json: PREV }, { match: "POST IncomingPhoneNumbers/PNtf.json", status: 500, json: {} }]);
+    expect(await turnOnTwilioVoicemail(refused.impl)).toMatchObject({ ok: false });
+    const after = await ownTwilioConfig();
+    expect(after?.voicemailOn).toBe(false);
+    expect(after?.previousVoiceUrl).toBeUndefined();
+    await disconnectPhone(fakeFetch([]).impl);
+  });
+});
+
+describe("phone route", () => {
+  const body = JSON.stringify({ vendor: "twilio", accountSid: SID, authToken: TOKEN });
+  const req = (method: string, headers: Record<string, string>) =>
+    new Request("http://127.0.0.1:3000/api/front-desk/phone", { method, headers: { "content-type": "application/json", ...headers }, body: method === "POST" ? body : undefined });
+
+  it("refuses any request that isn't from the app on her own computer, for every phone company", async () => {
+    const { POST, DELETE } = await import("../app/api/front-desk/phone/route");
+    const foreign = { host: "practice-os.vercel.app", origin: "https://practice-os.vercel.app" };
+    const crossSite = { host: "127.0.0.1:3000", "sec-fetch-site": "cross-site" };
+    for (const h of [foreign, crossSite]) {
+      expect((await POST(req("POST", h))).status).toBe(403);
+      expect((await DELETE(req("DELETE", h))).status).toBe(403);
+    }
+    const spruce = new Request("http://127.0.0.1:3000/api/front-desk/phone", {
+      method: "POST",
+      headers: { "content-type": "application/json", ...crossSite },
+      body: JSON.stringify({ vendor: "spruce", token: "x".repeat(20) }),
+    });
+    expect((await POST(spruce)).status).toBe(403);
+  });
+
+  it("still refuses on the Vercel copy, even with the admin password", async () => {
+    const { POST } = await import("../app/api/front-desk/phone/route");
+    const saved = { ...process.env };
+    process.env.VERCEL = "1";
+    process.env.ADMIN_PASSWORD = "admin-pass";
+    try {
+      const r = req("POST", { host: "practice-os.vercel.app", "sec-fetch-site": "same-origin", "x-admin-password": "admin-pass", cookie: "admin=admin-pass" });
+      expect((await POST(r)).status).toBe(403);
+    } finally {
+      process.env = saved;
+    }
+  });
+});

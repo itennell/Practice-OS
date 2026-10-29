@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { canDecide } from "@/lib/admin-guard";
+import { isLocalAppRequest } from "@/lib/connect/local-only";
 import { connectSpruce, connectTwilio, disconnectPhone, refreshTwilioGreeting, turnOnTwilioVoicemail, undoTwilioVoicemail } from "@/lib/frontdesk/connect";
 
 const Body = z.discriminatedUnion("vendor", [
@@ -11,8 +12,11 @@ const Body = z.discriminatedUnion("vendor", [
 ]);
 
 // The phone Connect card: paste the keys (Twilio) or token (Spruce), live check, then save.
+// Only the app on her own computer may change her phone: never the Vercel copy, even with ADMIN_PASSWORD.
+const allowed = (request: Request) => canDecide(request) && isLocalAppRequest(request);
+
 export async function POST(request: Request) {
-  if (!canDecide(request)) return Response.json({ error: "Not allowed here." }, { status: 403 });
+  if (!allowed(request)) return Response.json({ ok: false, fix: "Not allowed to change this here." }, { status: 403 });
   const parsed = Body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ ok: false, fix: "Paste your keys first." }, { status: 400 });
   const b = parsed.data;
@@ -30,7 +34,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  if (!canDecide(request)) return Response.json({ error: "Not allowed here." }, { status: 403 });
-  await disconnectPhone();
-  return Response.json({ ok: true });
+  if (!allowed(request)) return Response.json({ ok: false, fix: "Not allowed to change this here." }, { status: 403 });
+  const result = await disconnectPhone();
+  return Response.json(result, { status: result.ok ? 200 : 409 });
 }

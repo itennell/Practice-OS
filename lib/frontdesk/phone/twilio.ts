@@ -161,6 +161,9 @@ export function voicemailUrl(greeting: string): string {
 const numberUrl = (config: TwilioConfig, numberSid: string) => `${API}/Accounts/${config.accountSid}/IncomingPhoneNumbers/${numberSid}.json`;
 const basic = (config: TwilioConfig) => `Basic ${Buffer.from(`${config.accountSid}:${config.authToken}`).toString("base64")}`;
 
+/** Whether a number's call setting is Practice-OS voicemail (so it is never kept as the "old" setting). */
+export const isPracticeOsVoicemail = (url: string | null | undefined) => Boolean(url?.startsWith(`${ECHO}?`) && url.includes("Record"));
+
 /** Her number's current call setting, read before anything changes it. */
 export async function getVoiceSetting(config: TwilioConfig, numberSid: string, fetchImpl: typeof fetch = fetch): Promise<VoiceSetting> {
   const res = await fetchImpl(numberUrl(config, numberSid), { headers: { Authorization: basic(config) }, signal: AbortSignal.timeout(20_000) }).catch(() => null);

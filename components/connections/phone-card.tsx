@@ -242,7 +242,10 @@ export function PhoneCard({ initial }: { initial: PhoneCardStatus }) {
 
   const disconnect = async () => {
     const res = await fetch("/api/front-desk/phone", { method: "DELETE" }).catch(() => null);
-    if (!res?.ok) throw new Error("Couldn't disconnect. Try again.");
+    if (!res?.ok) {
+      const out = (await res?.json().catch(() => null)) as { fix?: string } | null;
+      throw new Error(out?.fix ?? "Couldn't disconnect. Try again.");
+    }
     setStatus({ connected: false });
     notify.success("Phone disconnected.", { description: "Front Desk stopped reading your voicemails and texts." });
   };
@@ -313,7 +316,11 @@ export function PhoneCard({ initial }: { initial: PhoneCardStatus }) {
                 <ConfirmDialog
                   trigger={<Button variant="quiet">Disconnect</Button>}
                   title="Disconnect your phone?"
-                  description="Front Desk will stop reading your voicemails and texts until you connect again. Your phone number and account are not changed."
+                  description={
+                    view.canUndoVoicemail
+                      ? "Front Desk will stop reading your voicemails and texts until you connect again. First, your number's old call setting is put back, so calls stop going to your Practice-OS voicemail. Nothing else on your account changes."
+                      : "Front Desk will stop reading your voicemails and texts until you connect again. Your phone number and account are not changed."
+                  }
                   confirmLabel="Disconnect phone"
                   onConfirm={disconnect}
                 />
