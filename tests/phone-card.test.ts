@@ -8,7 +8,7 @@ import { fakeFetch } from "./helpers/fake-fetch";
 describe("phoneCardView", () => {
   it("shows the demo line as connected, with no Spruce setup and no disconnect", () => {
     const v = phoneCardView({ connected: true, devLine: true, number: "+18555027670", note: "pending note" });
-    expect(v).toMatchObject({ connected: true, accountLabel: "Demo line (855) 502-7670, run by Twilio", note: "pending note", showSpruceSetup: false, canDisconnect: false });
+    expect(v).toMatchObject({ connected: true, accountLabel: "Demo line (855) 502-7670, run by Twilio", note: "pending note", showSetup: false, canDisconnect: false });
     expect(v.description).not.toMatch(/your own phone company/);
   });
 
@@ -18,12 +18,12 @@ describe("phoneCardView", () => {
 
   it("shows her own connected line with a disconnect button", () => {
     const v = phoneCardView({ connected: true, label: "Connected: (312) 555-0100" });
-    expect(v).toMatchObject({ connected: true, accountLabel: "(312) 555-0100", showSpruceSetup: false, canDisconnect: true });
+    expect(v).toMatchObject({ connected: true, accountLabel: "(312) 555-0100", showSetup: false, canDisconnect: true });
     expect(v.description).toMatch(/your own phone company/);
   });
 
   it("offers the Spruce setup only when nothing is connected", () => {
-    expect(phoneCardView({ connected: false })).toMatchObject({ connected: false, showSpruceSetup: true, canDisconnect: false });
+    expect(phoneCardView({ connected: false })).toMatchObject({ connected: false, showSetup: true, canDisconnect: false });
   });
 });
 

@@ -41,14 +41,15 @@ describe("Twilio dev adapter", () => {
 
   it("check() gives a plain fix when the keys are wrong", async () => {
     const f = fakeFetch([{ match: "GET /IncomingPhoneNumbers.json", status: 401, json: {} }]);
-    const out = await twilioAdapter(cfg, f.impl).check();
-    expect(out).toEqual({ ok: false, fix: expect.stringContaining("TWILIO_AUTH_TOKEN") });
+    expect(await twilioAdapter({ ...cfg, developer: true }, f.impl).check()).toEqual({ ok: false, fix: expect.stringContaining("TWILIO_AUTH_TOKEN") });
+    // Her own Twilio account: the fix points at the Twilio Console, not .env.
+    expect(await twilioAdapter(cfg, f.impl).check()).toEqual({ ok: false, fix: expect.stringContaining("Twilio Console home page") });
   });
 
   it("is only switched on by FRONT_DESK_DEV_TWILIO=true with all three keys", () => {
     const env = { TWILIO_ACCOUNT_SID: "AC", TWILIO_AUTH_TOKEN: "t", TWILIO_PHONE_NUMBER: "(312) 555-0100" };
     expect(twilioFromEnv(env as never)).toBeNull();
-    expect(twilioFromEnv({ ...env, FRONT_DESK_DEV_TWILIO: "true" } as never)).toEqual({ accountSid: "AC", authToken: "t", phoneNumber: "+13125550100" });
+    expect(twilioFromEnv({ ...env, FRONT_DESK_DEV_TWILIO: "true" } as never)).toEqual({ accountSid: "AC", authToken: "t", phoneNumber: "+13125550100", developer: true });
   });
 });
 
