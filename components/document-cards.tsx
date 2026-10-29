@@ -50,10 +50,18 @@ export function DocumentCards({ cards }: { cards: DocumentCard[] }) {
               {c.held_elsewhere && <span className="block">Kept in {c.held_elsewhere}</span>}
             </p>
             <div className="flex flex-wrap gap-2 px-1">
-              <Link href={withBack(c.open, back)} className={ACTION}>
-                <PanelRight aria-hidden size={16} />
-                Open<span className="sr-only"> {name}</span>
-              </Link>
+              {c.open.startsWith("/api/") ? (
+                // A file she added: opens in its own tab.
+                <a href={c.open} target="_blank" rel="noreferrer" className={ACTION}>
+                  <ExternalLink aria-hidden size={16} />
+                  Open<span className="sr-only"> {name}</span>
+                </a>
+              ) : (
+                <Link href={withBack(c.open, back)} className={ACTION}>
+                  <PanelRight aria-hidden size={16} />
+                  Open<span className="sr-only"> {name}</span>
+                </Link>
+              )}
               {c.pdf && (
                 <a href={c.pdf} download className={ACTION}>
                   <Download aria-hidden size={16} />

@@ -9,7 +9,7 @@
 import { audit } from "../audit";
 import { practiceToday } from "../compliance/store";
 import { chat as metaChat, readToolCalls, type ChatParams } from "../meta";
-import { CRISIS_REPLY, checkCrisis } from "../safety";
+import { CRISIS_REPLY, alertCrisis, checkCrisis } from "../safety";
 import { guard, REFUSAL, type GuardKind } from "./guard";
 import { relevantMemories, type Memory } from "./memory";
 import { soul } from "./soul";
@@ -107,6 +107,7 @@ export async function respond(message: string, opts: RespondOptions): Promise<Re
   const crisis = checkCrisis(message);
   if (crisis.crisis) {
     await audit({ actor: "safety", action: "crisis_reply", subjectType: "chat", details: { category: crisis.category, by: opts.by } });
+    await alertCrisis({ source: "chat", category: crisis.category, by: opts.by });
     return { kind: "crisis", text: CRISIS_REPLY };
   }
   const check = await guard(message, "message");

@@ -105,9 +105,9 @@ describe.skipIf(!ready)("golden conversations (replayed)", () => {
     expect(last).toBe(recorded.replies.at(-1)!.text);
     expect(last).toMatch(scenario.expectReply);
 
-    // Every call offers the whole shared tool list and starts with SOUL.md.
+    // Every call offers the whole shared tool list (less the MCP-only ones) and starts with SOUL.md.
     for (const r of requests) {
-      expect((r.tools ?? []).map((t) => (t as { function: { name: string } }).function.name)).toEqual(TOOLS.map((t) => t.name));
+      expect((r.tools ?? []).map((t) => (t as { function: { name: string } }).function.name)).toEqual(TOOLS.filter((t) => !t.mcpOnly).map((t) => t.name));
       expect(r.messages[0]).toMatchObject({ role: "system" });
       expect(String(r.messages[0].content)).toMatch(/# Aeon/);
     }

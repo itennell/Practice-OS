@@ -1,4 +1,5 @@
 import { aeonAction } from "./aeon_action";
+import { fileDocument } from "./file_document";
 import { gfeIssue } from "./gfe_issue";
 import { referralLetter } from "./referral_letter";
 import { instagramPost } from "./instagram_post";
@@ -17,6 +18,7 @@ export const executors: Partial<Record<string, Executor>> = {
   test_note: testNote,
   state_rules: stateRules,
   gfe_issue: gfeIssue,
+  file_document: fileDocument,
   aeon_action: aeonAction,
   referral_letter: referralLetter,
   instagram_post: instagramPost,

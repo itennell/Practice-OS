@@ -82,3 +82,37 @@ export function checkCrisis(text: string): CrisisResult {
   if (nearMiss) return { crisis: true, category: "self_harm" };
   return { crisis: false };
 }
+
+/**
+ * The crisis check fired in the chat or on a file she added: the caller shows
+ * CRISIS_REPLY, and this texts an urgent alert to her own verified phone and
+ * writes both to audit_log (AGENTS.md > Approvals: the one path that skips
+ * approvals). Never includes the words that triggered it. Front Desk has its own
+ * caller-facing version (lib/frontdesk/crisis.ts) and shares the alert phone.
+ */
+export async function alertCrisis(input: { source: "chat" | "upload"; category: CrisisCategory; by: string }): Promise<{ alerted: boolean }> {
+  const { audit } = await import("./audit");
+  const { alertPhone } = await import("./frontdesk/crisis");
+  const { sendText } = await import("./frontdesk/store");
+  await audit({ actor: "safety", action: "crisis_detected", subjectType: input.source, details: { category: input.category, by: input.by } });
+  const to = await alertPhone().catch(() => null);
+  if (!to) {
+    await audit({ actor: "safety", action: "crisis_alert_failed", subjectType: input.source, details: { error: "no alert phone (settings.alert_phone or CLINICIAN_ALERT_PHONE)" } });
+    return { alerted: false };
+  }
+  const what = input.source === "chat" ? "A message in your chat with Aeon" : "A file added in your chat with Aeon";
+  try {
+    await sendText({
+      to,
+      body: `URGENT from Practice-OS: ${what} mentioned danger or self-harm. Aeon showed the 988/911 message. Please check now.`,
+      inquiryId: null,
+      actor: "safety",
+      action: "crisis_alert_sent",
+      force: true,
+    });
+    return { alerted: true };
+  } catch (e) {
+    await audit({ actor: "safety", action: "crisis_alert_failed", subjectType: input.source, details: { error: String(e) } });
+    return { alerted: false };
+  }
+}

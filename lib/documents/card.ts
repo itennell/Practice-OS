@@ -17,6 +17,7 @@ export const DOCUMENT_KINDS = [
   "credential_doc",
   "caqh_checklist",
   "guide",
+  "uploaded",
 ] as const;
 export type DocumentKind = (typeof DOCUMENT_KINDS)[number];
 
@@ -31,6 +32,7 @@ export const KIND_LABEL: Record<DocumentKind, string> = {
   credential_doc: "Credentialing document",
   caqh_checklist: "CAQH checklist",
   guide: "How-do-I guide",
+  uploaded: "Your document",
 };
 
 /** A link inside the app: one leading slash, never "//" (another site) or a backslash. */

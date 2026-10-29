@@ -24,6 +24,9 @@ const nextConfig: NextConfig = {
     ],
   },
   partialPrefetching: true,
+  // PDF and Word readers for files added in the chat (lib/uploads/read.ts): loaded from
+  // node_modules at run time, not bundled, so pdf.js finds its own worker code.
+  serverExternalPackages: ["unpdf", "mammoth"],
   // Admin replaced Deadlines, Paperwork, How do I and the Dashboard (redesign PR 3); old links keep working.
   async redirects() {
     const tab = (from: string, panel: string) => ({
