@@ -56,7 +56,8 @@ export const documentCardSchema = z.object({
   /** A GET link that downloads the PDF, when there is one. */
   pdf: appPath.nullable(),
   /** The official page a deadline or guide comes from. */
-  source: z.object({ label: z.string().max(160), href: z.string().url().max(500) }).nullable(),
+  // https:// only (never javascript: or another scheme), or a path inside the app.
+  source: z.object({ label: z.string().max(160), href: z.union([z.string().url().max(500).regex(/^https:\/\//, "https only"), appPath]) }).nullable(),
   /** What only she can do with it, in plain words. */
   needs_her: z.string().max(300).nullable(),
   /** Practice-OS tracks it but doesn't hold the file: where the real one lives. */

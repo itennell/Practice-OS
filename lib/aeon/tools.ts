@@ -154,6 +154,8 @@ function withCards(said: Record<string, unknown>, cards: DocumentCard[]): ToolRe
 const OPEN_CARD = "Her card in the chat opens it, already filled in; don't name a page.";
 
 async function makeGfe(input: z.infer<z.ZodObject<typeof gfeInput>>, ctx: ToolContext): Promise<ToolResult> {
+  // It saves an estimate row and an approval, so the view-only demo copy refuses it like any change.
+  if (ctx.viewOnly) return { content: [{ type: "text", text: VIEW_ONLY }], isError: true };
   const r = await gfe.draftEstimate(input, { createdBy: ctx.by });
   const [row, today] = await Promise.all([gfe.getEstimate(r.id), practiceToday()]);
   return withCards(
@@ -185,6 +187,8 @@ async function makeRelease(input: z.infer<z.ZodObject<typeof releaseInput>>): Pr
     const filled = Object.entries(fields).filter(([, v]) => v).map(([k]) => k);
     return withCards(
       {
+        // Kept for one release so outside MCP clients that read `open` keep working; the card has the same link.
+        open: `/admin?panel=release&draft=${draft}`,
         filled,
         left_for_her: ["client name", "client date of birth", ...["recipient", "purpose", "information"].filter((k) => !filled.includes(k)), "signatures"],
         next: `Tell her: I filled in what I know. Download the PDF from the card, type the client's name and birth date, and have it signed. Keep a copy in the client's record. ${OPEN_CARD}`,
@@ -207,6 +211,8 @@ async function makeCms855i(ctx: ToolContext): Promise<ToolResult> {
       form: `CMS-855I (${cms855i.CMS855I_VERSION})`,
       filled: r.filled,
       left_for_her: r.leftForYou,
+      // Kept for one release for outside MCP clients; the card has the same link.
+      download: "/api/payers/cms855i",
       faster_route: "PECOS (pecos.cms.hhs.gov) lists MFT and MHC as specialties and is usually faster than paper.",
       next: `She downloads it from the card, finishes what's left, signs and submits it herself. ${OPEN_CARD}`,
       is_sample: profile.isSample,

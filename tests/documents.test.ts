@@ -4,7 +4,8 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { loadEnv } from "../lib/env";
 import { cardsFrom, documentCardSchema, type DocumentCard } from "../lib/documents/card";
-import { credentialingCards, rankDocuments } from "../lib/documents/index";
+import { credentialingCards, deadlineCard, rankDocuments } from "../lib/documents/index";
+import type { ObligationView } from "../lib/compliance/view";
 import type { CredentialingProfile } from "../lib/credentialing/profile";
 
 loadEnv();
@@ -34,6 +35,36 @@ describe("document cards", () => {
       expect(documentCardSchema.safeParse(base({ open })).success).toBe(false);
     }
     expect(documentCardSchema.safeParse(base({ open: "/admin?panel=gfe&focus=1" })).success).toBe(true);
+  });
+
+  it("only links a source over https or inside the app", () => {
+    const src = (href: string) => documentCardSchema.safeParse(base({ source: { label: "x", href } })).success;
+    expect(src("javascript:alert(1)")).toBe(false);
+    expect(src("http://example.com")).toBe(false);
+    expect(src("//evil.example")).toBe(false);
+    expect(src("https://www.ecfr.gov/x")).toBe(true);
+    expect(src("/admin/how-do-i/caqh-reattestation")).toBe(true);
+  });
+
+  it("caps a long deadline's fields so the card is never dropped", () => {
+    const long = "x".repeat(400);
+    const o = {
+      id: "00000000-0000-4000-8000-000000000001",
+      title: long,
+      citation: long,
+      you_must: long,
+      what_to_do: long,
+      source_url: "https://example.gov/rule",
+      due_on: "2026-12-01",
+      urgency: "yellow",
+      category: "other",
+      rule_id: "long_rule",
+      jurisdiction: "IL",
+      is_sample: true,
+    } as unknown as ObligationView;
+    const card = deadlineCard(o, "2026-10-29");
+    expect(cardsFrom({ documents: [card] })).toHaveLength(1);
+    expect(deadlineCard({ ...o, source_url: "javascript:alert(1)" }, "2026-10-29").source).toBeNull();
   });
 
   it("drops anything malformed from a tool result instead of drawing it", () => {
@@ -149,6 +180,19 @@ describe.skipIf(!hasDb)("document tools on the demo practice", async () => {
       { by: "test:docs" },
     );
     expect(cardsFrom(made.structuredContent)[0]).toMatchObject({ kind: "superbill", pdf: expect.stringMatching(/^\/api\/superbills\/.+\/pdf$/) });
+  });
+
+  it("drafts no Good Faith Estimate on the view-only demo copy", async () => {
+    const sql = db();
+    const [{ n: before }] = await sql<{ n: string }[]>`select count(*) as n from practice_os.good_faith_estimates`;
+    const gfe = { basis: "scheduled", scheduled_on: "2026-10-29", service_on: "2026-11-12", service_kind: "individual", lines: [{ code: "90837", quantity: 1, location: "office" }] };
+    for (const [name, args] of [["draft_gfe", gfe], ["create_document", { kind: "gfe", gfe }]] as const) {
+      const r = await runTool(name, args, { by: "test:docs", viewOnly: true });
+      expect(r.isError).toBe(true);
+      expect(r.content[0].text).toMatch(/view-only/);
+    }
+    const [{ n: after }] = await sql<{ n: string }[]>`select count(*) as n from practice_os.good_faith_estimates`;
+    expect(after).toBe(before);
   });
 
   it("refuses on the view-only demo copy when the kind saves a record", async () => {
