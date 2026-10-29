@@ -226,8 +226,16 @@ export type GraphicDeps = {
 
 export type Graphic = { jpeg: Buffer; check: GraphicCheck; tries: number; backgroundPrompt: string };
 
+/** Tests and recorded conversations only (PLAYWRIGHT_IMAGE_STANDIN=1, like the Cal.com stand-in): a plain background, no image or photo model. */
+async function standIn(words: Words): Promise<Graphic> {
+  if (process.env.VERCEL || process.env.NODE_ENV === "production") throw new Error("PLAYWRIGHT_IMAGE_STANDIN is for tests only.");
+  const background = await sharp({ create: { width: 1024, height: 1024, channels: 3, background: "#EDE7F6" } }).png().toBuffer();
+  return { jpeg: await composePost({ background, cutout: null, words }), check: { ok: true, problems: [] }, tries: 1, backgroundPrompt: "(stand-in)" };
+}
+
 /** Draw, lay out, check; one redraw when the check fails. */
 export async function designPost(pillar: Pillar, words: Words, deps: GraphicDeps = {}): Promise<Graphic> {
+  if (process.env.PLAYWRIGHT_IMAGE_STANDIN === "1") return standIn(words);
   const never = deps.neverShow ?? [];
   const cutout = never.includes("face") ? null : await (deps.cutout ?? danaCutout)();
   const draw = deps.background ?? (async (prompt: string) => (await generateImage("instagram.background", prompt)).image);
