@@ -1,5 +1,7 @@
 # The Connect relay
 
+> **Future.** Instagram posting is cut for now (2026-10-29): Aeon helps her write posts and she posts them herself, so no relay is needed. This code stays for later.
+
 `relay/` is a small Vercel project, separate from the app, with no database.
 It does three things and nothing else:
 
