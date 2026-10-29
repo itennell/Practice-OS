@@ -34,8 +34,9 @@ describe.skipIf(!hasDb)("make_release_form", () => {
     );
     expect(r.isError).toBeFalsy();
     const out = JSON.parse(r.content[0].text);
-    const draft = new URL(out.open, "http://x").searchParams.get("draft")!;
-    expect(out.open).toMatch(/^\/admin\?panel=release&draft=/);
+    const open = out.documents[0].opens_at as string;
+    const draft = new URL(open, "http://x").searchParams.get("draft")!;
+    expect(open).toMatch(/^\/admin\?panel=release&draft=/);
     expect(getReleaseDraft(draft)).toEqual({ recipient: "Dr. Lee [Sample]", purpose: "Coordinate care", information: "Dates of attendance", expires_on: "2099-01-01" });
     expect(out.left_for_her).toEqual(expect.arrayContaining(["client name", "client date of birth", "signatures"]));
   });

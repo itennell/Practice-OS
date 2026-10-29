@@ -2,7 +2,7 @@ import { ZodError } from "zod";
 import { canDecide } from "@/lib/admin-guard";
 import { createSuperbill } from "@/lib/superbill/store";
 
-// She prepares a superbill by hand on Paperwork > Superbills (Aeon's chat uses
+// She prepares a superbill by hand on Admin > Superbills (Aeon's chat uses
 // the draft_superbill tool instead). Saved by reference with no client details.
 export async function POST(request: Request) {
   if (!canDecide(request)) return Response.json({ error: "Not allowed to change this here." }, { status: 403 });

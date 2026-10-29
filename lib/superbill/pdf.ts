@@ -26,7 +26,7 @@ export const DIAGNOSIS_FIELDS = (["A", "B", "C", "D"] as const).map((l) => ({ na
 /** The provider block needs her NPI and tax ID; they come from Credentialing. */
 export class MissingProviderDetails extends Error {
   constructor() {
-    super("Add your NPI and tax ID on Paperwork > Credentialing first. The superbill must show both.");
+    super("Add your NPI and tax ID on Admin > Credentialing first. The superbill must show both.");
   }
 }
 

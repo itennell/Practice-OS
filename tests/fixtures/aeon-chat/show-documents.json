@@ -1,0 +1,312 @@
+{
+  "scenario": "show-documents",
+  "recordedAt": "2026-10-29T14:46:21.076Z",
+  "calls": [
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "find_documents",
+        "open_document",
+        "create_document",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "draft_superbill",
+        "make_release_form",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "fill_payer_form",
+        "list_payer_applications",
+        "update_payer_application",
+        "remember",
+        "recent_memory_changes",
+        "forget",
+        "find_referral_sources",
+        "list_referral_sources",
+        "move_referral_source",
+        "draft_outreach",
+        "plan_instagram_week",
+        "draft_instagram_post",
+        "list_instagram_posts",
+        "front_desk_status",
+        "front_desk_check_now",
+        "offer_consult_times"
+      ],
+      "lastRole": "user",
+      "response": {
+        "id": "chatcmpl-01a18820-5546-765a-9194-c52a3b860d88",
+        "choices": [
+          {
+            "finish_reason": "tool_calls",
+            "index": 0,
+            "message": {
+              "content": "Checking what needs you this week.",
+              "refusal": null,
+              "tool_calls": [
+                {
+                  "id": "call_a02820e3-cab7-48e5-9ef7-05548ce36881",
+                  "type": "function",
+                  "function": {
+                    "name": "morning_brief",
+                    "arguments": "{}"
+                  }
+                }
+              ],
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793285182,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 63,
+          "prompt_tokens": 10334,
+          "total_tokens": 10397,
+          "completion_tokens_details": {
+            "reasoning_tokens": 6
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        }
+      }
+    },
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "find_documents",
+        "open_document",
+        "create_document",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "draft_superbill",
+        "make_release_form",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "fill_payer_form",
+        "list_payer_applications",
+        "update_payer_application",
+        "remember",
+        "recent_memory_changes",
+        "forget",
+        "find_referral_sources",
+        "list_referral_sources",
+        "move_referral_source",
+        "draft_outreach",
+        "plan_instagram_week",
+        "draft_instagram_post",
+        "list_instagram_posts",
+        "front_desk_status",
+        "front_desk_check_now",
+        "offer_consult_times"
+      ],
+      "lastRole": "tool",
+      "response": {
+        "id": "chatcmpl-01a18820-6d6c-77d3-bf83-c478fc8535c1",
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "index": 0,
+            "message": {
+              "content": "Nothing is due in the next 7 days. I checked your deadlines.\n\nTwo things are coming up soon:\n\n1. BCBSIL application follow-up - Wed, Nov 4, in 6 days.\nYou need to do this: call them or check the portal on application [Sample] APP-1042.\n\n2. CAQH re-attestation - Sat, Nov 7, in 9 days.\nYou need to do this: log in and click Attest yourself. I can't attest for you.\n\nDetails and sources for both are on your Deadlines page.\n\nYou also have 7 setup questions waiting on that same page.\n\nWant me to pull your CAQH checklist so you can see what to fix before you attest?",
+              "refusal": null,
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793285188,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 1221,
+          "prompt_tokens": 10580,
+          "total_tokens": 11801,
+          "completion_tokens_details": {
+            "reasoning_tokens": 1065
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        }
+      }
+    },
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "find_documents",
+        "open_document",
+        "create_document",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "draft_superbill",
+        "make_release_form",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "fill_payer_form",
+        "list_payer_applications",
+        "update_payer_application",
+        "remember",
+        "recent_memory_changes",
+        "forget",
+        "find_referral_sources",
+        "list_referral_sources",
+        "move_referral_source",
+        "draft_outreach",
+        "plan_instagram_week",
+        "draft_instagram_post",
+        "list_instagram_posts",
+        "front_desk_status",
+        "front_desk_check_now",
+        "offer_consult_times"
+      ],
+      "lastRole": "user",
+      "response": {
+        "id": "chatcmpl-01a18820-796f-76c2-b4fe-fc09c5a44ccf",
+        "choices": [
+          {
+            "finish_reason": "tool_calls",
+            "index": 0,
+            "message": {
+              "content": "I'll pull those documents into the chat now.",
+              "refusal": null,
+              "tool_calls": [
+                {
+                  "id": "call_0ba2a4ab-3320-49f8-bff3-ed8b49bf3291",
+                  "type": "function",
+                  "function": {
+                    "name": "find_documents",
+                    "arguments": "{\"due_within_days\":14}"
+                  }
+                }
+              ],
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793285192,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 580,
+          "prompt_tokens": 10501,
+          "total_tokens": 11081,
+          "completion_tokens_details": {
+            "reasoning_tokens": 510
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        }
+      }
+    },
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "find_documents",
+        "open_document",
+        "create_document",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "draft_superbill",
+        "make_release_form",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "fill_payer_form",
+        "list_payer_applications",
+        "update_payer_application",
+        "remember",
+        "recent_memory_changes",
+        "forget",
+        "find_referral_sources",
+        "list_referral_sources",
+        "move_referral_source",
+        "draft_outreach",
+        "plan_instagram_week",
+        "draft_instagram_post",
+        "list_instagram_posts",
+        "front_desk_status",
+        "front_desk_check_now",
+        "offer_consult_times"
+      ],
+      "lastRole": "tool",
+      "response": {
+        "id": "chatcmpl-01a18820-870a-75b3-98a0-fa8e39584599",
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "index": 0,
+            "message": {
+              "content": "Here they are below.\n\nStart with the Good Faith Estimate due today. It needs your approval first, then you add the client details to make the PDF.\n\nThe CAQH checklist shows 5 things to fix, and the Nov 7 attestation only you can do. The BCBSIL follow-up for Nov 4 is there too.",
+              "refusal": null,
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793285195,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 991,
+          "prompt_tokens": 11332,
+          "total_tokens": 12323,
+          "completion_tokens_details": {
+            "reasoning_tokens": 914
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        }
+      }
+    }
+  ],
+  "replies": [
+    {
+      "text": "Nothing is due in the next 7 days. I checked your deadlines.\n\nTwo things are coming up soon:\n\n1. BCBSIL application follow-up - Wed, Nov 4, in 6 days.\nYou need to do this: call them or check the portal on application [Sample] APP-1042.\n\n2. CAQH re-attestation - Sat, Nov 7, in 9 days.\nYou need to do this: log in and click Attest yourself. I can't attest for you.\n\nDetails and sources for both are on your Deadlines page.\n\nYou also have 7 setup questions waiting on that same page.\n\nWant me to pull your CAQH checklist so you can see what to fix before you attest?",
+      "tools": [
+        "morning_brief"
+      ]
+    },
+    {
+      "text": "Here they are below.\n\nStart with the Good Faith Estimate due today. It needs your approval first, then you add the client details to make the PDF.\n\nThe CAQH checklist shows 5 things to fix, and the Nov 7 attestation only you can do. The BCBSIL follow-up for Nov 4 is there too.",
+      "tools": [
+        "find_documents"
+      ]
+    }
+  ]
+}

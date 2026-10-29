@@ -14,6 +14,8 @@ export const APPROVAL_KINDS = [
   "aeon_action",
   // Front Desk (migration 016)
   "text_consult_options",
+  // Chat documents (migration 018)
+  "file_document",
 ] as const;
 
 export type ApprovalKind = (typeof APPROVAL_KINDS)[number];

@@ -16,7 +16,8 @@
     "db:reset": "tsx scripts/db-reset.ts",
     "research": "tsx scripts/research.ts",
     "models:download": "tsx scripts/download-models.ts",
-    "aeon:record": "tsx scripts/record-aeon-fixture.ts"
+    "aeon:record": "tsx scripts/record-aeon-fixture.ts",
+    "eval:documents": "tsx scripts/eval-documents.ts"
   },
   "dependencies": {
     "@base-ui/react": "1.9.0",
@@ -29,6 +30,7 @@
     "dotenv": "18.0.9",
     "embedded-postgres": "18.4.0-beta.17",
     "lucide-react": "1.61.0",
+    "mammoth": "1.12.3",
     "motion": "12.43.0",
     "next": "16.4.3",
     "openai": "4.104.0",
@@ -42,6 +44,7 @@
     "sonner": "2.0.8",
     "tailwind-merge": "3.7.0",
     "three": "0.180.0",
+    "unpdf": "1.8.1",
     "zod": "3.25.76",
     "zod-to-json-schema": "3.25.2"
   },

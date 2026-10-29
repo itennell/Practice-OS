@@ -83,9 +83,31 @@ export async function sendMessage(input: {
   });
   if (reply.kind !== "answer") return { conversationId: existing?.conversation.id ?? null, reply };
 
+  const conversationId = await saveExchange({
+    conversationId: existing?.conversation.id ?? null,
+    text: input.text,
+    reply,
+    mode: input.mode,
+    viewOnly: input.viewOnly,
+  });
+  return { conversationId, reply };
+}
+
+/**
+ * Saves one exchange: her message and Aeon's answer, in a new conversation when
+ * there is none yet. Both sides have already passed the sensitive-info guard.
+ */
+export async function saveExchange(input: {
+  conversationId: string | null;
+  text: string;
+  reply: { text: string; steps: Step[]; approvalIds: string[] };
+  mode?: ApprovalMode;
+  viewOnly?: boolean;
+}): Promise<string> {
+  const { reply } = input;
   const sql = db();
-  const conversationId = await sql.begin(async (tx) => {
-    let id = existing?.conversation.id;
+  return sql.begin(async (tx) => {
+    let id = input.conversationId ?? undefined;
     if (!id) {
       const [row] = await tx<{ id: string }[]>`
         insert into practice_os.conversations (title, approval_mode) values (${titleFrom(input.text)}, ${input.mode ?? null}) returning id`;
@@ -107,5 +129,4 @@ export async function sendMessage(input: {
     }
     return id;
   });
-  return { conversationId, reply };
 }
