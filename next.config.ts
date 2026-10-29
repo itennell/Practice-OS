@@ -36,6 +36,8 @@ const nextConfig: NextConfig = {
       permanent: false,
     });
     return [
+      // Instagram became a tab of Media.
+      { source: "/instagram", destination: "/media/instagram", permanent: false },
       tab("superbills", "superbill"),
       tab("release", "release"),
       tab("insurance", "insurance"),
