@@ -5,8 +5,8 @@ import { ReferralBoard } from "@/components/referrals/board";
 import { PageHeader } from "@/components/ui";
 import { DEFAULT_SPECIALTIES, getReferralSettings } from "@/lib/referrals/settings";
 import { STAGE_LABEL } from "@/lib/referrals/stages";
-import { latestLetters, listSources, practiceFocus } from "@/lib/referrals/store";
-import { tierFor, type TierResult } from "@/lib/referrals/tier";
+import { latestLetters, listSources, practiceFacts } from "@/lib/referrals/store";
+import { boardTier, type TierResult } from "@/lib/referrals/tier";
 
 export const metadata = { title: "Referrals · Practice-OS" };
 
@@ -26,10 +26,10 @@ export default function ReferralsPage() {
 
 async function Referrals() {
   await connection(); // read the database per request, never at build time
-  const [sources, letters, setup, focus] = await Promise.all([listSources(), latestLetters(), getReferralSettings(), practiceFocus()]);
+  const [sources, letters, setup, facts] = await Promise.all([listSources(), latestLetters(), getReferralSettings(), practiceFacts()]);
   const board = Object.fromEntries(sources.filter((s) => s.npi).map((s) => [s.npi!, { stage: STAGE_LABEL[s.stage] }]));
   const tiers: Record<string, TierResult> = Object.fromEntries(
-    sources.map((s) => [s.id, tierFor({ taxonomy: s.taxonomy, npiType: s.npi_type }, { miles: s.distance_miles, focus })]),
+    sources.map((s) => [s.id, boardTier(s, { focus: facts.focus, clinicianState: facts.state })]),
   );
   return (
     <div className="flex flex-col gap-8">
