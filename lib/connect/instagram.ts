@@ -10,6 +10,42 @@ import { unseal } from "../../relay/lib/seal";
 
 const relay = () => requireEnv("RELAY_URL").replace(/\/$/, "");
 
+/** What the Instagram card and Connect button say when this copy's relay isn't set up. */
+export const INSTAGRAM_NOT_READY = "Instagram isn't ready on this copy yet.";
+
+export type Readiness = { ready: true } | { ready: false; reason: string };
+const READY_CACHE_MS = 60_000;
+let readyCache: { at: number; value: Readiness } | null = null;
+
+/**
+ * Asks the relay's /api/health whether every setting it needs is there. The
+ * technical reason is for the server log only; the clinician sees INSTAGRAM_NOT_READY.
+ */
+export async function instagramReadiness(fetchImpl: typeof fetch = fetch, now = Date.now()): Promise<Readiness> {
+  if (readyCache && now - readyCache.at < READY_CACHE_MS) return readyCache.value;
+  const value = await (async (): Promise<Readiness> => {
+    const url = process.env.RELAY_URL;
+    if (!url) return { ready: false, reason: "RELAY_URL is not set in .env" };
+    try {
+      const res = await fetchImpl(`${url.replace(/\/$/, "")}/api/health`, { cache: "no-store", signal: AbortSignal.timeout(3_000) });
+      const json = (await res.json().catch(() => null)) as { ready?: boolean; checks?: Record<string, boolean> } | null;
+      if (!res.ok || !json) return { ready: false, reason: `relay health answered HTTP ${res.status}` };
+      if (json.ready) return { ready: true };
+      const missing = Object.entries(json.checks ?? {}).filter(([, ok]) => !ok).map(([k]) => k);
+      return { ready: false, reason: `relay is missing ${missing.join(", ") || "settings"}` };
+    } catch (e) {
+      return { ready: false, reason: `relay unreachable: ${e instanceof Error ? e.message : String(e)}` };
+    }
+  })();
+  readyCache = { at: now, value };
+  return value;
+}
+
+/** Tests only. */
+export function resetInstagramReadiness() {
+  readyCache = null;
+}
+
 /** Asks the relay for Meta's sign-in page. `key` is the one-time key the token comes back sealed with. */
 export async function beginInstagram(state: string, returnTo: string, key: Buffer): Promise<string> {
   const res = await fetch(`${relay()}/api/connect/instagram/begin`, {

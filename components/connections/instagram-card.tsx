@@ -58,13 +58,14 @@ export function InstagramCard({ status }: { status: ConnectionStatus }) {
             {check.reason}
           </p>
         )}
-        {check.state === "not_connected" && (
+        {check.state === "not_connected" && status.notReady && <p className="text-small text-[var(--fg-muted)]">{status.notReady}</p>}
+        {check.state === "not_connected" && !status.notReady && (
           <p className="text-small text-[var(--fg-muted)]">
             You&rsquo;ll sign in on Instagram&rsquo;s own page. It needs an Instagram professional (business or creator) account.
           </p>
         )}
       </div>
-      {!connected && check.state !== "checking" && (
+      {!connected && check.state !== "checking" && !status.notReady && (
         <ConnectButton provider="instagram" variant="accent">
           {check.state === "not_connected" ? "Connect Instagram" : "Connect again"}
         </ConnectButton>
