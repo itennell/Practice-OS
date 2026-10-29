@@ -82,7 +82,7 @@ test("Referrals map: 60614 pins and a tiered list, pin and row pick each other, 
   expect(errors).toEqual([]);
 });
 
-test("Draft email, then Copy puts the subject and letter on the clipboard", async ({ page, context, browserName }) => {
+test("Draft email waits for approval; once approved, Copy puts the subject and letter on the clipboard", async ({ page, context, browserName, baseURL }) => {
   test.skip(browserName !== "chromium", "clipboard permissions are Chromium-only here");
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   // Muse writes the letter in real use; here a fixed one stands in so the test doesn't need a model key.
@@ -95,18 +95,33 @@ test("Draft email, then Copy puts the subject and letter on the clipboard", asyn
   await page.goto("/referrals");
   const card = page.getByRole("region", { name: "Follow up" }).getByRole("listitem", { name: "[Sample] Old Town OB-GYN" });
   await card.getByRole("button", { name: "Draft a check-in email" }).click();
-  await expect(card).toContainText("Email to send yourself");
-  await expect(card).toContainText("Open your email and start a new message");
-  await card.getByRole("button", { name: "Copy email to [Sample] Old Town OB-GYN" }).click();
-  await expect(card.getByRole("button", { name: "Copy email to [Sample] Old Town OB-GYN" })).toHaveText("Copied");
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(`Subject: [Sample] Checking in from Reyes Counseling\n\n${letter}`);
+  await expect(card).toContainText("Email draft");
+  await expect(card).toContainText("Then a Copy button shows here");
+  await expect(card.getByRole("button", { name: /^Copy email/ })).toHaveCount(0);
 
-  // The seeded letter (no stand-in) copies the same way.
-  const lakeview = page.getByRole("region", { name: "Found" }).getByRole("listitem", { name: "[Sample] Lakeview Family Medicine" });
-  await lakeview.getByRole("button", { name: "Copy email to [Sample] Lakeview Family Medicine" }).click();
+  // The seeded Lakeview letter, approved: now Copy shows, with the demo warning.
+  const lakeview = () => page.getByRole("listitem", { name: "[Sample] Lakeview Family Medicine" });
+  await expect(lakeview().getByRole("button", { name: /^Copy email/ })).toHaveCount(0);
+  const approved = await page.request.post("/api/approvals/00000000-0000-4000-8000-000000000901/approve", { headers: { origin: baseURL! } });
+  expect(approved.ok()).toBe(true);
+  await page.reload();
+  await expect(lakeview()).toContainText("Demo practice: don\u2019t send this to a real provider.");
+  await lakeview().getByRole("button", { name: "Copy email to [Sample] Lakeview Family Medicine" }).click();
+  await expect(lakeview().getByRole("button", { name: "Copy email to [Sample] Lakeview Family Medicine" })).toHaveText("Copied");
   const copied = await page.evaluate(() => navigator.clipboard.readText());
   expect(copied).toMatch(/^Subject: \[Sample\] Introducing Reyes Counseling in Lincoln Park\n\n\[Sample\] Dear Lakeview Family Medicine team,/);
   expect(copied).toContain("Dana Reyes, LCPC (fictional demo practice)");
+});
+
+test("Add to board keeps keyboard focus on the row", async ({ page }) => {
+  await page.goto("/referrals");
+  await waitForResults(page, "60614");
+  const add = page.getByRole("region", { name: "Referral sources by tier" }).getByRole("button", { name: /^Add to board: / }).first();
+  const name = (await add.getAttribute("aria-label"))!.replace("Add to board: ", "");
+  await add.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator(":focus")).toHaveText("On your board: Found", { timeout: 30_000 });
+  await expect(page.getByRole("region", { name: "Found" }).getByRole("listitem", { name })).toBeVisible();
 });
 
 for (const scheme of ["light", "dark"] as const) {

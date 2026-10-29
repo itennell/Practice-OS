@@ -21,7 +21,7 @@ const MOVE_OPTIONS = STAGES.map((s) => ({ value: s, label: STAGE_LABEL[s] }));
 
 const HINT: Record<Stage, string> = {
   found: "From the map. Draft an email to start.",
-  contacted: "Email sent. Follow up in a week.",
+  contacted: "Letter approved. Send it, then follow up in a week.",
   follow_up: "Time for a friendly check-in.",
   connected: "You've talked. Keep in touch.",
   not_a_fit: "Set aside.",
@@ -35,7 +35,7 @@ function dateLabel(iso: string): string {
  * The drafted email on the card: subject and letter, a Copy button, and plain
  * steps. Aeon never sends; she pastes it into her own email.
  */
-function LetterBox({ letter, name }: { letter: LetterState; name: string }) {
+function LetterBox({ letter, name, demo }: { letter: LetterState; name: string; demo: boolean }) {
   const [copied, setCopied] = useState(false);
   const [open, setOpen] = useState(false);
   const boxId = `letter-${letter.approvalId}`;
@@ -47,6 +47,8 @@ function LetterBox({ letter, name }: { letter: LetterState; name: string }) {
     ) : null;
   }
   const text = `Subject: ${letter.subject ?? ""}\n\n${letter.letter}`;
+  // She approves the letter first; only then can she copy it to send.
+  const approved = letter.status === "done";
 
   async function copy() {
     try {
@@ -70,13 +72,13 @@ function LetterBox({ letter, name }: { letter: LetterState; name: string }) {
   return (
     <div className="flex flex-col gap-2 rounded-[16px] border border-[var(--line)] p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-small font-semibold">Email to send yourself</p>
+        <p className="text-small font-semibold">{approved ? "Email to send yourself" : "Email draft"}</p>
         {(letter.status === "pending" || letter.status === "running") && (
           <Link href="/approvals" className="text-small text-[var(--link)] underline underline-offset-2">
             <StatusPill status="pending">Waiting in Approvals</StatusPill>
           </Link>
         )}
-        {letter.status === "done" && <StatusPill status="done">Marked as sent</StatusPill>}
+        {approved && <StatusPill status="done">Approved</StatusPill>}
         {letter.status === "failed" && (
           <Link href="/approvals" className="text-small font-medium text-[var(--danger-fg)] underline underline-offset-2">
             Didn&rsquo;t go through. See why
@@ -99,20 +101,41 @@ function LetterBox({ letter, name }: { letter: LetterState; name: string }) {
       ) : (
         <p className="line-clamp-4 text-small whitespace-pre-line text-[var(--fg-muted)]">{letter.letter}</p>
       )}
+      {approved && demo && (
+        <p className="rounded-[12px] bg-[var(--status-pending-bg)] px-3 py-2 text-small font-medium text-[var(--status-pending-fg)]">
+          Demo practice: don&rsquo;t send this to a real provider.
+        </p>
+      )}
       <div className="flex flex-wrap gap-2">
-        <Button variant="accent" onClick={copy} aria-label={`Copy email to ${name}`}>
-          {copied ? "Copied" : "Copy"}
-        </Button>
+        {approved && (
+          <Button variant="accent" onClick={copy} aria-label={`Copy email to ${name}`}>
+            {copied ? "Copied" : "Copy"}
+          </Button>
+        )}
         <Button variant="quiet" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-controls={open ? `${boxId}-text` : undefined}>
           {open ? "Show less" : "Read it all"}
         </Button>
       </div>
-      <ol className="list-decimal pl-5 text-small text-[var(--fg-muted)]">
-        <li>Press Copy.</li>
-        <li>Open your email and start a new message to {name}.</li>
-        <li>Paste, check it, and send it yourself.</li>
-        {(letter.status === "pending" || letter.status === "running") && <li>Then approve it in Approvals, so the card moves to Contacted with a follow-up in a week.</li>}
-      </ol>
+      {approved ? (
+        <ol className="list-decimal pl-5 text-small text-[var(--fg-muted)]">
+          <li>Press Copy.</li>
+          <li>Open your email and start a new message to {name}.</li>
+          <li>Paste, check it, and send it yourself. Aeon never sends.</li>
+        </ol>
+      ) : (
+        letter.status !== "failed" && (
+          <ol className="list-decimal pl-5 text-small text-[var(--fg-muted)]">
+            <li>
+              Read it in{" "}
+              <Link href="/approvals" className="text-[var(--link)] underline underline-offset-2">
+                Approvals
+              </Link>{" "}
+              and approve it (you can change it there).
+            </li>
+            <li>Then a Copy button shows here, to paste it into your own email.</li>
+          </ol>
+        )
+      )}
     </div>
   );
 }
@@ -122,6 +145,7 @@ function Card({
   tier,
   letter,
   drafting,
+  demo,
   onMove,
   onDraft,
 }: {
@@ -129,6 +153,7 @@ function Card({
   tier: TierResult | undefined;
   letter: LetterState | undefined;
   drafting: boolean;
+  demo: boolean;
   onMove: (stage: Stage) => void;
   onDraft: () => void;
 }) {
@@ -174,7 +199,7 @@ function Card({
       {card.next_follow_up_on && card.stage !== "connected" && card.stage !== "not_a_fit" && (
         <p className="text-small font-medium">Follow up {dateLabel(card.next_follow_up_on)}</p>
       )}
-      {letter && <LetterBox letter={letter} name={card.name} />}
+      {letter && <LetterBox letter={letter} name={card.name} demo={demo} />}
       <SettingSelect
         compact
         label="Move to"
@@ -256,10 +281,13 @@ export function ReferralBoard({
   initial,
   letters: initialLetters,
   tiers,
+  demo,
 }: {
   initial: ReferralSource[];
   letters: Record<string, LetterState>;
   tiers: Record<string, TierResult>;
+  /** The fictional demo practice: letters must never reach a real provider. */
+  demo: boolean;
 }) {
   const [cards, setCards] = useState(initial);
   const [letters, setLetters] = useState(initialLetters);
@@ -301,7 +329,7 @@ export function ReferralBoard({
         ...l,
         [card.id]: { approvalId: data.approval_id!, status: "pending", subject: data.subject ?? null, letter: data.letter ?? null },
       }));
-      setAnnounce(`The email to ${card.name} is ready on its card. Press Copy, then paste it into your email.`);
+      setAnnounce(`The email to ${card.name} is ready. Approve it in Approvals, then copy it from its card.`);
     } catch (err) {
       notify.error(err instanceof Error ? err.message : "I couldn't write the letter. Try again.");
     } finally {
@@ -331,6 +359,7 @@ export function ReferralBoard({
                     tier={tiers[c.id]}
                     letter={letters[c.id]}
                     drafting={drafting === c.id}
+                    demo={demo}
                     onMove={(s) => move(c.id, s)}
                     onDraft={() => draft(c)}
                   />
