@@ -3,8 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/check-install.mjs",
     "dev": "next dev -H 127.0.0.1",
+    "prebuild": "node scripts/check-install.mjs",
     "build": "next build",
+    "prestart": "node scripts/check-install.mjs",
     "start": "next start -H 127.0.0.1",
     "lint": "eslint",
     "test": "vitest run",

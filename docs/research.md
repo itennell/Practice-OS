@@ -721,3 +721,139 @@ Each clinician brings her own business phone account; Practice-OS connects to it
 3. **Not chosen.** Twilio and Telnyx are developer consoles, too hard for her, and Twilio's BAA needs a sales contract. RingCentral and Dialpad need app review and admin portals, and RingCentral has unsigned webhooks. Dialpad can't list inbound texts. Google Voice has no API and its rules ban automation.
 
 **Risks before building.** The Spruce API needs a Support request, and SMS is off in the Spruce trial, so ask Spruce now for a demo account with the API and texting on, because Nov 3 is close. Ask Spruce whether the API is included in Communicator or is a paid add-on, what its rate limits are, and whether a once-a-minute check is fine under its "automated means" clause. Quo trials can't register for texting, so texts would fail with a 400 until registration is approved. The repo's old `.env.example` assumed a Practice-OS-owned Twilio number; it can stay as a developer-only adapter for tests and Isaiah's own demo line.
+
+## Referral sources: repos, evidence, relationships, legal limits and the tier model (checked 2026-10-29)
+
+Plain English summary: the strongest evidence says the best sources are the ones who see many people who need talk therapy and who can hand them off easily. That is family medicine, pediatrics, perinatal (OB-GYN), psychiatrists who mostly prescribe, and college counseling overflow. Referral volume matters less than how smoothly the handoff goes. Evidence on "what share of a solo therapist's caseload comes from each source" does not exist in any source we could open, so the tier weights below are judgment informed by the evidence, not measured shares. A healthcare attorney should read the legal part before launch. This is not legal advice.
+
+Tags: [opened] = the page was read; [search-only] = the number came from a search snippet and the page blocked the fetch, so verify before quoting.
+
+### 1. Repos and datasets (evaluated, no code copied)
+
+Skipped here because section 3 already covers them: atomic-crm, ropensci/npi, SalesGPT, kaymen99/sales-outreach, google-maps-scraper, openreferral/specification, google_workspace_mcp, twenty, krayin, espocrm, frappe/crm.
+
+| Item | License | Stars / last push | Reusable | No keys? |
+|---|---|---|---|---|
+| [Census 2024 ZCTA Gazetteer](https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2024_Gazetteer/2024_Gaz_zcta_national.zip) | US Census data (public domain; license text not re-read) | 2024 file, ~33k rows | **Best ZIP centroid source.** Load into a small table, compute haversine in ~6 lines | Yes |
+| [GeoNames US postal codes](https://download.geonames.org/export/zip/US.zip) | CC BY 4.0 (needs attribution; [U] not re-read) | live | Adds PO-box ZIPs the Census file lacks | Yes |
+| [uszipcode](https://github.com/MacHu-GWU/uszipcode-project) | MIT | 250 / 2026-10-28 | Reference only; downloads its own sqlite on first use [U] | Yes |
+| [jftuga/geodist](https://github.com/jftuga/geodist), [mapado/haversine](https://github.com/mapado/haversine), [Turf](https://github.com/Turfjs/turf) | MIT | 195 / 371 / 10.5k; 2026-10-25, 2025-11-24, 2026-10-26 | Reference only; the formula is six lines, no dependency | Yes |
+| [CMS-Enterprise/npd](https://github.com/CMS-Enterprise/npd) | CC0-1.0 | 19 / 2026-10-01 | Shows where CMS is taking NPPES + PECOS (National Provider Directory) | Yes |
+| [neilharvey94044/NPPES-Data-Load](https://github.com/neilharvey94044/NPPES-Data-Load) | MIT | 16 / 2020-05-14 (stale) | Idea for loading the bulk NPPES CSV; check columns against the current file | Yes |
+| [eliotk/npi-registry-mcp-server](https://github.com/eliotk/npi-registry-mcp-server) | MIT | 4 / 2025-07-18 | Compare query-parameter mapping and paging with ours | Yes |
+| [andrewallenbruce/provider](https://github.com/andrewallenbruce/provider) | MIT-style (CRAN LICENSE file) | 32 / 2026-10-14 | Map of which CMS provider APIs exist | Yes |
+| [Physician Shared Patient Patterns](https://www.nber.org/research/data/physician-shared-patient-patterns-data) via [CMS FAQ](https://www.cms.gov/regulations-and-guidance/legislation/foia/referral-data-faqs) | Public CMS FOIA release (license not checked) [U] | Files 2009-2015 only | The only open "which NPI shares patients with which NPI" data. Medicare only, ~11 years old, huge. At most a weak tie-breaker | Yes |
+| [Analysis of the U.S. Patient Referral Network (arXiv)](https://arxiv.org/abs/1711.03245) | Paper | 2017 | Method for a referral graph from the CMS data | Yes |
+| [CareDensity](https://github.com/RobinDenz1/CareDensity) | **GPL-3.0, cannot copy** | 1 / 2026-09-10 | Read the formula only | Yes |
+| Physician-Shared-Patients (imccart), NPIDatasetParser (Preferral), nucc-taxonomy-mcp-server, PC-Patient-Sharing-Networks, LeadGenius, semerj/nppes-postgres | **No license file, cannot copy** | various | Ideas only | Yes |
+
+Takeaways:
+1. ZIP distance needs no dependency. Census ZCTA centroids plus our own haversine.
+2. No maintained TypeScript NPPES bulk loader exists. Keep the live API; do not build a bulk loader for this.
+3. Searches for a small-practice referral CRM, physician-liaison tool or healthcare referral-ranking code found nothing worth using (hits were job-referral apps, AGPL affiliate trackers, unlicensed ML notebooks). The pipeline board we have is the product here.
+4. The best "who sends to whom" signal is the clinician's own board: referrals received per source, replies, last contact. CMS shared-patient data is old and Medicare-only.
+
+### 2. Who refers to outpatient therapists, and how often
+
+Headline: no source gives "% of a therapist's clients by referral source". Strong evidence covers how many people get therapy, how many referrals are completed, and what referrers say blocks them. Completion is the key pattern: referrals out of primary care, pediatrics and OB complete poorly when the patient has to call an outside office, and well when the handoff is warm or on site.
+
+Population and need
+- 9.5% of US adults got counseling or therapy in 2019; 13.2% at ages 18-44 in the 2020 data ([NCHS Data Brief 419](https://www.cdc.gov/nchs/data/databriefs/db419.pdf), [opened]). Any mental health treatment was 21.6% of adults in 2021 and 28.6% of women aged 18-44 ([NCHS Data Brief 444](https://www.cdc.gov/nchs/products/databriefs/db444.htm), [opened]).
+- Of adults with a 12-month disorder, 41.1% got any treatment: general medical 22.8%, other mental health specialist 16.0%, psychiatrist 12.3%. Minimally adequate care was 12.7% in general medical vs 48.3% in specialty settings ([Wang 2005, PMID 15939840](https://pubmed.ncbi.nlm.nih.gov/15939840), [opened via Europe PMC]). So primary care sees many people it cannot treat adequately.
+
+Primary care
+- 66.8% of PCPs had trouble getting outpatient mental health services for patients, twice the rate for other services. Top reasons: coverage 59%, too few providers 58.9%, health plan barriers 51.1% ([Cunningham 2009, Health Affairs](https://www.patientcareonline.com/view/pcps-challenged-obtain-mental-health-referrals), [opened via summary]; 2004-05 data).
+- Referrals from PCPs with an on-site clinician: 95.5% of those who scheduled began treatment ([J Am Board Fam Med 2012](https://www.jabfm.org/content/25/2/255.full), [opened]; on-site, small samples). 81% of 200 referred patients had initial contact with an integrated behavioral health provider (Collaborative Care Research Network, Transl Behav Med 2012, [opened via Europe PMC]; integrated care, not outside practices; no direct URL kept).
+- Education plus feedback to PCPs cut referrals with inadequate clinical information by 93% (15 to 1) ([Qatar PCP initiative, PMC8314983](https://www.ebi.ac.uk/europepmc/webservices/rest/PMC8314983/fullTextXML), [opened]; one clinic, not US, no control group). PCPs value clear "what I treat" criteria and feedback.
+
+Pediatrics
+- Over 80% of pediatricians agree they should identify ADHD, depression, substance use and behavior problems; under one third agree they should treat them, except ADHD (70%) (Stein 2008, AAP Periodic Survey, Ambulatory Pediatrics 8(1):11-17, [opened via Europe PMC]; n=659; no direct URL kept, search the title). Pediatricians expect to refer out nearly everything except ADHD.
+- AAP survey: 96% agree pediatricians should be responsible for referring; barriers 98% long waits, 93% too few providers, 86% providers not taking Medicaid, 84% not taking insurance ([AAP News](https://publications.aap.org/aapnews/news/34812/AAP-survey-Anxiety-depression-a-core-part-of-care), [search-only]).
+- Only 18-22% of youth referred for mental health completed referral in one clinic's baseline; calling families moved completed intakes from 57% to 85% ([PMC13544776](https://www.ebi.ac.uk/europepmc/webservices/rest/PMC13544776/fullTextXML), [opened]; single developmental clinic).
+
+Perinatal and OB-GYN
+- Pooled uptake of referral after a positive perinatal depression screen was 43% (95% CI 35-50); on-site treatment 60% vs referral to an outside mental health service 32% (41 studies, [PMC7372167](https://www.ebi.ac.uk/europepmc/webservices/rest/PMC7372167/fullTextXML), [opened]).
+- USPSTF (2019, B grade) says to provide or refer pregnant and postpartum people at increased risk to counseling interventions ([USPSTF](https://www.uspreventiveservicestaskforce.org/uspstf/recommendation/perinatal-depression-preventive-interventions), [search-only]). This is guidance for why OB refers, not a volume figure.
+
+Psychiatry
+- Psychotherapy share of office-based psychiatrist visits fell from 44.4% (1996-97) to 28.9% (2004-05) ([Mojtabai & Olfson 2008, PMID 18678801](https://pubmed.ncbi.nlm.nih.gov/18678801), [opened via Europe PMC]). Inference, not a count: prescribers need therapists for the talk-therapy half.
+- Psychologists serve on clinical care teams with psychiatrists far more than with other physicians: psychiatrists "never" 24%, other physicians "never" 55% ([APA 2023 Practitioner Pulse topline](https://www.apa.org/pubs/reports/practitioner/2023-practitioner-pulse-survey-topline-data.pdf), [opened]; n about 280).
+
+School and college
+- Most adolescents who get mental health services get them outside school, but a bit over one third get them in school only ([Ali 2019, J Sch Health](https://pubmed.ncbi.nlm.nih.gov/30883761), [opened via Europe PMC]). No source on what share of schools hand off to private practice: no good source.
+- 80.8% of college counseling centers have difficulty meeting demand; 28.1% use "referring more students off campus" ([AUCCCD 2024-25 survey](https://www.aucccd.org/assets/documents/Survey/2024-2025%20Annual%20Survey%20Report%20Public.pdf), [opened]). College counseling is a real overflow source near campuses.
+
+Oncology, hospitals, EAPs, clergy
+- Germany, n=4,020 cancer patients: 21.9% had a recommendation or referral for psycho-oncology care; 49.8% of those used it ([Ernst 2018, PLOS ONE](https://journals.plos.org/plosone/article?id=10.1371%2Fjournal.pone.0205160), [opened]; non-US).
+- Clergy: about a quarter of people who ever sought help for a mental disorder contacted clergy ([Wang 2003](https://onlinelibrary.wiley.com/doi/10.1111/1475-6773.00138), [search-only]; early-1990s data). Clergy-to-therapist referral rate: no good source.
+- EAP utilization is about 3-8% per vendor and association sites [search-only]. EAP-to-external-therapist share: no good source. ED discharge follow-up: no good source verified.
+
+Other channels for comparison
+- Directory calls: 26% of psychiatrist directory calls ended in an appointment (Malowney 2015, [search-only]). Psychology Today referrals are reported down by therapists, anecdotally ([ClearHealthCosts, March 2026](https://clearhealthcosts.com/blog/2026/03/more-therapists-express-concern-about-decline-in-psychology-today-referrals/), [opened]; anecdotes, no survey).
+
+What referrers say they want (drives the factors): fast access and open slots, takes the patient's insurance including Medicaid, a clear statement of what you treat, one simple way to refer, a warm handoff, and a note back (consent required). Not found: a study asking PCPs to rank specialty niches as a referral driver.
+
+### 3. Relationship practices that work for solo therapists
+
+- Relationship beats materials. Start with doctors you already know, meet them socially, and keep to a few sources ([Practice of the Practice](https://practiceofthepractice.com/doctors/), [opened]; the "95% from five sources" line is the author's estimate, not data).
+- Referrals often pass through the office manager or front desk; ask for the referral coordinator, and expect mailed letters to be thrown out ([Therapy Marketer](https://www.therapymarketer.co/articles/how-to-get-referrals-from-doctors), [opened]). That page also suggests dropping off lunch; see the legal section before any tool suggests food.
+- With peer therapists: open with a sincere compliment, do not ask for referrals early, keep in touch lightly (an article, a card), never share identifying client details when asking about capacity ([SimplePractice](https://www.simplepractice.com/blog/building-referral-network/), [opened]).
+- One-page letter with location, contact, practice overview, waitlist status, insurance accepted; fees only if the referrer's patients may struggle to pay. Send the referrer a one-page note when treatment changes or ends, confirm each referral, thank the referrer, set reminders to re-contact quiet sources ([Zanda Health](https://zandahealth.com/blog/how-to-build-referral-relationships/), [opened]). It sets no cadence and says nothing on client consent; we require written consent (below).
+- What PCPs want back: one-sentence scope, protected new-patient slots, one referral route with few fields, closed-loop confirmation ([Medix Outreach](https://medixoutreach.com/blog/pcp-psychiatry-referrals), [opened]; a vendor blog, so weak evidence).
+- Cadence: quarterly or twice-yearly "I have openings" notes and a thank-you after each referral are common advice, from search summaries only [search-only]. No source gave a tested cadence. Our default: thank within 2 days of a referral, a short availability note about every 90 days, never more than one contact per source per 30 days.
+
+What the letter should say (synthesis of the above): who you serve and ages, insurance accepted, current availability or waitlist, how to refer and your response time, telehealth or in-person and location, contact details. No outcome promises, no exclusivity, nothing offered in return, no client details. One line: feedback to the referrer happens only with the client's written consent.
+
+### 4. Legal limits (not legal advice; an Illinois healthcare attorney should confirm)
+
+Federal
+- The Anti-Kickback Statute makes it a felony to knowingly and willfully offer, pay, solicit or receive any remuneration to induce or reward referrals of items or services paid by a federal health care program; up to $100,000 and 10 years ([42 USC 1320a-7b](https://www.law.cornell.edu/uscode/text/42/1320a-7b), [opened]). OIG says it is intent-based and that gifts to reward referrals are a risk ([OIG General Compliance Program Guidance](https://oig.hhs.gov/documents/compliance-guidance/1135/HHS-OIG-GCPG-2023.pdf), [opened]). Safe harbors are voluntary and all conditions must be met ([42 CFR 1001.952](https://www.law.cornell.edu/cfr/text/42/1001.952)). Paying a marketer per lead or by percentage cannot meet the personal-services safe harbor, whose pay must be fixed in advance at fair market value ([42 CFR 1001.952(d)](https://www.law.cornell.edu/cfr/text/42/1001.952); the "percentage is inherently problematic" reading is [search-only]).
+- Meals and gifts: OIG sets no dollar limit for referral sources. Its pharma speaker-program alert lists meals above modest value, alcohol, restaurant venues and repeated programs as suspect ([OIG alert](https://oig.hhs.gov/documents/special-fraud-alerts/865/SpecialFraudAlertSpeakerPrograms.pdf), [opened]); that is for drug and device companies, not a therapist rule. A law firm advises against gifts to referral sources and notes "nominal" is never defined ([Holland & Hart](https://www.hollandhart.com/gifts-to-referral-sources-and-patients)).
+- Stark covers physician referrals for designated health services ([CMS](https://www.cms.gov/medicare/regulations-guidance/physician-self-referral), list in [42 CFR 411.351](https://www.law.cornell.edu/cfr/text/42/411.351)). Outpatient psychotherapy by a non-physician is not on the list, so Stark mostly does not reach a solo therapist's office services; the AKS still does. Edge case not resolved: psychotherapy billed as a hospital outpatient service.
+- Offering a Medicare or Medicaid patient anything likely to sway provider choice is prohibited ([42 USC 1320a-7a](https://www.law.cornell.edu/uscode/text/42/1320a-7a)).
+
+Illinois
+- 740 ILCS 92/5 bars paying any remuneration to induce someone to procure patients for insurance-billed services, private insurance included ([text](https://law.onecle.com/illinois/740ilcs92/5.html), mirror; ilga.gov blocked our fetch). Penalty figures in section 8 above came from the ILGA page; confirm before quoting.
+- Fee splitting: IDFPR rules bar giving or receiving fees, commissions or rebates for services not rendered (psychologists 225 ILCS 15/15(12); social workers 225 ILCS 20/19(1)(l) and 68 Ill. Adm. Code 1470.96; counselors 225 ILCS 107/80(a)(12); summary in [Whitted Takiff PDF](https://www.whittedtakifflaw.com/wp-content/uploads/2018/12/Fee-Splitting-Implications-for-Physicians-Psychologists-and-Social-Workers-2018.pdf)). The social work rule bars kickbacks for referrals but appears to allow paying a referral service. So our no-pay-per-referral rule is stricter than the law; do not describe it as the legal minimum.
+- Health Care Worker Self-Referral Act, 225 ILCS 47: about referrals to entities in which the worker has an investment interest ([ILGA](https://ilga.gov/Legislation/ILCS/Articles?ActID=1304&ChapterID=24&Print=True), [search-only]). Matters only if a clinician refers to a business she owns part of.
+- MHDDCA (740 ILCS 110): even confirming that someone is a client is protected ([Whitted Takiff](https://www.whittedtakifflaw.com/for-professionals/memorandum/illinois-mental-health-confidentiality-act/)). Disclosure outside the treatment group needs written consent naming the recipient, purpose, information type, revocation right and an expiry ([740 ILCS 110/5](https://codes.findlaw.com/il/chapter-740-civil-liabilities/il-st-sect-740-110-5/)). The witness requirement was removed by HB 3078, signed Aug 15, 2025 ([Hinshaw](https://www.hinshawlaw.com/en/insights/healthcare-alert/health-care-alert-amended-illinois-mental-health-development-disabilities-confidentiality-act)); this corrects the witness line in section 8 above. Unresolved: whether a therapist may tell a PCP "I saw your patient" without written consent. No good source says yes, so the product asks for written consent.
+- HIPAA allows disclosure for treatment ([45 CFR 164.506(c)](https://www.law.cornell.edu/cfr/text/45/164.506)); the stricter Illinois law controls.
+
+Ethics: ACA A.10.b bars fee splitting and commissions for referrals [search-only]; APA 6.07 requires payment to follow services, "not based on the referral itself" ([APA code](https://www.apa.org/ethics/code/ethics-code-2017.pdf), [opened]); NASW 4.07 bars uninvited solicitation of vulnerable people ([NASW](https://www.socialworkers.org/About/Ethics/Code-of-Ethics/Code-of-Ethics-English/Social-Workers-Ethical-Responsibilities-as-Professionals), [opened]).
+
+What a tool may suggest (synthesis, not a legal finding)
+- Safe: draft an intro letter or one-pager the clinician reviews and sends; a thank-you note with nothing attached; a short coffee where each pays their own; an educational talk where the content is the point; a quarterly "I have openings" note; feedback to a referrer only after written client consent naming that recipient.
+- Flag and ask: food for a referral office (never recurring, never tied to referral counts, not automated); sending a referrer statistics that read like a reward; anything free or discounted for a referrer or their family.
+- Never suggest: reciprocal "you send me, I send you" deals; paying anyone per lead, per client or by percentage; any gift, fee or perk to a referrer, or to a client for referring; rent or payment from a referral source; telling a referrer anything about a client without written consent; outcome guarantees or exclusivity; uninvited approaches to vulnerable people.
+
+### 5. What NPPES gives and what it does not
+
+Checked with live calls for Chicago on 2026-10-29. Gives: name, credential, sole-proprietor flag; primary and secondary NUCC taxonomy with license number and state; LOCATION and MAILING address with phone and fax; authorized official name, title and phone for organizations; enumeration and last-updated dates; `endpoints` (Direct addresses), empty on every record we saw. Does not give: accepting new patients or referrals, email, website, insurance panels, patient volume or what they refer, a reliable link between a person and the practice or hospital where they work, or whether the record is still true. Examples seen: a pediatric nurse practitioner's record last updated 2008, a physician with a Chicago mailing address and a Massachusetts practice location, and an organization whose taxonomy list puts "Family Medicine" as secondary behind wound care. So score the primary taxonomy and the LOCATION address, and treat old records as "confirm first". Psychiatry and neurology share one taxonomy family, so match the code (2084P0800X for psychiatry), not the word.
+
+### 6. The tier model
+
+Machine-readable copy: `docs/research/referral-tiers.json`. Score 0-100 is the plain sum of six factors, then relationship modifiers, then tier cut-offs: A "Reach out first" 70+, B "Warm up next" 50-69, C "Later" below 50. Aim for 3-5 letters a month from A.
+
+| Factor | Max | Why (source) | Reason text shown to the clinician |
+|---|---|---|---|
+| Specialty | 35 | Family medicine 35, pediatrics 33, OB-GYN 32, psychiatry 30, internal medicine 30, oncology 22, therapists 20. Primary care sees most untreated need and cannot deliver adequate therapy (Wang 2005); pediatricians expect to refer out all but ADHD (Stein 2008); perinatal has a guideline reason to refer (USPSTF); psychiatrists do less psychotherapy (Mojtabai 2008). Oncology and peer-therapist evidence is thin. | "{Specialty} offices see people who need talk therapy and often have no one to send them to." |
+| Distance | 25 | Warm, easy handoffs complete far better than cold ones (on-site 60% vs outside 32% in perinatal). Near offices are easier to meet. 5 points lost per mile in a city. | "About {n} miles from your office." |
+| Reachable person | 15 | A named clinician reads a letter; a front desk often discards it (Therapy Marketer). Named individual 15, organization with a named official 8, organization only 3. | "You can write to a named person." |
+| Contact | 10 | Location phone 6, location fax 4 (medical referrals travel by fax). Mailing phones are often billing lines. | "Office phone and fax on file." |
+| Record freshness | 10 | Updated within 2 years 10, 2-5 years 4, older 0, with a "confirm they still practice" flag past 5 years. | "NPPES record updated {year}." |
+| Location state | 5 | Mailing and location can differ by state. | none |
+
+Relationship modifiers from the board (not NPPES): sent a referral before +20, warm intro +15, met in person +10, replied to a letter +8. Suppress: contacted in the last 30 days, marked not interested, or another provider at the same practice contacted in the last 14 days.
+
+Not in the score because NPPES cannot tell us: insurance match and open slots (the two things referrers most often say block them). The clinician can add them by hand in the board; when she does, a source that matches her payers and has a waitlist-free week should rank higher. School counselors, college counseling centers, EAPs, clergy and attorneys are not in NPPES; add them as manual sources (suggested default 18 points for specialty, 22 near a campus).
+
+Hard rules the model obeys: no factor, reason or modifier rewards or offers anything of value for a referral; reason text states facts about the source, never a promise about what they will send; the model never mentions a client to a source.
+
+Sensitivity note: the current code (lib/referrals/fit.ts) already uses 40 / 30 / 15 / 10 / 5 with six specialties. This model moves 5 points from distance and specialty into contact and a new location check, adds psychiatry, adds a fax signal and adds modifiers. Not yet re-ranked or tested for how many sources change tier on a live result set; do that when the map session wires it in.
+
+### 7. Gaps and what to verify
+
+- No source for the share of a solo therapist's caseload by referral source, EAP-to-external referral share, school-to-private handoff share, clergy referral rate, or ED discharge follow-up.
+- ilga.gov blocked automated fetches, so Illinois statute text is from mirrors and law-firm summaries. Confirm 740 ILCS 92/5 penalties and the MHDDCA treatment-disclosure question with an Illinois attorney.
+- Several numbers are [search-only] (AAP survey, USPSTF, Wang 2003, EAP rates, Malowney). Do not put them in the app or on a pitch slide before opening the page.
+- Run `receipts` before any of this reaches a pitch deck.
