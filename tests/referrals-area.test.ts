@@ -1,11 +1,15 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { canSearch } from "../lib/referrals/http";
+import { allow, limited, resetRateLimit } from "../lib/referrals/rate-limit";
 import fixture from "./fixtures/nppes-area.json";
 import { chicagolandZips, linkGroups, LOOP, parseArea, searchArea, zipsNear, type PracticeContext } from "../lib/referrals/area";
-import { addressKey, clearGeocodeCache, geocodeAddresses, parseCensusLine } from "../lib/referrals/geocode";
+import { addressKey, clearGeocodeCache, geocodeAddresses, geocodeCacheSize, oneAtATime, parseCensusLine } from "../lib/referrals/geocode";
 import { haversineMiles, zipCenters } from "../lib/referrals/geo";
 import {
+  CACHE_MAX,
   cachedFetch,
   clearNppesCache,
+  nppesCacheSize,
   parseResponses,
   parseResult,
   searchProviders,
@@ -14,7 +18,8 @@ import {
   type NppesResponse,
   type NppesResult,
 } from "../lib/referrals/nppes";
-import { capFirst, focusFrom, SPECIALTY_POINTS, TIER_LABEL, tierFor } from "../lib/referrals/tier";
+import { BUILT_IN_WEIGHTS, capFirst, focusFrom, readWeights, SPECIALTY_POINTS, TIER_LABEL, tierFor, WEIGHTS } from "../lib/referrals/tier";
+import research from "../docs/research/referral-tiers.json";
 
 // Real NPPES replies recorded 2026-10-29 (tests/fixtures/nppes-area.json, fields the app reads only).
 type Recorded = { query: { taxonomy_description: string; postal_code: string }; results: NppesResult[] };
@@ -83,8 +88,8 @@ describe("NPPES on real recorded replies", () => {
     const group = counselors.find((r) => r.other_names?.some((o) => o.code === "3"))!;
     const p = parseResult(group)!;
     expect(p.npiType).toBe("organization");
-    expect(p.practiceName).toBe("Amk Counseling");
-    expect(p.organization).toBe("Abbie Kelley, LLC");
+    expect(p.practiceName).toBe("[Sample] Example Counseling 1");
+    expect(p.organization).toBe("[Sample] Example Group 13 LLC");
     expect(titleCase("NORTH SHORE PEDIATRICS, S.C.")).toBe("North Shore Pediatrics, S.C.");
   });
 
@@ -250,5 +255,113 @@ describe("area search, golden run on the recorded 60614 replies", () => {
     expect(result.providers.length).toBeGreaterThan(10);
     const inArea = new Set(result.zips);
     for (const p of result.providers) expect(inArea.has(p.zip)).toBe(true);
+  });
+});
+
+describe("review fixes: outbound calls stay bounded", () => {
+  it("the fixture is synthetic: [Sample] names, 555 phones, NPIs that fail the NPI check digit", () => {
+    const luhn = (npi: string) => {
+      const digits = `80840${npi}`.split("").reverse().map(Number);
+      return digits.reduce((sum, d, i) => sum + (i % 2 ? (d * 2 > 9 ? d * 2 - 9 : d * 2) : d), 0) % 10 === 0;
+    };
+    for (const r of recorded.flatMap((x) => x.results)) {
+      expect(luhn(String(r.number))).toBe(false);
+      const name = r.basic.organization_name ?? r.basic.first_name ?? "";
+      expect(name).toMatch(/^\[SAMPLE\]/);
+      for (const a of r.addresses ?? []) if (a.telephone_number) expect(a.telephone_number).toMatch(/^312555/);
+    }
+  });
+
+  it("keeps at most CACHE_MAX NPPES replies in memory", async () => {
+    const fetcher = cachedFetch(async () => ({ results: [] }));
+    for (let i = 0; i < CACHE_MAX + 50; i++) await fetcher(`https://npiregistry.cms.hhs.gov/api/?i=${i}`);
+    expect(nppesCacheSize()).toBe(CACHE_MAX);
+  });
+
+  it("stops at the deadline and says how many areas were done", async () => {
+    let t = 0;
+    const res = await searchProviders(["pediatrics"], ["60614", "60657", "60610", "60611", "60612"], {
+      fetcher: async (url) => ((t += 40), fromRecording(url)),
+      concurrency: 1,
+      deadline: 100,
+      now: () => t,
+    });
+    // 40 ms a question, one at a time: three areas fit before 100 ms.
+    expect(res.timedOut).toEqual({ done: 3, of: 5 });
+  });
+
+  it("asks OpenStreetMap one question at a time, at least the gap apart", async () => {
+    let clock = 0;
+    const starts: number[] = [];
+    const sleep = async (ms: number) => void (clock += ms);
+    const task = async () => void starts.push(clock);
+    await Promise.all([1, 2, 3].map(() => oneAtATime(task, 1100, () => clock, sleep)));
+    expect(starts[1] - starts[0]).toBeGreaterThanOrEqual(1100);
+    expect(starts[2] - starts[1]).toBeGreaterThanOrEqual(1100);
+  });
+
+  it("geocodes each address once even when listed many times", async () => {
+    let lines = 0;
+    const post = async (form: FormData) => {
+      lines = String(await (form.get("addressFile") as Blob).text()).split("\n").length;
+      return "";
+    };
+    const a = { street: "100 W Example St", city: "Chicago", state: "IL", zip: "60614" };
+    await geocodeAddresses(Array.from({ length: 50 }, () => a), { post });
+    expect(lines).toBe(1);
+    expect(geocodeCacheSize().points).toBe(1);
+  });
+
+  it("checks a typed place with the chat's privacy guard before looking it up", async () => {
+    let looked = false;
+    const ctx: PracticeContext = { office: null, officeZip: "60614", state: "IL", focus: [] };
+    await expect(
+      searchArea({ area: { kind: "place", place: "Jane Smith" }, radiusMiles: 1, specialties: ["pediatrics"] }, ctx, {
+        check: async () => false,
+        place: async () => ((looked = true), null),
+      }),
+    ).rejects.toThrow("didn't look it up");
+    expect(looked).toBe(false);
+  });
+
+  it("reads the real research file, and falls back to built-in weights if its shape changes", () => {
+    expect(readWeights(research)).toEqual(WEIGHTS);
+    expect(WEIGHTS).toEqual(BUILT_IN_WEIGHTS);
+    const renamed = JSON.parse(JSON.stringify(research));
+    renamed.factors.find((f: { id: string }) => f.id === "distance").per_mile = undefined;
+    expect(() => readWeights(renamed)).toThrow("distance per_mile");
+  });
+});
+
+describe("review fixes: who may search, and how often", () => {
+  const req = (headers: Record<string, string>) =>
+    new Request("https://practice-os.example/api/referrals/area", { method: "POST", headers: { "content-type": "application/json", ...headers } });
+  const saved = { VERCEL: process.env.VERCEL, ADMIN_PASSWORD: process.env.ADMIN_PASSWORD };
+  afterEach(() => {
+    process.env.VERCEL = saved.VERCEL;
+    process.env.ADMIN_PASSWORD = saved.ADMIN_PASSWORD;
+    if (saved.VERCEL === undefined) delete process.env.VERCEL;
+    if (saved.ADMIN_PASSWORD === undefined) delete process.env.ADMIN_PASSWORD;
+    resetRateLimit();
+  });
+
+  it("on the Vercel copy needs the admin password, not just a matching Origin", () => {
+    process.env.VERCEL = "1";
+    process.env.ADMIN_PASSWORD = "s3cret-for-test";
+    const origin = { origin: "https://practice-os.example", host: "practice-os.example" };
+    expect(canSearch(req(origin))).toBe(false);
+    expect(canSearch(req({ ...origin, "x-admin-password": "wrong-password!" }))).toBe(false);
+    expect(canSearch(req({ ...origin, "x-admin-password": "s3cret-for-test" }))).toBe(true);
+  });
+
+  it("limits each IP to 10 searches a minute on the Vercel copy, and not at all on her computer", () => {
+    process.env.VERCEL = "1";
+    const r = req({ "x-forwarded-for": "203.0.113.9" });
+    for (let i = 0; i < 10; i++) expect(limited(r, "area", 10)).toBeNull();
+    expect(limited(r, "area", 10)?.status).toBe(429);
+    expect(limited(req({ "x-forwarded-for": "203.0.113.10" }), "area", 10)).toBeNull();
+    delete process.env.VERCEL;
+    expect(limited(r, "area", 10)).toBeNull();
+    expect(allow("k", 1, 0) && !allow("k", 1, 1) && allow("k", 1, 61_000)).toBe(true);
   });
 });

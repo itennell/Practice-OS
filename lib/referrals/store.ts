@@ -87,16 +87,19 @@ export async function addToBoard(
   const { focus, state } = await practiceFacts(sql);
   const added: FoundSource[] = [];
   const missing: string[] = [];
-  for (const item of items) {
-    const p = await lookup(item.npi);
+  // Each one is saved as soon as NPPES answers for it, so one slow lookup doesn't lose the rest.
+  for (const npi of new Set(items.map((i) => i.npi))) {
+    const item = items.find((i) => i.npi === npi)!;
+    const p = await lookup(npi).catch(() => null);
     if (!p) {
-      missing.push(item.npi);
+      missing.push(npi);
       continue;
     }
     const miles = item.distanceMiles === null || !Number.isFinite(item.distanceMiles) ? null : Math.max(0, Math.min(500, item.distanceMiles));
-    added.push({ ...p, distanceMiles: miles, fitScore: providerTier(p, { miles, focus, clinicianState: state }).score });
+    const one: FoundSource = { ...p, distanceMiles: miles, fitScore: providerTier(p, { miles, focus, clinicianState: state }).score };
+    await saveSources([one], sql);
+    added.push(one);
   }
-  await saveSources(added, sql);
   await audit(
     { actor: "clinician", action: "referral_sources_added", subjectType: "referral_sources", details: { npis: added.map((a) => a.npi), missing } },
     sql,
