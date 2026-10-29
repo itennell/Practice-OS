@@ -77,6 +77,16 @@ describe.skipIf(!hasDb)("instagram_post executor (no publishing)", () => {
         select status, failed_reason, image_jpeg is not null as has_image, approval_id from practice_os.posts where id = ${postId}`;
       expect(after).toEqual({ status: "pending_approval", failed_reason: null, has_image: true, approval_id: again.approvalId });
       expect(await retryPost("test", postId)).toMatchObject({ ok: false, status: 409 });
+      // A finished draft is sent to her approvals with its own picture (no new drawing).
+      const jpeg = await toInstagramJpeg(readFileSync("public/demo/dana-reyes-headshot.jpg"));
+      const [d] = await db()<{ id: string }[]>`
+        insert into practice_os.posts (topic, caption, headline, image_jpeg, status, is_sample)
+        values ('how_to_book', 'Book from the link in bio.', 'A draft', ${jpeg}, 'draft', true) returning id`;
+      const sent = await retryPost("test", d.id, { graphic: { background: async () => { throw new Error("must not draw"); } } });
+      expect(sent.ok).toBe(true);
+      if (sent.ok) made.push(sent.approvalId);
+      const [row] = await db()<{ status: string; same: boolean }[]>`select status, image_jpeg = ${jpeg} as same from practice_os.posts where id = ${d.id}`;
+      expect(row).toEqual({ status: "pending_approval", same: true });
     } finally {
       delete process.env.PLAYWRIGHT_IMAGE_STANDIN;
     }
