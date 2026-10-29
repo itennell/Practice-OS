@@ -1,7 +1,7 @@
 // One-paste Connect Cal.com (lib/frontdesk/calendar/calcom-setup.ts) against recorded
 // and doc-shaped Cal.com responses (tests/fixtures/frontdesk/calcom-setup.ts). No network.
 import { describe, expect, it } from "vitest";
-import { autoConnectCalcom, CONSULT_SLUG, pickConsult } from "../lib/frontdesk/calendar/calcom-setup";
+import { autoConnectCalcom, bookingBlocker, CONSULT_LOCATION, CONSULT_SLUG, pickConsult } from "../lib/frontdesk/calendar/calcom-setup";
 import { shortSlotLabel } from "../lib/frontdesk/calendar/zone";
 import * as F from "./fixtures/frontdesk/calcom-setup";
 import { fakeFetch, type Route } from "./helpers/fake-fetch";
@@ -52,8 +52,9 @@ describe("autoConnectCalcom", () => {
     const post = f.calls.find((c) => c.method === "POST")!;
     expect(post.headers["cal-api-version"]).toBe("2026-06-12");
     const body = JSON.parse(post.body!);
-    expect(body).toMatchObject({ title: "Free 15-minute consultation", slug: CONSULT_SLUG, lengthInMinutes: 15, locations: [{ type: "attendeePhone" }] });
-    expect(JSON.stringify(body)).not.toMatch(/\+1\d{10}|phone"\s*:\s*"/); // never her own number
+    // A location that needs nothing from the caller: Cal.com requires a phone for "attendeePhone".
+    expect(body).toMatchObject({ title: "Free 15-minute consultation", slug: CONSULT_SLUG, lengthInMinutes: 15, locations: [CONSULT_LOCATION] });
+    expect(JSON.stringify(body)).not.toMatch(/attendee|\+1\d{10}|"phone"/); // never a caller detail, never her own number
   });
 
   it("pasting twice never makes a duplicate: the second run finds the one the first made", async () => {
@@ -85,6 +86,25 @@ describe("autoConnectCalcom", () => {
     expect(
       await run({ list: { match: "GET /event-types", json: F.list(F.intro30) }, create: { match: "POST /event-types", status: 403, json: F.forbidden } }),
     ).toEqual({ ok: false, fix: expect.stringContaining("wouldn't add the consult") });
+  });
+
+  it("an event whose location is the caller's phone gets a plain fix, and Practice-OS never edits it", async () => {
+    // Isaiah's real 7685541 (read-only GET, 2026-10-29): locations [{type: "attendeePhone"}], email required.
+    const f = fakeFetch(routes({ list: { match: "GET /event-types", json: F.list(F.isaiahConsultLive) } }));
+    const out = await autoConnectCalcom(KEY, { now: NOW, fetchImpl: f.impl });
+    expect(out).toEqual({ ok: false, fix: expect.stringMatching(/^In Cal.com, open "Free 15-Minute Consultation", go to Location/) });
+    expect(f.calls.filter((c) => c.method !== "GET")).toEqual([]);
+  });
+
+  it("bookingBlocker allows name, email and title, and flags any other required question", () => {
+    expect(bookingBlocker(F.isaiahConsultFixed)).toBeNull();
+    expect(bookingBlocker({ ...F.isaiahConsultFixed, bookingFields: [{ slug: "insurance", required: true, hidden: false }] })).toMatch(/make the "insurance" question optional/);
+    expect(bookingBlocker({ ...F.isaiahConsultFixed, bookingFields: [{ slug: "insurance", required: true, hidden: true }] })).toBeNull();
+  });
+
+  it("returns her own Cal.com email for bookings, never a caller's", async () => {
+    const out = await autoConnectCalcom(KEY, { now: NOW, fetchImpl: fakeFetch(routes()).impl });
+    expect(out).toMatchObject({ ok: true, ownerEmail: "dana@example.com" });
   });
 
   it("no open times this week still connects, with no next time", async () => {

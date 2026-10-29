@@ -4,10 +4,10 @@ import { chooseCalendar, connectCalcomAuto, disconnectCalcom } from "@/lib/front
 
 // The Cal.com Connect card: one pasted key, then Practice-OS checks it, finds or
 // makes her consult, saves it and reads the next open time (lib/frontdesk/connect.ts).
-// "choose" records her calendar (Cal.com only for now; Google comes later).
+// "choose" records her calendar: Cal.com only until Google Calendar returns.
 const Body = z.discriminatedUnion("step", [
   z.object({ step: z.literal("calcom_auto"), apiKey: z.string().min(1).max(500) }),
-  z.object({ step: z.literal("choose"), provider: z.enum(["calcom", "google"]) }),
+  z.object({ step: z.literal("choose"), provider: z.enum(["calcom"]) }),
 ]);
 
 export async function POST(request: Request) {

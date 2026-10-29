@@ -41,10 +41,12 @@ export function CalcomCard({ initial, onConnected }: { initial: CalcomCardStatus
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ step: "calcom_auto", apiKey: v }),
     }).catch(() => null);
-    const out = ((await res?.json().catch(() => null)) ?? { ok: false, fix: "Couldn't reach Practice-OS. Try again." }) as Result;
+    const out = ((await res?.json().catch(() => null)) ?? { ok: false, fix: "Couldn't reach Practice-OS. Try again." }) as Result | { ok?: false; fix?: string; error?: string };
     setBusy(false);
     if (!out.ok) {
-      setError(out.fix);
+      const failed = out as { fix?: string; error?: string };
+      setError(failed.fix ?? failed.error ?? "Couldn't connect. Try again.");
+      lastTried.current = ""; // let her try the same key again after fixing Cal.com
       return;
     }
     const line = out.nextOpen ? `Connected ✓ · next open time ${out.nextOpen}` : "Connected ✓. No open times this week. Add hours in Cal.com's Availability.";
@@ -122,13 +124,11 @@ export function CalcomCard({ initial, onConnected }: { initial: CalcomCardStatus
           value={key}
           error={error}
           disabled={busy}
-          onChange={(e) => {
-            setKey(e.target.value);
-            if (looksLikeKey(e.target.value)) void connect(e.target.value);
-          }}
+          // Typing waits for the Check button; only a paste connects on its own.
+          onChange={(e) => setKey(e.target.value)}
           onPaste={(e) => {
-            const pasted = e.clipboardData.getData("text");
-            if (pasted) {
+            const pasted = e.clipboardData.getData("text").trim();
+            if (looksLikeKey(pasted)) {
               e.preventDefault();
               setKey(pasted.trim());
               void connect(pasted);

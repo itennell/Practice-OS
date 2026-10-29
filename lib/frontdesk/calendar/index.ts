@@ -1,17 +1,16 @@
-import { getAccessToken, NeedsConnectError } from "../../connect";
 import { getConnection } from "../../connections";
 import { db } from "../../db";
 import { calcomAdapter } from "./calcom";
-import { GOOGLE_CALENDAR_SCOPES, googleAdapter } from "./google";
+import { GOOGLE_CALENDAR_SCOPES } from "./google";
 import { DEFAULT_HOURS, type Hours } from "./slots";
-import { CalendarError, type CalendarAdapter, type CalendarProvider } from "./types";
+import type { CalendarAdapter, CalendarProvider } from "./types";
 
 export * from "./types";
 export { GOOGLE_CALENDAR_SCOPES };
 
 // Cal.com connection row (provider 'calcom'): the API key is the encrypted
 // access token; meta names her consult event type.
-export type CalcomMeta = { eventTypeId: number; eventTypeLabel?: string };
+export type CalcomMeta = { eventTypeId: number; eventTypeLabel?: string; ownerEmail?: string };
 
 export async function calendarSettings(): Promise<{ provider: CalendarProvider | null; timeZone: string; hours: Hours; consultMinutes: number }> {
   const [row] = await db()`
@@ -26,28 +25,17 @@ export async function calendarSettings(): Promise<{ provider: CalendarProvider |
   };
 }
 
-// The app's shared Google sign-in (lib/connect) owns the token and its refresh.
-async function googleToken(): Promise<string> {
-  try {
-    return await getAccessToken("google", GOOGLE_CALENDAR_SCOPES);
-  } catch (e) {
-    if (e instanceof NeedsConnectError) {
-      throw new CalendarError("Google calendar not connected", "Press Connect Google Calendar on the Front Desk page and allow calendar access.");
-    }
-    throw new CalendarError(String(e), "Couldn't reach Google just now. Try again in a minute.");
-  }
-}
-
 /** The calendar she picked, or null when none is connected. */
 export async function getCalendarAdapter(): Promise<CalendarAdapter | null> {
   const s = await calendarSettings();
-  if (s.provider === "google") return googleAdapter({ getToken: googleToken, timeZone: s.timeZone, hours: s.hours, consultMinutes: s.consultMinutes });
-  // Cal.com is the calendar for now: a saved Cal.com connection counts even before she picks.
-  if (s.provider === "calcom" || s.provider === null) {
+  // Google Calendar (./google.ts with lib/connect getAccessToken) comes back after the hackathon.
+  // Cal.com is the only calendar for now: a saved Cal.com connection counts even
+  // before she picks, and a saved "google" choice means Cal.com until Google returns.
+  if (s.provider === "calcom" || s.provider === null || s.provider === "google") {
     const conn = await getConnection("calcom").catch(() => null);
     const meta = conn?.meta as Partial<CalcomMeta> | undefined;
     if (!conn?.accessToken || typeof meta?.eventTypeId !== "number") return null;
-    return calcomAdapter({ apiKey: conn.accessToken, eventTypeId: meta.eventTypeId, timeZone: s.timeZone });
+    return calcomAdapter({ apiKey: conn.accessToken, eventTypeId: meta.eventTypeId, timeZone: s.timeZone, ownerEmail: meta.ownerEmail });
   }
   return null;
 }

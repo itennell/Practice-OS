@@ -14,7 +14,7 @@ export default defineConfig({
     reuseExistingServer: true,
     timeout: 240_000,
     // Front Desk's Connect Cal.com talks to a local fixture server in tests (tests/e2e/front-desk.spec.ts).
-    env: { CALCOM_API_BASE: "http://127.0.0.1:3299" },
+    env: { CALCOM_API_BASE: "http://127.0.0.1:3299", PLAYWRIGHT_CALCOM_STANDIN: "1" },
   },
   projects: [
     { name: "desktop-light", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 }, colorScheme: "light" } },

@@ -11,12 +11,40 @@ const V = CALCOM_VERSIONS;
 
 /** Cal.com's API, or a local fixture server in end-to-end tests (CALCOM_API_BASE, http://127.0.0.1 only). */
 export function calcomBase(): string {
-  const test = process.env.CALCOM_API_BASE;
+  const test = process.env.NODE_ENV === "production" && !process.env.PLAYWRIGHT_CALCOM_STANDIN ? undefined : process.env.CALCOM_API_BASE;
   return test && /^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(test) ? test : CALCOM_API;
 }
 
-export type CalcomConfig = { apiKey: string; eventTypeId: number; timeZone: string };
-export type CalcomEventType = { id: number; title: string; slug: string; lengthInMinutes: number };
+/** ownerEmail: her own Cal.com address, sent as the booking's attendee email (her event requires one); never the caller's. */
+export type CalcomConfig = { apiKey: string; eventTypeId: number; timeZone: string; ownerEmail?: string };
+export type CalcomLocation = { type: string; [k: string]: unknown };
+export type CalcomBookingField = { field?: string; slug?: string; required?: boolean; hidden?: boolean };
+export type CalcomEventType = {
+  id: number;
+  title: string;
+  slug: string;
+  lengthInMinutes: number;
+  locations?: CalcomLocation[];
+  bookingFields?: CalcomBookingField[];
+};
+
+const CALLER_LOCATIONS = new Set(["attendeePhone", "attendeeAddress", "attendeeDefined"]);
+const OK_REQUIRED = new Set(["name", "email", "title", "location"]);
+
+/**
+ * Why Front Desk can't book this event without a caller detail, as one plain fix,
+ * or null when it can. Practice-OS never edits her event; she changes it in Cal.com.
+ */
+export function bookingBlocker(t: CalcomEventType): string | null {
+  if (t.locations?.some((l) => CALLER_LOCATIONS.has(l.type))) {
+    return `In Cal.com, open "${t.title}", go to Location, and replace the caller's phone or address with "In Person (Organizer Address)" set to: By phone: the practice calls you. Save, then paste your key here again. (Front Desk never sends a caller's number to Cal.com.)`;
+  }
+  const extra = t.bookingFields?.find((f) => f.required && !f.hidden && !OK_REQUIRED.has(String(f.slug ?? f.field)));
+  if (extra) {
+    return `In Cal.com, open "${t.title}", go to Advanced, and make the "${extra.slug ?? extra.field}" question optional. Save, then paste your key here again.`;
+  }
+  return null;
+}
 
 type Envelope<T> = { status: string; data: T };
 
@@ -69,7 +97,9 @@ export function calcomAdapter(config: CalcomConfig, fetchImpl: typeof fetch = fe
       try {
         const types = await listCalcomEventTypes(config.apiKey, fetchImpl);
         const t = types.find((e) => e.id === config.eventTypeId);
-        if (!t) return { ok: false, fix: "That consult event type isn't on your Cal.com account any more. Pick it again." };
+        if (!t) return { ok: false, fix: "That consult event type isn't on your Cal.com account any more. Paste your Cal.com key again." };
+        const blocker = bookingBlocker(t);
+        if (blocker) return { ok: false, fix: blocker };
         return { ok: true, label: `Connected: ${t.title} (${t.lengthInMinutes} min, Cal.com)` };
       } catch (e) {
         return { ok: false, fix: e instanceof CalendarError ? e.fix : "Couldn't reach Cal.com. Check your internet, then try again." };
@@ -90,7 +120,8 @@ export function calcomAdapter(config: CalcomConfig, fetchImpl: typeof fetch = fe
           start: slot.start.toISOString(),
           eventTypeId: config.eventTypeId,
           // Only the reference reaches Cal.com; the caller's details stay in Practice-OS.
-          attendee: { name: `Phone consult ${reference}`, timeZone: config.timeZone, language: "en" },
+          // Her own address, never the caller's: the event's email field is required (checked live 2026-10-29).
+          attendee: { name: `Phone consult ${reference}`, timeZone: config.timeZone, language: "en", ...(config.ownerEmail ? { email: config.ownerEmail } : {}) },
           metadata: { reference, source: "practice-os-front-desk" },
         }),
       });

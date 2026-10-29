@@ -64,7 +64,7 @@ export async function connectCalcomAuto(apiKey: string, fetchImpl?: typeof fetch
   const savedId = (saved?.meta as Partial<CalcomMeta> | undefined)?.eventTypeId;
   const out = await autoConnectCalcom(apiKey, { savedEventTypeId: typeof savedId === "number" ? savedId : null, fetchImpl });
   if (!out.ok) return out;
-  const meta: CalcomMeta = { eventTypeId: out.eventType.id, eventTypeLabel: out.eventType.title };
+  const meta: CalcomMeta = { eventTypeId: out.eventType.id, eventTypeLabel: out.eventType.title, ...(out.ownerEmail ? { ownerEmail: out.ownerEmail } : {}) };
   await saveConnection({ provider: "calcom", accountLabel: out.eventType.title, accessToken: apiKey.trim(), refreshToken: null, scopes: [], expiresAt: null, meta });
   await chooseCalendar("calcom");
   const minutes = out.eventType.lengthInMinutes;
