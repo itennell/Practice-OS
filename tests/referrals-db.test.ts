@@ -10,7 +10,7 @@ const hasDb = Boolean(process.env.DATABASE_URL);
 const { approve } = await import("../lib/approvals");
 const { closeDb, db } = await import("../lib/db");
 const { draftOutreach } = await import("../lib/referrals/outreach");
-const { getSource, latestLetters, moveDueFollowUps } = await import("../lib/referrals/store");
+const { addToBoard, getSource, latestLetters, moveDueFollowUps, rescoreOldCards } = await import("../lib/referrals/store");
 const { practiceToday } = await import("../lib/compliance/store");
 const { getReferralSettings, saveReferralSettings } = await import("../lib/referrals/settings");
 const { referralsQuestions } = await import("../lib/referrals/onboarding");
@@ -123,6 +123,45 @@ describe.skipIf(!hasDb)("referral letters", () => {
     await db()`update practice_os.referral_sources set stage = 'contacted', next_follow_up_on = current_date - 1 where id = ${sourceId}`;
     expect(await moveDueFollowUps()).toBeGreaterThanOrEqual(1);
     expect((await getSource(sourceId))!.stage).toBe("follow_up");
+  });
+});
+
+describe.skipIf(!hasDb)("Add to board", () => {
+  it("saves each NPI once, as soon as it is found, and keeps going when one lookup fails", async () => {
+    const base = Date.now() % 1e8;
+    const ok1 = `18${String(base).padStart(8, "0")}`;
+    const ok2 = `18${String(base + 1).padStart(8, "0")}`;
+    const bad = `18${String(base + 2).padStart(8, "0")}`;
+    let lookups = 0;
+    const lookup = async (npi: string) => {
+      lookups++;
+      if (npi === bad) throw new Error("NPPES timed out");
+      return {
+        npi, name: `[Sample] Test ${npi}`, organization: null, practiceName: null, npiType: "individual" as const, credential: "MD",
+        taxonomy: "207Q00000X", taxonomyLabel: "Family Medicine", specialty: "family_medicine" as const, specialtyLabel: "Family medicine",
+        address: "100 W Example St", city: "Chicago", state: "IL", zip: "60614", phone: null, fax: null, official: null, lastUpdated: null,
+      };
+    };
+    const { added, missing } = await addToBoard(
+      [{ npi: ok1, distanceMiles: 0.5 }, { npi: ok1, distanceMiles: 0.5 }, { npi: bad, distanceMiles: 1 }, { npi: ok2, distanceMiles: 2 }],
+      db(),
+      lookup,
+    );
+    for (const a of added) sources.push(a.id!);
+    expect(lookups).toBe(3);
+    expect(added.map((a) => a.npi)).toEqual([ok1, ok2]);
+    expect(missing).toEqual([bad]);
+  });
+});
+
+describe.skipIf(!hasDb)("score versions", () => {
+  it("scores cards from an older formula again and marks them current", async () => {
+    const id = await makeSource();
+    await db()`update practice_os.referral_sources set score_version = 1, fit_score = 3 where id = ${id}`;
+    await rescoreOldCards(db(), async () => null, 500);
+    const card = (await getSource(id))!;
+    expect(card.score_version).toBe(2);
+    expect(card.fit_score).toBeGreaterThan(3);
   });
 });
 

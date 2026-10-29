@@ -19,20 +19,89 @@ import { specialtyForCode, SPECIALTY_BY_ID, type Provider, type SpecialtyId } fr
 export type Tier = "first" | "next" | "later";
 export const TIERS: Tier[] = ["first", "next", "later"];
 
-type ResearchTier = { id: "A" | "B" | "C"; label: string; min: number };
-type Factor = { id: string; max: number; points?: Record<string, number>; per_mile?: number; unknown_distance_points?: number; flag_if_older_than_years?: number };
+export type Weights = {
+  labels: Record<Tier, string>;
+  min: { first: number; next: number };
+  specialty: Record<SpecialtyId, number>;
+  distance: { max: number; perMile: number; unknown: number };
+  reachable: { individual: number; namedOfficial: number; groupOnly: number };
+  contact: { phone: number; fax: number };
+  fresh: { within2y: number; from2to5y: number; older: number; flagYears: number };
+  inState: number;
+};
 
-const BY_ID: Record<Tier, ResearchTier["id"]> = { first: "A", next: "B", later: "C" };
-const tierRow = (t: Tier) => (research.tiers as ResearchTier[]).find((r) => r.id === BY_ID[t])!;
-export const TIER_LABEL: Record<Tier, string> = { first: tierRow("first").label, next: tierRow("next").label, later: tierRow("later").label };
-const factor = (id: string) => (research.factors as Factor[]).find((f) => f.id === id)!;
+// The same numbers as referral-tiers.json v1.0, used only if that file can't be read.
+export const BUILT_IN_WEIGHTS: Weights = {
+  labels: { first: "Reach out first", next: "Warm up next", later: "Later" },
+  min: { first: 70, next: 50 },
+  specialty: { family_medicine: 35, pediatrics: 33, ob_gyn: 32, psychiatry: 30, internal_medicine: 30, oncology: 22, therapists: 20 },
+  distance: { max: 25, perMile: 5, unknown: 8 },
+  reachable: { individual: 15, namedOfficial: 8, groupOnly: 3 },
+  contact: { phone: 6, fax: 4 },
+  fresh: { within2y: 10, from2to5y: 4, older: 0, flagYears: 5 },
+  inState: 5,
+};
 
-export const SPECIALTY_POINTS = factor("specialty").points as Record<SpecialtyId, number>;
-const DISTANCE = factor("distance");
-const REACHABLE = factor("reachable_person").points!;
-const CONTACT = factor("contact").points!;
-const FRESH = factor("record_fresh");
-const STATE = factor("location_state").points!;
+/** The research file to weights. Throws, saying what is missing, if its shape changed. */
+export function readWeights(json: unknown): Weights {
+  const doc = json as { tiers?: { id: string; label: string; min: number }[]; factors?: { id: string; max?: number; points?: Record<string, number>; per_mile?: number; unknown_distance_points?: number; flag_if_older_than_years?: number }[] };
+  const tier = (id: string) => {
+    const t = doc.tiers?.find((x) => x.id === id);
+    if (!t || typeof t.label !== "string" || typeof t.min !== "number") throw new Error(`tier ${id} is missing`);
+    return t;
+  };
+  const factor = (id: string) => {
+    const f = doc.factors?.find((x) => x.id === id);
+    if (!f) throw new Error(`factor ${id} is missing`);
+    return f;
+  };
+  const num = (v: unknown, what: string): number => {
+    if (typeof v !== "number" || !Number.isFinite(v)) throw new Error(`${what} is not a number`);
+    return v;
+  };
+  const specialtyPoints = factor("specialty").points ?? {};
+  const distance = factor("distance");
+  const reach = factor("reachable_person").points ?? {};
+  const contact = factor("contact").points ?? {};
+  const fresh = factor("record_fresh");
+  const state = factor("location_state").points ?? {};
+  return {
+    labels: { first: tier("A").label, next: tier("B").label, later: tier("C").label },
+    min: { first: num(tier("A").min, "tier A min"), next: num(tier("B").min, "tier B min") },
+    specialty: Object.fromEntries(
+      (Object.keys(BUILT_IN_WEIGHTS.specialty) as SpecialtyId[]).map((id) => [id, num(specialtyPoints[id], `specialty ${id}`)]),
+    ) as Record<SpecialtyId, number>,
+    distance: { max: num(distance.max, "distance max"), perMile: num(distance.per_mile, "distance per_mile"), unknown: num(distance.unknown_distance_points, "distance unknown") },
+    reachable: {
+      individual: num(reach.individual, "reachable individual"),
+      namedOfficial: num(reach.organization_with_named_official, "reachable named official"),
+      groupOnly: num(reach.organization_only, "reachable organization only"),
+    },
+    contact: { phone: num(contact.location_phone, "contact phone"), fax: num(contact.location_fax, "contact fax") },
+    fresh: {
+      within2y: num(fresh.points?.updated_within_2y, "fresh within 2y"),
+      from2to5y: num(fresh.points?.updated_2_to_5y, "fresh 2 to 5y"),
+      older: num(fresh.points?.older, "fresh older"),
+      flagYears: num(fresh.flag_if_older_than_years, "fresh flag years"),
+    },
+    inState: num(state.practice_location_in_clinician_state, "location state"),
+  };
+}
+
+function loadWeights(): Weights {
+  try {
+    return readWeights(research);
+  } catch (err) {
+    // A renamed key in the research file must not take down the chat tools.
+    console.error(`[referrals] docs/research/referral-tiers.json: ${err instanceof Error ? err.message : String(err)}. Using the built-in weights.`);
+    return BUILT_IN_WEIGHTS;
+  }
+}
+
+export const WEIGHTS = loadWeights();
+export const TIER_LABEL = WEIGHTS.labels;
+export const SPECIALTY_POINTS = WEIGHTS.specialty;
+const tierOf = (score: number): Tier => (score >= WEIGHTS.min.first ? "first" : score >= WEIGHTS.min.next ? "next" : "later");
 
 export type Focus = "children" | "teens" | "adults" | "older_adults" | "couples" | "families" | "perinatal";
 const FOCUS_WORDS: Record<Focus, string> = {
@@ -129,45 +198,45 @@ export function tierFor(p: TierInput, ctx: TierContext): TierResult {
 
   // Distance.
   if (ctx.miles === null) {
-    score += DISTANCE.unknown_distance_points!;
+    score += WEIGHTS.distance.unknown;
     reasons.push("distance unknown");
   } else {
-    score += Math.max(0, Math.round(DISTANCE.max - DISTANCE.per_mile! * ctx.miles));
+    score += Math.max(0, Math.round(WEIGHTS.distance.max - WEIGHTS.distance.perMile * ctx.miles));
     const where = milesLabel(ctx.miles, ctx.approximate);
     reasons.push(where.endsWith("mi") ? `${where} from your office` : where);
   }
 
   // A person to write to.
   if (p.npiType === "individual") {
-    score += REACHABLE.individual;
+    score += WEIGHTS.reachable.individual;
     reasons.push("you can write to them by name, not a front desk");
   } else if (p.official) {
-    score += REACHABLE.organization_with_named_official;
+    score += WEIGHTS.reachable.namedOfficial;
     reasons.push(`a group; you can write to ${p.official} by name`);
   } else {
-    score += REACHABLE.organization_only;
+    score += WEIGHTS.reachable.groupOnly;
     reasons.push("a group with no named contact, so the letter goes to a front desk");
   }
   if (p.worksAt) reasons.push(`works at ${p.worksAt}`);
 
   // Phone and fax at the practice location.
-  if (p.phone) score += CONTACT.location_phone;
-  if (p.fax) score += CONTACT.location_fax;
+  if (p.phone) score += WEIGHTS.contact.phone;
+  if (p.fax) score += WEIGHTS.contact.fax;
   if (p.phone || p.fax) reasons.push(`office ${[p.phone && "phone", p.fax && "fax"].filter(Boolean).join(" and ")} on file`);
 
   // How fresh the NPPES record is.
   const updated = p.lastUpdated ? new Date(p.lastUpdated) : null;
   if (updated && !Number.isNaN(updated.getTime())) {
     const years = ((ctx.today ?? new Date()).getTime() - updated.getTime()) / (365.25 * 24 * 3600 * 1000);
-    score += years < 2 ? FRESH.points!.updated_within_2y : years < 5 ? FRESH.points!.updated_2_to_5y : FRESH.points!.older;
-    if (years >= FRESH.flag_if_older_than_years!) reasons.push(`record last updated ${updated.getFullYear()}; confirm they still practice before writing`);
+    score += years < 2 ? WEIGHTS.fresh.within2y : years < 5 ? WEIGHTS.fresh.from2to5y : WEIGHTS.fresh.older;
+    if (years >= WEIGHTS.fresh.flagYears) reasons.push(`record last updated ${updated.getFullYear()}; confirm they still practice before writing`);
   }
 
   // Practice location in her state.
-  if (p.state && ctx.clinicianState && p.state.toUpperCase() === ctx.clinicianState.toUpperCase()) score += STATE.practice_location_in_clinician_state;
+  if (p.state && ctx.clinicianState && p.state.toUpperCase() === ctx.clinicianState.toUpperCase()) score += WEIGHTS.inState;
 
   score = Math.min(100, Math.round(score));
-  const tier: Tier = mismatch ? "later" : score >= tierRow("first").min ? "first" : score >= tierRow("next").min ? "next" : "later";
+  const tier: Tier = mismatch ? "later" : tierOf(score);
   return { tier, score, reasons, specialty };
 }
 
@@ -180,18 +249,34 @@ export function providerTier(p: Provider, ctx: TierContext, worksAt: string | nu
 }
 
 /**
+ * Which scoring wrote a card's fit_score. 1 was the first fit formula (before
+ * 2026-10-29); 2 is these research weights. Bump it when the weights change,
+ * and old cards are scored again (lib/referrals/store.ts rescoreOldCards).
+ */
+export const SCORE_VERSION = 2;
+
+/**
  * A board card: its reasons from what the board keeps, and its tier from the
  * score saved when it was found (that one saw the whole NPPES record: fax,
- * named contact, record age). A "not who you help" card stays Later.
+ * named contact, record age), but only if this scoring wrote it. A "not who
+ * you help" card stays Later.
  */
 export function boardTier(
-  card: { taxonomy: string | null; npi_type: "individual" | "organization" | null; phone: string | null; state: string | null; fit_score: number | null; distance_miles: number | null },
+  card: {
+    taxonomy: string | null;
+    npi_type: "individual" | "organization" | null;
+    phone: string | null;
+    state: string | null;
+    fit_score: number | null;
+    score_version: number | null;
+    distance_miles: number | null;
+  },
   ctx: Omit<TierContext, "miles">,
 ): TierResult {
   const r = tierFor({ taxonomy: card.taxonomy, npiType: card.npi_type, phone: card.phone, state: card.state }, { ...ctx, miles: card.distance_miles });
-  if (card.fit_score === null || r.tier === "later" && r.reasons.some((x) => x.startsWith("mostly sees"))) return r;
-  const score = card.fit_score;
-  return { ...r, score, tier: score >= tierRow("first").min ? "first" : score >= tierRow("next").min ? "next" : "later" };
+  const mismatch = r.reasons.some((x) => x.startsWith("mostly sees"));
+  if (card.fit_score === null || card.score_version !== SCORE_VERSION || mismatch) return r;
+  return { ...r, score: card.fit_score, tier: tierOf(card.fit_score) };
 }
 
 /**

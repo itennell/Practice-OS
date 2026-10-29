@@ -226,19 +226,24 @@ const defaultFetch: Fetcher = async (url) => {
 };
 
 // Polite to a free public service: the same question within 6 hours is answered
-// from memory, and at most a few questions are in flight at once.
+// from memory, and at most a few questions are in flight at once. A full reply
+// is about 1 MB, so the memory keeps the latest 200 (about 200 MB at worst).
 const CACHE_MS = 6 * 3600 * 1000;
-const CACHE_MAX = 3000;
+export const CACHE_MAX = 200;
 const cache = new Map<string, { at: number; value: Promise<NppesResponse> }>();
 
 export function cachedFetch(fetcher: Fetcher = defaultFetch, now = () => Date.now()): Fetcher {
   return (url) => {
     const hit = cache.get(url);
-    if (hit && now() - hit.at < CACHE_MS) return hit.value;
+    if (hit && now() - hit.at < CACHE_MS) {
+      cache.delete(url); // most recently used goes to the end
+      cache.set(url, hit);
+      return hit.value;
+    }
     const value = fetcher(url);
     cache.set(url, { at: now(), value });
     value.catch(() => cache.delete(url));
-    if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value!);
+    while (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value!);
     return value;
   };
 }
@@ -247,12 +252,18 @@ export function clearNppesCache() {
   cache.clear();
 }
 
+export function nppesCacheSize(): number {
+  return cache.size;
+}
+
 export type SearchResult = {
   providers: Provider[];
   /** NPPES questions asked (cached ones count too). */
   requests: number;
   /** True when a search hit NPPES's 1,200-a-search ceiling or our request budget, so the list is partial. */
   truncated: boolean;
+  /** Set when the deadline came first: how many of the areas were searched in full. */
+  timedOut: { done: number; of: number } | null;
 };
 
 const PAGE = 200;
@@ -262,8 +273,10 @@ const LAST_SKIP = 1000; // NPPES refuses skip above 1000
 export async function searchProviders(
   specialties: SpecialtyId[],
   postals: string[],
-  opts: { fetcher?: Fetcher; maxRequests?: number; concurrency?: number } = {},
+  opts: { fetcher?: Fetcher; maxRequests?: number; concurrency?: number; deadline?: number; now?: () => number } = {},
 ): Promise<SearchResult> {
+  const now = opts.now ?? Date.now;
+  const late = () => opts.deadline !== undefined && now() >= opts.deadline;
   const fetcher = opts.fetcher ?? cachedFetch();
   const budget = opts.maxRequests ?? 150;
   const jobs = specialties.flatMap((id) => SPECIALTY_BY_ID.get(id)!.searches).flatMap((d) => postals.map((z) => [d, z] as const));
@@ -271,9 +284,16 @@ export async function searchProviders(
   const queue = [...jobs];
   let requests = 0;
   let truncated = false;
+  let timedOut = false;
+  // An area counts as done when every one of its searches finished.
+  const left = new Map(postals.map((z) => [z, jobs.filter((j) => j[1] === z).length]));
   async function worker() {
     for (let job = queue.shift(); job; job = queue.shift()) {
       for (let skip = 0; skip <= LAST_SKIP; skip += PAGE) {
+        if (late()) {
+          timedOut = true;
+          return;
+        }
         if (requests >= budget) {
           truncated = true;
           return;
@@ -285,10 +305,17 @@ export async function searchProviders(
         if ((res.results?.length ?? 0) < PAGE) break;
         if (skip === LAST_SKIP) truncated = true;
       }
+      left.set(job[1], left.get(job[1])! - 1);
     }
   }
   await Promise.all(Array.from({ length: Math.min(opts.concurrency ?? 4, jobs.length) }, worker));
-  return { providers: parseResponses(responses, new Set(specialties)), requests, truncated };
+  const done = [...left.values()].filter((n) => n === 0).length;
+  return {
+    providers: parseResponses(responses, new Set(specialties)),
+    requests,
+    truncated,
+    timedOut: timedOut ? { done, of: postals.length } : null,
+  };
 }
 
 /** The old shape, for the chat tool and the board's Find form. */

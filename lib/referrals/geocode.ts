@@ -19,7 +19,28 @@ export function addressKey(a: Address): string {
   return `${a.street}|${a.city}|${a.state}|${a.zip}`.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
+// Both caches keep the most recently used entries and drop the oldest.
+const POINTS_MAX = 20_000;
+const PLACES_MAX = 500;
 const points = new Map<string, Point | null>();
+
+function remember<V>(map: Map<string, V>, key: string, value: V, max: number) {
+  map.delete(key);
+  map.set(key, value);
+  while (map.size > max) map.delete(map.keys().next().value!);
+}
+
+function recall<V>(map: Map<string, V>, key: string): V | undefined {
+  if (!map.has(key)) return undefined;
+  const v = map.get(key)!;
+  map.delete(key);
+  map.set(key, v);
+  return v;
+}
+
+export function geocodeCacheSize() {
+  return { points: points.size, places: places.size };
+}
 
 function csvCell(v: string): string {
   return `"${v.replace(/"/g, "'")}"`;
@@ -35,10 +56,10 @@ export function parseCensusLine(line: string): { id: string; point: Point | null
   return Number.isFinite(lat) && Number.isFinite(lon) ? { id, point: [lat, lon] } : { id, point: null };
 }
 
-type Post = (body: FormData) => Promise<string>;
+type Post = (body: FormData, timeoutMs: number) => Promise<string>;
 
-const censusPost: Post = async (body) => {
-  const res = await fetch(CENSUS_BATCH, { method: "POST", body, signal: AbortSignal.timeout(30_000) });
+const censusPost: Post = async (body, timeoutMs) => {
+  const res = await fetch(CENSUS_BATCH, { method: "POST", body, signal: AbortSignal.timeout(timeoutMs) });
   if (!res.ok) throw new Error(`The Census geocoder answered ${res.status}.`);
   return res.text();
 };
@@ -48,13 +69,21 @@ const censusPost: Post = async (body) => {
  * caller falls back to the ZIP center. At most `max` new addresses per call
  * (the batch takes about a second per hundred).
  */
-export async function geocodeAddresses(addresses: Address[], opts: { post?: Post; max?: number } = {}): Promise<Map<string, Point | null>> {
+export async function geocodeAddresses(
+  addresses: Address[],
+  opts: { post?: Post; max?: number; timeoutMs?: number } = {},
+): Promise<Map<string, Point | null>> {
   const out = new Map<string, Point | null>();
   const todo: Address[] = [];
+  const queued = new Set<string>();
   for (const a of addresses) {
     const key = addressKey(a);
-    if (points.has(key)) out.set(key, points.get(key)!);
-    else if (!todo.some((t) => addressKey(t) === key)) todo.push(a);
+    const known = recall(points, key);
+    if (known !== undefined) out.set(key, known);
+    else if (!queued.has(key)) {
+      queued.add(key);
+      todo.push(a);
+    }
   }
   const batch = todo.slice(0, opts.max ?? 600);
   if (batch.length === 0) return out;
@@ -63,7 +92,7 @@ export async function geocodeAddresses(addresses: Address[], opts: { post?: Post
   form.append("addressFile", new Blob([csv], { type: "text/csv" }), "addresses.csv");
   form.append("benchmark", "Public_AR_Current");
   try {
-    const text = await (opts.post ?? censusPost)(form);
+    const text = await (opts.post ?? censusPost)(form, Math.max(1000, Math.min(30_000, opts.timeoutMs ?? 30_000)));
     const found = new Map<string, Point | null>();
     for (const line of text.split(/\r?\n/)) {
       const row = parseCensusLine(line);
@@ -72,7 +101,7 @@ export async function geocodeAddresses(addresses: Address[], opts: { post?: Post
     batch.forEach((a, i) => {
       const key = addressKey(a);
       const point = found.get(String(i)) ?? null;
-      points.set(key, point);
+      remember(points, key, point, POINTS_MAX);
       out.set(key, point);
     });
   } catch (err) {
@@ -83,28 +112,43 @@ export async function geocodeAddresses(addresses: Address[], opts: { post?: Post
 }
 
 const places = new Map<string, { point: Point; label: string } | null>();
-let lastPlaceAt = 0;
 
 type Get = (url: string) => Promise<{ lat: string; lon: string; display_name: string }[]>;
 
-const nominatimGet: Get = async (url) => {
-  const wait = lastPlaceAt + 1100 - Date.now();
-  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-  lastPlaceAt = Date.now();
-  const res = await fetch(url, { headers: { "user-agent": USER_AGENT, accept: "application/json" }, signal: AbortSignal.timeout(10_000) });
-  if (!res.ok) throw new Error(`OpenStreetMap answered ${res.status}.`);
-  return res.json();
-};
+// Nominatim allows one question a second from the whole app: each call waits
+// for the one before it, then 1.1 seconds, so two searches at once still queue.
+const GAP_MS = 1100;
+let line: Promise<unknown> = Promise.resolve();
+let lastAt = 0;
+
+export function oneAtATime<T>(task: () => Promise<T>, gapMs = GAP_MS, now = Date.now, sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))): Promise<T> {
+  const run = line.then(async () => {
+    const wait = lastAt + gapMs - now();
+    if (wait > 0) await sleep(wait);
+    lastAt = now();
+    return task();
+  });
+  line = run.catch(() => undefined);
+  return run;
+}
+
+const nominatimGet: Get = (url) =>
+  oneAtATime(async () => {
+    const res = await fetch(url, { headers: { "user-agent": USER_AGENT, accept: "application/json" }, signal: AbortSignal.timeout(10_000) });
+    if (!res.ok) throw new Error(`OpenStreetMap answered ${res.status}.`);
+    return res.json();
+  });
 
 /** A typed city or neighborhood, in her state, to its center. Null when OpenStreetMap doesn't know it. */
 export async function geocodePlace(place: string, state: string, get: Get = nominatimGet): Promise<{ point: Point; label: string } | null> {
   const q = `${place.trim()}, ${state}`;
   const key = q.toLowerCase();
-  if (places.has(key)) return places.get(key)!;
+  const known = recall(places, key);
+  if (known !== undefined) return known;
   const url = `${NOMINATIM}?${new URLSearchParams({ q, countrycodes: "us", format: "jsonv2", limit: "1" })}`;
   const [hit] = await get(url);
   const found = hit ? { point: [Number(hit.lat), Number(hit.lon)] as Point, label: hit.display_name.split(",").slice(0, 2).join(",").trim() } : null;
-  places.set(key, found);
+  remember(places, key, found, PLACES_MAX);
   return found;
 }
 

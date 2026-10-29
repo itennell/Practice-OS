@@ -1,12 +1,12 @@
-import { connection } from "next/server";
+import { after, connection } from "next/server";
 import { Suspense } from "react";
 import { AreaExplorer } from "@/components/referrals/area-explorer";
 import { ReferralBoard } from "@/components/referrals/board";
 import { PageHeader } from "@/components/ui";
 import { DEFAULT_SPECIALTIES, getReferralSettings } from "@/lib/referrals/settings";
 import { STAGE_LABEL } from "@/lib/referrals/stages";
-import { latestLetters, listSources, practiceFacts } from "@/lib/referrals/store";
-import { boardTier, type TierResult } from "@/lib/referrals/tier";
+import { latestLetters, listSources, practiceFacts, rescoreOldCards } from "@/lib/referrals/store";
+import { boardTier, SCORE_VERSION, type TierResult } from "@/lib/referrals/tier";
 
 export const metadata = { title: "Referrals · Practice-OS" };
 
@@ -27,6 +27,10 @@ export default function ReferralsPage() {
 async function Referrals() {
   await connection(); // read the database per request, never at build time
   const [sources, letters, setup, facts] = await Promise.all([listSources(), latestLetters(), getReferralSettings(), practiceFacts()]);
+  // Cards scored by an older formula are scored again after the page is sent.
+  if (sources.some((s) => s.score_version !== SCORE_VERSION)) {
+    after(() => rescoreOldCards().catch((err) => console.error(`[referrals] rescore: ${err instanceof Error ? err.message : String(err)}`)));
+  }
   const board = Object.fromEntries(sources.filter((s) => s.npi).map((s) => [s.npi!, { stage: STAGE_LABEL[s.stage] }]));
   const tiers: Record<string, TierResult> = Object.fromEntries(
     sources.map((s) => [s.id, boardTier(s, { focus: facts.focus, clinicianState: facts.state })]),
