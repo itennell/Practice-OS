@@ -76,6 +76,7 @@ Every UI piece Isaiah picked for Practice-OS, where it goes, and how to build it
 | UI-030 | Calendar (shared month calendar) | DLN | Calendar | must | built | shadcn/ui (MIT); coss ui reference only (AGPL) | `components/shared/calendar.tsx` (`Calendar`); in forms `components/shared/date-field.tsx` (`DateField`, the Calendar in a popover) |
 | UI-031 | Toast notifications | GLB | Toasts | must | built | shadcn/ui (MIT) | `components/shared/toaster.tsx` (`Toaster`, `notify`) |
 | UI-032 | Settings controls (switches and selects) | SET | Auto-approve kinds | must | built | shadcn/ui (MIT) | `components/shared/settings-controls.tsx` (`SettingSwitch`, `SettingSelect`, `SettingRadio`, `TextField`) |
+| UI-033 | List card (one card, hairline rows) | GLB | Lists | must | built | Calm redesign (Cal.com pattern, own build) | `components/shared/list-card.tsx` (`ListCard`, `ListRow`) |
 
 ## Build notes
 
@@ -107,7 +108,7 @@ Big rounded primary actions, dark on light (54px), with the purple accent pill (
 
 **CHT · Conversation list** · must · built · Design board p.8
 
-A dark side menu for talking to Aeon: search, navigation, pinned and recent chats, and a New chat button.
+A side menu for talking to Aeon: search, navigation, pinned and recent chats, and a New chat button. Calm redesign (2026-10-28, Redesign 2/5): the menu takes the page colour with a hairline edge in light mode and stays one step darker than the page (#1F1E1D) in dark mode; rows are 44px with 16px icons and 14px labels; New chat is a quiet row; counts are plain muted numbers, with an accent dot on Approvals when something is waiting. Tokens `--menu-*` in app/globals.css.
 
 ### UI-006 Chat bubbles with cut corners
 
@@ -143,7 +144,7 @@ A small icon that morphs from a ring to a spinning arc, then a check, X or strik
 
 **CHT · Message input** · must · approved · React Bits (app exception) · [link](https://reactbits.dev/c/micro/prompt-bar?menuBackground=9d9d9d)
 
-The one text box for typing to Aeon, used everywhere there is a chat or prompt: the Chat with Aeon panel (main spot), the dashboard chat box, typed answers in onboarding, and the website chat. Placeholder "Ask anything" plus a microphone button. Turn OFF the model picker and effort picker (pass empty models and efforts lists; they show by default), and leave out the slash commands and sources. The spot where React Bits keeps its model picker (bottom row, left, inside the bar) now holds Aeon's mode picker (Manual, Auto, Bypass) through the `controls` prop; any future in-bar picker goes there too, never as a separate button outside the bar. DECIDED (Isaiah, 2026-10-26): dictation is for the clinician only; the public website chat is typing only. Swap its Hugeicons for lucide so the app keeps one icon style. Colors follow the Caseload palette (background, color, menuBackground). Dictation wiring: onDictate records in the browser, converts to a mono WAV and sends it to muse-voice-transcribe-1.0. Install: npx shadcn@latest add @react-bits/PromptBar-TS-TW. Needs motion. Respects reduced motion; has screen-reader labels.
+The one text box for typing to Aeon, used everywhere there is a chat or prompt (calm redesign, Redesign 3/5: `shape="pill"` gives the 56px one-row pill used by Chat with Aeon; the mode picker stays inside on the left): the Chat with Aeon panel (main spot), the dashboard chat box, typed answers in onboarding, and the website chat. Placeholder "Ask anything" plus a microphone button. Turn OFF the model picker and effort picker (pass empty models and efforts lists; they show by default), and leave out the slash commands and sources. The spot where React Bits keeps its model picker (bottom row, left, inside the bar) now holds Aeon's mode picker (Manual, Auto, Bypass) through the `controls` prop; any future in-bar picker goes there too, never as a separate button outside the bar. DECIDED (Isaiah, 2026-10-26): dictation is for the clinician only; the public website chat is typing only. Swap its Hugeicons for lucide so the app keeps one icon style. Colors follow the Caseload palette (background, color, menuBackground). Dictation wiring: onDictate records in the browser, converts to a mono WAV and sends it to muse-voice-transcribe-1.0. Install: npx shadcn@latest add @react-bits/PromptBar-TS-TW. Needs motion. Respects reduced motion; has screen-reader labels.
 
 ### UI-012 Slide to Commit
 
@@ -264,6 +265,12 @@ One month calendar used everywhere dates matter, so dates look the same across t
 **GLB · Toasts** · must · approved · shadcn/ui (MIT) · added at review · [link](https://ui.shadcn.com/docs/components/sonner)
 
 Small messages that pop up in a corner and fade, confirming what just happened or saying what went wrong: "Text sent to Sam Example", "Post published", "Saved as a Gmail draft", "Couldn't reach Gmail. Reconnect it in Settings." Used across every screen after an approval runs, a setting changes, or a connection fails. Success messages fade on their own; errors stay until dismissed and name the fix. Announced to screen readers. Caseload look: glass toast, radius 20px, Status Mark (UI-010) icon on the left, bottom-right on desktop, top on phones. Install: npx shadcn@latest add sonner (shadcn/ui, MIT). Added at the review because every screen needs it.
+
+### UI-033 List card (one card, hairline rows)
+
+**GLB · Lists** · must · built · Calm redesign (2026-10-28)
+
+One bordered card whose rows are split by hairlines, instead of a grid of separate cards (the Cal.com list pattern, rebuilt). `ListCard` has a small muted heading and an optional link on the right; `ListRow` has a small icon tile (accent-tinted for the row that needs her), a title, one muted line and an end slot (a chip, a date, a button). First used by Home's Today list and Still to set up; Approvals, Admin, Referrals and Front Desk adopt it next.
 
 ### UI-032 Settings controls (switches and selects)
 

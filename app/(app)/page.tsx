@@ -2,8 +2,11 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
+import { CalendarDays, Inbox } from "lucide-react";
 import { AeonChat, type ChatEntry } from "@/components/aeon-chat";
-import { GlassCard } from "@/components/ui";
+import { SUGGESTIONS } from "@/lib/aeon/suggestions";
+import { ListCard, ListRow } from "@/components/shared/list-card";
+import { chipClass } from "@/components/ui";
 import { getConversation } from "@/lib/aeon/chat";
 import { listApprovals } from "@/lib/approvals";
 import { loadApprovalSettings } from "@/lib/approval-settings";
@@ -25,10 +28,11 @@ async function Chat({ searchParams }: { searchParams: PageProps<"/">["searchPara
   await connection(); // read the database per request, never at build time
   const { c, ask } = await searchParams;
   const id = typeof c === "string" && /^[0-9a-f-]{36}$/i.test(c) ? c : null;
-  const [profile, found, settings] = await Promise.all([
+  const [profile, found, settings, suggestions] = await Promise.all([
     getProfile(),
     id ? getConversation(id) : null,
     loadApprovalSettings(),
+    suggestionsFor(),
   ]);
   // The first run opens on Aeon's onboarding interview until she finishes it.
   if (!profile?.onboarding_completed_at) redirect("/onboarding");
@@ -46,6 +50,7 @@ async function Chat({ searchParams }: { searchParams: PageProps<"/">["searchPara
       initialMessages={messages}
       firstName={profile?.full_name.split(" ")[0] ?? null}
       start={<StartCards />}
+      suggestions={suggestions}
       ask={typeof ask === "string" && !found ? ask.slice(0, 500) : undefined}
       mode={found?.conversation.approval_mode ?? settings.mode}
       // The Vercel demo copy is view only: the pill shows the mode but can't change it.
@@ -61,65 +66,73 @@ function dueWords(item: BriefItem): string {
   return `Due in ${item.days_left} day${item.days_left === 1 ? "" : "s"}`;
 }
 
-/** Under the message box before the first message: today's brief and what's waiting for her. */
+/** Under the message box before the first message: one quiet Today list (what's waiting
+ *  for her OK and the next deadlines), then anything she put off in onboarding. */
 async function StartCards() {
   const [brief, approvals] = await Promise.all([morningBrief(), listApprovals()]);
-  const soon = [...brief.this_week, ...brief.urgent_soon].slice(0, 4);
+  const soon = [...brief.this_week, ...brief.urgent_soon].slice(0, 3);
   const waiting = approvals.filter((a) => a.status === "pending");
   return (
     <>
-    <StillToSetUp />
-    <div className="grid gap-4 md:grid-cols-2">
-      <GlassCard aria-labelledby="brief-heading" className="flex flex-col gap-3 p-5">
-        <h2 id="brief-heading" className="label-caps">
-          This week{brief.is_sample ? " [Sample]" : ""}
-        </h2>
+      <ListCard
+        id="today-heading"
+        label={`Today${brief.is_sample ? " [Sample]" : ""}`}
+        action={
+          <Link href="/admin" className="inline-flex min-h-touch items-center text-small font-semibold text-[var(--link)] underline-offset-4 hover:underline">
+            Open Admin
+          </Link>
+        }
+      >
+        {waiting.length > 0 ? (
+          <ListRow
+            accent
+            icon={<Inbox size={16} strokeWidth={1.75} />}
+            title={`${waiting.length} waiting for your OK`}
+            detail={waiting.length > 1 ? `${waiting[0].title}, and ${waiting.length - 1} more` : waiting[0].title}
+            end={
+              <Link href="/approvals" className={chipClass(true, false, "font-semibold")}>
+                Review
+              </Link>
+            }
+          />
+        ) : (
+          <ListRow icon={<Inbox size={16} strokeWidth={1.75} />} title="Nothing needs your OK" detail="Aeon asks here before it sends, posts or books anything." />
+        )}
         {soon.length === 0 ? (
-          <p className="text-[var(--fg-muted)]">Nothing is due in the next 7 days.</p>
+          <ListRow icon={<CalendarDays size={16} strokeWidth={1.75} />} title="Nothing due in the next 7 days" />
         ) : (
-          <ul className="flex flex-col gap-2">
-            {soon.map((item) => (
-              <li key={`${item.rule_id}-${item.due_on}`} className="flex flex-col">
-                <span className="font-medium">{item.title}</span>
-                <span className="text-small text-[var(--fg-muted)]">{dueWords(item)}</span>
-              </li>
-            ))}
-          </ul>
+          soon.map((item) => (
+            <ListRow
+              key={`${item.rule_id}-${item.due_on}`}
+              icon={<CalendarDays size={16} strokeWidth={1.75} />}
+              title={item.title}
+              end={<span className="text-small text-[var(--fg-muted)]">{dueWords(item)}</span>}
+            />
+          ))
         )}
-        <Link href="/admin/deadlines" className="mt-auto text-small font-semibold text-[var(--link)] underline-offset-4 hover:underline">
-          All deadlines
-        </Link>
-      </GlassCard>
-      <GlassCard aria-labelledby="waiting-heading" className="flex flex-col gap-3 p-5">
-        <h2 id="waiting-heading" className="label-caps">
-          Waiting for you ({waiting.length})
-        </h2>
-        {waiting.length === 0 ? (
-          <p className="text-[var(--fg-muted)]">Nothing needs your approval right now.</p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {waiting.slice(0, 3).map((a) => (
-              <li key={a.id} className="font-medium">
-                {a.title}
-              </li>
-            ))}
-          </ul>
-        )}
-        <Link href="/approvals" className="mt-auto text-small font-semibold text-[var(--link)] underline-offset-4 hover:underline">
-          Open approvals
-        </Link>
-      </GlassCard>
-    </div>
+      </ListCard>
+      <StillToSetUp />
     </>
   );
 }
 
+/** Chips under the message box, from what is actually waiting; the fixed three fill any gap. */
+async function suggestionsFor(): Promise<string[]> {
+  const approvals = await listApprovals().catch(() => []);
+  const waiting = approvals.filter((a) => a.status === "pending").length;
+  const picks = ["What needs me this week?", waiting > 0 ? "What's waiting for my OK?" : null, "Draft a Good Faith Estimate"].filter(
+    (s): s is string => s !== null,
+  );
+  for (const s of SUGGESTIONS) if (picks.length < 3 && !picks.includes(s)) picks.push(s);
+  return picks.slice(0, 3);
+}
+
 function ChatSkeleton() {
   return (
-    <div aria-hidden className="mx-auto flex w-full max-w-[760px] flex-col items-center gap-4 pt-6">
-      <div className="size-28 animate-pulse rounded-full bg-[var(--hairline)]" />
-      <div className="h-9 w-72 max-w-full animate-pulse rounded-full bg-[var(--hairline)]" />
-      <div className="h-[52px] w-full animate-pulse rounded-full bg-[var(--hairline)]" />
+    <div aria-hidden className="mx-auto flex w-full max-w-[640px] flex-col items-center gap-5 pt-[10vh]">
+      <div className="size-[72px] animate-pulse rounded-full bg-[var(--hairline)]" />
+      <div className="h-11 w-80 max-w-full animate-pulse rounded-full bg-[var(--hairline)]" />
+      <div className="h-14 w-full animate-pulse rounded-full bg-[var(--hairline)]" />
     </div>
   );
 }

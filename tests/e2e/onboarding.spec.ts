@@ -155,7 +155,7 @@ test("A new clinician sets up the whole practice, and the home page lists what s
   expect(await seriousViolations(page)).toEqual([]);
   await page.getByRole("button", { name: "Finish setup" }).click();
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole("heading", { level: 1, name: /How can I help\?/ })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: /^(Good (morning|afternoon|evening)|Hello)\b/ })).toBeVisible();
 
   const todo = page.getByRole("region", { name: "Still to set up" });
   await expect(todo).toContainText("What's your NPI number?");
@@ -214,7 +214,7 @@ test("Larger text at a narrow window: nothing scrolls sideways and axe stays cle
 test("Dana's demo practice is already set up, so the app opens on the chat", async ({ page }) => {
   execSync("npm run db:reset", { stdio: "ignore" });
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1, name: /How can I help\?/ })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: /^(Good (morning|afternoon|evening)|Hello)\b/ })).toBeVisible();
   await page.goto("/onboarding?q=fees");
   await expect(heading(page)).toHaveText(/What do you charge/);
 });

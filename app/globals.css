@@ -24,6 +24,11 @@
   --text-title: 2rem;
   --text-title--line-height: 1.15;
   --text-title--font-weight: 600;
+  /* Display: the one big title on Home (calm redesign). Used nowhere else. */
+  --text-display: 2.5rem;
+  --text-display--line-height: 1.1;
+  --text-display--font-weight: 650;
+  --text-display--letter-spacing: -0.02em;
   --text-section: 1.25rem;
   --text-section--line-height: 1.3;
   --text-body: 0.9375rem;
@@ -36,6 +41,8 @@
   --radius-card: 24px;
   --radius-card-sm: 20px;
   --radius-card-lg: 28px;
+  /* Controls inside cards: menu rows, list rows, selects. */
+  --radius-control: 12px;
 
   --blur-glass: 18px;
 
@@ -76,6 +83,8 @@
   --glass-line: rgb(31 30 29 / 0.1);
   --line: #e3e1d9;
   --hairline: rgb(31 30 29 / 0.07);
+  /* The one slightly stronger line: the message box and other input pills. */
+  --line-strong: rgb(31 30 29 / 0.18);
   --card-shadow: 0 1px 2px rgb(31 30 29 / 0.04);
   --primary-bg: var(--color-primary);
   --primary-fg: #ffffff;
@@ -129,15 +138,17 @@
 
   --focus-ring: #5b47c9;
 
-  /* The dark chat menu (UI-005): dark in both themes. */
-  --menu-bg: #1f1e1d;
-  --menu-fg: #f5f4ef;
-  --menu-muted: #b5b3ab;
-  --menu-hover: rgb(255 255 255 / 0.06);
-  --menu-active: rgb(255 255 255 / 0.11);
-  --menu-line: rgb(255 255 255 / 0.14);
-  --menu-badge: rgb(255 255 255 / 0.14);
-  --menu-focus: #b0a3fb;
+  /* The chat menu (UI-005), calm redesign: the page colour with a hairline edge in light,
+     one step darker than the page in dark. */
+  --menu-bg: var(--color-canvas);
+  --menu-fg: var(--color-ink);
+  --menu-muted: var(--color-muted);
+  --menu-hover: rgb(31 30 29 / 0.05);
+  --menu-active: rgb(31 30 29 / 0.07);
+  --menu-line: var(--line);
+  --menu-badge: rgb(31 30 29 / 0.07);
+  --menu-focus: #5b47c9;
+  --menu-dot: #5b47c9;
 
   /* Motion durations. The orb breathes over --dur-breathe. */
   --dur-fast: 150ms;
@@ -160,6 +171,7 @@
     --glass-line: rgb(255 255 255 / 0.08);
     --line: #44433f;
     --hairline: rgb(255 255 255 / 0.07);
+    --line-strong: rgb(255 255 255 / 0.16);
     --card-shadow: none;
     --primary-bg: var(--color-dark-ink);
     --primary-fg: var(--color-ink);
@@ -205,7 +217,15 @@
 
     --focus-ring: #b0a3fb;
 
-    --menu-bg: #1b1a19;
+    --menu-bg: #1f1e1d;
+    --menu-fg: #f5f4ef;
+    --menu-muted: #b5b3ab;
+    --menu-hover: rgb(255 255 255 / 0.06);
+    --menu-active: rgb(255 255 255 / 0.1);
+    --menu-line: rgb(255 255 255 / 0.09);
+    --menu-badge: rgb(255 255 255 / 0.1);
+    --menu-focus: #b0a3fb;
+    --menu-dot: #b0a3fb;
   }
 }
 

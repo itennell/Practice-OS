@@ -1,3 +1,5 @@
+import { ListTodo } from "lucide-react";
+import { ListCard, ListRow } from "@/components/shared/list-card";
 import { ButtonLink } from "@/components/ui";
 import { stillToSetUp } from "@/lib/onboarding/store";
 
@@ -7,24 +9,21 @@ export async function StillToSetUp() {
   const items = await stillToSetUp().catch(() => []);
   if (items.length === 0) return null;
   return (
-    <section aria-labelledby="still-to-set-up" className="glass flex flex-col gap-3 p-5">
-      <h2 id="still-to-set-up" className="text-section">
-        Still to set up
-      </h2>
-      <ul className="flex flex-col divide-y divide-[var(--hairline)]">
-        {items.slice(0, 6).map((item) => (
-          <li key={item.id} className="flex flex-wrap items-center gap-3 py-2">
-            <div className="min-w-0 flex-1">
-              <p className="text-body">{item.ask}</p>
-              <p className="text-small text-[var(--fg-muted)]">{item.why ?? item.chapter}</p>
-            </div>
+    <ListCard id="still-to-set-up" label="Still to set up">
+      {items.slice(0, 6).map((item) => (
+        <ListRow
+          key={item.id}
+          icon={<ListTodo size={16} strokeWidth={1.75} />}
+          title={item.ask}
+          detail={item.why ?? item.chapter}
+          end={
             <ButtonLink variant="quiet" href={`/onboarding?q=${encodeURIComponent(item.id)}`}>
               Answer
             </ButtonLink>
-          </li>
-        ))}
-      </ul>
-      {items.length > 6 && <p className="text-small text-[var(--fg-muted)]">And {items.length - 6} more.</p>}
-    </section>
+          }
+        />
+      ))}
+      {items.length > 6 && <li className="border-t border-[var(--line)] px-4 py-3 text-small text-[var(--fg-muted)]">And {items.length - 6} more.</li>}
+    </ListCard>
   );
 }

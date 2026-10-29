@@ -62,7 +62,7 @@ test("Menu: Aeon, New chat, search, practice links with counts, recent chats and
   const again = await openMenu(page);
   await again.getByRole("button", { name: "New chat" }).click();
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole("heading", { level: 1, name: /How can I help\?/ })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: /^(Good (morning|afternoon|evening)|Hello)\b/ })).toBeVisible();
   await expect(page.getByRole("log", { name: "Conversation" })).toHaveCount(0);
 });
 
