@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { stat } from "node:fs/promises";
 import { AeonFiles, type AeonFile } from "@/components/aeon-files";
 import { OfficeSettings } from "@/components/office-settings";
-import { ButtonLink, GlassCard } from "@/components/ui";
+import { ButtonLink, GlassCard, PageHeader } from "@/components/ui";
 import { listMemories, memoryMarkdown } from "@/lib/aeon/memory";
 import { MEMORY_CAP_CHARS, usedChars } from "@/lib/aeon/memory-ops";
 import { SOUL_PATH, soul } from "@/lib/aeon/soul";
@@ -17,7 +17,7 @@ export const metadata: Metadata = { title: "Settings · Practice-OS" };
 export default function Page() {
   return (
     <>
-      <h1 className="text-title">Settings</h1>
+      <PageHeader title="Settings" description="How Aeon works, your connections, and your practice details." />
       <GlassCard aria-labelledby="connections-heading" className="flex max-w-3xl flex-wrap items-center justify-between gap-4 p-6 md:p-8">
         <div className="flex flex-col gap-1">
           <h2 id="connections-heading" className="text-section font-semibold">

@@ -8,6 +8,19 @@ export function Orb({ size = 40, className = "" }: { size?: number; className?: 
   return <span aria-hidden className={`orb inline-block shrink-0 ${className}`} style={{ width: size, height: size }} />;
 }
 
+/** Page header (calm redesign): one title, one plain line under it, and at most one action on the right. */
+export function PageHeader({ title, description, action }: { title: string; description?: ReactNode; action?: ReactNode }) {
+  return (
+    <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+      <div className="flex min-w-0 flex-col gap-1">
+        <h1 className="text-title">{title}</h1>
+        {description && <p className="max-w-[65ch] text-[var(--fg-muted)]">{description}</p>}
+      </div>
+      {action}
+    </header>
+  );
+}
+
 export function GlassCard({ className = "", ...props }: ComponentProps<"section">) {
   return <section className={`glass ${className}`} {...props} />;
 }

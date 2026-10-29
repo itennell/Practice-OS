@@ -7,6 +7,7 @@ import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { loadEnv } from "../lib/env";
 import { NER_MODEL, modelCacheDir } from "../lib/aeon/phi-classifier";
+import { gluedNames } from "./fixtures/phi-corpus";
 
 loadEnv();
 const ready = Boolean(process.env.DATABASE_URL) && existsSync(path.join(modelCacheDir(), NER_MODEL));
@@ -49,20 +50,39 @@ describe.skipIf(!ready)("memories (live database)", () => {
     expect(second).toEqual({ memory: first.memory, created: false });
   });
 
+  // The marker that finds the row again sits in its own brackets: glued onto the
+  // name it changed every run (Date.now) and once slipped past the guard in CI.
+  // Glued characters are covered by the fixed list below instead.
   it.each([
-    ["My client Zelda Quint{u} prefers mornings", "client_name"],
-    ["Kevin Ortiz{u} pays on the 1st", "client_name"],
+    ["My client Zelda Quint prefers mornings {u}", "client_name"],
+    ["Kevin Ortiz pays on the 1st {u}", "client_name"],
     ["DOB 3/14/1988 {u}", "birth_date"],
     ["she has PTSD {u}", "diagnosis"],
   ])("refuses %s and stores it nowhere", async (template, kind) => {
     const unique = `${tag}r${made.length}${kind}`;
-    const text = template.replace("{u}", unique);
+    const text = template.replace("{u}", `(${unique})`);
     await expect(mem.remember({ kind: "fact", text }, by)).rejects.toMatchObject({ kind });
     const [{ n }] = await db()`
       select (select count(*) from practice_os.memories where text like ${"%" + unique + "%"})
            + (select count(*) from practice_os.audit_log where details::text like ${"%" + unique + "%"}) as n`;
     expect(Number(n)).toBe(0);
   });
+
+  it("refuses a client name with any odd character glued on, and stores none of them", async () => {
+    const unique = `${tag}glued`;
+    const slipped: string[] = [];
+    for (const name of gluedNames("Kevin Ortiz")) {
+      const text = `${name} pays on the 1st (${unique})`;
+      const saved = await mem.remember({ kind: "fact", text }, by).then(
+        (r) => (made.push(r.memory.id), true),
+        (err: unknown) => !(err instanceof mem.MemoryRefused),
+      );
+      if (saved) slipped.push(JSON.stringify(name));
+    }
+    expect(slipped).toEqual([]);
+    const [{ n }] = await db()`select count(*) as n from practice_os.memories where text like ${"%" + unique + "%"}`;
+    expect(Number(n)).toBe(0);
+  }, 120_000); // about 400 guarded writes; slow when the whole suite runs at once
 
   it("replaces an older memory and forgets on request", async () => {
     const old = await mem.remember({ kind: "fact", text: `[Sample] Fee for 90837 is $165 (${tag})` }, by);

@@ -21,9 +21,11 @@
   --color-dark-accent: #8e7cf8;
 
   /* Board type scale: title 27-34/600, body 15/400 at 1.5, label 12/600, small 12-13. */
-  --text-title: 2rem;
+  /* Page titles (calm redesign): a touch smaller and tighter, so the content leads. */
+  --text-title: 1.75rem;
   --text-title--line-height: 1.15;
-  --text-title--font-weight: 600;
+  --text-title--font-weight: 650;
+  --text-title--letter-spacing: -0.01em;
   /* Display: the one big title on Home (calm redesign). Used nowhere else. */
   --text-display: 2.5rem;
   --text-display--line-height: 1.1;

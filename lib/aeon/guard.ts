@@ -49,25 +49,47 @@ export function isAllowedPerson(name: string, text: string, allow: Allowlist): b
 // ID numbers and "client <name>" withhold one; other names are blanked below.
 const TOOL_RESULT_RULES: readonly PhiKind[] = ["identifier", "client_name"];
 
+/**
+ * The text both layers read: look-alike letters folded (NFKC: fullwidth "Ｋｅｖｉｎ"
+ * is "Kevin"), accents and stray combining marks dropped, and invisible
+ * characters (zero-width spaces, joiners, direction marks) removed, so they
+ * can't split or hide a name. Used for checking only; what is saved is unchanged.
+ */
+export function normalizeForCheck(text: string): string {
+  return text.normalize("NFKD").replace(/[\p{M}\p{Cf}]/gu, "").normalize("NFKC");
+}
+
 export async function guard(text: string, at: GuardPoint, allow?: Allowlist): Promise<GuardResult> {
-  const list = allow ?? (await practiceAllowlist());
-  const rules = at === "tool_result" ? checkIdentity(text, list, TOOL_RESULT_RULES) : checkIdentity(text, list);
+  // The allowlist is cleaned the same way, so an allowed "José García" matches "Jose Garcia".
+  const raw = allow ?? (await practiceAllowlist());
+  const list: Allowlist = { names: raw.names.map(normalizeForCheck), contacts: raw.contacts.map(normalizeForCheck) };
+  const plain = normalizeForCheck(text);
+  const rules = at === "tool_result" ? checkIdentity(plain, list, TOOL_RESULT_RULES) : checkIdentity(plain, list);
   if (!rules.ok) return { ok: false, kind: rules.kind };
 
   let names: string[];
   try {
-    names = await findNames(text);
+    names = await findNames(plain);
   } catch (err) {
     console.error(`[guard] name-finder unavailable: ${err instanceof Error ? err.message : String(err)}`);
     return { ok: false, kind: "unavailable" };
   }
-  const strangers = names.filter((n) => !isAllowedPerson(n, text, list));
+  const strangers = names.filter((n) => !isAllowedPerson(n, plain, list));
   if (strangers.length === 0) return { ok: true, text };
   // A tool result keeps its business content with the names blanked out;
   // anything she typed or Aeon would save or say is refused outright.
   if (at !== "tool_result") return { ok: false, kind: "client_name" };
   let redacted = text;
   for (const n of strangers) redacted = redacted.replace(new RegExp(escape(n), "gi"), NAME_WITHHELD);
+  // Names are found in the cleaned copy but blanked in the original, so a copy
+  // written differently ("Kévin", hidden characters) can survive. Check again:
+  // if any stranger is still there, withhold the whole result.
+  try {
+    const again = normalizeForCheck(redacted);
+    if ((await findNames(again)).some((n) => !isAllowedPerson(n, again, list))) return { ok: false, kind: "client_name" };
+  } catch {
+    return { ok: false, kind: "unavailable" };
+  }
   return { ok: true, text: redacted };
 }
 

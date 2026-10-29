@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 import { REFUSAL, WITHHELD, guard, isAllowedPerson } from "../lib/aeon/guard";
 import { checkIdentity } from "../lib/aeon/identity-filter";
 import { NER_MODEL, findNames, mergeEntities, modelCacheDir } from "../lib/aeon/phi-classifier";
-import { ALLOWED, PHI_CASES, type PhiCase } from "./fixtures/phi-corpus";
+import { ALLOWED, PHI_CASES, gluedNames, type PhiCase } from "./fixtures/phi-corpus";
 
 const haveModel = existsSync(path.join(modelCacheDir(), NER_MODEL));
 type Refuse = Extract<PhiCase, { expect: "refuse" }>;
@@ -21,7 +21,26 @@ describe("mergeEntities", () => {
       { entity: "I-PER", word: "##sha", score: 0.98 },
       { entity: "I-PER", word: "Green", score: 0.99 },
     ]);
-    expect(merged).toEqual([{ label: "PER", text: "Tasha Green", score: 0.98 }]);
+    expect(merged).toEqual([{ label: "PER", text: "Tasha Green", score: 0.99 }]);
+  });
+
+  it("stops a word at a left-out piece and keeps the name's score (CI flake: Kevin Ortiz + test tag)", () => {
+    // "Kevin Ortiztmvezakuir...": "##t" came back as O and was left out, "##m" was unsure.
+    const merged = mergeEntities([
+      { entity: "B-PER", word: "Kevin", score: 0.9996, index: 1 },
+      { entity: "I-PER", word: "Ortiz", score: 0.9993, index: 2 },
+      { entity: "I-PER", word: "##m", score: 0.48, index: 4 },
+      { entity: "I-PER", word: "##vez", score: 0.8, index: 5 },
+    ]);
+    expect(merged).toEqual([{ label: "PER", text: "Kevin Ortiz", score: 0.9996 }]);
+  });
+
+  it("splits words with a left-out word between them", () => {
+    const merged = mergeEntities([
+      { entity: "B-PER", word: "Kevin", score: 0.99, index: 1 },
+      { entity: "I-PER", word: "Ortiz", score: 0.99, index: 3 },
+    ]);
+    expect(merged.map((e) => e.text)).toEqual(["Kevin", "Ortiz"]);
   });
 
   it("drops a word whose pieces disagree (Aetna is not a person)", () => {
@@ -68,6 +87,40 @@ describe.skipIf(!haveModel)("guard with the local name-finder", () => {
 
   it.each(passes.map((c) => [c.text]))("lets through: %s", async (text) => {
     expect(await guard(text, "message", ALLOWED)).toEqual({ ok: true, text });
+  });
+
+  it("refuses a client name with any odd character glued on", async () => {
+    const slipped: string[] = [];
+    for (const name of [...gluedNames("Kevin Ortiz"), ...gluedNames("Luis Romero")]) {
+      for (const text of [`${name} pays on the 1st`, `Remember ${name} cancelled again`]) {
+        if ((await guard(text, "memory", ALLOWED)).ok) slipped.push(JSON.stringify(text));
+      }
+    }
+    expect(slipped).toEqual([]);
+  }, 180_000); // about 1,600 checks; slow when the whole suite runs at once
+
+  it("sees through invisible and look-alike characters inside a name", async () => {
+    for (const text of ["Kev\u200bin Or\u200dtiz pays on the 1st", "\uff2b\uff45\uff56\uff49\uff4e \uff2f\uff52\uff54\uff49\uff5a pays on the 1st", "Mr.\u200bGrimsby liked it"]) {
+      expect((await guard(text, "memory", ALLOWED)).ok, text).toBe(false);
+    }
+  });
+
+  it("withholds a tool result whose name is hidden by invisible characters", async () => {
+    const result = await guard('{"note":"Kev\u200bin Ortiz asked about fees"}', "tool_result", ALLOWED);
+    expect(result).toEqual({ ok: false, kind: "client_name" });
+  });
+
+  it("withholds a tool result where one copy of a name is accented and one is plain", async () => {
+    // Found in the cleaned copy, blanked in the original: the accented copy would survive.
+    const result = await guard('{"a":"Kévin Ortiz asked about fees","b":"Kevin Ortiz paid"}', "tool_result", ALLOWED);
+    expect(result).toEqual({ ok: false, kind: "client_name" });
+  });
+
+  it("allows an accented name on her list, written with or without the accents", async () => {
+    const allow = { names: [...ALLOWED.names, "José García"], contacts: ALLOWED.contacts };
+    for (const text of ["Draft a letter to José García about referrals", "Draft a letter to Jose Garcia about referrals"]) {
+      expect(await guard(text, "message", allow)).toEqual({ ok: true, text });
+    }
   });
 
   it("blanks strangers' names in a tool result instead of dropping it", async () => {
