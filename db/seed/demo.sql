@@ -127,7 +127,7 @@ insert into practice_os.approvals (id, kind, title, preview, payload, created_by
   ('00000000-0000-4000-8000-000000000903', 'sms_reply',
    '[Sample] Text Riley Example open consult times',
    '{"to": "[Sample] Riley Example", "body": "[Sample] Hi Riley, this is the AI assistant for Reyes Counseling. Yes, superbills are available. Open consult times: Tue 6:00 PM, Thu 5:30 PM."}'::jsonb,
-   '{"inquiry_id": "00000000-0000-4000-8000-000000000402", "delivery": "sms_to_verified_test_phone"}'::jsonb,
+   '{"inquiry_id": "00000000-0000-4000-8000-000000000402", "to": "+13125550102", "body": "[Sample] Hi Riley, this is the AI assistant for Reyes Counseling. Yes, superbills are available. Open consult times: Tue 6:00 PM, Thu 5:30 PM."}'::jsonb,
    'aeon:front_desk', true),
   ('00000000-0000-4000-8000-000000000904', 'test_note',
    '[Sample] Test note: hello from Aeon',

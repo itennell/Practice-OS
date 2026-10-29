@@ -30,7 +30,7 @@ const PRACTICE: PracticeLink[] = [
   { href: "/admin", label: "Admin", icon: ClipboardList, count: "admin", countWord: "need you" },
   { href: "/approvals", label: "Approvals", icon: Inbox, count: "approvals", countWord: "waiting" },
   { href: "/referrals", label: "Referrals", icon: Users },
-  { href: "/media", label: "Media", icon: Camera },
+  { href: "/instagram", label: "Instagram", icon: Camera },
   { href: "/front-desk", label: "Front Desk", icon: Phone },
 ];
 

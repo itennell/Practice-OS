@@ -1,6 +1,0 @@
-{"id":"pt-profile","message":"help me with my Psychology Today profile","tools":["directory_profile"]}
-{"id":"pt-bio-answers","message":"can you write my bio for psychology today? people mostly come to me for anxiety and couples stuff","tools":["directory_profile"],"args":{"focus":"anxiety|couple"}}
-{"id":"where-else","message":"where else should I list my practice besides psychology today?","tools":["other_directories"],"not_tools":["directory_profile"]}
-{"id":"goodtherapy","message":"is GoodTherapy worth paying for?","tools":["other_directories"],"args":{"directory":"goodtherapy"}}
-{"id":"no-website","message":"I don't have a website yet. can you help me make one?","tools":["website_help"]}
-{"id":"has-website","message":"my website is reyescounseling.com, what should be on it?","tools":["website_help"],"args":{"url":"reyescounseling"}}

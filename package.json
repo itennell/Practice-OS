@@ -22,7 +22,6 @@
     "aeon:record": "tsx scripts/record-aeon-fixture.ts",
     "eval:documents": "tsx scripts/eval-documents.ts",
     "eval:instagram": "tsx scripts/eval-instagram.ts",
-    "eval:media": "tsx scripts/eval-media.ts",
     "doctor": "tsx scripts/doctor.ts"
   },
   "dependencies": {
