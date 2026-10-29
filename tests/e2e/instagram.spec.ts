@@ -121,7 +121,7 @@ test("An advice topic is explained and the nearest logistics post is offered", a
 });
 
 test("Research first: a short summary and angles with their links, then she picks one", async ({ page }) => {
-  await page.goto("/instagram");
+  await page.goto("/media/instagram");
   await page.getByLabel("What should the post be about?").fill("what to bring to a first session");
   await page.getByRole("button", { name: "Plan several" }).click();
   const panel = page.getByRole("region", { name: "What other therapists post about this" });

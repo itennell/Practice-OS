@@ -956,7 +956,7 @@ export const TOOLS: AeonTool[] = [
         from_the_web: research.source === "web",
         angles: research.angles.map((a, i) => ({ number: i + 1, title: a.title, hook: a.hook, format: a.format, why: a.why, links: a.sources })),
         next: "Ask which angle to write; then draft_instagram_post with that angle's title and hook as the request.",
-        see: "/instagram",
+        see: "/media/instagram",
       });
     },
   }),
