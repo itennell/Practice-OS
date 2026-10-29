@@ -15,7 +15,7 @@ Twilio is the default. Spruce Health is the alternative (below).
 
 ## How it works on her computer
 
-Practice-OS asks Twilio every minute for new voicemails and texts while the app is open, and sends texts through Twilio. Her computer doesn't need to be reachable from the internet. When she connects, Practice-OS sets her number to play her greeting and record a message, using a small Twilio-hosted page (Twilio's "echo" Twimlet), so there's nothing for her to set up in Twilio for voicemail. Calls to the number go straight to her greeting and voicemail.
+Practice-OS asks Twilio every minute for new voicemails and texts while the app is open, and sends texts through Twilio. Her computer doesn't need to be reachable from the internet. Connecting changes nothing on her Twilio account. Then the card says what it will change ("Calls to this number will go to your greeting and voicemail") and does it only when she presses the button: Practice-OS points the number's incoming calls at a small Twilio-hosted page (Twilio's "echo" Twimlet) that plays her greeting and records a message. It keeps the number's old call setting, writes the change to the audit log, and **Undo** puts the old setting back. Calls to the number then go straight to her greeting and voicemail.
 
 The app has to be running for Front Desk to answer. Voicemails left while her computer is off are picked up the next time it's on.
 
@@ -24,8 +24,9 @@ The app has to be running for Front Desk to answer. Voicemails left while her co
 1. Make a Twilio account: https://www.twilio.com/try-twilio. You should see the Twilio Console home page.
 2. Upgrade the account by adding a payment card (Console › Admin › Billing, or the **Upgrade** button). You should no longer see "Trial" at the top.
 3. Buy a toll-free number: **Phone Numbers › Manage › Buy a number**, choose **Toll-free**, then **Buy**. You should see it under **Phone Numbers › Manage › Active numbers**. Twilio may ask for a business profile first; fill it in with the practice's details.
-4. On the Console home page, find **Account Info**. Copy the **Account SID** and the **Auth Token** (press the eye to show it) and paste them into the card. Practice-OS checks them straight away, finds the toll-free number, and sets up voicemail on it. If there's more than one number, it asks which one.
-5. Ask for texting approval: **Messaging › Regulatory compliance › Toll-free verifications** (Twilio moves this menu sometimes; searching "toll-free verification" in the Console finds it). Pick the number and fill in the form. For "use case", say the texts are appointment scheduling for people who called the practice and left a voicemail. The card shows "in review" until the carriers approve it.
+4. On the Console home page, find **Account Info**. Copy the **Account SID** and the **Auth Token** (press the eye to show it) and paste them into the card. Practice-OS checks them straight away and finds the toll-free number. If there's more than one number, it asks which one. Nothing on her Twilio account changes yet.
+5. Press **Send calls to my greeting and voicemail**. The card says exactly what this changes first, and **Undo** puts the number's old setting back. If she changes her greeting later, **Put my latest greeting on the number** updates it.
+6. Ask for texting approval: **Messaging › Regulatory compliance › Toll-free verifications** (Twilio moves this menu sometimes; searching "toll-free verification" in the Console finds it). Pick the number and fill in the form. For "use case", say the texts are appointment scheduling for people who called the practice and left a voicemail. The card shows "in review" until the carriers approve it.
 
 When the card says **Connected** with her number, Front Desk is working.
 
