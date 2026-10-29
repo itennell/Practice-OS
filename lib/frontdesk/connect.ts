@@ -8,6 +8,7 @@ import { calendarSettings, getCalendarAdapter, type CalcomMeta } from "./calenda
 import { type CalendarProvider } from "./calendar/types";
 import { getPhoneAdapter, PHONE_PROVIDER, type PhoneMeta } from "./phone";
 import { spruceAdapter } from "./phone/spruce";
+import { textingNote, tollfreeStatus } from "./phone/tollfree";
 import { twilioFromEnv } from "./phone/twilio";
 import type { CheckResult } from "./phone/types";
 
@@ -16,10 +17,16 @@ import type { CheckResult } from "./phone/types";
 
 export type ConnectStatus = { connected: boolean; check: CheckResult | null; vendor?: string; devLine?: boolean };
 
-export async function phoneStatus(): Promise<ConnectStatus> {
+/** The phone card's facts. On the demo line, `note` says whether callers can get texts yet. */
+export type PhoneStatus = ConnectStatus & { number?: string; note?: string };
+
+export async function phoneStatus(): Promise<PhoneStatus> {
   const phone = await getPhoneAdapter().catch(() => null);
   if (!phone) return { connected: false, check: null };
-  return { connected: true, vendor: phone.vendor, devLine: Boolean(twilioFromEnv()), check: await phone.check() };
+  const dev = twilioFromEnv();
+  if (!dev) return { connected: true, vendor: phone.vendor, devLine: false, check: await phone.check() };
+  const [check, texting] = await Promise.all([phone.check(), tollfreeStatus(dev)]);
+  return { connected: true, vendor: phone.vendor, devLine: true, number: dev.phoneNumber, check, note: textingNote(texting) ?? undefined };
 }
 
 export async function connectSpruce(token: string): Promise<CheckResult> {
