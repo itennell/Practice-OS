@@ -69,6 +69,7 @@ type NppesAddress = {
   state?: string;
   postal_code?: string;
   telephone_number?: string;
+  fax_number?: string;
 };
 type NppesTaxonomy = { code: string; desc?: string; primary?: boolean };
 export type NppesResult = {
@@ -81,6 +82,9 @@ export type NppesResult = {
     credential?: string;
     organization_name?: string;
     last_updated?: string;
+    authorized_official_first_name?: string;
+    authorized_official_last_name?: string;
+    authorized_official_title_or_position?: string;
   };
   addresses?: NppesAddress[];
   taxonomies?: NppesTaxonomy[];
@@ -108,6 +112,10 @@ export type Provider = {
   state: string;
   zip: string;
   phone: string | null;
+  /** Fax at the practice location: medical offices still send referrals by fax. */
+  fax: string | null;
+  /** For a group: the person NPPES lists as its authorized official, so a letter can name someone. */
+  official: string | null;
   lastUpdated: string | null;
 };
 
@@ -168,6 +176,10 @@ export function parseResult(r: NppesResult, want?: Set<SpecialtyId>): Provider |
     state: (loc.state ?? "").toUpperCase(),
     zip: loc.postal_code.slice(0, 5),
     phone: formatPhone(loc.telephone_number),
+    fax: formatPhone(loc.fax_number),
+    official: individual
+      ? null
+      : [r.basic.authorized_official_first_name, r.basic.authorized_official_last_name].filter(Boolean).map((x) => titleCase(x!)).join(" ") || null,
     lastUpdated: r.basic.last_updated ?? null,
   };
 }

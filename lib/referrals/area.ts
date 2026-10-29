@@ -9,7 +9,7 @@ import { geocodeAddresses, geocodePlace, addressKey, type Point } from "./geocod
 import { haversineMiles, zipCenters } from "./geo";
 import { searchProviders, SPECIALTY_BY_ID, type Provider, type SpecialtyId } from "./nppes";
 import { getReferralSettings } from "./settings";
-import { capFirst, focusFrom, tierFor, TIERS, type Focus, type TierResult } from "./tier";
+import { capFirst, focusFrom, providerTier, TIERS, type Focus, type TierResult } from "./tier";
 
 type Centers = Record<string, Point>;
 
@@ -165,7 +165,7 @@ export async function searchArea(
   const rough = (p: Provider) => {
     const c = centers[p.zip];
     const miles = officePoint && c ? haversineMiles(officePoint, c) : null;
-    return tierFor({ taxonomy: p.taxonomy, npiType: p.npiType }, { miles, focus: ctx.focus }).score;
+    return providerTier(p, { miles, focus: ctx.focus, clinicianState: ctx.state }).score;
   };
   const byPromise = [...providers].sort((a, b) => rough(b) - rough(a));
   const located = await (deps.geocode ?? geocodeAddresses)(
@@ -186,7 +186,7 @@ export async function searchArea(
       precision: exact ? "address" : "zip",
       distanceMiles,
       worksAt,
-      tier: tierFor({ taxonomy: p.taxonomy, npiType: p.npiType, worksAt }, { miles: distanceMiles, focus: ctx.focus, approximate: !exact || !ctx.office }),
+      tier: providerTier(p, { miles: distanceMiles, focus: ctx.focus, approximate: !exact || !ctx.office, clinicianState: ctx.state }, worksAt),
     });
   }
   const order = (a: AreaProvider, b: AreaProvider) =>

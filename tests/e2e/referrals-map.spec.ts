@@ -46,7 +46,7 @@ test("Referrals map: 60614 pins and a tiered list, pin and row pick each other, 
   await waitForResults(page, "60614");
 
   const tiers = page.getByRole("region", { name: "Referral sources by tier" });
-  for (const t of ["Reach out first", "Next", "Later"]) await expect(tiers.getByRole("heading", { name: new RegExp(`^${t}`) })).toBeVisible();
+  for (const t of ["Reach out first", "Warm up next", "Later"]) await expect(tiers.getByRole("heading", { name: new RegExp(`^${t}`) })).toBeVisible();
   const firstRow = tiers.getByRole("listitem").first();
   await expect(firstRow).toContainText("Why reach out first:");
   await expect(firstRow).toContainText(/Individual clinician|Group or clinic/);
