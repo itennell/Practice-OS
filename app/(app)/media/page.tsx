@@ -1,8 +1,9 @@
 import { connection } from "next/server";
 import { Suspense } from "react";
-import { ProfileBuilder } from "@/components/media/profile-builder";
-import { loadMediaFacts, missingAnswers, place, QUESTIONS } from "@/lib/media/facts";
-import { directoryVersions, loadProfileDraft } from "@/lib/media/profile";
+import { PtStudio } from "@/components/media/pt-studio";
+import { loadMediaFacts, place } from "@/lib/media/facts";
+import { assemble, directoryVersions, finish, loadProfileDraft } from "@/lib/media/profile";
+import { buildProfileView, interviewState } from "@/lib/media/pt-profile";
 import { PT_PRICE } from "@/lib/media/schema";
 
 export const metadata = { title: "Media · Practice-OS" };
@@ -17,8 +18,9 @@ export default function MediaPage() {
         <div className="flex min-w-0 flex-col gap-2">
           <h1 className="text-title break-words">Psychology Today and directories</h1>
           <p className="max-w-[60ch] text-[var(--fg-muted)]">
-            Aeon writes every box of your Psychology Today profile ({PT_PRICE}) to fit its limit, then the same words for
-            other listings. You read each one, make it yours, and paste it in. Nothing is sent anywhere.
+            Aeon asks a few short questions, section by section, and shows your whole Psychology Today profile ({PT_PRICE})
+            as it will read. You make the words yours and paste them in, then use the same words for other listings.
+            Nothing is sent anywhere.
           </p>
         </div>
       </header>
@@ -35,13 +37,12 @@ async function Builder() {
   if (!f) return <p className="text-[var(--fg-muted)]">Finish setting up your practice first, so Aeon knows what to write.</p>;
   const draft = await loadProfileDraft();
   return (
-    <ProfileBuilder
+    <PtStudio
       who={{ name: f.name, credential: f.credential, place: place(f), sample: f.isSample }}
-      questions={QUESTIONS}
-      answers={f.answers}
-      missing={missingAnswers(f.answers)}
+      state={interviewState(f)}
+      view={buildProfileView(f, draft)}
       draft={draft}
-      directories={draft ? directoryVersions(draft) : []}
+      directories={directoryVersions(draft ?? finish(f, assemble(f, null).fields, "template"))}
       canWrite={!process.env.VERCEL}
     />
   );
