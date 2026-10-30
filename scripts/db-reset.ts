@@ -22,6 +22,8 @@ export const DEMO_TABLES = [
   "compliance_facts",
   "compliance_rules",
   "referral_sources",
+  // Referrals v2 (023): what each source said about a card.
+  "referral_facts",
   "posts",
   // Instagram studio (021)
   "post_research",
@@ -46,6 +48,8 @@ export const ALL_TABLES = [
   // Front Desk (016): her callers' STOP list and where each phone stream was read; never reset.
   "sms_opt_outs",
   "front_desk_sync",
+  // Referrals v2 (023): cached outside answers and robots.txt; not demo data.
+  "referral_fetch_cache",
 ] as const;
 
 // Without DATABASE_URL this is the built-in database, which reports as project "local".

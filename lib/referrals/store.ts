@@ -7,6 +7,7 @@ import { practiceToday } from "../compliance/store";
 import { db } from "../db";
 import { nearbyZips, zipCenters, zipDistance } from "./geo";
 import { fetchProviders, looksResidential, providerByNpi, SPECIALTY_BY_ID, type Provider, type SpecialtyId } from "./nppes";
+import { nppesFacts, saveFacts } from "./evidence/store";
 import { focusFrom, providerTier, SCORE_VERSION, tierFor, type Focus } from "./tier";
 import { STAGES, STAGE_LABEL, type Stage } from "./stages";
 
@@ -149,6 +150,9 @@ export async function saveSources(found: FoundSource[], sql: postgres.Sql = db()
     returning id, npi`;
   const ids = new Map(result.map((r) => [r.npi as string, r.id as string]));
   for (const p of found) p.id = ids.get(p.npi);
+  // The registry's answer is the card's first piece of evidence (lib/referrals/evidence).
+  const checkedAt = new Date().toISOString();
+  for (const p of found) if (p.id) await saveFacts(p.id, nppesFacts(p, checkedAt), { checked: ["nppes"], sql });
   // The privacy guard lets her Referrals names through; let it see the new ones now.
   forgetAllowlist();
   return result.count;
