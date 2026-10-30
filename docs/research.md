@@ -1398,3 +1398,106 @@ Screeners (blank copies). Optional, any license. Free to copy.
 | All seven items, word for word | [GAD-7 (phqscreeners.com)](https://www.phqscreeners.com/select-screener) | Good practice |
 | The four answer choices | [GAD-7](https://www.phqscreeners.com/select-screener) | Good practice |
 | Pfizer attribution and free-use line | [PHQ Screeners terms of use](https://www.phqscreeners.com/select-screener) | Good practice |
+
+---
+
+# Growth agent, Phase 1 findings (checked 2026-10-30; research, not legal advice)
+
+Why this exists: before Aeon grows the practice (ads, listings, website), the policies, APIs, ethics and costs below decide what it may automate. Every area keeps the same hard limits (bottom of this section). Anything marked UNCONFIRMED was not on a live official page today and must be re-checked before building on it. Prices may change; re-check every number at checkout.
+
+## 1. Google Ads healthcare and personalized-advertising policies
+
+A plain psychotherapy practice advertising consults is not listed in Google's special-certification buckets (those cover prescription-drug services, online pharmacies, telemedicine that facilitates prescribing, addiction treatment, US health insurance). Whether her exact wording triggers a certification or limited review is decided at review time — UNCONFIRMED until she runs it. Health is a Sensitive interest category: no advertiser-curated audiences (website-visitor lists, Customer Match–type uploads); plan for keyword + location targeting. Never imply knowledge of the viewer's condition, and never pass health details into Google tags or feeds.
+
+- Aeon can automate (drafts only, she approves): generic consult ad copy without condition claims; keyword pre-screen against certification triggers; a do-not-upload checklist for tags/feeds; consent/privacy wording drafts for counsel to approve; a disapproval log from her forwarded notices.
+- Needs her: Ads account creation and Terms, any certification application, tag installation decisions, any audience upload (default: never), disapproval appeals.
+- Costs: ad spend only (hers, per click, no published fixed price); possible LegitScript-type certification cost if triggered — UNCONFIRMED.
+- Risks: disapproval/suspension from condition-specific copy; confidentiality breach via tags/feeds; guarantee-style copy (ethics); credential leaks; mild lock-in.
+- Approvals: account creation, every ad/keyword set, any tag/audience/certification/budget change. Spend: a hard monthly account-level cap she chooses, no auto-increases; Aeon never changes budgets.
+- Sources (all HTTP 200, 2026-10-30): [Healthcare & medicines policy](https://support.google.com/adspolicy/answer/176031) · [Restricted targeting](https://support.google.com/adspolicy/answer/143465) · [Data collection and use](https://support.google.com/adspolicy/answer/6020956) · [US-states privacy compliance](https://support.google.com/google-ads/answer/9614122).
+
+## 2. Google Ads API access (2026 model)
+
+Developer tokens were sunset 2026-09-09: access is now per Google Cloud project, not per manager-account API Center. New path: enable the API in her Cloud project (automatic Test access: test accounts only, 15,000 ops/day), then apply for Explorer access (automated review; 2,880 prod ops/day + 15,000 test). Higher tiers Basic (15,000/day) and Standard (unlimited most services) need applications; Basic/Standard need brand verification, Standard review ~10 business days. Explorer blocks account creation, user management, planning and billing services. No per-call API fee published on the verified pages. Billing for ads is 100% her Ads account and card.
+
+- Aeon can automate (read-only, small scale): test-account reporting queries; draft production changes as approval items with exact payloads; spend/diagnostic monitoring with alerts (~50/80/100% of cap); quota/error log with backoff; application text and brand-verification checklist for her to submit.
+- Needs her: Cloud project ownership, OAuth/service-account grants, linking the project to her Ads account, her billing instrument, access applications and brand verification, every production write and billing change.
+- Costs: engineering time + her ad spend; no published API fee (UNCONFIRMED beyond "no fee published").
+- Risks: test-project calls to production error out; credential storage (server-side, least privilege, rotate); bulk-change blast radius (default read-only + drafts); Cloud-project owner roster discipline; low lock-in.
+- Approvals: project creation/linking, any OAuth grant, any access application, any production write, any billing change.
+- Sources (all HTTP 200, 2026-10-30): Google Ads API docs via [developers.google.com/google-ads/api](https://developers.google.com/google-ads/api) (onboarding, access levels, quotas, billing pages). Exact quota numbers above are per Cloud project per sliding 24h as published; re-check before building.
+
+## 3. Google Business Profile APIs
+
+The APIs manage account/location data with almost the UI's full features: business information, Posts, review data (list, reply, delete a reply), verification management, insights, admins, attributes/services, media upload, real-time (Pub/Sub) notifications, Ads integration. Access is per Cloud project and never extends to profiles she doesn't manage. New-profile verification is Google-determined (live video recording, live call, phone/SMS, email); a human on site performs it. Exact numeric quotas UNCONFIRMED (limits exist and are increasable per the FAQ). No per-call usage fee found — UNCONFIRMED, confirm terms before building.
+
+- Aeon can automate: stage hours/address/phone/category edits for approval then push; draft GBP Posts from logistics for approval; review digest + drafted replies (never auto-post); real-time notification surfacing; insights summaries for the morning brief.
+- Needs her: the API access request (domain email + live site, ~14-day review); OAuth grant as profile owner/manager; verification itself; every public word on reviews; admin/ownership changes.
+- Costs: engineering (OAuth app, token storage, review-draft UI); Cloud project free tier suffices; her verification time; no ad spend required.
+- Risks: OAuth tokens are high-value secrets (encrypt, least privilege, revocable); listing suspension on policy violations (keep human gate); review replies are forever (one PHI slip is an incident); re-verification can be demanded anytime; Google-side deprecations (isolate calls behind one module).
+- Approvals: OAuth and scope changes, first access request, every publish, admin/ownership changes, verification attempts.
+- Sources (all HTTP 200, 2026-10-30): [GBP APIs overview](https://developers.google.com/my-business) · [GBP FAQs](https://developers.google.com/my-business/content/faq) · [Review data](https://developers.google.com/my-business/content/review-data) · [Locations setup](https://developers.google.com/my-business/content/locations-setup) · [Verify your business](https://support.google.com/business/answer/7107242?hl=en) · [Video verification](https://support.google.com/business/answer/14271705?hl=en).
+
+## 4. Search Console API and site verification
+
+`searchanalytics.query()` exposes Performance data (queries, clicks, impressions, CTR, position; 25,000-row pages). Also site lists, sitemaps, URL inspection (tighter quotas). Verified quotas (page updated 2025-08-28): Search Analytics 1,200 QPM per site/user, 30,000,000 QPD + 40,000 QPM per project; URL inspection 2,000 QPD / 600 QPM per site; all other resources 20 QPS / 200 QPM per user. Free of charge, subject to limits. Verification a non-technical owner can do: HTML file, meta tag, GA code, Tag Manager snippet, Site Kit plugin for WordPress, or DNS TXT (only method covering a Domain property). Keep two verification methods and two owners she controls.
+
+- Aeon can automate: weekly plain-English visibility summaries; sitemap/indexing-error digests; click trend tracking with proposed tweaks for approval; token-health monitoring; batched exports for quarterly trends.
+- Needs her: verification itself (her host/registrar login); property type and role grants; GA/Tag Manager account creation; removals/redirects (per-change approval); recovery of orphaned properties.
+- Costs: free API; her domain/hosting already owned; quotas far beyond a single practice site.
+- Risks: verified-owner permission is powerful (guard credentials); query data may carry identifiable intent (store aggregates, never join with client records); token hygiene; unvetted third-party plugins (prefer Site Kit/host-native/DNS); mild lock-in (keep raw exports).
+- Approvals: verification attempts, owner/user grants, plugin/tag installs, sitemap/robots changes, external data sharing, removals/redirects.
+- Sources (all HTTP 200, 2026-10-30): [Search Console API](https://developers.google.com/webmaster-tools) · [Search analytics queries](https://developers.google.com/webmaster-tools/v1/how-tos/search_analytics) · [Usage limits](https://developers.google.com/webmaster-tools/limits) · [Pricing](https://developers.google.com/webmaster-tools/pricing) · [Site verification](https://support.google.com/webmasters/answer/9008080) · [Owners and permissions](https://support.google.com/webmasters/answer/7687615?hl=en).
+
+## 5. HHS/OCR tracking-technology guidance and the 2024 court decision
+
+OCR's bulletin "Use of Online Tracking Technologies" (Dec 1, 2022; revised Mar 18, 2024) treated IP-address-plus-visit-to-public-health-page as triggering HIPAA. On June 20, 2024 the N.D. of Texas in *AHA v. Becerra* vacated the bulletin only to that extent; the rest stands: authenticated pages still involve PHI; disclosures to tracking vendors need a BAA or authorization; pixels/analytics sending identifiers + health page views are disclosures. Server-side first-party measurement that never discloses PHI to a third party (self-hosted logs, aggregate cookieless counts, BAA vendor with identifiers stripped) remains allowed. (hhs.gov bot-screens automated fetches; vacatur confirmed via the bulletin's indexed text plus law-firm summaries. Appeal-dismissal timing UNCONFIRMED.)
+
+- Aeon can automate: tracker inventory with plain-language what-sends-where; tracker-removal/consent task lists for approval; checking whether a vendor signs a BAA (record, don't assume). NEVER auto-install pixels/analytics sending visitor IP + page views; never send appointment/intake/portal data to ad/analytics vendors; never treat the vacatur as clearance for authenticated/intake pages.
+- Needs her: keep-or-remove call on current pixels (under BAA or removal); signing any BAA; whether her site has authenticated areas; breach-risk call on past pixel fires; analytics account ownership.
+- Costs: no rule fee; vendor/tooling tiers, pixel-removal dev time, possible counsel review.
+- Risks: impermissible PHI disclosure; breach-notification duty; OCR enforcement on the intact remainder; state-law/FTC exposure; class-action risk; client-trust loss.
+- Approvals: any tracker change; any BAA; any new analytics tool; any intake/booking-page change; counsel engagement after suspected past disclosure.
+- Sources: [HHS OCR tracking bulletin](https://www.hhs.gov/hipaa/for-professionals/privacy/guidance/hipaa-online-tracking/index.html) (indexed text confirms June 20, 2024 vacatur; checked 2026-10-30).
+
+## 6. Ethics-code limits on testimonials, reviews, claims, solicitation
+
+APA 5.05: no soliciting testimonials from current therapy clients or the vulnerably influenced; 5.01 bars false/deceptive public statements. NASW 4.07: no uninvited solicitation of vulnerable prospects; no soliciting testimonial endorsements, including reuse permission, from current clients or vulnerable others. ACA 2014: broadest testimonial rule (current clients, former clients, vulnerable others per secondaries — section letter UNCONFIRMED), with implications discussion + permission. AAMFT: no testimonial-specific ban found in secondaries (numbering UNCONFIRMED); truthful advertising + confidentiality effectively bar client endorsements; no kickbacks for referrals. NBCC (2023): no soliciting testimonials from current clients, families, close friends, or former clients within 5 years (confirm in-PDF; older text said 2 years). Across codes: soliciting Google/Yelp reviews from clients counts as soliciting testimonials; public review replies must never confirm a treatment relationship; efficacy claims must be truthful with no guaranteed outcomes.
+
+- Aeon can automate: logistics-only marketing drafts with no outcome promises; flagging guarantee/ranking/superiority language; neutral review-response templates confirming nothing. NEVER request reviews/testimonials from current (or for counselors, former/vulnerable) clients; never publish client statements as endorsements without her documented consent; never offer/accept anything of value for referrals or reviews.
+- Needs her: which code(s) bind her (license + state board layer); whether an unsolicited review may be acknowledged; accuracy of every credential/specialty/outcome claim; consent + wording for any testimonial; her directory/review-site accounts and responses.
+- Costs: her time; possible ethics-counsel consult on complaints.
+- Risks: board discipline; ethics complaints; confidentiality breach via review replies; FTC exposure on false efficacy claims; trust loss.
+- Approvals: every public post/bio/listing; any review response; any client-statement use; any effectiveness/specialty/credential claim; any outreach letter.
+- Sources (all HTTP 200, 2026-10-30): [APA Ethics Code](https://www.apa.org/ethics/code) (5.05, 5.01) · [NASW Code 4.07](https://www.socialworkers.org/About/Ethics/Code-of-Ethics/Code-of-Ethics-English/Social-Workers-Ethical-Responsibilities-as-Professionals) · [ACA ethics](https://www.counseling.org/resources/ethics) · [AAMFT Code](https://www.aamft.org/Legal_Ethics/Code_of_Ethics.aspx) · [NBCC Code PDF](https://www.nbcc.org/assets/ethics/nbcccodeofethics.pdf). Section letters, AAMFT numbering and the NBCC 5-year window need in-source confirmation before quoting precisely.
+
+## 7. What therapist growth agencies and private-pay coaches sell (public pages only)
+
+Bundles: done-for-you local SEO + GBP management (retainers); website management + SEO add-on; Google Ads setup + management plus ad spend paid separately; one-off audits; coaching cohorts (3–12 months). Public prices seen today: SEO retainers ~$400–700+/mo entry (Therapy Flow $400/mo; Local SEO Therapists from ~$700/mo); ads management ~$390–420/mo plus $1,000–2,000/mo spend (Fully Booked Pros $420/mo + ≥$1,000 spend, 3-month minimum; Therapy Everywhere $499 consult then $390/mo); coaching ~$4,000–4,800/program (Abundance $3,999–$4,800). Realistic 12-month totals: SEO-only ~$4,800–8,400; ads ~$17,000–29,000 including spend. Agencies quoting only on sales calls are unnamed (UNCONFIRMED).
+
+- Aeon can automate: directory listing/renewal/completeness tracking; SEO page outlines and bio copy for her to paste; spend-vs-inquiries logging with cost-per-consult drift flags; coaching/contract date nudges; vendor comparison rows from public pages.
+- Needs her: signing/paying any contract (her card/signature); granting agencies account access; niche/fees/positioning choices; attending calls and approving voice copy; cancellations/chargebacks.
+- Costs: as above, vendor list prices before ad spend.
+- Needs her approval: every agency/coach purchase; flag retainers over $500/mo and programs over $2,000; ad spend needs its own monthly cap. Aeon never signs, pays, or grants access.
+- Risks: minimum-term retainers and agency-owned ad accounts (require client-owned accounts); no-BAA vendors must never get client detail; testimonial demands clashing with ethics (her call); unenforceable guarantee claims; auto-renew/installment fine print.
+- Sources (all HTTP 200, 2026-10-30): [Therapy Flow](https://mytherapyflow.com/website-and-seo-boost-program/) · [Local SEO Therapists](https://localseotherapists.com/) · [Fully Booked Pros](https://www.fullybookedpros.com/google-ads) · [Therapy Everywhere](https://therapyeverywhere.com/google-ads-psychologists-psychiatrists-therapists/) · [Abundance](https://www.abundancepracticebuilding.com/fill).
+
+## 8. Hosting options for a clinician-owned website
+
+Squarespace Basic $25/mo monthly or $19/mo annual (~$228/yr; 14-day trial, no free plan; free custom domain first year). WordPress.com Personal $9/mo monthly or $4/mo annual (~$48/yr; free plan exists with subdomain + ads; best portability via standard export). Google Sites $0 (login-gated check; domain ~$10–20/yr UNCONFIRMED; weakest exit path — expect a rebuild). Recommendation for a non-technical starter: WordPress.com Personal for cheapest custom-domain path with portability, Squarespace Basic for easiest polish, Google Sites only as a throwaway starter page.
+
+- Aeon can automate: full site copy drafts + image/alt-text checklists; plan comparisons against her needs; launch checklists (domain, SSL, analytics, backup, 988 line); renewal/SSL/broken-link monitoring; export/migration runbooks.
+- Needs her: account creation and payment; domain purchase, auto-renew, privacy protection; template and photo/copy approval; booking/email integrations; any BAA (prefer no health forms on site).
+- Costs: as above; domains renew yearly everywhere.
+- Risks: stop paying, site goes offline; designs don't port; contact forms collecting health detail (route to phone/booking only); WordPress plugin surface (keep minimal); builder-held domains complicate moves.
+- Approvals: platform choice and any paid plan; flag plans over $25/mo and upsells; Aeon never touches payment details.
+- Sources (all HTTP 200, 2026-10-30): [squarespace.com/pricing](https://www.squarespace.com/pricing) · [wordpress.com/pricing](https://wordpress.com/pricing/) · [sites.google.com/new](https://sites.google.com/new) (login-gated).
+
+## Hard limits (preserved for any Phase 2 build)
+
+- Never spend money without a clinician approval and a hard monthly cap.
+- Never claim guaranteed rankings or “HIPAA compliant.”
+- No client testimonials, client stories, clinical advice, condition targeting, or remarketing.
+- No tracking pixels; consult conversions are counted server-side without client details.
+- The site belongs to the clinician and must be exportable.
+- Build the private-pay planner first if Phase 2 is approved.
