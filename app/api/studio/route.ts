@@ -1,6 +1,7 @@
 import { connection } from "next/server";
 import { z } from "zod";
 import { BY, refuse } from "@/lib/studio/http";
+import { standInDeps } from "@/lib/studio/standin";
 import { listProjects, makeProject, type MakeEvent } from "@/lib/studio/store";
 
 export async function GET() {
@@ -25,7 +26,7 @@ export async function POST(request: Request) {
     async start(controller) {
       const send = (e: MakeEvent | { type: "error"; why: string } | { type: "end" }) => controller.enqueue(encoder.encode(`${JSON.stringify(e)}\n`));
       try {
-        await makeProject(BY, parsed.data.request, send);
+        await makeProject(BY, parsed.data.request, send, process.env.PLAYWRIGHT_STUDIO_STANDIN === "1" ? standInDeps() : {});
       } catch (err) {
         send({ type: "error", why: err instanceof Error ? err.message : "Aeon couldn't make that. Try again." });
       } finally {

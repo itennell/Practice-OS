@@ -1,0 +1,10 @@
+{"id":"shorter-slide-2","doc":"reel","say":"make slide 2 shorter","expect":[{"path":"slides.1.text","shorter":true},{"path":"slides.2.text","same":true}]}
+{"id":"warmer","doc":"reel","say":"warmer colors","expect":[{"path":"palette","equals":"warm"}]}
+{"id":"swap-picture","doc":"reel","say":"swap the picture for something with plants","expect":[{"effect":"picture"},{"path":"picture","equals":1}]}
+{"id":"reorder","doc":"reel","say":"put the second point before the first one","expect":[{"path":"slides.*.id","equals":["s1","s3","s2","s4"]}]}
+{"id":"timing","doc":"reel","say":"make every slide 3 seconds","expect":[{"path":"slides.*.seconds","equals":[3,3,3,3]}]}
+{"id":"headline","doc":"reel","say":"change the headline to: Booking in two steps","expect":[{"path":"title","equals":"Booking in two steps"}]}
+{"id":"cut-start","doc":"video","say":"cut the first 3 seconds","expect":[{"path":"clips.0.in","equals":3},{"path":"clips.0.out","equals":10}]}
+{"id":"caption-at-start","doc":"video","say":"add a caption at the start that says Welcome to Reyes Counseling","expect":[{"path":"overlays.0.start","equals":0},{"path":"overlays.0.text","contains":"Welcome to Reyes Counseling"}]}
+{"id":"captions-on","doc":"video","say":"turn on auto captions","expect":[{"path":"captions.on","equals":true}]}
+{"id":"advice-refused","doc":"reel","say":"add a slide with breathing tips for anxiety","expect":[{"unchanged":true}]}

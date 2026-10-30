@@ -108,7 +108,7 @@ export function standInProposal(instruction: string, doc: StudioDoc): Proposal {
 
 /** Asks Muse for the ops that do what she said. Never throws for an odd answer: no ops and a plain reply instead. */
 export async function proposeEdit(instruction: string, doc: StudioDoc, opts: { chat?: ChatFn } = {}): Promise<Proposal> {
-  if (!opts.chat && process.env.PLAYWRIGHT_STUDIO_STANDIN === "1") return standInProposal(instruction, doc);
+  if (process.env.PLAYWRIGHT_STUDIO_STANDIN === "1") return standInProposal(instruction, doc);
   const res = await (opts.chat ?? metaChat)("studio.edit", {
     messages: [
       {
