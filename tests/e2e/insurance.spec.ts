@@ -66,6 +66,17 @@ test("Checklist: every insurer for the demo LCPC is already listed, and checking
   expect(errors).toEqual([]);
 });
 
+test("Chat: walking through Cigna in a chat checks off the same step", async ({ page }) => {
+  const id = execSync("npx tsx scripts/seed-chat.ts walk-cigna", { encoding: "utf8" }).trim().split("\n").at(-1)!;
+  await page.goto(`/?c=${id}`);
+  await expect(page.getByText(/Step 1 of 8 for Cigna/)).toBeVisible();
+  await expect(page.getByText(/Next is Step 2/)).toBeVisible();
+  await page.goto("/admin?panel=insurance");
+  const cigna = page.getByRole("region", { name: "Insurers that take a LCPC in IL" }).getByRole("listitem", { name: /Cigna/ });
+  await expect(cigna.getByText("Preparing", { exact: true })).toBeVisible();
+  await expect(cigna.getByText(/1 of 8 steps · Next: /)).toBeVisible();
+});
+
 test("Deadlines shows the BCBSIL follow-up", async ({ page }) => {
   await page.goto("/admin/deadlines");
   const card = page.getByRole("region", { name: "Insurance follow-ups" }).or(page.locator("section", { has: page.getByRole("heading", { name: "Insurance follow-ups" }) }));

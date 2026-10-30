@@ -58,6 +58,15 @@ export const SCENARIOS: Scenario[] = [
     expectReply: /BCBS|CAQH|card|below/i,
   },
   {
+    // Insurance checklist parity: the chat walks the same checklist as Admin › Insurance and
+    // checks off the same step. Cigna starts "not started" for the demo LCPC.
+    name: "walk-cigna",
+    conversations: [["Walk me through getting on Cigna, one step at a time.", "Done, my CAQH profile is complete and attested, and I gave Cigna access."]],
+    expectTools: ["payer_checklist", "check_payer_step"],
+    forbidTools: ["update_payer_application"],
+    expectReply: /next|step|portal/i,
+  },
+  {
     // The Instagram content coach: ideas first, then a draft of the one she picks, waiting for her OK.
     // Record and replay with PLAYWRIGHT_IMAGE_STANDIN=1 (no image models).
     name: "content-coach",

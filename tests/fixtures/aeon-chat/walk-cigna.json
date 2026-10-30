@@ -1,0 +1,441 @@
+{
+  "scenario": "walk-cigna",
+  "recordedAt": "2026-10-30T02:09:27.366Z",
+  "calls": [
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "find_documents",
+        "open_document",
+        "create_document",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "draft_superbill",
+        "make_release_form",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "fill_payer_form",
+        "list_payer_applications",
+        "update_payer_application",
+        "payer_checklist",
+        "check_payer_step",
+        "remember",
+        "recent_memory_changes",
+        "forget",
+        "find_referral_sources",
+        "list_referral_sources",
+        "move_referral_source",
+        "draft_outreach",
+        "plan_instagram_week",
+        "draft_instagram_post",
+        "research_post_topic",
+        "list_instagram_posts",
+        "instagram_account_steps",
+        "post_ideas",
+        "weekly_plan",
+        "draft_post",
+        "front_desk_status",
+        "front_desk_check_now",
+        "offer_consult_times",
+        "directory_profile",
+        "other_directories",
+        "website_help"
+      ],
+      "lastRole": "user",
+      "response": {
+        "id": "chatcmpl-01a18a92-aba2-7773-b850-f27994e5badd",
+        "choices": [
+          {
+            "finish_reason": "tool_calls",
+            "index": 0,
+            "message": {
+              "content": "I'll pull up the steps to join Cigna and we'll take them one at a time.",
+              "refusal": null,
+              "tool_calls": [
+                {
+                  "id": "call_45fb73af-a0b7-48f0-8e6f-8e5323a5c701",
+                  "type": "function",
+                  "function": {
+                    "name": "payer_checklist",
+                    "arguments": "{\"payer\":\"Cigna\"}"
+                  }
+                }
+              ],
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793326230,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 261,
+          "prompt_tokens": 12590,
+          "total_tokens": 12851,
+          "completion_tokens_details": {
+            "reasoning_tokens": 179
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        }
+      }
+    },
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "find_documents",
+        "open_document",
+        "create_document",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "draft_superbill",
+        "make_release_form",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "fill_payer_form",
+        "list_payer_applications",
+        "update_payer_application",
+        "payer_checklist",
+        "check_payer_step",
+        "remember",
+        "recent_memory_changes",
+        "forget",
+        "find_referral_sources",
+        "list_referral_sources",
+        "move_referral_source",
+        "draft_outreach",
+        "plan_instagram_week",
+        "draft_instagram_post",
+        "research_post_topic",
+        "list_instagram_posts",
+        "instagram_account_steps",
+        "post_ideas",
+        "weekly_plan",
+        "draft_post",
+        "front_desk_status",
+        "front_desk_check_now",
+        "offer_consult_times",
+        "directory_profile",
+        "other_directories",
+        "website_help"
+      ],
+      "lastRole": "tool",
+      "response": {
+        "id": "chatcmpl-01a18a92-d6bf-7717-9a59-250b8dbdab16",
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "index": 0,
+            "message": {
+              "content": "Happy to. We will do this one step at a time.\n\n**Step 1 of 8 for Cigna / Evernorth Behavioral Health: Finish CAQH and authorize Evernorth.**\n\nWhat you need to do:\n1. Go to https://proview.caqh.org\n2. Finish and attest your CAQH profile.\n3. Add Evernorth as an authorized plan, and write down your CAQH ID.\n\nWhy: Evernorth pulls your license, insurance, and work history from CAQH.\n\nI checked the Practice-OS payer list for Cigna. This step is one I researched, please confirm on that page.\n\nWant me to pull your CAQH checklist so we can see what is missing? Tell me when step 1 is done and I will give you step 2.",
+              "refusal": null,
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793326241,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 1154,
+          "prompt_tokens": 13823,
+          "total_tokens": 14977,
+          "completion_tokens_details": {
+            "reasoning_tokens": 982
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 12529
+          }
+        }
+      }
+    },
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "find_documents",
+        "open_document",
+        "create_document",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "draft_superbill",
+        "make_release_form",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "fill_payer_form",
+        "list_payer_applications",
+        "update_payer_application",
+        "payer_checklist",
+        "check_payer_step",
+        "remember",
+        "recent_memory_changes",
+        "forget",
+        "find_referral_sources",
+        "list_referral_sources",
+        "move_referral_source",
+        "draft_outreach",
+        "plan_instagram_week",
+        "draft_instagram_post",
+        "research_post_topic",
+        "list_instagram_posts",
+        "instagram_account_steps",
+        "post_ideas",
+        "weekly_plan",
+        "draft_post",
+        "front_desk_status",
+        "front_desk_check_now",
+        "offer_consult_times",
+        "directory_profile",
+        "other_directories",
+        "website_help"
+      ],
+      "lastRole": "user",
+      "response": {
+        "id": "chatcmpl-01a18a92-f43a-73d2-afd9-07c0b24580a0",
+        "choices": [
+          {
+            "finish_reason": "tool_calls",
+            "index": 0,
+            "message": {
+              "content": "Got it — I'll pull the Cigna checklist and mark that first step complete.",
+              "refusal": null,
+              "tool_calls": [
+                {
+                  "id": "call_5a0553ab-4b6c-43af-9988-40bdd9f4deeb",
+                  "type": "function",
+                  "function": {
+                    "name": "payer_checklist",
+                    "arguments": "{\"payer\":\"Cigna\"}"
+                  }
+                }
+              ],
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793326248,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 611,
+          "prompt_tokens": 12782,
+          "total_tokens": 13393,
+          "completion_tokens_details": {
+            "reasoning_tokens": 531
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        }
+      }
+    },
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "find_documents",
+        "open_document",
+        "create_document",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "draft_superbill",
+        "make_release_form",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "fill_payer_form",
+        "list_payer_applications",
+        "update_payer_application",
+        "payer_checklist",
+        "check_payer_step",
+        "remember",
+        "recent_memory_changes",
+        "forget",
+        "find_referral_sources",
+        "list_referral_sources",
+        "move_referral_source",
+        "draft_outreach",
+        "plan_instagram_week",
+        "draft_instagram_post",
+        "research_post_topic",
+        "list_instagram_posts",
+        "instagram_account_steps",
+        "post_ideas",
+        "weekly_plan",
+        "draft_post",
+        "front_desk_status",
+        "front_desk_check_now",
+        "offer_consult_times",
+        "directory_profile",
+        "other_directories",
+        "website_help"
+      ],
+      "lastRole": "tool",
+      "response": {
+        "id": "chatcmpl-01a18a93-142e-7341-85e0-44b809f58802",
+        "choices": [
+          {
+            "finish_reason": "tool_calls",
+            "index": 0,
+            "message": {
+              "content": null,
+              "refusal": null,
+              "tool_calls": [
+                {
+                  "id": "call_665eadd6-29ef-46a7-8ac6-d756c5c7c508",
+                  "type": "function",
+                  "function": {
+                    "name": "check_payer_step",
+                    "arguments": "{\"payer\":\"Cigna\",\"step_id\":\"caqh-ready\"}"
+                  }
+                }
+              ],
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793326257,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 223,
+          "prompt_tokens": 14013,
+          "total_tokens": 14236,
+          "completion_tokens_details": {
+            "reasoning_tokens": 150
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 12529
+          }
+        }
+      }
+    },
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "find_documents",
+        "open_document",
+        "create_document",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "draft_superbill",
+        "make_release_form",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "fill_payer_form",
+        "list_payer_applications",
+        "update_payer_application",
+        "payer_checklist",
+        "check_payer_step",
+        "remember",
+        "recent_memory_changes",
+        "forget",
+        "find_referral_sources",
+        "list_referral_sources",
+        "move_referral_source",
+        "draft_outreach",
+        "plan_instagram_week",
+        "draft_instagram_post",
+        "research_post_topic",
+        "list_instagram_posts",
+        "instagram_account_steps",
+        "post_ideas",
+        "weekly_plan",
+        "draft_post",
+        "front_desk_status",
+        "front_desk_check_now",
+        "offer_consult_times",
+        "directory_profile",
+        "other_directories",
+        "website_help"
+      ],
+      "lastRole": "tool",
+      "response": {
+        "id": "chatcmpl-01a18a93-2b17-77a6-b225-52cf78adb97f",
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "index": 0,
+            "message": {
+              "content": "Marked done. Good work.\n\nNext is Step 2: Register on the Evernorth Provider Portal.\n\nWhat to do:\n1. Go to https://www.evernorth.com/providers/behavioral/join-the-network\n2. Create an account.\n3. Get the Contracting entitlement, then go to My Practice, then Contracting.\n\nThat portal is where you submit your form in the next step.\n\nI researched this step from the payer list, please confirm on that page.\n\nTell me when this is done and I will give you Step 3.",
+              "refusal": null,
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793326263,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 761,
+          "prompt_tokens": 14205,
+          "total_tokens": 14966,
+          "completion_tokens_details": {
+            "reasoning_tokens": 640
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 12657
+          }
+        }
+      }
+    }
+  ],
+  "replies": [
+    {
+      "text": "Happy to. We will do this one step at a time.\n\n**Step 1 of 8 for Cigna / Evernorth Behavioral Health: Finish CAQH and authorize Evernorth.**\n\nWhat you need to do:\n1. Go to https://proview.caqh.org\n2. Finish and attest your CAQH profile.\n3. Add Evernorth as an authorized plan, and write down your CAQH ID.\n\nWhy: Evernorth pulls your license, insurance, and work history from CAQH.\n\nI checked the Practice-OS payer list for Cigna. This step is one I researched, please confirm on that page.\n\nWant me to pull your CAQH checklist so we can see what is missing? Tell me when step 1 is done and I will give you step 2.",
+      "tools": [
+        "payer_checklist"
+      ]
+    },
+    {
+      "text": "Marked done. Good work.\n\nNext is Step 2: Register on the Evernorth Provider Portal.\n\nWhat to do:\n1. Go to https://www.evernorth.com/providers/behavioral/join-the-network\n2. Create an account.\n3. Get the Contracting entitlement, then go to My Practice, then Contracting.\n\nThat portal is where you submit your form in the next step.\n\nI researched this step from the payer list, please confirm on that page.\n\nTell me when this is done and I will give you Step 3.",
+      "tools": [
+        "payer_checklist",
+        "check_payer_step"
+      ]
+    }
+  ]
+}

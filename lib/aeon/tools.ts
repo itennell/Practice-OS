@@ -27,6 +27,7 @@ import { CPT, MODIFIERS, POS } from "../superbill/codes";
 import * as superbill from "../superbill/store";
 import * as cms855i from "../payers/cms855i";
 import * as payers from "../payers/store";
+import * as payerChecklist from "../payers/checklist";
 import * as instagram from "../instagram/store";
 import * as coach from "../instagram/coach";
 import type { ChatFn } from "../instagram/critic";
@@ -680,14 +681,14 @@ export const TOOLS: AeonTool[] = [
     name: "update_payer_application",
     title: "Add or update an insurance application",
     description:
-      "Adds a payer (no id) or updates one (with id from list_payer_applications). Status: preparing, applied, pending, approved, denied, withdrawn. " +
+      "Adds a payer (no id) or updates one (with id from list_payer_applications). Status: not_started, preparing, applied, pending, follow_up, approved, denied, withdrawn. " +
       "Applied with no follow_up_on sets a follow-up 30 days out; approved with no recredential_on sets 36 months out. " +
       "Example: 'I sent my BCBSIL application today' -> {payer: 'BCBSIL', status: 'applied'}. Never a license number or client detail.",
     input: {
       id: z.string().uuid().optional(),
       payer: z.string().min(2).max(120),
       form: z.enum(["cms855i"]).optional(),
-      status: z.enum(["preparing", "applied", "pending", "approved", "denied", "withdrawn"]),
+      status: z.enum(payers.STATUSES),
       applied_on: isoDay.optional(),
       follow_up_on: isoDay.optional(),
       approved_on: isoDay.optional(),
@@ -700,6 +701,108 @@ export const TOOLS: AeonTool[] = [
     label: "Updated your insurance applications",
     changesData: true,
     run: async (input, ctx) => text(await payers.savePayerApplication(input, ctx.by)),
+  }),
+
+  // AGENTS.md > Admin: the insurance checklist. The Insurance tab and these two tools share lib/payers/checklist.ts.
+  tool({
+    name: "payer_checklist",
+    title: "Read her insurance checklist",
+    description:
+      "Every insurer (and insurance platform) that fits her license and state, from Practice-OS's sourced payer catalog: status, steps done, next step, " +
+      "and the shared prerequisites (NPI, taxonomy, CAQH, malpractice, EIN). With payer ('Aetna', 'Medicare', 'Blue Cross', 'prerequisites'), returns that " +
+      "checklist's steps in order: title, how to do it, official link, what Aeon can prefill (caqh_prep, cms855i via fill_payer_form), and whether each " +
+      "source is verified. To walk her through a payer: give ONE step at a time (the next undone one), its how, and its link; when she says it's done, " +
+      "call check_payer_step, then give the next. Steps marked unverified: say 'Aeon researched this, please confirm'. Never say Aeon submits: she " +
+      "signs and sends every application herself. Read-only.",
+    input: { payer: z.string().trim().max(120).optional().describe("A payer's name or id, or 'prerequisites'. Leave out for the whole list.") },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+    label: "Checked your insurance checklist",
+    changesData: false,
+    run: async (input) => {
+      const list = await payerChecklist.loadChecklist();
+      if (list.set.blocked) return text({ license: list.license, state: list.state, blocked: list.set.blocked });
+      const step = (s: { id: string; title: string; how: string; portal_url: string | null; aeon_can: string; source: { verified: boolean }; done_on: string | null }) => ({
+        id: s.id,
+        title: s.title,
+        how: s.how,
+        link: s.portal_url,
+        aeon_can: s.aeon_can === "none" ? null : s.aeon_can,
+        verified: s.source.verified,
+        done: Boolean(s.done_on),
+      });
+      const q = input.payer?.trim().toLowerCase();
+      if (q && (q === "prerequisites" || q.startsWith("before"))) {
+        const steps = list.prerequisites.map((p) => ({ ...step(p), only_if: p.applies === "pllc" ? "she bills as a PLLC or group" : undefined }));
+        return text({ checklist: "prerequisites", steps, next: steps.find((s) => !s.done) ?? null });
+      }
+      if (q) {
+        const found = payerChecklist.findPayer(list, q);
+        if (!found) {
+          return text({ error: `No payer called "${input.payer}" fits a ${list.license} in ${list.state}.`, payers: list.payers.map((i) => i.fit.payer.name) });
+        }
+        const steps = found.steps.map((s) => ({ ...step(s), stage: s.stage, she_submits: s.submits || undefined }));
+        const p = found.fit.payer;
+        return text({
+          payer: { id: p.id, name: p.name, kind: p.kind, status: found.statusLabel, fits_her: found.fit.note },
+          networks: p.networks.map((n) => ({ name: n.name, panel: n.panel.status, note: n.panel.note })),
+          timeline: p.timeline.text,
+          fees: p.fees.text,
+          recredential: p.recredential.text,
+          steps,
+          next: steps.find((s) => !s.done) ?? null,
+          prerequisites_left: list.prerequisites.filter((x) => !x.done_on).map((x) => x.title),
+          notes: p.notes,
+        });
+      }
+      const row = (i: payerChecklist.PayerItem) => ({
+        id: i.fit.payer.id,
+        name: i.fit.payer.name,
+        status: i.statusLabel,
+        steps_done: `${i.steps.filter((s) => s.done_on).length} of ${i.steps.length}`,
+        next: i.next?.title ?? null,
+      });
+      return text({
+        license: list.license,
+        state: list.state,
+        state_researched: list.set.stateResearched,
+        prerequisites_left: list.prerequisites.filter((x) => !x.done_on).map((x) => x.title),
+        payers: list.payers.map(row),
+        platforms: list.platforms.map(row),
+        not_eligible: list.set.notEligible.map((n) => ({ name: n.payer.name, reason: n.reason })),
+      });
+    },
+  }),
+
+  tool({
+    name: "check_payer_step",
+    title: "Check off a step on her insurance checklist",
+    description:
+      "Marks one step done (or not done) on her insurance checklist, by payer (name or id, or 'prerequisites') and step id from payer_checklist. " +
+      "Only when she says she did it ('I finished my CAQH profile', 'I sent the Aetna form'). Checking a payer's first step moves it to Preparing; " +
+      "checking the step where she submits moves it to Applied with a follow-up 30 days out. Returns the new status and the next step.",
+    input: {
+      payer: z.string().trim().min(2).max(120),
+      step_id: z.string().trim().min(2).max(80),
+      done: z.boolean().default(true),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+    label: "Updated your insurance checklist",
+    changesData: true,
+    run: async (input, ctx) => {
+      const list = await payerChecklist.loadChecklist();
+      const q = input.payer.trim().toLowerCase();
+      const prereq = q === "prerequisites" || q.startsWith("before");
+      const found = prereq ? undefined : payerChecklist.findPayer(list, q);
+      if (!prereq && !found) return text({ error: `No payer called "${input.payer}" on her checklist.` });
+      const scope = prereq ? payerChecklist.PREREQ_SCOPE : found!.fit.payer.id;
+      const steps = prereq ? list.prerequisites : found!.steps;
+      if (!steps.some((s) => s.id === input.step_id)) return text({ error: "That step isn't on this checklist.", steps: steps.map((s) => s.id) });
+      const result = await payerChecklist.setStep({ scope, step_id: input.step_id, done: input.done }, ctx.by);
+      const after = await payerChecklist.loadChecklist();
+      const nowSteps = prereq ? after.prerequisites : (payerChecklist.findPayer(after, scope)?.steps ?? []);
+      const next = nowSteps.find((s) => !s.done_on);
+      return text({ checked: input.step_id, done: input.done, status: result.statusLabel, next: next ? { id: next.id, title: next.title, how: next.how, link: next.portal_url } : null });
+    },
   }),
 
   // AGENTS.md > Aeon's memory: Aeon saves what it learns through remember, each one audited.
