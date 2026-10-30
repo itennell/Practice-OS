@@ -19,8 +19,10 @@ import {
   newId,
   shapeProblems,
   videoSeconds,
+  type Clip,
   type StudioDoc,
 } from "./doc";
+import { segments } from "./timeline";
 
 const ref = z.union([z.number().int().min(1).max(50), z.string().min(1).max(40)]);
 const text = (max: number) => z.string().trim().min(1).max(max);
@@ -146,7 +148,8 @@ function applyOne(doc: StudioDoc, op: Op, effects: Effect[], notes: string[]): S
       const i = indexOf(doc.clips, op.clip, "clip");
       const c = doc.clips[i];
       const next = { ...c, in: round(op.in ?? c.in), out: round(Math.min(op.out ?? c.out, c.duration)) };
-      return { ...doc, clips: doc.clips.map((x, k) => (k === i ? next : x)) };
+      const clips = doc.clips.map((x, k) => (k === i ? next : x));
+      return followClips(doc, clips, notes);
     }
     case "cut_start": {
       if (!doc.clips.length) fail("There's no video yet. Add one first.");
@@ -165,7 +168,7 @@ function applyOne(doc: StudioDoc, op: Op, effects: Effect[], notes: string[]): S
       if (!doc.clips.length) fail("There's no video yet. Add one first.");
       const c = doc.clips.at(-1)!;
       if (c.out - op.seconds <= c.in) fail(`The last clip is only ${round(c.out - c.in)} seconds.`);
-      return { ...doc, clips: [...doc.clips.slice(0, -1), { ...c, out: round(c.out - op.seconds) }] };
+      return followClips(doc, [...doc.clips.slice(0, -1), { ...c, out: round(c.out - op.seconds) }], notes);
     }
     case "split_clip": {
       const i = indexOf(doc.clips, op.clip, "clip");
@@ -173,16 +176,16 @@ function applyOne(doc: StudioDoc, op: Op, effects: Effect[], notes: string[]): S
       const cut = round(c.in + op.at);
       if (cut <= c.in || cut >= c.out) fail(`Clip ${i + 1} is ${round(c.out - c.in)} seconds; split it somewhere inside that.`);
       const second = { ...c, id: newId("c", allIds(doc)), in: cut };
-      return { ...doc, clips: [...doc.clips.slice(0, i), { ...c, out: cut }, second, ...doc.clips.slice(i + 1)] };
+      return followClips(doc, [...doc.clips.slice(0, i), { ...c, out: cut }, second, ...doc.clips.slice(i + 1)], notes);
     }
     case "move_clip": {
       const i = indexOf(doc.clips, op.clip, "clip");
       if (op.to > doc.clips.length) fail(`There are only ${doc.clips.length} clips.`);
-      return { ...doc, clips: move(doc.clips, i, op.to - 1) };
+      return followClips(doc, move(doc.clips, i, op.to - 1), notes);
     }
     case "remove_clip": {
       const i = indexOf(doc.clips, op.clip, "clip");
-      return { ...doc, clips: doc.clips.filter((_, k) => k !== i) };
+      return followClips(doc, doc.clips.filter((_, k) => k !== i), notes);
     }
     case "add_clip": {
       if (doc.kind !== "video") fail("Clips go in a video.");
@@ -221,6 +224,47 @@ function shiftTimed<T extends { start: number; end: number }>(list: T[], by: num
   return list
     .map((o) => ({ ...o, start: round(Math.max(0, o.start + by)), end: round(o.end + by) }))
     .filter((o) => o.end > 0 && o.end > o.start);
+}
+
+/** Where a finished-video moment sits inside its file, before the clips change. */
+function sourcePoint(before: Clip[], t: number): { id: string; source: string; at: number } | null {
+  const live = segments(before).filter((s) => s.end > s.start);
+  if (!live.length) return null;
+  if (t < 0 || t > live.at(-1)!.end) return null;
+  const seg = live.find((s) => t < s.end) ?? live.at(-1)!;
+  return { id: seg.clip.id, source: seg.clip.source, at: round(seg.clip.in + Math.max(0, t - seg.start)) };
+}
+
+/** The finished-video moment for a point inside a file, after the clips change. Null when that footage is gone. */
+function timelinePoint(after: Clip[], p: { id: string; source: string; at: number }): number | null {
+  const live = segments(after).filter((s) => s.end > s.start);
+  const seg = live.find((s) => s.clip.id === p.id && p.at >= s.clip.in && p.at <= s.clip.out) ?? live.find((s) => s.clip.source === p.source && p.at >= s.clip.in && p.at <= s.clip.out);
+  if (!seg) return null;
+  return round(seg.start + (p.at - seg.clip.in));
+}
+
+/** Moves timed items through a clip change so they stay on the same footage. Items whose footage is gone are dropped. */
+function remapTimed<T extends { start: number; end: number }>(list: T[], before: Clip[], after: Clip[]): { kept: T[]; lost: T[] } {
+  const kept: T[] = [];
+  const lost: T[] = [];
+  for (const item of list) {
+    const from = sourcePoint(before, item.start);
+    const to = sourcePoint(before, item.end);
+    const start = from && timelinePoint(after, from);
+    const end = to && timelinePoint(after, to);
+    if (start === null || end === null || end <= start) lost.push(item);
+    else kept.push({ ...item, start, end });
+  }
+  return { kept, lost };
+}
+
+/** New clip order after a trim, split, move, remove or end cut: texts and captions follow their footage. */
+function followClips(doc: StudioDoc, clips: Clip[], notes: string[]): StudioDoc {
+  const overlays = remapTimed(doc.overlays, doc.clips, clips);
+  const cues = remapTimed(doc.captions.cues, doc.clips, clips);
+  for (const o of overlays.lost) notes.push(`took out the text "${o.text}" that isn't in the video any more`);
+  if (cues.lost.length) notes.push(`took out ${cues.lost.length === 1 ? "1 caption" : `${cues.lost.length} captions`} that ${cues.lost.length === 1 ? "isn't" : "aren't"} in the video any more`);
+  return { ...doc, clips, overlays: overlays.kept, captions: { ...doc.captions, cues: cues.kept } };
 }
 
 /** Validates and applies a list of ops, all or nothing. The input document is never changed. */

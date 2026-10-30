@@ -170,6 +170,18 @@ describe.skipIf(!hasDb)("studio", () => {
     const fromChat = await chatEdit(project!.id, "add my clip", { by: "test", chat: stub({ reply: "Ok.", ops: [{ op: "add_clip", clip: { ...clip, id: "c9" } }] }).chat });
     expect(fromChat.ok).toBe(false);
   });
+
+  it("words typed onto the canvas get the client-detail guard", async () => {
+    const project = await makeProject("test", "edit my own video", () => {});
+    const id = project!.id;
+    await applyEdit(id, [{ op: "add_clip", clip: { id: "c1", source: "opfs:abc", name: "", duration: 8, in: 0, out: 8 } }], { source: "canvas", by: "test" });
+    const bad = await applyEdit(id, [{ op: "add_text", text: "Call (555) 123-4567", start: 0, end: 3 }], { source: "canvas", by: "test", chat: stub().chat });
+    expect(bad).toMatchObject({ ok: false, status: 422 });
+    expect(bad.ok === false && bad.why).toMatch(/phone number/);
+    expect((await getProject(id))!.doc.overlays).toEqual([]);
+    const good = await applyEdit(id, [{ op: "add_text", text: "Free 15-minute call", start: 0, end: 3 }], { source: "canvas", by: "test", chat: stub().chat });
+    expect(good.ok).toBe(true);
+  });
 });
 
 // ---- Review fixes (PR #103) ------------------------------------------------------------

@@ -60,6 +60,16 @@ describe("studio check", () => {
     expect(r.ok).toBe(false);
   });
 
+  it("a crisis phrase split across two caption pieces stops on the joined transcript", async () => {
+    const before: StudioDoc = { ...emptyDoc("video", "a tour of the office"), captions: { on: true, cues: [] } };
+    const next: StudioDoc = { ...before, captions: { on: true, cues: [{ start: 0, end: 2, text: "I want to" }, { start: 2, end: 4, text: "die" }] } };
+    // Each piece alone reads safe; together they are a crisis phrase.
+    expect(textProblems("I want to", limits)).toEqual([]);
+    expect(textProblems("die", limits)).toEqual([]);
+    const r = await checkStep(before, next, limits, { muse: false });
+    expect(r).toMatchObject({ ok: false, hardStop: true, why: RULE_TEXT.self_harm });
+  });
+
   it("moving a slide re-checks the whole joined run with Muse, not only new words", async () => {
     const before = reel(["We talk for 15 minutes first, free", "Pick a time online"]);
     const moved = reel(["Pick a time online", "We talk for 15 minutes first, free"]);
