@@ -7,6 +7,8 @@ import type { CredentialingProfile } from "../credentialing/profile";
 import { loadCredentialingProfile } from "../credentialing/store";
 import { money } from "../gfe/build";
 import { SERVICE_KINDS, estimateStatus, getEstimate, listEstimates, type EstimateRow } from "../gfe/store";
+import { formList, getForm } from "../client-forms";
+import { isFormId, type FormDef } from "../client-forms/types";
 import { allGuides, getGuide, type Guide } from "../guides";
 import { CMS855I_SOURCE, LEFT_FOR_YOU } from "../payers/cms855i";
 import { STATUS_LABEL, listPayerApplications, type PayerApplication } from "../payers/store";
@@ -141,6 +143,22 @@ function releaseTemplateCards(isSample: boolean): DocumentCard[] {
       is_sample: isSample,
     }),
   ];
+}
+
+/** A client form template from the library (lib/client-forms): her practice filled in, client boxes blank. */
+export function clientFormCard(def: FormDef, isSample: boolean): DocumentCard {
+  return card({
+    id: `client_form:${def.id}`,
+    kind: "client_form",
+    title: def.title,
+    subtitle: def.summary.slice(0, 240),
+    status: "Template",
+    topics: words(...def.topics, "client form template"),
+    open: `/admin?panel=forms&form=${def.id}`,
+    pdf: `/api/client-forms/${def.id}/pdf`,
+    needs_her: "Read it once with your attorney. Hand it to the client to fill in and sign; their copy is never saved in Practice-OS.",
+    is_sample: isSample,
+  });
 }
 
 export function payerCard(a: PayerApplication, today: ISODate): DocumentCard {
@@ -287,6 +305,7 @@ export async function allDocuments(): Promise<DocumentCard[]> {
     ...estimates.map((e) => gfeCard(e, today)),
     ...bills.map(superbillCard),
     ...releaseTemplateCards(profile?.isSample ?? false),
+    ...(profile ? formList().map((f) => clientFormCard(f, profile.isSample)) : []),
     ...allGuides().map(guideCard),
     ...uploads.map(uploadedCard),
   ];
@@ -298,6 +317,7 @@ const KIND_WORDS: Record<DocumentKind, string[]> = {
   gfe: ["gfe", "estimate", "estimates", "faith"],
   superbill: ["superbill", "superbills", "bill", "reimbursement"],
   release_form: ["release", "roi", "consent", "revocation"],
+  client_form: ["form", "forms", "template", "consent", "intake", "policy", "policies", "notice", "client"],
   payer_application: ["payer", "insurance", "application", "applications", "insurer", "enrollment", "credentialing"],
   cms855i: ["medicare", "855i", "cms", "pecos", "form"],
   credentialing_profile: ["credentialing", "profile", "caqh"],
@@ -387,6 +407,11 @@ export async function openDocument(id: string): Promise<DocumentCard | null> {
       }
       const profile = await loadCredentialingProfile();
       return releaseTemplateCards(profile?.isSample ?? false).find((c) => c.id === id) ?? null;
+    }
+    case "client_form": {
+      const def = isFormId(key) ? getForm(key) : undefined;
+      const profile = def ? await loadCredentialingProfile() : null;
+      return def && profile ? clientFormCard(def, profile.isSample) : null;
     }
     case "uploaded": {
       const d = UUID.test(key) ? await getStoredDocument(key) : null;

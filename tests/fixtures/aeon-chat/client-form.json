@@ -1,0 +1,176 @@
+{
+  "scenario": "client-form",
+  "recordedAt": "2026-10-30T02:34:31.919Z",
+  "calls": [
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "find_documents",
+        "open_document",
+        "create_document",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "draft_superbill",
+        "make_release_form",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "fill_payer_form",
+        "list_payer_applications",
+        "update_payer_application",
+        "remember",
+        "recent_memory_changes",
+        "forget",
+        "find_referral_sources",
+        "list_referral_sources",
+        "move_referral_source",
+        "draft_outreach",
+        "plan_instagram_week",
+        "draft_instagram_post",
+        "research_post_topic",
+        "list_instagram_posts",
+        "instagram_account_steps",
+        "post_ideas",
+        "weekly_plan",
+        "draft_post",
+        "front_desk_status",
+        "front_desk_check_now",
+        "offer_consult_times",
+        "directory_profile",
+        "other_directories",
+        "website_help"
+      ],
+      "lastRole": "user",
+      "response": {
+        "id": "chatcmpl-01a18aa8-df6f-71b2-9b9f-9d1113936cf2",
+        "choices": [
+          {
+            "finish_reason": "tool_calls",
+            "index": 0,
+            "message": {
+              "content": "I'll make that telehealth consent form for you now.",
+              "refusal": null,
+              "tool_calls": [
+                {
+                  "id": "call_ebfe5c7f-27f9-4b34-8063-d8353f769d65",
+                  "type": "function",
+                  "function": {
+                    "name": "create_document",
+                    "arguments": "{\"client_form\":{\"form\":\"telehealth_consent\"},\"kind\":\"client_form\"}"
+                  }
+                }
+              ],
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793327685,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 480,
+          "prompt_tokens": 12305,
+          "total_tokens": 12785,
+          "completion_tokens_details": {
+            "reasoning_tokens": 387
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        }
+      }
+    },
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "find_documents",
+        "open_document",
+        "create_document",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "draft_superbill",
+        "make_release_form",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "fill_payer_form",
+        "list_payer_applications",
+        "update_payer_application",
+        "remember",
+        "recent_memory_changes",
+        "forget",
+        "find_referral_sources",
+        "list_referral_sources",
+        "move_referral_source",
+        "draft_outreach",
+        "plan_instagram_week",
+        "draft_instagram_post",
+        "research_post_topic",
+        "list_instagram_posts",
+        "instagram_account_steps",
+        "post_ideas",
+        "weekly_plan",
+        "draft_post",
+        "front_desk_status",
+        "front_desk_check_now",
+        "offer_consult_times",
+        "directory_profile",
+        "other_directories",
+        "website_help"
+      ],
+      "lastRole": "tool",
+      "response": {
+        "id": "chatcmpl-01a18aa9-07dc-76cf-8239-ebff3f38b639",
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "index": 0,
+            "message": {
+              "content": "Done. Your telehealth consent form is ready.\n\nIt's the card below. It opens already filled in with your practice, and you can download the PDF. Client boxes are blank for them to fill in and sign.\n\nWhat to do:\n1. Open the card and read it once.\n2. Have your own attorney read it once.\n3. Give it to clients your own way to sign.",
+              "refusal": null,
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793327695,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 398,
+          "prompt_tokens": 12631,
+          "total_tokens": 13029,
+          "completion_tokens_details": {
+            "reasoning_tokens": 310
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 12273
+          }
+        }
+      }
+    }
+  ],
+  "replies": [
+    {
+      "text": "Done. Your telehealth consent form is ready.\n\nIt's the card below. It opens already filled in with your practice, and you can download the PDF. Client boxes are blank for them to fill in and sign.\n\nWhat to do:\n1. Open the card and read it once.\n2. Have your own attorney read it once.\n3. Give it to clients your own way to sign.",
+      "tools": [
+        "create_document"
+      ]
+    }
+  ]
+}

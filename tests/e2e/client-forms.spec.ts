@@ -7,7 +7,9 @@ import * as mupdf from "mupdf";
 // Admin › Client forms (lib/client-forms): the library lists every template, each
 // opens with its required-elements check, downloads as a real PDF with her
 // practice filled in and the client boxes blank, and edits that drop a required
-// element are refused.
+// element are refused. The chat gives the same template as a document card;
+// that conversation is replayed from Muse's recorded replies
+// (tests/fixtures/aeon-chat/client-form.json), so no live model call.
 
 test.beforeEach(() => {
   execSync("npm run db:reset", { stdio: "ignore" });
@@ -88,4 +90,24 @@ test("Editing a template: her wording saves and prints; taking out a required pa
 
   await panel.getByRole("button", { name: "Use Aeon’s wording" }).click();
   await expect(panel.getByRole("status")).toContainText("Back to Aeon");
+});
+
+test("Asking Aeon for a telehealth consent form gives the template as a card with Open and Download", async ({ page }) => {
+  const id = execSync("npx tsx scripts/seed-chat.ts client-form", { encoding: "utf8" }).trim().split("\n").at(-1)!;
+  await page.goto(`/?c=${id}`);
+  const log = page.getByRole("log", { name: "Conversation" });
+  await expect(log.getByText("make me a telehealth consent form")).toBeVisible();
+  const cards = log.getByRole("list", { name: /documents?$/i }).last();
+  await expect(cards.getByRole("link", { name: /^Open Consent for Telehealth/ })).toBeVisible();
+  expect(await axeViolations(page)).toEqual([]);
+
+  const download = page.waitForEvent("download");
+  await cards.getByRole("link", { name: /^Download/ }).first().click();
+  const text = await pdfText(await download);
+  expect(text).toContain("Consent for Telehealth");
+  expect(text).toContain("you are in Illinois");
+
+  const open = cards.getByRole("link", { name: /^Open Consent for Telehealth/ });
+  await page.goto((await open.getAttribute("href"))!);
+  await expect(page.getByRole("dialog", { name: "Client forms" }).getByRole("heading", { name: "Consent for Telehealth" })).toBeVisible();
 });
