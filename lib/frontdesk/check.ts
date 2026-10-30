@@ -1,7 +1,7 @@
 import { audit } from "../audit";
 import { db } from "../db";
 import { deps } from "./deps";
-import { processText, processVoicemail } from "./ingest";
+import { processCall, processText, processVoicemail } from "./ingest";
 import { PhoneError } from "./phone/types";
 import { queueReminders } from "./reminders";
 
@@ -15,15 +15,17 @@ const FIRST_LOOKBACK_MS = 24 * 3_600_000;
 
 export type CheckSummary =
   | { ran: false; reason: "locked" | "no_phone" }
-  | { ran: true; voicemails: number; texts: number; crises: number; reminders: number; error?: string };
+  | { ran: true; calls: number; voicemails: number; texts: number; crises: number; reminders: number; checkedAt: string; error?: string };
 
-async function cursor(vendor: string, stream: "voicemail" | "sms", now: Date): Promise<Date> {
+type Stream = "call" | "voicemail" | "sms";
+
+async function cursor(vendor: string, stream: Stream, now: Date): Promise<Date> {
   const [row] = await db()`select last_seen_at from practice_os.front_desk_sync where vendor = ${vendor} and stream = ${stream}`;
   const seen = row?.last_seen_at ? new Date(row.last_seen_at) : new Date(now.getTime() - FIRST_LOOKBACK_MS);
   return new Date(seen.getTime() - OVERLAP_MS);
 }
 
-async function saveCursor(vendor: string, stream: "voicemail" | "sms", seen: Date | null, error: string | null) {
+async function saveCursor(vendor: string, stream: Stream, seen: Date | null, error: string | null) {
   await db()`
     insert into practice_os.front_desk_sync (vendor, stream, last_seen_at, last_checked_at, last_error)
     values (${vendor}, ${stream}, ${seen}, now(), ${error})
@@ -53,19 +55,25 @@ async function runCheck(): Promise<CheckSummary> {
   const phone = await deps().phone();
   if (!phone) return { ran: false, reason: "no_phone" };
   const now = deps().now();
-  const summary = { ran: true as const, voicemails: 0, texts: 0, crises: 0, reminders: 0, error: undefined as string | undefined };
+  const summary = { ran: true as const, calls: 0, voicemails: 0, texts: 0, crises: 0, reminders: 0, checkedAt: now.toISOString(), error: undefined as string | undefined };
+  const counter = { call: "calls", voicemail: "voicemails", sms: "texts" } as const;
 
-  for (const stream of ["voicemail", "sms"] as const) {
+  // Calls first, so a voicemail's call is already in the inbox when the voicemail lands.
+  const streams: Stream[] = phone.listCalls ? ["call", "voicemail", "sms"] : ["voicemail", "sms"];
+  for (const stream of streams) {
     let newest: Date | null = null;
     try {
       const since = await cursor(phone.vendor, stream, now);
-      const items = stream === "voicemail" ? await phone.listVoicemails(since) : await phone.listInboundTexts(since);
+      const items =
+        stream === "call" ? await phone.listCalls!(since) : stream === "voicemail" ? await phone.listVoicemails(since) : await phone.listInboundTexts(since);
       for (const item of items) {
         const outcome =
-          stream === "voicemail"
-            ? await processVoicemail(item as Parameters<typeof processVoicemail>[0], phone)
-            : await processText(item as Parameters<typeof processText>[0], phone);
-        if (outcome !== "skipped") summary[stream === "voicemail" ? "voicemails" : "texts"]++;
+          stream === "call"
+            ? await processCall(item as Parameters<typeof processCall>[0], phone)
+            : stream === "voicemail"
+              ? await processVoicemail(item as Parameters<typeof processVoicemail>[0], phone)
+              : await processText(item as Parameters<typeof processText>[0], phone);
+        if (outcome !== "skipped") summary[counter[stream]]++;
         if (outcome === "crisis") summary.crises++;
         if (!newest || item.receivedAt > newest) newest = item.receivedAt;
       }

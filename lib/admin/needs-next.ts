@@ -21,7 +21,7 @@ export type NeedKind = "deadline" | "gfe" | "insurance" | "credentialing" | "sup
 /** One button per item: open the right form already filled (`panel`), go to a page (`href`), or start a chat (`ask`). */
 export type NeedAction = { label: string } & ({ panel: AdminPanel } | { href: string } | { ask: string });
 
-export type AdminPanel = "gfe" | "superbill" | "release" | "credentialing" | "insurance" | "hours";
+export type AdminPanel = "forms" | "gfe" | "superbill" | "release" | "credentialing" | "insurance" | "hours";
 
 export type NeedItem = {
   id: string;

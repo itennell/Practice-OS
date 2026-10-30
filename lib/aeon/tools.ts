@@ -16,6 +16,8 @@ import { recheckRules } from "../compliance/recheck";
 import { TOPICS } from "../compliance/research";
 import * as credActions from "../credentialing/actions";
 import * as cred from "../credentialing/store";
+import { getForm } from "../client-forms";
+import { FORM_IDS, type FormId } from "../client-forms/types";
 import { db } from "../db";
 import { isDryRun } from "../env";
 import { money } from "../gfe/build";
@@ -66,7 +68,7 @@ const QUEUEABLE_KINDS = APPROVAL_KINDS.filter((k) => k !== "aeon_action") as [Ex
  * Nor do the Media writers: their drafts stay on her computer until she pastes them.
  * They still count as changes, so the view-only demo copy refuses them (no writes, no Muse).
  */
-const ALWAYS_RUNS = new Set(["remember", "forget", "post_ideas", "weekly_plan", "draft_post", "plan_instagram_week", "draft_instagram_post", "directory_profile", "website_help"]);
+const ALWAYS_RUNS = new Set(["remember", "forget", "post_ideas", "weekly_plan", "draft_post", "plan_instagram_week", "draft_instagram_post", "directory_profile", "pt_profile_interview", "website_help"]);
 
 export type ToolResult = {
   content: { type: "text"; text: string }[];
@@ -168,6 +170,18 @@ function withCards(said: Record<string, unknown>, cards: DocumentCard[]): ToolRe
 }
 
 const OPEN_CARD = "Her card in the chat opens it, already filled in; don't name a page.";
+
+/** A client form template from the library: saves nothing, holds no client details. */
+async function makeClientForm(form: FormId): Promise<ToolResult> {
+  const def = getForm(form);
+  const [made] = def ? await documents.clientFormCards(def) : [];
+  if (!def || !made) return { content: [{ type: "text", text: "Add the practice details on Admin › Credentialing first; client forms use them." }], isError: true };
+  // A form that can't download yet (policies never saved, a gap to fill, not Illinois) comes back without a PDF and says why.
+  const say = made.pdf
+    ? `${OPEN_CARD} It is a template: her practice is filled in and the client's boxes are blank. Recommend her own attorney reads it once.`
+    : `${OPEN_CARD} It can't be downloaded yet: ${made.needs_her} Tell her that plainly; her card opens the form so she can finish it.`;
+  return withCards({ made: def.title, say }, [made]);
+}
 
 async function makeGfe(input: z.infer<z.ZodObject<typeof gfeInput>>, ctx: ToolContext): Promise<ToolResult> {
   // It saves an estimate row and an approval, so the view-only demo copy refuses it like any change.
@@ -388,15 +402,18 @@ export const TOOLS: AeonTool[] = [
     title: "Make a document",
     description:
       "Makes one document and shows it as a card: a Good Faith Estimate (gfe, queued for her approval), a superbill, an Illinois release of information form " +
-      "(release_form; needs the date the consent ends), or a payer enrollment form (payer_form: Medicare's CMS-855I from her credentialing profile). " +
+      "(release_form; needs the date the consent ends), a payer enrollment form (payer_form: Medicare's CMS-855I from her credentialing profile), " +
+      "or a client form template (client_form: privacy notice, informed consent, telehealth consent, practice policies, intake, minor consent and the rest of the library, " +
+      "filled with her practice and blank for the client; never fill in a client's answers). " +
       "Pass the fields for that kind only, the same as draft_gfe, draft_superbill and make_release_form take. Takes no client details. " +
       "It prepares; it never signs, sends or submits anything: she does that herself.",
     input: {
-      kind: z.enum(["gfe", "superbill", "release_form", "payer_form"]),
+      kind: z.enum(["gfe", "superbill", "release_form", "payer_form", "client_form"]),
       gfe: z.object(gfeInput).optional().describe("For kind gfe."),
       superbill: z.object(superbillInput).optional().describe("For kind superbill."),
       release_form: z.object(releaseInput).optional().describe("For kind release_form."),
       payer_form: z.object({ form: z.enum(["cms855i"]) }).optional().describe("For kind payer_form."),
+      client_form: z.object({ form: z.enum(FORM_IDS) }).optional().describe("For kind client_form: which template, e.g. telehealth_consent."),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: false },
     label: "Made a document",
@@ -408,6 +425,7 @@ export const TOOLS: AeonTool[] = [
       if (input.kind === "gfe") return makeGfe(input.gfe!, ctx);
       if (input.kind === "superbill") return makeSuperbill(input.superbill!, ctx);
       if (input.kind === "release_form") return makeRelease(input.release_form!);
+      if (input.kind === "client_form") return makeClientForm(input.client_form!.form);
       return makeCms855i(ctx);
     },
   }),
@@ -1243,7 +1261,7 @@ export const TOOLS: AeonTool[] = [
     title: "Write her Psychology Today profile",
     description:
       "Writes every text box of her Psychology Today profile (and the same words for other directories) from her saved facts and a few answers in her own words. " +
-      "Use when she asks for help with her Psychology Today profile, a directory listing, or her bio. " +
+      "Use when she asks to write or rewrite her Psychology Today profile, a directory listing, or her bio; to set it up step by step, use pt_profile_interview first. " +
       "If it returns questions, ask them one or two at a time in plain words, then call again with her answers. " +
       "Each box fits Psychology Today's limit and is checked: no advice, client stories, testimonials, promises or rankings. " +
       "Tell her to read each box and make it hers before she pastes it (Psychology Today asks that AI text be personalized), and that the Media page has a Copy button for each box.",
@@ -1347,6 +1365,75 @@ export const TOOLS: AeonTool[] = [
         ...(has ? { checklist: WEBSITE.checklist.map((c) => c.label) } : { recommended: `${WEBSITE.default.name}: ${WEBSITE.default.cost}. ${WEBSITE.default.why}`, steps: site.SETUP_STEPS, meta: WEBSITE.meta.note }),
         ...(pages ? { pages: pages.pages.map((p) => ({ page: p.label, text: p.text })), next: "The words and the practice details block are on the Media page, Website tab, with a Copy button each." } : {}),
         hipaa: WEBSITE.hipaa,
+      });
+    },
+  }),
+
+  tool({
+    name: "pt_profile_interview",
+    title: "Set up her Psychology Today profile, one question at a time",
+    description:
+      "Aeon's Psychology Today interview, section by section in the order the profile reads (name and title, statement, photos, free consult, At a Glance, finances, qualifications, specialties, endorsements, client focus, treatment approach, location). " +
+      "Use when she wants to set up, start or finish her Psychology Today profile. Call with no answer to get the next question; if it gives say_first_word_for_word, open your reply with exactly that line. Ask the question in plain words, one at a time, and list the choices when there are any. " +
+      "When she answers, call it once with her answer and the step id (no need to call it with no answer first). " +
+      "Then call again with her answer for that step: a string for typed or one-choice questions (pass the choice's value), an array of labels for pick-many questions (use the listed labels word for word where they match; her own words are fine otherwise), a number for years. " +
+      "For a 'confirm' or 'info' step, answer true once she says it's right. Pass skip: true if she wants to skip. If it returns refused, tell her why in plain words and ask again. " +
+      "When it says done, call directory_profile to write her profile, and tell her the Media page shows the whole profile as it will read, with Copy buttons.",
+    input: {
+      step: z.string().max(40).optional().describe("The step id the answer is for (from the last question)."),
+      answer: z.union([z.string().max(400), z.array(z.string().max(60)).max(25), z.number().int().min(0).max(70), z.boolean()]).optional(),
+      skip: z.boolean().optional(),
+      back: z.boolean().optional().describe("Go back one question."),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: false },
+    label: "Worked on your Psychology Today profile",
+    changesData: true,
+    run: async (input: { step?: string; answer?: string | string[] | number | boolean; skip?: boolean; back?: boolean }) => {
+      const facts = await import("../media/facts");
+      const pt = await import("../media/pt-profile");
+      let f = await facts.loadMediaFacts();
+      let refused: string | undefined;
+      const current = pt.interviewState(f).step?.id;
+      const step = input.step ?? current;
+      if (step && (input.skip || input.answer !== undefined)) {
+        // Only the question she's on (or one she already saw, after Back) can be answered.
+        const wrong = pt.stepNotAnswerable(f, step);
+        if (wrong) {
+          const s = pt.interviewState(f);
+          return text({ refused: wrong, progress: `${s.answered} of ${s.total} answered`, ...(s.step ? { question: { step: s.step.id, ask: s.step.ask } } : { done: true }) });
+        }
+        try {
+          f = await pt.saveStep(f, step, input.skip ? { skip: true } : { value: typeof input.answer === "boolean" ? null : input.answer });
+        } catch (err) {
+          if (!(err instanceof facts.AnswerRefused)) throw err;
+          refused = err.message;
+        }
+      }
+      const at = refused ? step : input.back && step ? (pt.previousStep(step) ?? undefined) : undefined;
+      const s = pt.interviewState(f, at);
+      const q = s.step;
+      return text({
+        ...(s.answered === 0 && !refused ? { say_first_word_for_word: s.welcome } : {}),
+        ...(refused ? { refused } : {}),
+        progress: `${s.answered} of ${s.total} answered`,
+        ...(q
+          ? {
+              question: {
+                step: q.id,
+                section: q.sectionTitle,
+                ask: q.ask,
+                help: q.help,
+                kind: q.kind,
+                ...(q.lines.length ? { shows: q.lines } : {}),
+                ...(q.options.length ? { choices: q.options.map((o) => (o.value === o.label ? o.label : { value: o.value, label: o.label })) } : {}),
+                ...(q.kind === "multi" ? { pick: q.min === q.max ? `exactly ${q.max}` : `up to ${q.max}` } : {}),
+                ...(q.value !== null && q.value !== "" && !(Array.isArray(q.value) && !q.value.length) ? { already_have: q.value } : {}),
+              },
+            }
+          : { done: true, next: "Call directory_profile to write her profile now." }),
+        ...(s.skipped.length ? { skipped: s.skipped.map((x) => x.label) } : {}),
+        preview_page: "/media",
+        rules: "Her own words for the statement. Never suggest client stories, testimonials, promises or advice. Psychology Today asks that AI-written words be read and made hers.",
       });
     },
   }),

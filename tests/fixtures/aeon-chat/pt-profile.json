@@ -1,0 +1,952 @@
+{
+  "scenario": "pt-profile",
+  "recordedAt": "2026-10-30T02:31:26.198Z",
+  "calls": [
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "find_documents",
+        "open_document",
+        "create_document",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "draft_superbill",
+        "make_release_form",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "fill_payer_form",
+        "list_payer_applications",
+        "update_payer_application",
+        "remember",
+        "recent_memory_changes",
+        "forget",
+        "find_referral_sources",
+        "list_referral_sources",
+        "move_referral_source",
+        "draft_outreach",
+        "plan_instagram_week",
+        "draft_instagram_post",
+        "research_post_topic",
+        "list_instagram_posts",
+        "instagram_account_steps",
+        "post_ideas",
+        "weekly_plan",
+        "draft_post",
+        "front_desk_status",
+        "front_desk_check_now",
+        "offer_consult_times",
+        "pt_profile_interview",
+        "directory_profile",
+        "other_directories",
+        "website_help"
+      ],
+      "lastRole": "user",
+      "response": {
+        "id": "chatcmpl-01a18aa6-15e5-70df-824b-486efc037279",
+        "choices": [
+          {
+            "finish_reason": "tool_calls",
+            "index": 0,
+            "message": {
+              "content": "I'll walk you through your Psychology Today profile step by step.",
+              "refusal": null,
+              "tool_calls": [
+                {
+                  "id": "call_ad7bc225-86d0-4426-a08c-06cf99902a61",
+                  "type": "function",
+                  "function": {
+                    "name": "pt_profile_interview",
+                    "arguments": "{}"
+                  }
+                }
+              ],
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793327502,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 149,
+          "prompt_tokens": 12557,
+          "total_tokens": 12706,
+          "completion_tokens_details": {
+            "reasoning_tokens": 89
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        }
+      }
+    },
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "find_documents",
+        "open_document",
+        "create_document",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "draft_superbill",
+        "make_release_form",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "fill_payer_form",
+        "list_payer_applications",
+        "update_payer_application",
+        "remember",
+        "recent_memory_changes",
+        "forget",
+        "find_referral_sources",
+        "list_referral_sources",
+        "move_referral_source",
+        "draft_outreach",
+        "plan_instagram_week",
+        "draft_instagram_post",
+        "research_post_topic",
+        "list_instagram_posts",
+        "instagram_account_steps",
+        "post_ideas",
+        "weekly_plan",
+        "draft_post",
+        "front_desk_status",
+        "front_desk_check_now",
+        "offer_consult_times",
+        "pt_profile_interview",
+        "directory_profile",
+        "other_directories",
+        "website_help"
+      ],
+      "lastRole": "tool",
+      "response": {
+        "id": "chatcmpl-01a18aa6-2ce8-75ca-9fcf-5c680687b9b2",
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "index": 0,
+            "message": {
+              "content": "Welcome. Let's set up your Psychology Today profile.\n\nIs this how your name and title should read?\n\n* Dana Reyes, LCPC\n* Licensed Clinical Professional Counselor\n* Reyes Counseling PLLC\n* Lincoln Park, Chicago\n\nReply yes if it looks right, or tell me what to fix.",
+              "refusal": null,
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793327508,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 296,
+          "prompt_tokens": 12828,
+          "total_tokens": 13124,
+          "completion_tokens_details": {
+            "reasoning_tokens": 227
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        }
+      }
+    },
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "find_documents",
+        "open_document",
+        "create_document",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "draft_superbill",
+        "make_release_form",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "fill_payer_form",
+        "list_payer_applications",
+        "update_payer_application",
+        "remember",
+        "recent_memory_changes",
+        "forget",
+        "find_referral_sources",
+        "list_referral_sources",
+        "move_referral_source",
+        "draft_outreach",
+        "plan_instagram_week",
+        "draft_instagram_post",
+        "research_post_topic",
+        "list_instagram_posts",
+        "instagram_account_steps",
+        "post_ideas",
+        "weekly_plan",
+        "draft_post",
+        "front_desk_status",
+        "front_desk_check_now",
+        "offer_consult_times",
+        "pt_profile_interview",
+        "directory_profile",
+        "other_directories",
+        "website_help"
+      ],
+      "lastRole": "user",
+      "response": {
+        "id": "chatcmpl-01a18aa6-45a4-76dc-81c4-c08f8f9d134a",
+        "choices": [
+          {
+            "finish_reason": "tool_calls",
+            "index": 0,
+            "message": {
+              "content": "Got it — I'll pull up the next step for your profile.",
+              "refusal": null,
+              "tool_calls": [
+                {
+                  "id": "call_9af5d93d-9ee0-495e-9f8e-f28457e8dccc",
+                  "type": "function",
+                  "function": {
+                    "name": "pt_profile_interview",
+                    "arguments": "{}"
+                  }
+                }
+              ],
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793327515,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 546,
+          "prompt_tokens": 12631,
+          "total_tokens": 13177,
+          "completion_tokens_details": {
+            "reasoning_tokens": 485
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        }
+      }
+    },
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "find_documents",
+        "open_document",
+        "create_document",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "draft_superbill",
+        "make_release_form",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "fill_payer_form",
+        "list_payer_applications",
+        "update_payer_application",
+        "remember",
+        "recent_memory_changes",
+        "forget",
+        "find_referral_sources",
+        "list_referral_sources",
+        "move_referral_source",
+        "draft_outreach",
+        "plan_instagram_week",
+        "draft_instagram_post",
+        "research_post_topic",
+        "list_instagram_posts",
+        "instagram_account_steps",
+        "post_ideas",
+        "weekly_plan",
+        "draft_post",
+        "front_desk_status",
+        "front_desk_check_now",
+        "offer_consult_times",
+        "pt_profile_interview",
+        "directory_profile",
+        "other_directories",
+        "website_help"
+      ],
+      "lastRole": "tool",
+      "response": {
+        "id": "chatcmpl-01a18aa6-6563-738f-b30b-8c3dbd831d58",
+        "choices": [
+          {
+            "finish_reason": "tool_calls",
+            "index": 0,
+            "message": {
+              "content": "Confirmed — I'll save that and get your statement question.",
+              "refusal": null,
+              "tool_calls": [
+                {
+                  "id": "call_98c4170f-1771-4767-bad7-bdcbda9c896e",
+                  "type": "function",
+                  "function": {
+                    "name": "pt_profile_interview",
+                    "arguments": "{\"answer\":\"true\",\"step\":\"header\"}"
+                  }
+                }
+              ],
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793327523,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 196,
+          "prompt_tokens": 12903,
+          "total_tokens": 13099,
+          "completion_tokens_details": {
+            "reasoning_tokens": 109
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 12529
+          }
+        }
+      }
+    },
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "find_documents",
+        "open_document",
+        "create_document",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "draft_superbill",
+        "make_release_form",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "fill_payer_form",
+        "list_payer_applications",
+        "update_payer_application",
+        "remember",
+        "recent_memory_changes",
+        "forget",
+        "find_referral_sources",
+        "list_referral_sources",
+        "move_referral_source",
+        "draft_outreach",
+        "plan_instagram_week",
+        "draft_instagram_post",
+        "research_post_topic",
+        "list_instagram_posts",
+        "instagram_account_steps",
+        "post_ideas",
+        "weekly_plan",
+        "draft_post",
+        "front_desk_status",
+        "front_desk_check_now",
+        "offer_consult_times",
+        "pt_profile_interview",
+        "directory_profile",
+        "other_directories",
+        "website_help"
+      ],
+      "lastRole": "tool",
+      "response": {
+        "id": "chatcmpl-01a18aa6-8d4d-72ce-b38c-b1de4e1496bc",
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "index": 0,
+            "message": {
+              "content": "What do people most often come to you for?\n\nFor example: anxiety, life changes, couples who argue a lot. In your own words.",
+              "refusal": null,
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793327533,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 423,
+          "prompt_tokens": 13162,
+          "total_tokens": 13585,
+          "completion_tokens_details": {
+            "reasoning_tokens": 385
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        }
+      }
+    },
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "find_documents",
+        "open_document",
+        "create_document",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "draft_superbill",
+        "make_release_form",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "fill_payer_form",
+        "list_payer_applications",
+        "update_payer_application",
+        "remember",
+        "recent_memory_changes",
+        "forget",
+        "find_referral_sources",
+        "list_referral_sources",
+        "move_referral_source",
+        "draft_outreach",
+        "plan_instagram_week",
+        "draft_instagram_post",
+        "research_post_topic",
+        "list_instagram_posts",
+        "instagram_account_steps",
+        "post_ideas",
+        "weekly_plan",
+        "draft_post",
+        "front_desk_status",
+        "front_desk_check_now",
+        "offer_consult_times",
+        "pt_profile_interview",
+        "directory_profile",
+        "other_directories",
+        "website_help"
+      ],
+      "lastRole": "user",
+      "response": {
+        "id": "chatcmpl-01a18aa6-a804-7679-991a-0e37277a38c0",
+        "choices": [
+          {
+            "finish_reason": "tool_calls",
+            "index": 0,
+            "message": {
+              "content": "Got it — I'll pull up your profile setup and keep going.",
+              "refusal": null,
+              "tool_calls": [
+                {
+                  "id": "call_ae5f7ca9-eba4-44cb-8e69-8b6ef32513e9",
+                  "type": "function",
+                  "function": {
+                    "name": "pt_profile_interview",
+                    "arguments": "{}"
+                  }
+                }
+              ],
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793327540,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 879,
+          "prompt_tokens": 12683,
+          "total_tokens": 13562,
+          "completion_tokens_details": {
+            "reasoning_tokens": 818
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 12529
+          }
+        }
+      }
+    },
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "find_documents",
+        "open_document",
+        "create_document",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "draft_superbill",
+        "make_release_form",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "fill_payer_form",
+        "list_payer_applications",
+        "update_payer_application",
+        "remember",
+        "recent_memory_changes",
+        "forget",
+        "find_referral_sources",
+        "list_referral_sources",
+        "move_referral_source",
+        "draft_outreach",
+        "plan_instagram_week",
+        "draft_instagram_post",
+        "research_post_topic",
+        "list_instagram_posts",
+        "instagram_account_steps",
+        "post_ideas",
+        "weekly_plan",
+        "draft_post",
+        "front_desk_status",
+        "front_desk_check_now",
+        "offer_consult_times",
+        "pt_profile_interview",
+        "directory_profile",
+        "other_directories",
+        "website_help"
+      ],
+      "lastRole": "tool",
+      "response": {
+        "id": "chatcmpl-01a18aa6-cb97-74a3-b260-97958ef9b0f2",
+        "choices": [
+          {
+            "finish_reason": "tool_calls",
+            "index": 0,
+            "message": {
+              "content": "Saving that focus, then we'll continue.",
+              "refusal": null,
+              "tool_calls": [
+                {
+                  "id": "call_1ba4e88f-0015-4c7e-9f78-6b4767d55bea",
+                  "type": "function",
+                  "function": {
+                    "name": "pt_profile_interview",
+                    "arguments": "{\"answer\":\"Mostly anxiety, big life changes, and couples who feel stuck\",\"step\":\"focus\"}"
+                  }
+                }
+              ],
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793327549,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 891,
+          "prompt_tokens": 12916,
+          "total_tokens": 13807,
+          "completion_tokens_details": {
+            "reasoning_tokens": 795
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        }
+      }
+    },
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "find_documents",
+        "open_document",
+        "create_document",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "draft_superbill",
+        "make_release_form",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "fill_payer_form",
+        "list_payer_applications",
+        "update_payer_application",
+        "remember",
+        "recent_memory_changes",
+        "forget",
+        "find_referral_sources",
+        "list_referral_sources",
+        "move_referral_source",
+        "draft_outreach",
+        "plan_instagram_week",
+        "draft_instagram_post",
+        "research_post_topic",
+        "list_instagram_posts",
+        "instagram_account_steps",
+        "post_ideas",
+        "weekly_plan",
+        "draft_post",
+        "front_desk_status",
+        "front_desk_check_now",
+        "offer_consult_times",
+        "pt_profile_interview",
+        "directory_profile",
+        "other_directories",
+        "website_help"
+      ],
+      "lastRole": "tool",
+      "response": {
+        "id": "chatcmpl-01a18aa6-f22b-737f-bc32-10c5bcc69f90",
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "index": 0,
+            "message": {
+              "content": "What is a first session with you like?\n\nA sentence or two is plenty.",
+              "refusal": null,
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793327559,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 470,
+          "prompt_tokens": 13166,
+          "total_tokens": 13636,
+          "completion_tokens_details": {
+            "reasoning_tokens": 445
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        }
+      }
+    },
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "find_documents",
+        "open_document",
+        "create_document",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "draft_superbill",
+        "make_release_form",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "fill_payer_form",
+        "list_payer_applications",
+        "update_payer_application",
+        "remember",
+        "recent_memory_changes",
+        "forget",
+        "find_referral_sources",
+        "list_referral_sources",
+        "move_referral_source",
+        "draft_outreach",
+        "plan_instagram_week",
+        "draft_instagram_post",
+        "research_post_topic",
+        "list_instagram_posts",
+        "instagram_account_steps",
+        "post_ideas",
+        "weekly_plan",
+        "draft_post",
+        "front_desk_status",
+        "front_desk_check_now",
+        "offer_consult_times",
+        "pt_profile_interview",
+        "directory_profile",
+        "other_directories",
+        "website_help"
+      ],
+      "lastRole": "user",
+      "response": {
+        "id": "chatcmpl-01a18aa7-1c0d-7617-bf85-4d6828d95d56",
+        "choices": [
+          {
+            "finish_reason": "tool_calls",
+            "index": 0,
+            "message": {
+              "content": "Got it — I'll log that and keep your profile setup moving.",
+              "refusal": null,
+              "tool_calls": [
+                {
+                  "id": "call_e76e9c60-01e4-4cec-8f18-4a4a65300207",
+                  "type": "function",
+                  "function": {
+                    "name": "pt_profile_interview",
+                    "arguments": "{}"
+                  }
+                }
+              ],
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793327569,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 1422,
+          "prompt_tokens": 12722,
+          "total_tokens": 14144,
+          "completion_tokens_details": {
+            "reasoning_tokens": 1361
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 12657
+          }
+        }
+      }
+    },
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "find_documents",
+        "open_document",
+        "create_document",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "draft_superbill",
+        "make_release_form",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "fill_payer_form",
+        "list_payer_applications",
+        "update_payer_application",
+        "remember",
+        "recent_memory_changes",
+        "forget",
+        "find_referral_sources",
+        "list_referral_sources",
+        "move_referral_source",
+        "draft_outreach",
+        "plan_instagram_week",
+        "draft_instagram_post",
+        "research_post_topic",
+        "list_instagram_posts",
+        "instagram_account_steps",
+        "post_ideas",
+        "weekly_plan",
+        "draft_post",
+        "front_desk_status",
+        "front_desk_check_now",
+        "offer_consult_times",
+        "pt_profile_interview",
+        "directory_profile",
+        "other_directories",
+        "website_help"
+      ],
+      "lastRole": "tool",
+      "response": {
+        "id": "chatcmpl-01a18aa7-3b93-703e-8810-a24e9d07999e",
+        "choices": [
+          {
+            "finish_reason": "tool_calls",
+            "index": 0,
+            "message": {
+              "content": null,
+              "refusal": null,
+              "tool_calls": [
+                {
+                  "id": "call_c84cf5c0-bb3e-4f9e-b026-f7e0653766f7",
+                  "type": "function",
+                  "function": {
+                    "name": "pt_profile_interview",
+                    "arguments": "{\"answer\":\"We talk about what brought you in and what you hope will change\",\"step\":\"firstSession\"}"
+                  }
+                }
+              ],
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793327577,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 716,
+          "prompt_tokens": 12937,
+          "total_tokens": 13653,
+          "completion_tokens_details": {
+            "reasoning_tokens": 635
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 12529
+          }
+        }
+      }
+    },
+    {
+      "tools": [
+        "status",
+        "queue_approval",
+        "morning_brief",
+        "find_documents",
+        "open_document",
+        "create_document",
+        "research_state_rules",
+        "recheck_rules",
+        "update_facts",
+        "answer_setup",
+        "log_event",
+        "draft_gfe",
+        "draft_superbill",
+        "make_release_form",
+        "get_credentialing",
+        "update_credentialing",
+        "caqh_prep",
+        "check_npi",
+        "fill_payer_form",
+        "list_payer_applications",
+        "update_payer_application",
+        "remember",
+        "recent_memory_changes",
+        "forget",
+        "find_referral_sources",
+        "list_referral_sources",
+        "move_referral_source",
+        "draft_outreach",
+        "plan_instagram_week",
+        "draft_instagram_post",
+        "research_post_topic",
+        "list_instagram_posts",
+        "instagram_account_steps",
+        "post_ideas",
+        "weekly_plan",
+        "draft_post",
+        "front_desk_status",
+        "front_desk_check_now",
+        "offer_consult_times",
+        "pt_profile_interview",
+        "directory_profile",
+        "other_directories",
+        "website_help"
+      ],
+      "lastRole": "tool",
+      "response": {
+        "id": "chatcmpl-01a18aa7-7c0b-76d0-a8c7-42ffceffba7c",
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "index": 0,
+            "message": {
+              "content": "Got it.\n\nHow do you like to work? Name any approaches you use, in your own words.",
+              "refusal": null,
+              "role": "assistant"
+            },
+            "logprobs": null
+          }
+        ],
+        "created": 1793327594,
+        "model": "muse-spark-1.3",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 1674,
+          "prompt_tokens": 13171,
+          "total_tokens": 14845,
+          "completion_tokens_details": {
+            "reasoning_tokens": 1644
+          },
+          "prompt_tokens_details": {
+            "cached_tokens": 12657
+          }
+        }
+      }
+    }
+  ],
+  "replies": [
+    {
+      "text": "Welcome. Let's set up your Psychology Today profile.\n\nIs this how your name and title should read?\n\n* Dana Reyes, LCPC\n* Licensed Clinical Professional Counselor\n* Reyes Counseling PLLC\n* Lincoln Park, Chicago\n\nReply yes if it looks right, or tell me what to fix.",
+      "tools": [
+        "pt_profile_interview"
+      ]
+    },
+    {
+      "text": "What do people most often come to you for?\n\nFor example: anxiety, life changes, couples who argue a lot. In your own words.",
+      "tools": [
+        "pt_profile_interview",
+        "pt_profile_interview"
+      ]
+    },
+    {
+      "text": "What is a first session with you like?\n\nA sentence or two is plenty.",
+      "tools": [
+        "pt_profile_interview",
+        "pt_profile_interview"
+      ]
+    },
+    {
+      "text": "Got it.\n\nHow do you like to work? Name any approaches you use, in your own words.",
+      "tools": [
+        "pt_profile_interview",
+        "pt_profile_interview"
+      ]
+    }
+  ]
+}

@@ -24,3 +24,17 @@ describe("Instagram routes refuse other websites", () => {
     });
   }
 });
+
+describe("Plan several takes 1 to 5 posts", () => {
+  const post = (count: unknown) =>
+    plan(
+      new Request("http://127.0.0.1:3000/api/instagram/plan", {
+        method: "POST",
+        headers: { host: "127.0.0.1:3000", "sec-fetch-site": "same-origin", "content-type": "application/json" },
+        body: JSON.stringify({ request: "how superbills work", count }),
+      }),
+    );
+  it.each([0, 6, 2.5, "3"])("refuses %s before anything runs", async (count) => {
+    expect((await post(count)).status).toBe(400);
+  });
+});

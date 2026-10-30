@@ -44,6 +44,13 @@ export const SCENARIOS: Scenario[] = [
     expectReply: /approv/i,
   },
   {
+    // Client forms library (lib/client-forms): asking in the chat gives the template as a document card.
+    name: "client-form",
+    conversations: [["make me a telehealth consent form"]],
+    expectTools: ["create_document"],
+    expectReply: /telehealth/i,
+  },
+  {
     name: "status",
     conversations: [["Is Practice-OS in dry-run mode right now?"]],
     expectTools: ["status"],
@@ -74,5 +81,19 @@ export const SCENARIOS: Scenario[] = [
     expectTools: [],
     forbidTools: ["forget", "remember"],
     expectReply: /clinical|outside|not something|can't|cannot|don't give/i,
+  },
+  {
+    name: "pt-profile",
+    conversations: [
+      [
+        "Set up my Psychology Today profile",
+        "Yes, that's right",
+        "Mostly anxiety, big life changes, and couples who feel stuck",
+        "We talk about what brought you in and what you hope will change",
+      ],
+    ],
+    expectTools: ["pt_profile_interview"],
+    forbidTools: ["directory_profile"],
+    expectReply: /work/i,
   },
 ];

@@ -23,6 +23,7 @@
     "eval:documents": "tsx scripts/eval-documents.ts",
     "eval:instagram": "tsx scripts/eval-instagram.ts",
     "eval:media": "tsx scripts/eval-media.ts",
+    "eval:studio": "tsx scripts/eval-studio.ts",
     "doctor": "tsx scripts/doctor.ts"
   },
   "dependencies": {

@@ -1,6 +1,7 @@
 import { queueApproval } from "../approvals";
 import { db } from "../db";
 import { pickThree } from "./calendar/slots";
+import type { CalendarAdapter } from "./calendar/types";
 import { shortSlotLabel } from "./calendar/zone";
 import { deps } from "./deps";
 import { prettyPhone } from "./phone/numbers";
@@ -19,7 +20,7 @@ export type OfferOutcome = "queued" | "no_phone" | "opted_out" | "no_calendar" |
 
 export async function offerTimes(
   inquiryId: string,
-  opts: { purpose: "book" | "reschedule"; bookingId?: string | null; createdBy?: string },
+  opts: { purpose: "book" | "reschedule"; bookingId?: string | null; createdBy?: string; /** "Simulate a voicemail" without a calendar: the sample one. */ calendar?: CalendarAdapter },
 ): Promise<{ outcome: OfferOutcome; approvalId?: string }> {
   const inquiry = await getInquiry(inquiryId);
   if (!inquiry?.contact_phone) {
@@ -30,7 +31,7 @@ export async function offerTimes(
   if (await isOptedOut(inquiry.contact_phone)) return { outcome: "opted_out" };
 
   const { calendar, timeZone, now } = deps();
-  const cal = await calendar();
+  const cal = opts.calendar ?? (await calendar());
   const p = await practice();
   const firstContact = inquiry.ai_disclosed_at == null;
   const who = inquiry.contact_name ?? prettyPhone(inquiry.contact_phone);
