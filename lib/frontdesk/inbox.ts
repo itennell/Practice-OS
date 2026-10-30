@@ -1,10 +1,14 @@
 import { db } from "../db";
 import { prettyPhone } from "./phone/numbers";
+import { blankContacts, maskPhone } from "./redact";
+
+export { maskPhone };
 
 // The Front Desk inbox: one timeline of calls, voicemails, texts in and out,
 // and consult bookings, newest first. Callers aren't her clients yet, but their
-// numbers are still private, so the page gets the last four digits only; the
-// full number comes from /api/front-desk/reveal, one at a time, written to the log.
+// numbers are still private, so the page gets the last four digits only, and
+// numbers and emails inside a voicemail or text are blanked the same way; the
+// full number or words come from /api/front-desk/reveal, one at a time, written to the log.
 
 export const INBOX_FILTERS = ["all", "needs_you", "calls", "voicemails", "texts", "bookings"] as const;
 export type InboxFilter = (typeof INBOX_FILTERS)[number];
@@ -23,7 +27,10 @@ export type InboxItem = {
   /** Whether a full number can be revealed. */
   hasNumber: boolean;
   name: string | null;
+  /** The words, with phone numbers and emails blanked. */
   body: string;
+  /** Whether the body had details blanked that Show can reveal. */
+  bodyHidden: boolean;
   inquiryId: string | null;
   status: "new" | "options_sent" | "booked" | "needs_clinician" | "closed" | null;
   crisis: boolean;
@@ -40,13 +47,6 @@ export type InboxItem = {
   reference: string | null;
   startsAt: string | null;
 };
-
-/** "(•••) •••-0144": enough to tell callers apart, not enough to call them. */
-export function maskPhone(e164: string | null): string {
-  if (!e164) return "Hidden number";
-  const digits = e164.replace(/\D/g, "");
-  return digits.length >= 4 ? `(•••) •••-${digits.slice(-4)}` : "Hidden number";
-}
 
 const KIND_FILTER: Partial<Record<InboxFilter, InboxKind[]>> = {
   calls: ["call"],
@@ -111,6 +111,8 @@ export async function frontDeskInbox(filter: InboxFilter = "all", limit = 100): 
   return rows.map((r) => {
     const meta = r.meta ?? {};
     const safety = meta.safety && typeof meta.safety === "object" ? (meta.safety as Safety) : null;
+    // Booking rows carry their status in body; only words a caller or the desk wrote are blanked.
+    const body = r.kind === "booking" ? { text: r.body, hidden: false } : blankContacts(r.body);
     return {
       id: r.id,
       kind: r.kind,
@@ -118,7 +120,8 @@ export async function frontDeskInbox(filter: InboxFilter = "all", limit = 100): 
       caller: maskPhone(r.phone),
       hasNumber: Boolean(r.phone),
       name: r.name,
-      body: r.body,
+      body: body.text,
+      bodyHidden: body.hidden,
       inquiryId: r.inquiry_id,
       status: r.status,
       crisis: r.crisis,
@@ -143,6 +146,13 @@ export async function revealNumber(id: string): Promise<string | null> {
       left join practice_os.inquiries i on i.id = b.inquiry_id where b.id = ${id}
     limit 1`;
   return row?.phone ? prettyPhone(row.phone) : null;
+}
+
+/** The full words of one voicemail or text, for the Show button. */
+export async function revealBody(id: string): Promise<string | null> {
+  const [row] = await db()<{ body: string }[]>`
+    select body from practice_os.messages where id = ${id} and channel in ('voicemail', 'sms')`;
+  return row?.body ?? null;
 }
 
 /** When Front Desk last read each stream, and the last problem, for "Check now". */
