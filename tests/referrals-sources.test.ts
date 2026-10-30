@@ -158,3 +158,64 @@ describe.skipIf(!hasDb)("re-check against the database", async () => {
     expect(await recheckIfDue({ ...deps, now: new Date() }, db(), 1)).toBeNull();
   });
 });
+
+describe.skipIf(!hasDb)("re-check reads their website", async () => {
+  const { closeDb, db } = await import("../lib/db");
+  const { recheckSource } = await import("../lib/referrals/sources/recheck");
+  const { evidenceFor } = await import("../lib/referrals/evidence/store");
+  const { discoverContacts } = await import("../lib/referrals/email/discover");
+  const ids: string[] = [];
+  afterAll(async () => {
+    if (ids.length) await db()`delete from practice_os.referral_sources where id in ${db()(ids)}`;
+    await closeDb();
+  });
+  const pages: Record<string, { status: number; body: string }> = {
+    "https://riverafm.example/robots.txt": { status: 200, body: "User-agent: *\nDisallow: /private/\n" },
+    "https://riverafm.example/": { status: 200, body: '<a href="/contact">Contact us</a>' },
+    "https://riverafm.example/contact": { status: 200, body: '<p>Write to <a href="mailto:maria.rivera@riverafm.example">Dr. Rivera</a></p>' },
+  };
+  const fakeFetch = async (url: string) => {
+    const p = pages[url] ?? { status: 404, body: "" };
+    return { url, finalUrl: url, status: p.status, body: p.body, fromCache: false };
+  };
+
+  it("takes the email from their contact page, says where it came from, and keeps the robots.txt decision", async () => {
+    const [row] = await db()`
+      insert into practice_os.referral_sources (npi, name, npi_type, credential, address, city, state, zip, phone)
+      values ('1900000011', 'Maria Rivera, MD', 'individual', 'MD', '2400 N Lincoln Ave', 'Chicago', 'IL', '60614', '312-555-0100')
+      on conflict (npi) do update set checked_at = null returning id`;
+    ids.push(row.id);
+    const r = await recheckSource(row.id, {
+      nppes: async () => null,
+      cms: async () => [],
+      license: async () => [],
+      osm: async () => fixture("osm-overpass.json"),
+      geocode: async () => [41.925, -87.648],
+      website: (url, card) => discoverContacts(url, card, { fetch: fakeFetch }),
+      now: NOW,
+    });
+    expect(r.checked).toContain("website");
+    const ev = (await evidenceFor([{ id: row.id, npi_type: "individual" }]))[row.id];
+    expect(ev.fields.email).toMatchObject({ value: "maria.rivera@riverafm.example", origins: ["website"] });
+    expect(ev.fields.email!.fact.detail).toMatchObject({ label: "on their contact page", page: "https://riverafm.example/contact" });
+    expect(ev.fields.website!.fact.detail).toMatchObject({ robotsAllowed: true });
+    expect(ev.conflicts.some((c) => c.startsWith("Email differs"))).toBe(true); // OpenStreetMap had office@
+  });
+
+  it("a site that asks not to be solicited gives nothing, and says so", async () => {
+    const [row] = await db()`
+      insert into practice_os.referral_sources (npi, name, npi_type, city, state, zip, website)
+      values ('1900000012', 'Maria Rivera, MD', 'individual', 'Chicago', 'IL', '60614', 'https://riverafm.example')
+      on conflict (npi) do update set checked_at = null returning id`;
+    ids.push(row.id);
+    const noSolicit = async (url: string) =>
+      url.endsWith("robots.txt") ? { url, finalUrl: url, status: 404, body: "", fromCache: false } : { url, finalUrl: url, status: 200, body: "<p>No solicitation, please. mailto:<a href='mailto:x@riverafm.example'>x</a></p>", fromCache: false };
+    const r = await recheckSource(row.id, {
+      nppes: async () => null, cms: async () => [], license: async () => [], osm: async () => fixture("osm-overpass.json"), geocode: async () => null,
+      website: (url, card) => discoverContacts(url, card, { fetch: noSolicit }), now: NOW,
+    });
+    expect(r.notes).toContain("Their website asks not to be solicited, so Aeon took nothing from it.");
+    const facts = (await db()`select field from practice_os.referral_facts where source_id = ${row.id} and origin = 'website'`).map((f) => f.field);
+    expect(facts).toEqual(["website"]);
+  });
+});

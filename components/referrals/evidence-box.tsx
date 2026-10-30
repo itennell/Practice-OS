@@ -58,11 +58,12 @@ export function EvidenceBox({
     setChecking(true);
     try {
       const res = await fetch(`/api/referrals/${card.id}/recheck`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
-      const data = (await res.json()) as { evidence?: Evidence; card?: ReferralSource; unavailable?: string[]; error?: string };
+      const data = (await res.json()) as { evidence?: Evidence; card?: ReferralSource; unavailable?: string[]; notes?: string[]; error?: string };
       if (!res.ok || !data.evidence || !data.card) throw new Error(data.error ?? "Aeon couldn't check right now. Try again in a minute.");
       onUpdate(data.card, data.evidence);
       const skipped = data.unavailable?.length ? ` ${data.unavailable.join(", ")} didn't answer; Aeon will try again later.` : "";
-      notify.success(`Checked ${card.name} again.${skipped}`);
+      const notes = data.notes?.length ? ` ${data.notes.join(" ")}` : "";
+      notify.success(`Checked ${card.name} again.${skipped}${notes}`);
     } catch (err) {
       notify.error(err instanceof Error ? err.message : "Aeon couldn't check right now.");
     } finally {
@@ -165,6 +166,9 @@ export function EvidenceBox({
                     <span className="text-[var(--fg-muted)]">
                       ({v.origins.map((o) => ORIGIN_LABEL[o]).join(", ")}; {v.confidence})
                     </span>
+                    {field === "website" && typeof v.fact.detail?.robots === "string" && (
+                      <span className="block text-[var(--fg-muted)]">Their robots.txt: {v.fact.detail.robots}</span>
+                    )}
                     {v.others.map((o) => (
                       <span key={o.origin} className="block text-[var(--status-pending-fg)]">
                         {ORIGIN_LABEL[o.origin]} says {o.value}

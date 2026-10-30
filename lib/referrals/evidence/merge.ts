@@ -78,7 +78,7 @@ const TRUST: Record<Field, Origin[]> = {
   phone: ["clinician", "website", "osm", "cms_dac", "nppes"],
   fax: ["clinician", "website", "nppes", "osm"],
   email: ["clinician", "website", "osm"],
-  website: ["clinician", "osm", "website"],
+  website: ["clinician", "website", "osm"],
   npi_status: ["nppes"],
   license_status: ["state_license"],
   medicare: ["cms_dac", "cms_order_referring"],

@@ -16,6 +16,7 @@ import { checkCms } from "./cms";
 import { checkOsm } from "./osm";
 import { checkStateLicense } from "./state-license";
 import type { JsonFetcher } from "./http";
+import { discoverContacts, type DiscoverResult } from "../email/discover";
 
 export type RecheckDeps = {
   nppes?: (npi: string) => Promise<Provider | null>;
@@ -23,7 +24,7 @@ export type RecheckDeps = {
   license?: JsonFetcher;
   osm?: JsonFetcher;
   /** Practice website contacts (lib/referrals/email); off when not given. */
-  website?: (url: string, card: { name: string }) => Promise<{ facts: Fact[] }>;
+  website?: (url: string, card: { name: string }) => Promise<Pick<DiscoverResult, "facts" | "blocked" | "robots">>;
   geocode?: (street: string, city: string, state: string, zip: string) => Promise<Point | null>;
   now?: Date;
 };
@@ -52,8 +53,15 @@ async function defaultGeocode(street: string, city: string, state: string, zip: 
 
 /** The live sources, for the app's routes and the daily run. */
 export function recheckDeps(): RecheckDeps {
-  return {};
+  return { website: (url, card) => discoverContacts(url, card, { sql: db() }) };
 }
+
+const BLOCKED_NOTE: Record<NonNullable<DiscoverResult["blocked"]>, string> = {
+  blocklisted: "That website is a directory or social site whose terms don't allow automated reading, so Aeon didn't read it.",
+  robots: "Their website's robots.txt asks tools not to read it, so Aeon didn't.",
+  no_solicitation: "Their website asks not to be solicited, so Aeon took nothing from it.",
+  unreachable: "Their website didn't answer.",
+};
 
 /** Asks every source about one card and saves what each said. Never throws for one source failing. */
 export async function recheckSource(id: string, deps: RecheckDeps = {}, sql: postgres.Sql = db()): Promise<RecheckResult> {
@@ -119,6 +127,14 @@ export async function recheckSource(id: string, deps: RecheckDeps = {}, sql: pos
       const web = await deps.website(site, { name: card.name });
       facts.push(...web.facts);
       checked.push("website");
+      if (web.blocked) notes.push(BLOCKED_NOTE[web.blocked]);
+      // The site itself, with the robots.txt decision, so the card can say why it was or wasn't read.
+      if (web.blocked !== "blocklisted" && web.blocked !== "unreachable" && /^https?:\/\//.test(site)) {
+        facts.push({
+          field: "website", value: site, origin: "website", originUrl: site.startsWith("https://") ? site : null, method: "name_address", checkedAt: at,
+          detail: { robots: web.robots.reason, robotsAllowed: web.robots.allowed, blocked: web.blocked },
+        });
+      }
     } catch {
       unavailable.push("Their website");
     }
