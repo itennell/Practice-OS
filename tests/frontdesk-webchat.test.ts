@@ -13,7 +13,8 @@ vi.mock("../lib/aeon/phi-classifier", async (orig) => ({ ...(await orig<object>(
 
 const { db, closeDb } = await import("../lib/db");
 const { setFrontDeskDeps } = await import("../lib/frontdesk/deps");
-const { webChatMessage, webChatThread, WebChatError, MAX_CHARS } = await import("../lib/frontdesk/webchat");
+const { webChatMessage, webChatThread, purgeExpiredWebChats, WebChatError, MAX_CHARS } = await import("../lib/frontdesk/webchat");
+const { sampleCalendar } = await import("../lib/frontdesk/test-console");
 const { approve } = await import("../lib/approvals");
 const { CRISIS_REPLY } = await import("../lib/safety");
 
@@ -36,7 +37,12 @@ beforeAll(() => {
   if (!localDb) return;
   process.env.DRY_RUN = "false"; // safe: the phone is a fake that only records
   process.env.CLINICIAN_ALERT_PHONE = "+13125550199";
-  setFrontDeskDeps({ phone: async () => phone, calendar: async () => null, timeZone: async () => "America/Chicago", now: () => NOW });
+  setFrontDeskDeps({
+    phone: async () => phone,
+    calendar: async () => sampleCalendar(NOW, "America/Chicago"),
+    timeZone: async () => "America/Chicago",
+    now: () => NOW,
+  });
 });
 
 afterAll(async () => {
@@ -97,8 +103,61 @@ describe.skipIf(!localDb)("website chat (local database only)", () => {
     expect(sent).toEqual(["+13125550199"]); // her alert only
     const [{ n: approvals }] = await db()`select count(*)::int as n from practice_os.approvals where payload ->> 'inquiry_id' = ${conversation}`;
     expect(approvals).toBe(0);
-    const [msg] = await db()`select meta from practice_os.messages where inquiry_id = ${conversation} and direction = 'inbound'`;
+    const [msg] = await db()`select body, meta from practice_os.messages where inquiry_id = ${conversation} and direction = 'inbound'`;
+    expect(msg.body).toBe("[Message withheld after the safety check]");
+    expect(msg.body).not.toContain("end my life");
     expect(msg.meta.safety.crisis).toBe("self_harm");
+  });
+
+  it("runs the crisis check before the length and 40-message limits", async () => {
+    const first = await send(null, "A practice-hours question");
+    await db()`
+      insert into practice_os.messages (inquiry_id, direction, channel, body, vendor, provider_sid)
+      select ${first.conversation}, 'inbound', 'web_chat', 'ordinary message', 'web', null
+      from generate_series(1, 40)`;
+    const out = await send(first.conversation, `${"x".repeat(MAX_CHARS + 20)} I wish I was dead`);
+    expect(out.lines.at(-1)?.text).toBe(CRISIS_REPLY);
+    const [stored] = await db()`
+      select body, meta from practice_os.messages
+      where inquiry_id = ${first.conversation} and direction = 'inbound'
+      order by created_at desc, id desc limit 1`;
+    expect(stored.body).toBe("[Message withheld after the safety check]");
+    expect(stored.meta.safety).toEqual({ crisis: "self_harm" });
+  });
+
+  it("uses only a real connected calendar and catches calendar failures", async () => {
+    for (const mode of ["missing", "throws"] as const) {
+      const adapter = mode === "missing" ? null : sampleCalendar(NOW, "America/Chicago");
+      if (adapter) adapter.openSlots = async () => {
+        throw new Error("calendar unavailable");
+      };
+      setFrontDeskDeps({ phone: async () => phone, calendar: async () => adapter, timeZone: async () => "America/Chicago", now: () => NOW });
+      const out = await send(null, "I'd like to book a consult");
+      expect(out.lines.at(-1)?.text).toMatch(/can't check the calendar right now/i);
+      const [{ n }] = await db()`select count(*)::int as n from practice_os.approvals where payload ->> 'inquiry_id' = ${out.conversation}`;
+      expect(n).toBe(0);
+    }
+    setFrontDeskDeps({ phone: async () => phone, calendar: async () => sampleCalendar(NOW, "America/Chicago"), timeZone: async () => "America/Chicago", now: () => NOW });
+  });
+
+  it("keeps only one pending consult-times approval", async () => {
+    const first = await send(null, "Please show me consult times");
+    await send(first.conversation, "I still want to book a consult");
+    const [{ n }] = await db()`
+      select count(*)::int as n from practice_os.approvals
+      where kind = 'web_chat_reply' and status = 'pending' and payload ->> 'inquiry_id' = ${first.conversation}`;
+    expect(n).toBe(1);
+  });
+
+  it("purges public chats and pending replies after 30 days", async () => {
+    const old = await send(null, "Please show me consult times");
+    const expiredAt = new Date(NOW.getTime() - 31 * 86_400_000);
+    await db()`update practice_os.inquiries set created_at = ${expiredAt} where id = ${old.conversation}`;
+    await db()`update practice_os.messages set created_at = ${expiredAt} where inquiry_id = ${old.conversation}`;
+    expect(await purgeExpiredWebChats(NOW)).toBeGreaterThanOrEqual(1);
+    expect(await webChatThread(old.conversation)).toBeNull();
+    const [{ n }] = await db()`select count(*)::int as n from practice_os.approvals where payload ->> 'inquiry_id' = ${old.conversation}`;
+    expect(n).toBe(0);
   });
 
   it("a question goes to her; the visitor gets the fixed passed-on line", async () => {

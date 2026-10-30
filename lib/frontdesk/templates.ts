@@ -115,6 +115,10 @@ export function webChatNoTimes(p: Practice): string {
   return `There are no open consult times this week. ${p.clinicianFirstName} will follow up if you leave a phone number or email.`;
 }
 
+export function webChatCalendarUnavailable(p: Practice): string {
+  return `I can't check the calendar right now. I've let ${p.clinicianFirstName} know so they can follow up. Leave a phone number or email if you'd like a reply outside this chat.`;
+}
+
 export function webChatPassedOn(p: Practice): string {
   return `I've passed your message to ${p.clinicianFirstName}. Leave a phone number or email if you'd like a reply outside this chat.`;
 }

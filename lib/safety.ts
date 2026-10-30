@@ -23,6 +23,7 @@ const SQUASHED: Record<CrisisCategory, string[]> = {
     "takemylife", "takemyownlife", "takeherlife", "takehislife",
     "overdose", "toomanypills", "hangmyself", "hangherself", "hanghimself",
     "wanttodie", "wantstodie", "wanttobedead", "wantstobedead",
+    "wishiwasdead", "dontwanttobealive", "wanttodisappear",
     "betteroffdead", "betteroffwithoutme", "noreasontolive",
     "dontwanttobehereanymore", "dontwanttoliveanymore", "dontwanttolive", "dontwanttowakeup",
     "cantgoonliving", "wantittobeover",

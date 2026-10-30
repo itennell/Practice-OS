@@ -13,7 +13,7 @@ const axe = async (page: import("@playwright/test").Page) => {
   return results.violations.filter((v) => v.impact === "serious" || v.impact === "critical").map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`);
 };
 
-test("a visitor asks to book; times show in the chat once she approves", async ({ page, context }) => {
+test("a visitor asks to book; no sample times appear without a connected calendar", async ({ page, context }) => {
   const errors: string[] = [];
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
   await page.goto("/website-chat");
@@ -24,20 +24,13 @@ test("a visitor asks to book; times show in the chat once she approves", async (
 
   await page.getByRole("textbox", { name: "Your message" }).fill("Hi, I'd like to book a consult");
   await page.getByRole("button", { name: "Send" }).click();
-  await expect(log).toContainText("checks them first");
+  await expect(log).toContainText("can't check the calendar right now");
   await expect(log).not.toContainText("Open consult times");
 
-  // She approves in the app (another tab), and the times appear in the visitor's chat.
+  // No stand-in times or approval may be created for a real visitor.
   const admin = await context.newPage();
   await admin.goto("/approvals");
-  const card = admin.getByRole("listitem", { name: /^Show a website visitor 3 consult times$/ });
-  await card.getByRole("button", { name: "Approve", exact: true }).click();
-  await expect(admin.getByRole("listitem", { name: /^Show a website visitor 3 consult times$/ }).getByText("Done")).toBeVisible({ timeout: 15_000 });
-  await expect(log).toContainText("Open consult times with", { timeout: 15_000 });
-
-  await page.getByRole("textbox", { name: "Your message" }).fill("2 please, 312-555-0170");
-  await page.getByRole("button", { name: "Send" }).click();
-  await expect(log).toContainText("will confirm the time");
+  await expect(admin.getByRole("listitem", { name: /Show a website visitor .* consult time/ })).toHaveCount(0);
   expect(await axe(page)).toEqual([]);
 
   // On Front Desk the chat is in the Inbox, under its own filter.
