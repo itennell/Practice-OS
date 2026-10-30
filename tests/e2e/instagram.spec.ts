@@ -88,8 +88,8 @@ test("Posts show as Instagram previews; approve one, then download its pictures"
   await expect(ready.getByText("Ready to post").first()).toBeVisible();
   await expect(ready.getByRole("button", { name: "Copy caption" })).toBeVisible();
   for (const [name, w, h] of [
-    [/Picture 4:5/, 1080, 1350],
-    [/Square picture/, 1080, 1080],
+    [/^Download picture/, 1080, 1350],
+    [/^Download square picture/, 1080, 1080],
   ] as const) {
     const [file] = await Promise.all([page.waitForEvent("download"), ready.getByRole("link", { name }).click()]);
     expect(file.suggestedFilename()).toMatch(/^instagram-post-.*\.jpg$/);
@@ -97,6 +97,15 @@ test("Posts show as Instagram previews; approve one, then download its pictures"
     expect([meta.format, meta.width, meta.height]).toEqual(["jpeg", w, h]);
   }
   await expect(ready.getByRole("listitem").filter({ hasText: "Open the Instagram app" })).toBeVisible();
+  // The take-home buttons come first and big, then "How to post it" over the steps, then the reel.
+  const order = await ready.evaluate((el) => {
+    const find = (re: RegExp) => [...el.querySelectorAll("a, button, h4")].findIndex((n) => re.test(n.textContent ?? ""));
+    return [/^\s*Download picture/, /^\s*Download square picture/, /^\s*Copy caption/, /^How to post it$/, /Make a reel/].map(find);
+  });
+  expect(order.every((n, i) => n >= 0 && (i === 0 || n > order[i - 1]))).toBe(true);
+  await expect(ready.getByRole("heading", { name: "How to post it" })).toBeVisible();
+  const big = await ready.getByRole("link", { name: /^Download picture/ }).boundingBox();
+  expect(big!.height).toBeGreaterThanOrEqual(50);
 
   await axe(page);
 
@@ -117,6 +126,21 @@ test("An advice topic is explained and the nearest logistics post is offered", a
   await expect(page.getByText("1 waiting for you · 1 ready to post")).toBeVisible();
   await page.getByRole("button", { name: "Write something else" }).click();
   await expect(page.getByText(/so Aeon can't write advice/)).toHaveCount(0);
+  await axe(page);
+});
+
+// QA (2026-10-29): "a post about depression" showed nothing and read as an error.
+test("An illness topic is explained, with three logistics posts to pick, never an empty result", async ({ page }) => {
+  await page.goto("/media/instagram");
+  await page.getByLabel("What should the post be about?").fill("a post about depression");
+  await page.getByRole("button", { name: "Write this post" }).click();
+  await expect(page.getByText("Posts stay on how your practice works, so Aeon writes about the logistics around depression", { exact: false })).toBeVisible();
+  for (const label of ["What a first session for depression looks like", "What sessions for depression cost", "How to book a first session for depression"]) {
+    await expect(page.getByRole("button", { name: `Write “${label}”` })).toBeVisible();
+  }
+  await expect(page.getByRole("status").filter({ hasText: /error|went wrong/i })).toHaveCount(0);
+  // Nothing was written.
+  await expect(page.getByText("1 waiting for you · 1 ready to post")).toBeVisible();
   await axe(page);
 });
 
@@ -154,7 +178,7 @@ test("Make a reel from a ready post: edit words, order and length, then download
   // Advice typed into a slide is refused before any video is made.
   const point = editor.getByLabel("Slide 2: Point");
   await point.fill("Try box breathing before your session");
-  await editor.getByRole("button", { name: "Download reel (MP4)" }).click();
+  await editor.getByRole("button", { name: /^Download video/ }).click();
   await expect(editor.getByRole("alert")).toContainText("Posts stay on logistics");
 
   // Her edits: words, order and length.
@@ -167,7 +191,7 @@ test("Make a reel from a ready post: edit words, order and length, then download
   await expect(length).toHaveAttribute("aria-valuetext", "10 seconds");
   await axe(page);
 
-  const [file] = await Promise.all([page.waitForEvent("download", { timeout: 90_000 }), editor.getByRole("button", { name: "Download reel (MP4)" }).click()]);
+  const [file] = await Promise.all([page.waitForEvent("download", { timeout: 90_000 }), editor.getByRole("button", { name: /^Download video/ }).click()]);
   expect(file.suggestedFilename()).toMatch(/^instagram-reel-.*\.mp4$/);
   const probe = JSON.parse(
     execFileSync("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name,width,height:format=duration", "-of", "json", (await file.path())!], { encoding: "utf8" }),
@@ -232,6 +256,12 @@ test("Keyboard reaches every action, and text at 200% still fits", async ({ page
   await expect(page.getByRole("slider", { name: "Posts" })).toBeFocused();
   await page.keyboard.press("ArrowLeft");
   await expect(page.getByRole("slider", { name: "Posts" })).toHaveAttribute("aria-valuetext", "2 posts");
+  // Plan several goes from 1 to 5.
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.getByRole("slider", { name: "Posts" })).toHaveAttribute("aria-valuetext", "1 post");
+  for (let i = 0; i < 6; i++) await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("slider", { name: "Posts" })).toHaveAttribute("aria-valuetext", "5 posts");
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "Plan several" })).toBeFocused();
 
