@@ -27,6 +27,11 @@ function Chips({ step, value, onChange }: { step: InterviewStep; value: string[]
   const listed = new Set(step.options.map((o) => o.value));
   const extra = value.filter((v) => !listed.has(v));
   const full = step.max !== undefined && value.length >= step.max;
+  const addOwn = () => {
+    const t = own.replace(/\s+/g, " ").trim();
+    if (t && !value.includes(t) && !full) onChange([...value, t]);
+    setOwn("");
+  };
   return (
     <div className="flex flex-col gap-3">
       <p className="text-small text-[var(--fg-muted)]" aria-live="polite">
@@ -49,20 +54,26 @@ function Chips({ step, value, onChange }: { step: InterviewStep; value: string[]
           );
         })}
       </div>
-      <form
-        className="flex flex-wrap items-end gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const t = own.replace(/\s+/g, " ").trim();
-          if (t && !value.includes(t) && !full) onChange([...value, t]);
-          setOwn("");
-        }}
-      >
-        <TextField label="Not listed? Add your own" compact maxLength={60} value={own} disabled={full} onChange={(e) => setOwn(e.target.value)} wrapClassName="min-w-0 flex-1" />
-        <Button type="submit" variant="quiet" disabled={!own.trim() || full}>
+      <div className="flex flex-wrap items-end gap-2">
+        <TextField
+          label="Not listed? Add your own"
+          compact
+          maxLength={60}
+          value={own}
+          disabled={full}
+          onChange={(e) => setOwn(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              addOwn();
+            }
+          }}
+          wrapClassName="min-w-0 flex-1"
+        />
+        <Button type="button" variant="quiet" disabled={!own.trim() || full} onClick={addOwn}>
           <Plus size={16} aria-hidden /> Add
         </Button>
-      </form>
+      </div>
     </div>
   );
 }
@@ -164,6 +175,7 @@ export function PtInterview({ initial, canWrite, onChange, onWrite, writing }: {
       {step ? (
         <form
           className="flex flex-col gap-4"
+          data-step={step.id}
           onSubmit={(e) => {
             e.preventDefault();
             go({ step: step.id, value });
