@@ -25,7 +25,7 @@ const PILLAR_LABEL: Record<PostView["pillar"], string> = {
 
 /** How to post it herself: Aeon writes, she posts (publishing is cut for now). */
 const POST_STEPS = [
-  "Save the picture, and keep it on your phone.",
+  "Tap Download picture, and keep it on your phone.",
   "Tap Copy caption.",
   "Open the Instagram app and tap +.",
   "Pick the picture, then paste the caption.",
@@ -35,10 +35,24 @@ const POST_STEPS = [
 function ReadyToPost({ post }: { post: PostView }) {
   const [copied, setCopied] = useState<"" | "yes" | "no">("");
   const image = `/api/instagram/posts/${post.id}/image?download=1`;
+  const stepsId = `how-to-post-${post.id}`;
   return (
-    <div className="flex flex-col gap-3 border-t border-[var(--hairline)] p-4">
+    <div className="flex flex-col gap-4 border-t border-[var(--hairline)] p-4">
       <p className="font-medium">Ready for you to post yourself</p>
+      {/* The things she came for, first and big: the picture and the caption. Nothing is posted from here. */}
       <div className="flex flex-col gap-2">
+        {post.hasImage && (
+          <>
+            <ButtonLink variant="primary" className="w-full" href={image} download>
+              <Download aria-hidden size={18} /> Download picture
+              <span className="sr-only"> (4:5, for the feed, JPEG)</span>
+            </ButtonLink>
+            <ButtonLink variant="primary" className="w-full" href={`${image}&shape=square`} download>
+              <Download aria-hidden size={18} /> Download square picture
+              <span className="sr-only"> (1:1, JPEG)</span>
+            </ButtonLink>
+          </>
+        )}
         <Button
           type="button"
           variant="primary"
@@ -52,28 +66,21 @@ function ReadyToPost({ post }: { post: PostView }) {
         >
           <Copy aria-hidden size={18} /> Copy caption
         </Button>
-        {post.hasImage && (
-          <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2">
-            <ButtonLink variant="quiet" className="w-full" href={image} download>
-              <Download aria-hidden size={18} /> Picture 4:5
-              <span className="sr-only"> (for the feed, JPEG)</span>
-            </ButtonLink>
-            <ButtonLink variant="quiet" className="w-full" href={`${image}&shape=square`} download>
-              <Download aria-hidden size={18} /> Square picture
-              <span className="sr-only"> (JPEG)</span>
-            </ButtonLink>
-          </div>
-        )}
+        <p role="status" aria-live="polite" className={copied ? "text-small" : "sr-only"}>
+          {copied === "yes" ? "Caption copied." : copied === "no" ? "Couldn't copy. Tap more on the caption, then select it and copy it." : ""}
+        </p>
       </div>
+      <section aria-labelledby={stepsId} className="flex flex-col gap-2">
+        <h4 id={stepsId} className="font-semibold">
+          How to post it
+        </h4>
+        <ol className="flex list-decimal flex-col gap-1 pl-6 text-small text-[var(--fg)]">
+          {POST_STEPS.map((step) => (
+            <li key={step}>{step}</li>
+          ))}
+        </ol>
+      </section>
       {post.hasImage && <ReelEditor postId={post.id} />}
-      <p role="status" aria-live="polite" className={copied ? "text-small" : "sr-only"}>
-        {copied === "yes" ? "Caption copied." : copied === "no" ? "Couldn't copy. Tap more on the caption, then select it and copy it." : ""}
-      </p>
-      <ol className="flex list-decimal flex-col gap-1 pl-6 text-small text-[var(--fg)]">
-        {POST_STEPS.map((step) => (
-          <li key={step}>{step}</li>
-        ))}
-      </ol>
     </div>
   );
 }
@@ -266,22 +273,40 @@ function ResearchPanel({
   );
 }
 
-type Offer = { why: string; angle: { label: string; pillar: string } };
+type OfferAngle = { label: string; pillar: string };
+type Offer = { why: string; angles: OfferAngle[]; kind: "write" | "plan" };
 type Message = { tone: "ok" | "problem"; text: string };
 
-/** What the routes answer, in her words. */
-function say(kind: "write" | "plan", data: Record<string, unknown>): { message: Message | null; offer: Offer | null; clear: boolean } {
+const posts = (n: number) => `${n} ${n === 1 ? "post" : "posts"}`;
+
+/** What the routes answer, in her words. Every answer says something; none leaves the box empty. */
+export function say(kind: "write" | "plan", data: Record<string, unknown>): { message: Message | null; offer: Offer | null; clear: boolean } {
   const o = data.outcome;
-  if (o === "off_topic") return { message: null, offer: { why: String(data.why), angle: data.angle as Offer["angle"] }, clear: false };
-  if (o === "blocked") return { message: { tone: "problem", text: `Aeon didn't write this one. ${data.why}` }, offer: null, clear: false };
+  if (o === "off_topic") {
+    const angles = Array.isArray(data.angles) && data.angles.length ? (data.angles as OfferAngle[]) : data.angle ? [data.angle as OfferAngle] : [];
+    return { message: null, offer: { why: String(data.why ?? "Posts stay on how your practice works."), angles, kind }, clear: false };
+  }
+  if (o === "blocked") return { message: { tone: "problem", text: `Aeon didn't write this one. ${data.why ?? ""}`.trim() }, offer: null, clear: false };
   if (kind === "plan") {
-    const saved = (data.saved as unknown[]).length;
+    const saved = Array.isArray(data.saved) ? data.saved.length : 0;
     const blocked = Number(data.blocked ?? 0);
-    return { message: { tone: "ok", text: `${saved - blocked} posts are ready for you to look at${blocked ? `; ${blocked} were held back by the safety check` : ""}.` }, offer: null, clear: true };
+    const ready = saved - blocked;
+    if (ready <= 0)
+      return {
+        message: { tone: "problem", text: `The safety check held back ${blocked === 1 ? "the post" : `all ${posts(blocked)}`}. Each card below says why; try a different topic.` },
+        offer: null,
+        clear: false,
+      };
+    return {
+      message: { tone: "ok", text: `${posts(ready)} ${ready === 1 ? "is" : "are"} ready for you to look at${blocked ? `; ${blocked} ${blocked === 1 ? "was" : "were"} held back by the safety check` : ""}.` },
+      offer: null,
+      clear: true,
+    };
   }
   if (o === "rewritten") return { message: { tone: "ok", text: `Aeon wrote a different post instead: "${data.headline}". ${data.why ?? "The first draft didn't pass the safety check."}` }, offer: null, clear: true };
   if (o === "blocked_after_rewrite") return { message: { tone: "problem", text: `Aeon couldn't write a safe version. ${data.why}` }, offer: null, clear: false };
-  return { message: { tone: "ok", text: `"${data.headline}" is ready for you to look at.` }, offer: null, clear: true };
+  if (o === "queued" && data.headline) return { message: { tone: "ok", text: `"${data.headline}" is ready for you to look at.` }, offer: null, clear: true };
+  return { message: { tone: "problem", text: "Aeon didn't finish that one. Try again." }, offer: null, clear: false };
 }
 
 export function InstagramBoard({ initialPosts, profile }: { initialPosts: PostView[]; profile: PreviewProfile }) {
@@ -381,9 +406,9 @@ export function InstagramBoard({ initialPosts, profile }: { initialPosts: PostVi
                 label="Posts"
                 value={count}
                 onValueChange={setCount}
-                min={2}
-                max={3}
-                valueText={(n) => `${n} posts`}
+                min={1}
+                max={5}
+                valueText={posts}
                 disabled={working !== null}
                 compact
                 className="flex-1 sm:w-40 sm:flex-none"
@@ -401,7 +426,7 @@ export function InstagramBoard({ initialPosts, profile }: { initialPosts: PostVi
               working === "research"
                 ? "Aeon is looking at what other therapists post about this…"
                 : working === "plan"
-                  ? `Aeon is writing and drawing ${count} posts…`
+                  ? `Aeon is writing and drawing ${posts(count)}…`
                   : "Aeon is writing your post…"
             }
           />
@@ -426,17 +451,23 @@ export function InstagramBoard({ initialPosts, profile }: { initialPosts: PostVi
         {offer && (
           <div className="flex flex-col gap-3 rounded-[16px] border border-[var(--hairline)] p-4">
             <p className="font-medium">{offer.why}</p>
-            <p className="text-[var(--fg-muted)]">Here&apos;s the closest post about how your practice works:</p>
+            {offer.angles.length > 0 && (
+              <p className="text-[var(--fg-muted)]">{offer.angles.length === 1 ? "Here's the closest post about how your practice works:" : "Pick a post about how your practice works:"}</p>
+            )}
             <div className="flex flex-wrap gap-2">
-              <Button
-                variant="accent"
-                onClick={() => {
-                  setAsk(offer.angle.label);
-                  run("write", offer.angle.label, offer.angle.pillar);
-                }}
-              >
-                Write &ldquo;{offer.angle.label}&rdquo;
-              </Button>
+              {offer.angles.map((a) => (
+                <Button
+                  key={a.label}
+                  variant="accent"
+                  onClick={() => {
+                    setAsk(a.label);
+                    if (offer.kind === "plan") run("plan", a.label);
+                    else run("write", a.label, a.pillar);
+                  }}
+                >
+                  {offer.kind === "plan" ? `Plan ${posts(count)}: ` : "Write "}&ldquo;{a.label}&rdquo;
+                </Button>
+              ))}
               <Button variant="quiet" onClick={() => setOffer(null)}>
                 Write something else
               </Button>

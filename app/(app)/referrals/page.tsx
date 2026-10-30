@@ -6,8 +6,12 @@ import { PageHeader } from "@/components/ui";
 import { DEFAULT_SPECIALTIES, getReferralSettings } from "@/lib/referrals/settings";
 import { STAGE_LABEL } from "@/lib/referrals/stages";
 import { getProfile } from "@/lib/profile";
-import { latestLetters, listSources, practiceFacts, rescoreOldCards } from "@/lib/referrals/store";
-import { boardTier, SCORE_VERSION, type TierResult } from "@/lib/referrals/tier";
+import { evidenceFor } from "@/lib/referrals/evidence/store";
+import { recheckIfDue, recheckDeps } from "@/lib/referrals/sources/recheck";
+import { latestLetters, listSources, moveDueFollowUps, practiceFacts, rescoreOldCards } from "@/lib/referrals/store";
+import { contactsFor } from "@/lib/referrals/contacts";
+import { tiersWithLog } from "@/lib/referrals/plan";
+import { SCORE_VERSION, type TierResult } from "@/lib/referrals/tier";
 
 export const metadata = { title: "Referrals · Practice-OS" };
 
@@ -38,10 +42,17 @@ async function Referrals() {
   if (sources.some((s) => s.score_version !== SCORE_VERSION)) {
     after(() => rescoreOldCards().catch((err) => console.error(`[referrals] rescore: ${err instanceof Error ? err.message : String(err)}`)));
   }
+  // Cards last checked over 30 days ago are checked again once a day, after the page is sent (her computer only).
+  if (!process.env.VERCEL) {
+    // The board already shows due follow-ups in Follow up; on her computer the move is saved too, with an audit row.
+    after(() => moveDueFollowUps().catch((err) => console.error(`[referrals] follow-ups: ${err instanceof Error ? err.message : String(err)}`)));
+    after(() => recheckIfDue(recheckDeps()).catch((err) => console.error(`[referrals] recheck: ${err instanceof Error ? err.message : String(err)}`)));
+  }
+  const evidence = await evidenceFor(sources);
   const board = Object.fromEntries(sources.filter((s) => s.npi).map((s) => [s.npi!, { stage: STAGE_LABEL[s.stage] }]));
-  const tiers: Record<string, TierResult> = Object.fromEntries(
-    sources.map((s) => [s.id, boardTier(s, { focus: facts.focus, clinicianState: facts.state })]),
-  );
+  // Tiers with her contact log on top (a prior referral, a warm intro, a meeting, a reply).
+  const contacts = await contactsFor(sources.map((s) => s.id));
+  const tiers: Record<string, TierResult> = tiersWithLog(sources, contacts, { focus: facts.focus, clinicianState: facts.state });
   return (
     <div className="flex flex-col gap-8">
       <AreaExplorer
@@ -53,7 +64,7 @@ async function Referrals() {
         <h2 id="board-heading" className="text-body font-semibold">
           Your board
         </h2>
-        <ReferralBoard initial={sources} letters={letters} tiers={tiers} demo={profile?.is_sample ?? true} />
+        <ReferralBoard initial={sources} letters={letters} tiers={tiers} evidence={evidence} contacts={contacts} demo={profile?.is_sample ?? true} />
       </section>
     </div>
   );
