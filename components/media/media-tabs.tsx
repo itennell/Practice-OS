@@ -23,8 +23,11 @@ export function MediaTabs({ hideInstagram }: { hideInstagram: boolean }) {
   );
 }
 
-/** Media's column: wide on Psychology Today (the interview sits beside the profile preview), 860px elsewhere. */
-export function MediaWidth({ children }: { children: React.ReactNode }) {
-  const wide = usePathname() === "/media";
+/**
+ * Media's column: 1240px on the routes listed in `wideOn` (a tab whose content sits
+ * side by side, like the Psychology Today interview beside its preview), 860px elsewhere.
+ */
+export function MediaWidth({ wideOn, children }: { wideOn: string[]; children: React.ReactNode }) {
+  const wide = wideOn.includes(usePathname());
   return <div className={`mx-auto flex w-full flex-col gap-6 ${wide ? "max-w-[1240px]" : "max-w-[860px]"}`}>{children}</div>;
 }
