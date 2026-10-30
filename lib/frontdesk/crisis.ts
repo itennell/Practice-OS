@@ -3,6 +3,7 @@ import { db } from "../db";
 import { CRISIS_REPLY, type CrisisCategory } from "../safety";
 import { toE164 } from "./phone/numbers";
 import type { PhoneAdapter } from "./phone/types";
+import { maskPhone } from "./redact";
 import { addAlert, sendText } from "./store";
 import { crisisAlertText } from "./templates";
 
@@ -29,7 +30,8 @@ export async function handleCrisis(input: {
   await db()`
     update practice_os.inquiries set crisis_flag = true, status = 'needs_clinician'
     where id = ${input.inquiryId}`;
-  await addAlert("crisis", crisisAlertText(input.channel, input.from), input.inquiryId);
+  // The page gets the masked number; only the text to her own phone below has it in full.
+  await addAlert("crisis", crisisAlertText(input.channel, input.from ? maskPhone(input.from) : null), input.inquiryId);
   await audit({
     actor: "safety",
     action: "crisis_detected",

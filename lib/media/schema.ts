@@ -55,3 +55,9 @@ export const WEBSITE = research.website as {
   pages: string[];
   checklist: ChecklistItem[];
 };
+
+export type PtListId = "specialties" | "therapyTypes" | "ages" | "participants" | "communities" | "faith" | "paymentMethods" | "sessionFormat";
+type PtList = { confidence: string; sources: string[]; options: string[]; note?: string };
+/** Psychology Today's pick-list wording, so her chips match its search filters. */
+export const PT_LISTS = research.psychologyToday.pickLists.lists as Record<PtListId, PtList>;
+export const PT_LISTS_CHECKED = research.psychologyToday.pickLists.checked;
