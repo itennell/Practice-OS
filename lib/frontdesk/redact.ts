@@ -21,6 +21,11 @@ export function maskPhone(e164: string | null): string {
   return digits.length >= 4 ? `(•••) •••-${digits.slice(-4)}` : "Hidden number";
 }
 
+/** Who an approval title or preview names: her saved name, else the masked number. Never the full number. */
+export function approvalWho(name: string | null, phone: string | null): string {
+  return name ?? maskPhone(phone);
+}
+
 /**
  * A caller's words as the page shows them before she taps Show: phone numbers
  * down to the last four digits, emails and spoken digit runs blanked.
