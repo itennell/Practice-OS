@@ -2,10 +2,15 @@
 // gets its own payer set, steps and wording (fixtures in tests/fixtures/payer-sets).
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
+import { loadEnv } from "../lib/env";
 import { CREDENTIALS, type Credential } from "../lib/compliance/types";
 import { allPayers, payerById, prerequisites, stateLicenses, stepsFor, taxonomyFor } from "../lib/payers/catalog";
+import { findPayer, shownStatus, statusAfter, type Checklist } from "../lib/payers/checklist";
 import { payersFor } from "../lib/payers/eligibility";
+
+loadEnv();
+const hasDb = Boolean(process.env.DATABASE_URL);
 
 type Fixture = {
   license: Credential;
@@ -108,5 +113,68 @@ describe("other states", () => {
     expect(set.payers.every((f) => f.payer.states.includes("*"))).toBe(true);
     expect(set.payers.map((f) => f.payer.id)).toContain("aetna");
     expect(set.payers.map((f) => f.payer.id)).not.toContain("bcbsil");
+  });
+});
+
+describe("status moves with the checklist", () => {
+  const steps = stepsFor(payerById("aetna")!, "LCPC");
+  const submit = steps.find((s) => s.submits)!.id;
+  const first = steps.find((s) => !s.submits)!.id;
+
+  it("not started, then preparing, then applied", () => {
+    expect(statusAfter({ status: "not_started" }, steps, new Set())).toBe("not_started");
+    expect(statusAfter({ status: "not_started" }, steps, new Set([first]))).toBe("preparing");
+    expect(statusAfter({ status: "preparing" }, steps, new Set([first, submit]))).toBe("applied");
+    expect(statusAfter({ status: "applied" }, steps, new Set([first]))).toBe("preparing");
+  });
+
+  it("never overrides her own approved, denied or withdrawn", () => {
+    for (const s of ["approved", "denied", "withdrawn"] as const) expect(statusAfter({ status: s }, steps, new Set())).toBe(s);
+  });
+
+  it("an application past its follow-up day reads Follow up", () => {
+    expect(shownStatus({ status: "applied", follow_up_on: "2026-10-01" }, "2026-10-29")).toBe("follow_up");
+    expect(shownStatus({ status: "applied", follow_up_on: "2026-11-28" }, "2026-10-29")).toBe("applied");
+  });
+
+  it("finds a payer from her words", () => {
+    const set = payersFor({ license: "LCPC", state: "IL" });
+    const item = (id: string) => ({ fit: set.payers.find((f) => f.payer.id === id)!, steps: [], app: {}, next: null, status: "not_started", statusLabel: "" });
+    const list = { payers: ["medicare", "aetna", "bcbsil"].map(item), platforms: [] } as unknown as Checklist;
+    expect(findPayer(list, "Aetna")?.fit.payer.id).toBe("aetna");
+    expect(findPayer(list, "blue cross")?.fit.payer.id).toBe("bcbsil");
+    expect(findPayer(list, "walk me through medicare")?.fit.payer.id).toBe("medicare");
+    expect(findPayer(list, "Kaiser")).toBeUndefined();
+  });
+});
+
+describe.skipIf(!hasDb)("insurance checklist in the database", async () => {
+  const { closeDb, db } = await import("../lib/db");
+  const { loadChecklist, setStep } = await import("../lib/payers/checklist");
+  afterAll(async () => {
+    await db()`delete from practice_os.payer_steps where scope = 'uhc-optum'`;
+    await db()`update practice_os.payer_applications set status = 'not_started', applied_on = null, follow_up_on = null, stage = 'credentialing' where catalog_id = 'uhc-optum'`;
+    await closeDb();
+  });
+
+  it("prelists every payer for her license once, then a checked step moves the status", async () => {
+    const before = await loadChecklist();
+    const again = await loadChecklist();
+    expect(again.payers.length).toBe(before.payers.length);
+    const [{ n }] = await db()`select count(*)::int as n from practice_os.payer_applications where catalog_id is not null`;
+    expect(n).toBe(before.payers.length + before.platforms.length);
+
+    const uhc = before.payers.find((i) => i.fit.payer.id === "uhc-optum")!;
+    const submit = uhc.steps.find((s) => s.submits)!;
+    expect((await setStep({ scope: "uhc-optum", step_id: uhc.steps[0]!.id, done: true }, "clinician")).status).toBe("preparing");
+    expect((await setStep({ scope: "uhc-optum", step_id: submit.id, done: true }, "clinician")).status).toBe("applied");
+    const after = (await loadChecklist()).payers.find((i) => i.fit.payer.id === "uhc-optum")!;
+    expect(after.app.follow_up_on).not.toBeNull();
+    const [audit] = await db()`select action from practice_os.audit_log where subject_id = ${`uhc-optum:${submit.id}`} order by id desc limit 1`;
+    expect(audit.action).toBe("payer_step_checked");
+  });
+
+  it("refuses a step that isn't on the checklist", async () => {
+    await expect(setStep({ scope: "uhc-optum", step_id: "not-a-step", done: true }, "clinician")).rejects.toThrow(/isn't on this checklist/);
   });
 });

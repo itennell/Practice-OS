@@ -16,9 +16,6 @@ import { CAQH_URL, caqhPrep } from "@/lib/credentialing/checklist";
 import { emptyCredentialingProfile, loadCredentialingProfile, sectionValues } from "@/lib/credentialing/store";
 import { CredentialingEditor } from "@/components/credentialing-editor";
 import { money } from "@/lib/gfe/build";
-import { CMS855I_VERSION, LEFT_FOR_YOU, MFT_MHC_FAQ, cms855iEntries, specialtyFor } from "@/lib/payers/cms855i";
-import { listPayerApplications, payerDates } from "@/lib/payers/store";
-import { PayerTracker } from "@/components/payer-tracker";
 import { CPT } from "@/lib/superbill/codes";
 import { listSuperbills, summarize } from "@/lib/superbill/store";
 import { MarkGiven, SuperbillForm } from "@/components/superbill-form";
@@ -276,99 +273,6 @@ export async function ReleaseForms({ draft }: { draft?: string }) {
           client’s record. A revocation must be in writing and signed. This is paperwork help, not legal advice; have a colleague or attorney
           read it once before real clients sign.
         </p>
-      </GlassCard>
-    </>
-  );
-}
-
-export async function Insurance() {
-  await connection(); // read the database per request, never at build time
-  const [apps, profile, today] = await Promise.all([listPayerApplications(), loadCredentialingProfile(), practiceToday()]);
-  const entries = profile ? cms855iEntries(profile) : [];
-  const spec = profile ? specialtyFor(profile.identity.credential) : null;
-  const dates = payerDates(apps, today, 90);
-  return (
-    <>
-      <GlassCard aria-labelledby="payers-heading" className="flex flex-col gap-4 p-5 md:p-6">
-        <div className="flex flex-col gap-1">
-          <h2 id="payers-heading" className="text-section font-semibold">
-            Insurance applications
-          </h2>
-          <p className="max-w-[65ch] text-[var(--fg-muted)]">
-            Where you are with each payer. Aeon reminds you to follow up 30 days after you apply and to recredential 36 months after
-            approval. You can also tell Aeon, like “I sent my BCBSIL application today”.
-          </p>
-        </div>
-        {dates.length > 0 && (
-          <ul className="flex flex-col gap-1">
-            {dates.map((d) => (
-              <li key={`${d.id}-${d.kind}`} className="text-small">
-                <strong>{formatDate(d.due_on, false)}</strong>: {d.what}
-              </li>
-            ))}
-          </ul>
-        )}
-        <PayerTracker apps={apps} />
-      </GlassCard>
-
-      <GlassCard aria-labelledby="cms855i-heading" className="flex flex-col gap-4 p-5 md:p-6">
-        <div className="flex flex-col gap-1">
-          <h2 id="cms855i-heading" className="text-section font-semibold">
-            Medicare enrollment (CMS-855I)
-          </h2>
-          <p className="max-w-[65ch] text-[var(--fg-muted)]">
-            Aeon fills the paper form (version {CMS855I_VERSION}, the one CMS posts) from your credentialing profile. You finish it, sign it and
-            send it to your Medicare contractor. Applying online in{" "}
-            <a href="https://pecos.cms.hhs.gov" target="_blank" rel="noreferrer" className="text-[var(--link)] underline underline-offset-2">
-              PECOS
-            </a>{" "}
-            is usually faster.
-          </p>
-        </div>
-        {!profile ? (
-          <p>Set up your credentialing profile first.</p>
-        ) : (
-          <>
-            {spec?.writeIn && (
-              <p className="max-w-[65ch] text-small">
-                The paper form doesn’t list your specialty yet, so Aeon checks “Undefined Non-Physician Practitioner Specialty” and writes in{" "}
-                <strong>{spec.writeIn}</strong>, as{" "}
-                <a href={MFT_MHC_FAQ} target="_blank" rel="noreferrer" className="text-[var(--link)] underline underline-offset-2">
-                  CMS’s May 2024 FAQ
-                </a>{" "}
-                says to.
-              </p>
-            )}
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="flex flex-col gap-2">
-                <h3 className="font-semibold">Aeon fills ({entries.length})</h3>
-                <ul className="flex flex-col gap-1 text-small">
-                  {entries.map((e) => (
-                    <li key={e.field}>
-                      {e.label}: <span className="text-[var(--fg-muted)]">{e.value === true ? "checked" : e.value}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="flex flex-col gap-2">
-                <h3 className="font-semibold">You complete</h3>
-                <ul className="flex list-disc flex-col gap-1 pl-5 text-small">
-                  {LEFT_FOR_YOU.map((l) => (
-                    <li key={l}>{l}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <ButtonLink variant="primary" href="/api/payers/cms855i" download>
-                Download the prepared CMS-855I
-              </ButtonLink>
-              <p className="text-small text-[var(--fg-muted)]">
-                {profile.isSample ? "[Sample] Every page is marked not for submission. " : ""}Aeon never signs or submits it.
-              </p>
-            </div>
-          </>
-        )}
       </GlassCard>
     </>
   );
