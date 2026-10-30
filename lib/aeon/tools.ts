@@ -1123,69 +1123,6 @@ export const TOOLS: AeonTool[] = [
   // ---- Media (lib/media): directory profiles and her website. Aeon writes, she
   // pastes; nothing is sent anywhere, so the drafts save without waiting for a tap.
   tool({
-    name: "pt_profile_interview",
-    title: "Set up her Psychology Today profile, one question at a time",
-    description:
-      "Aeon's Psychology Today interview, section by section in the order the profile reads (name and title, statement, photos, free consult, At a Glance, finances, qualifications, specialties, endorsements, client focus, treatment approach, location). " +
-      "Use when she wants to set up, start or finish her Psychology Today profile. Call with no answer to get the next question; if it gives say_first_word_for_word, open your reply with exactly that line. Ask the question in plain words, one at a time, and list the choices when there are any. " +
-      "When she answers, call it once with her answer and the step id (no need to call it with no answer first). " +
-      "Then call again with her answer for that step: a string for typed or one-choice questions (pass the choice's value), an array of labels for pick-many questions (use the listed labels word for word where they match; her own words are fine otherwise), a number for years. " +
-      "For a 'confirm' or 'info' step, answer true once she says it's right. Pass skip: true if she wants to skip. If it returns refused, tell her why in plain words and ask again. " +
-      "When it says done, call directory_profile to write her profile, and tell her the Media page shows the whole profile as it will read, with Copy buttons.",
-    input: {
-      step: z.string().max(40).optional().describe("The step id the answer is for (from the last question)."),
-      answer: z.union([z.string().max(400), z.array(z.string().max(60)).max(25), z.number().int().min(0).max(70), z.boolean()]).optional(),
-      skip: z.boolean().optional(),
-      back: z.boolean().optional().describe("Go back one question."),
-    },
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: false },
-    label: "Worked on your Psychology Today profile",
-    changesData: true,
-    run: async (input: { step?: string; answer?: string | string[] | number | boolean; skip?: boolean; back?: boolean }) => {
-      const facts = await import("../media/facts");
-      const pt = await import("../media/pt-profile");
-      let f = await facts.loadMediaFacts();
-      let refused: string | undefined;
-      const current = pt.interviewState(f).step?.id;
-      const step = input.step ?? current;
-      if (step && (input.skip || input.answer !== undefined)) {
-        try {
-          f = await pt.saveStep(f, step, input.skip ? { skip: true } : { value: typeof input.answer === "boolean" ? null : input.answer });
-        } catch (err) {
-          if (!(err instanceof facts.AnswerRefused)) throw err;
-          refused = err.message;
-        }
-      }
-      const at = refused ? step : input.back && step ? (pt.previousStep(step) ?? undefined) : undefined;
-      const s = pt.interviewState(f, at);
-      const q = s.step;
-      return text({
-        ...(s.answered === 0 && !refused ? { say_first_word_for_word: s.welcome } : {}),
-        ...(refused ? { refused } : {}),
-        progress: `${s.answered} of ${s.total} answered`,
-        ...(q
-          ? {
-              question: {
-                step: q.id,
-                section: q.sectionTitle,
-                ask: q.ask,
-                help: q.help,
-                kind: q.kind,
-                ...(q.lines.length ? { shows: q.lines } : {}),
-                ...(q.options.length ? { choices: q.options.map((o) => (o.value === o.label ? o.label : { value: o.value, label: o.label })) } : {}),
-                ...(q.kind === "multi" ? { pick: q.min === q.max ? `exactly ${q.max}` : `up to ${q.max}` } : {}),
-                ...(q.value !== null && q.value !== "" && !(Array.isArray(q.value) && !q.value.length) ? { already_have: q.value } : {}),
-              },
-            }
-          : { done: true, next: "Call directory_profile to write her profile now." }),
-        ...(s.skipped.length ? { skipped: s.skipped.map((x) => x.label) } : {}),
-        preview_page: "/media",
-        rules: "Her own words for the statement. Never suggest client stories, testimonials, promises or advice. Psychology Today asks that AI-written words be read and made hers.",
-      });
-    },
-  }),
-
-  tool({
     name: "directory_profile",
     title: "Write her Psychology Today profile",
     description:
@@ -1294,6 +1231,69 @@ export const TOOLS: AeonTool[] = [
         ...(has ? { checklist: WEBSITE.checklist.map((c) => c.label) } : { recommended: `${WEBSITE.default.name}: ${WEBSITE.default.cost}. ${WEBSITE.default.why}`, steps: site.SETUP_STEPS, meta: WEBSITE.meta.note }),
         ...(pages ? { pages: pages.pages.map((p) => ({ page: p.label, text: p.text })), next: "The words and the practice details block are on the Media page, Website tab, with a Copy button each." } : {}),
         hipaa: WEBSITE.hipaa,
+      });
+    },
+  }),
+
+  tool({
+    name: "pt_profile_interview",
+    title: "Set up her Psychology Today profile, one question at a time",
+    description:
+      "Aeon's Psychology Today interview, section by section in the order the profile reads (name and title, statement, photos, free consult, At a Glance, finances, qualifications, specialties, endorsements, client focus, treatment approach, location). " +
+      "Use when she wants to set up, start or finish her Psychology Today profile. Call with no answer to get the next question; if it gives say_first_word_for_word, open your reply with exactly that line. Ask the question in plain words, one at a time, and list the choices when there are any. " +
+      "When she answers, call it once with her answer and the step id (no need to call it with no answer first). " +
+      "Then call again with her answer for that step: a string for typed or one-choice questions (pass the choice's value), an array of labels for pick-many questions (use the listed labels word for word where they match; her own words are fine otherwise), a number for years. " +
+      "For a 'confirm' or 'info' step, answer true once she says it's right. Pass skip: true if she wants to skip. If it returns refused, tell her why in plain words and ask again. " +
+      "When it says done, call directory_profile to write her profile, and tell her the Media page shows the whole profile as it will read, with Copy buttons.",
+    input: {
+      step: z.string().max(40).optional().describe("The step id the answer is for (from the last question)."),
+      answer: z.union([z.string().max(400), z.array(z.string().max(60)).max(25), z.number().int().min(0).max(70), z.boolean()]).optional(),
+      skip: z.boolean().optional(),
+      back: z.boolean().optional().describe("Go back one question."),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: false },
+    label: "Worked on your Psychology Today profile",
+    changesData: true,
+    run: async (input: { step?: string; answer?: string | string[] | number | boolean; skip?: boolean; back?: boolean }) => {
+      const facts = await import("../media/facts");
+      const pt = await import("../media/pt-profile");
+      let f = await facts.loadMediaFacts();
+      let refused: string | undefined;
+      const current = pt.interviewState(f).step?.id;
+      const step = input.step ?? current;
+      if (step && (input.skip || input.answer !== undefined)) {
+        try {
+          f = await pt.saveStep(f, step, input.skip ? { skip: true } : { value: typeof input.answer === "boolean" ? null : input.answer });
+        } catch (err) {
+          if (!(err instanceof facts.AnswerRefused)) throw err;
+          refused = err.message;
+        }
+      }
+      const at = refused ? step : input.back && step ? (pt.previousStep(step) ?? undefined) : undefined;
+      const s = pt.interviewState(f, at);
+      const q = s.step;
+      return text({
+        ...(s.answered === 0 && !refused ? { say_first_word_for_word: s.welcome } : {}),
+        ...(refused ? { refused } : {}),
+        progress: `${s.answered} of ${s.total} answered`,
+        ...(q
+          ? {
+              question: {
+                step: q.id,
+                section: q.sectionTitle,
+                ask: q.ask,
+                help: q.help,
+                kind: q.kind,
+                ...(q.lines.length ? { shows: q.lines } : {}),
+                ...(q.options.length ? { choices: q.options.map((o) => (o.value === o.label ? o.label : { value: o.value, label: o.label })) } : {}),
+                ...(q.kind === "multi" ? { pick: q.min === q.max ? `exactly ${q.max}` : `up to ${q.max}` } : {}),
+                ...(q.value !== null && q.value !== "" && !(Array.isArray(q.value) && !q.value.length) ? { already_have: q.value } : {}),
+              },
+            }
+          : { done: true, next: "Call directory_profile to write her profile now." }),
+        ...(s.skipped.length ? { skipped: s.skipped.map((x) => x.label) } : {}),
+        preview_page: "/media",
+        rules: "Her own words for the statement. Never suggest client stories, testimonials, promises or advice. Psychology Today asks that AI-written words be read and made hers.",
       });
     },
   }),
