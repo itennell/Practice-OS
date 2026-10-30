@@ -306,3 +306,57 @@ export function capFirst<T extends { tier: TierResult }>(sorted: T[], max = FIRS
     return { ...p, tier: { ...p.tier, tier: "next" as const, reasons: [...p.tier.reasons, `a strong fit, after your top ${max} in this search`] } };
   });
 }
+
+// ---- the relationship, from her contact log ---------------------------------
+// referral-tiers.json "relationship_modifiers": points added after the sum, from
+// what she logged (lib/referrals/contacts.ts), never from NPPES.
+
+export type RelationshipInput = { warmIntro: boolean; referredBefore: boolean; met: boolean; replied: boolean };
+type Modifier = keyof RelationshipInput;
+const MODIFIER_KEYS: Record<Modifier, string> = {
+  warmIntro: "warm_intro_available",
+  referredBefore: "sent_us_a_referral_before",
+  met: "met_in_person",
+  replied: "replied_to_letter",
+};
+// The same numbers and words as referral-tiers.json v1.0, used only if that file can't be read.
+const BUILT_IN_MODIFIERS: Record<Modifier, { points: number; reason: string }> = {
+  referredBefore: { points: 20, reason: "They have sent you a client before: thank them and keep the line open." },
+  warmIntro: { points: 15, reason: "You know someone who can introduce you." },
+  met: { points: 10, reason: "You have met." },
+  replied: { points: 8, reason: "They answered your letter." },
+};
+
+export function readModifiers(json: unknown): Record<Modifier, { points: number; reason: string }> {
+  const m = (json as { relationship_modifiers?: { add_points?: Record<string, unknown>; reasons?: Record<string, unknown> } }).relationship_modifiers;
+  const out = {} as Record<Modifier, { points: number; reason: string }>;
+  for (const [k, key] of Object.entries(MODIFIER_KEYS) as [Modifier, string][]) {
+    const points = m?.add_points?.[key];
+    const reason = m?.reasons?.[key];
+    if (typeof points !== "number" || typeof reason !== "string") throw new Error(`relationship modifier ${key} is missing`);
+    out[k] = { points, reason };
+  }
+  return out;
+}
+
+function loadModifiers() {
+  try {
+    return readModifiers(research);
+  } catch (err) {
+    console.error(`[referrals] docs/research/referral-tiers.json: ${err instanceof Error ? err.message : String(err)}. Using the built-in modifiers.`);
+    return BUILT_IN_MODIFIERS;
+  }
+}
+export const MODIFIERS = loadModifiers();
+
+/** The tier with what her log says added on top: a prior referral, a warm intro, a meeting, a reply. */
+export function withRelationship(r: TierResult, rel: RelationshipInput): TierResult {
+  const order: Modifier[] = ["referredBefore", "warmIntro", "met", "replied"];
+  const on = order.filter((k) => rel[k]);
+  if (on.length === 0) return r;
+  const score = Math.min(100, r.score + on.reduce((n, k) => n + MODIFIERS[k].points, 0));
+  // "Not who you help" stays Later unless they have already referred to her.
+  const mismatch = r.reasons.some((x) => x.startsWith("mostly sees"));
+  const tier: Tier = mismatch && !rel.referredBefore ? "later" : tierOf(score);
+  return { ...r, score, tier, reasons: [r.reasons[0], ...on.map((k) => MODIFIERS[k].reason.replace(/\.$/, "")), ...r.reasons.slice(1)] };
+}

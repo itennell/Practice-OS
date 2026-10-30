@@ -91,7 +91,7 @@ export function EvidenceBox({
   return (
     <div className="flex flex-col gap-2 rounded-[16px] border border-[var(--hairline)] p-3" data-testid="evidence">
       <div className="flex flex-wrap items-center gap-2">
-        {ev && <StatusPill status={PILL[ev.confidence]}>{CONFIDENCE_LABEL[ev.confidence]}</StatusPill>}
+        {ev?.checkedAt && <StatusPill status={PILL[ev.confidence]}>{CONFIDENCE_LABEL[ev.confidence]}</StatusPill>}
         <span className="text-small text-[var(--fg-muted)]">{checkedLabel(ev?.checkedAt ?? null)}</span>
       </div>
       <p className="text-small">

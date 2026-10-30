@@ -6,6 +6,7 @@
 import type postgres from "postgres";
 import { guard } from "../aeon/guard";
 import { db } from "../db";
+import { suppressedNpis } from "./contacts";
 import { geocodeAddresses, geocodePlace, addressKey, type Point } from "./geocode";
 import { haversineMiles, zipCenters } from "./geo";
 import { isKnownPlace } from "./places";
@@ -80,7 +81,8 @@ export type AreaResult = {
   notes: string[];
 };
 
-export type PracticeContext = { office: Point | null; officeZip: string | null; state: string; focus: Focus[] };
+/** `suppressed`: NPIs on her do-not-contact list, left out of every search. */
+export type PracticeContext = { office: Point | null; officeZip: string | null; state: string; focus: Focus[]; suppressed?: Set<string> };
 
 type Deps = {
   search?: typeof searchProviders;
@@ -174,7 +176,8 @@ export async function searchArea(
     notes.push(`The NPI Registry was slow, so this is showing the first ${found.timedOut.done} of ${found.timedOut.of} areas. Search again in a minute for the rest.`);
   }
   const inArea = new Set(zips);
-  const providers = found.providers.filter((p) => inArea.has(p.zip));
+  // Someone on her do-not-contact list never shows again (lib/referrals/contacts.ts).
+  const providers = found.providers.filter((p) => inArea.has(p.zip) && !ctx.suppressed?.has(p.npi));
   if (found.truncated) {
     notes.push(
       area.kind === "chicagoland"
@@ -239,7 +242,8 @@ export async function practiceContext(sql: postgres.Sql = db()): Promise<Practic
     const key = { street: loc.street, city: loc.city, state: loc.state ?? profile?.state ?? "", zip: loc.zip.slice(0, 5) };
     office = (await geocodeAddresses([key])).get(addressKey(key)) ?? null;
   }
-  return { office, officeZip: settings.searchZip, state: profile?.state ?? "IL", focus: focusFrom(profile?.who) };
+  const suppressed = await suppressedNpis(sql).catch(() => new Set<string>());
+  return { office, officeZip: settings.searchZip, state: profile?.state ?? "IL", focus: focusFrom(profile?.who), suppressed };
 }
 
 export function specialtyLabels(ids: SpecialtyId[]): string {

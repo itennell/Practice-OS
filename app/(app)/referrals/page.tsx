@@ -9,7 +9,9 @@ import { getProfile } from "@/lib/profile";
 import { evidenceFor } from "@/lib/referrals/evidence/store";
 import { recheckIfDue, recheckDeps } from "@/lib/referrals/sources/recheck";
 import { latestLetters, listSources, practiceFacts, rescoreOldCards } from "@/lib/referrals/store";
-import { boardTier, SCORE_VERSION, type TierResult } from "@/lib/referrals/tier";
+import { contactsFor } from "@/lib/referrals/contacts";
+import { tiersWithLog } from "@/lib/referrals/plan";
+import { SCORE_VERSION, type TierResult } from "@/lib/referrals/tier";
 
 export const metadata = { title: "Referrals · Practice-OS" };
 
@@ -46,9 +48,9 @@ async function Referrals() {
   }
   const evidence = await evidenceFor(sources);
   const board = Object.fromEntries(sources.filter((s) => s.npi).map((s) => [s.npi!, { stage: STAGE_LABEL[s.stage] }]));
-  const tiers: Record<string, TierResult> = Object.fromEntries(
-    sources.map((s) => [s.id, boardTier(s, { focus: facts.focus, clinicianState: facts.state })]),
-  );
+  // Tiers with her contact log on top (a prior referral, a warm intro, a meeting, a reply).
+  const contacts = await contactsFor(sources.map((s) => s.id));
+  const tiers: Record<string, TierResult> = tiersWithLog(sources, contacts, { focus: facts.focus, clinicianState: facts.state });
   return (
     <div className="flex flex-col gap-8">
       <AreaExplorer
@@ -60,7 +62,7 @@ async function Referrals() {
         <h2 id="board-heading" className="text-body font-semibold">
           Your board
         </h2>
-        <ReferralBoard initial={sources} letters={letters} tiers={tiers} evidence={evidence} demo={profile?.is_sample ?? true} />
+        <ReferralBoard initial={sources} letters={letters} tiers={tiers} evidence={evidence} contacts={contacts} demo={profile?.is_sample ?? true} />
       </section>
     </div>
   );

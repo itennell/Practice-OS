@@ -7,6 +7,7 @@ import { practiceToday } from "../compliance/store";
 import { db } from "../db";
 import { nearbyZips, zipCenters, zipDistance } from "./geo";
 import { fetchProviders, looksResidential, providerByNpi, SPECIALTY_BY_ID, type Provider, type SpecialtyId } from "./nppes";
+import { suppressedNpis } from "./contacts";
 import { nppesFacts, saveFacts } from "./evidence/store";
 import { focusFrom, providerTier, SCORE_VERSION, tierFor, type Focus } from "./tier";
 import { STAGES, STAGE_LABEL, type Stage } from "./stages";
@@ -36,6 +37,9 @@ export type ReferralSource = {
   next_follow_up_on: string | null;
   notes: string | null;
   is_sample: boolean;
+  website?: string | null;
+  introduced_by?: string | null;
+  confidence?: "confirmed" | "partly" | "unconfirmed" | null;
 };
 
 export type FoundSource = Provider & { distanceMiles: number | null; fitScore: number; id?: string };
@@ -48,7 +52,8 @@ export async function findReferralSources(
   const centers = await zipCenters();
   if (!centers[opts.zip]) throw new Error(`I don't know ZIP ${opts.zip}. Check it and try again.`);
   const zips = nearbyZips(centers, opts.zip, opts.radiusMiles ?? 3, 5);
-  const providers = await fetchProviders(opts.specialties, zips, opts.fetcher);
+  const blocked = await suppressedNpis(sql);
+  const providers = (await fetchProviders(opts.specialties, zips, opts.fetcher)).filter((p) => !blocked.has(p.npi));
   const { focus, state } = await practiceFacts(sql);
   const scored = providers
     .map((p) => {
@@ -87,10 +92,15 @@ export async function addToBoard(
   lookup: (npi: string) => Promise<Provider | null> = (npi) => providerByNpi(npi),
 ): Promise<{ added: FoundSource[]; missing: string[] }> {
   const { focus, state } = await practiceFacts(sql);
+  const blocked = await suppressedNpis(sql);
   const added: FoundSource[] = [];
   const missing: string[] = [];
   // Each one is saved as soon as NPPES answers for it, so one slow lookup doesn't lose the rest.
   for (const npi of new Set(items.map((i) => i.npi))) {
+    if (blocked.has(npi)) {
+      missing.push(npi);
+      continue;
+    }
     const item = items.find((i) => i.npi === npi)!;
     const p = await lookup(npi).catch(() => null);
     if (!p) {
@@ -204,7 +214,7 @@ export async function moveDueFollowUps(sql: postgres.Sql = db()): Promise<number
 
 const COLUMNS = `id, npi, name, organization, taxonomy, specialty, npi_type, credential, address, city, state, zip,
   phone, email, stage, distance_miles::float8 as distance_miles, fit_score, score_version, last_contacted_at, next_follow_up_on::text as next_follow_up_on,
-  notes, is_sample`;
+  notes, is_sample, website, introduced_by, confidence`;
 
 export async function listSources(sql: postgres.Sql = db()): Promise<ReferralSource[]> {
   await moveDueFollowUps(sql);

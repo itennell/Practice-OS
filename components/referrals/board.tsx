@@ -12,6 +12,8 @@ import { STAGES, STAGE_LABEL, type Stage } from "@/lib/referrals/stages";
 import type { LetterState, ReferralSource } from "@/lib/referrals/store";
 import type { TierResult } from "@/lib/referrals/tier";
 import type { Evidence } from "@/lib/referrals/evidence/merge";
+import type { Contact } from "@/lib/referrals/contacts";
+import { ContactLog, type CardView } from "./contact-log";
 import { EvidenceBox } from "./evidence-box";
 import { TierBadge } from "./tier-badge";
 
@@ -148,17 +150,21 @@ function Card({
   tier,
   letter,
   evidence,
+  contacts,
   drafting,
   demo,
   onMove,
   onDraft,
   onUpdate,
+  onLogged,
 }: {
   card: ReferralSource;
   tier: TierResult | undefined;
   letter: LetterState | undefined;
   evidence: Evidence | undefined;
+  contacts: Contact[];
   onUpdate: (card: ReferralSource, evidence: Evidence) => void;
+  onLogged: (view: CardView, said: string) => void;
   drafting: boolean;
   demo: boolean;
   onMove: (stage: Stage) => void;
@@ -208,6 +214,7 @@ function Card({
         <p className="text-small font-medium">Follow up {dateLabel(card.next_follow_up_on)}</p>
       )}
       <EvidenceBox card={card} evidence={evidence} onUpdate={onUpdate} />
+      <ContactLog card={card} contacts={contacts} onUpdate={onLogged} />
       {letter && <LetterBox letter={letter} name={card.name} demo={demo} />}
       <SettingSelect
         compact
@@ -291,6 +298,7 @@ export function ReferralBoard({
   letters: initialLetters,
   tiers,
   evidence: initialEvidence,
+  contacts: initialContacts,
   demo,
 }: {
   initial: ReferralSource[];
@@ -298,12 +306,16 @@ export function ReferralBoard({
   tiers: Record<string, TierResult>;
   /** What each source said about each card, merged (lib/referrals/evidence). */
   evidence: Record<string, Evidence>;
+  /** Each card's contact log, newest first (lib/referrals/contacts). */
+  contacts: Record<string, Contact[]>;
   /** The fictional demo practice: letters must never reach a real provider. */
   demo: boolean;
 }) {
   const [cards, setCards] = useState(initial);
   const [letters, setLetters] = useState(initialLetters);
   const [evidence, setEvidence] = useState(initialEvidence);
+  const [contacts, setContacts] = useState(initialContacts);
+  const [tierById, setTierById] = useState(tiers);
   const [drafting, setDrafting] = useState<string | null>(null);
   const [announce, setAnnounce] = useState("");
   // A new search refreshes the server data; take it when it arrives.
@@ -313,6 +325,16 @@ export function ReferralBoard({
     setCards(initial);
     setLetters(initialLetters);
     setEvidence(initialEvidence);
+    setContacts(initialContacts);
+    setTierById(tiers);
+  }
+
+  function logged(view: CardView, said: string) {
+    setCards((all) => all.map((c) => (c.id === view.card.id ? view.card : c)));
+    setContacts((all) => ({ ...all, [view.card.id]: view.contacts }));
+    setTierById((all) => ({ ...all, [view.card.id]: view.tier }));
+    setAnnounce(said);
+    notify.success(said);
   }
 
   function updated(card: ReferralSource, ev: Evidence) {
@@ -375,10 +397,12 @@ export function ReferralBoard({
                   <Card
                     key={c.id}
                     card={c}
-                    tier={tiers[c.id]}
+                    tier={tierById[c.id]}
                     letter={letters[c.id]}
                     evidence={evidence[c.id]}
+                    contacts={contacts[c.id] ?? []}
                     onUpdate={updated}
+                    onLogged={logged}
                     drafting={drafting === c.id}
                     demo={demo}
                     onMove={(s) => move(c.id, s)}

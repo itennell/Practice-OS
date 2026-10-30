@@ -1,4 +1,5 @@
 import { listPayerApplications, payerDates, type PayerDate } from "../payers/store";
+import { referralFollowUps, type FollowUp } from "../referrals/plan";
 import { formatBriefDate } from "./format";
 import { deadlinesView, type ObligationView } from "./view";
 
@@ -29,6 +30,8 @@ export type MorningBrief = {
   needs_dates: { title: string; question: string }[];
   /** Insurance follow-ups and recredential dates in the next 7 days, overdue included. */
   payer_dates: PayerDate[];
+  /** Referrals: follow-ups due in the next 7 days, overdue included (lib/referrals/plan.ts). */
+  referral_follow_ups?: FollowUp[];
   is_sample: boolean;
   summary: string;
 };
@@ -79,6 +82,15 @@ export function summarize(b: Omit<MorningBrief, "summary">): string {
       lines.push(`- ${d.what} (${w}, ${formatBriefDate(d.due_on)})`);
     }
   }
+  // Referrals follow-ups: their own block, after the deadlines and insurance dates.
+  const followUps = b.referral_follow_ups ?? [];
+  if (followUps.length) {
+    lines.push(`Referral follow-ups (${followUps.length}):`);
+    for (const f of followUps) {
+      const w = f.days_left < 0 ? `${-f.days_left} days overdue` : f.days_left === 0 ? "today" : `in ${f.days_left} days`;
+      lines.push(`- ${f.name} (${w}, ${formatBriefDate(f.on)})`);
+    }
+  }
   lines.push("Details and sources are on the Deadlines page.");
   return lines.join("\n");
 }
@@ -104,6 +116,7 @@ export async function morningBrief(): Promise<MorningBrief> {
     setup_questions: view.setups.map((s) => ({ rule_id: s.rule_id, title: s.title, what_to_do: s.what_to_do })),
     needs_dates: view.needs_facts.map((n) => ({ title: n.title, question: DATE_QUESTION[n.fact] ?? n.fact })),
     payer_dates: payerDates(await listPayerApplications(), view.today, BRIEF_DAYS),
+    referral_follow_ups: await referralFollowUps().catch(() => []),
     is_sample: view.is_sample,
   };
   return { ...base, summary: summarize(base) };

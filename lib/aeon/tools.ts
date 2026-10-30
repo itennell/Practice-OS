@@ -34,7 +34,12 @@ import { ACCOUNT_STEPS } from "../instagram/onboarding";
 import { SPECIALTIES, type SpecialtyId } from "../referrals/nppes";
 import { draftOutreach } from "../referrals/outreach";
 import { DEFAULT_SPECIALTIES, getReferralSettings } from "../referrals/settings";
-import { findReferralSources, interleave, listSources, moveSource, STAGE_LABEL, STAGES } from "../referrals/store";
+import { CONTACT_KINDS, CONTACT_LABEL, logContact, REFERRED_NOTE } from "../referrals/contacts";
+import { CONFIDENCE_LABEL } from "../referrals/evidence/merge";
+import { evidenceFor, setTypedEmail } from "../referrals/evidence/store";
+import { cardsNamed, outreachPlan } from "../referrals/plan";
+import { recheckDeps, recheckSource } from "../referrals/sources/recheck";
+import { findReferralSources, getSource, interleave, listSources, moveSource, STAGE_LABEL, STAGES } from "../referrals/store";
 import * as documents from "../documents";
 import { DOCUMENT_KINDS, forModel, type DocumentCard } from "../documents/card";
 import { guard, WITHHELD } from "./guard";
@@ -292,7 +297,7 @@ export const TOOLS: AeonTool[] = [
     title: "Morning brief: what needs you this week",
     description:
       "Answers 'What needs me this week?' for the clinician's practice: compliance deadlines due in the next 7 days " +
-      "(license, CE, CAQH, taxes, filings), insurance follow-ups in the same week, anything urgent just after, setup questions waiting, " +
+      "(license, CE, CAQH, taxes, filings), insurance follow-ups in the same week, referral follow-ups due, anything urgent just after, setup questions waiting, " +
       "and dates Aeon still needs. Never say nothing is due when an insurance date is listed. " +
       "Each item says what to do and the part only she can do. Read-only; changes nothing.",
     input: {},
@@ -312,6 +317,10 @@ export const TOOLS: AeonTool[] = [
           what: z.string(),
         }),
       ),
+      // Referrals (lib/referrals/plan.ts): follow-ups due in the same 7 days.
+      referral_follow_ups: z
+        .array(z.object({ id: z.string(), name: z.string(), on: z.string(), days_left: z.number(), stage: z.string(), last: z.string().nullable() }))
+        .optional(),
       is_sample: z.boolean(),
       summary: z.string(),
     },
@@ -884,6 +893,115 @@ export const TOOLS: AeonTool[] = [
         ],
         structuredContent: { status: row?.status ?? "pending", approval_id: approvalId },
       };
+    },
+  }),
+
+  // ---- Referrals v2 (lib/referrals/plan, contacts, sources): the log, the week's plan, re-checks.
+  tool({
+    name: "referral_outreach_plan",
+    title: "Who to reach out to this week",
+    description:
+      "Answers 'who should I reach out to this week?': referral follow-ups due in the next 7 days first, then up to 3 new people " +
+      "from the top of her Referrals board with why and the next step. People she reached out to in the last 30 days wait, and " +
+      "anyone on her do-not-contact list is never suggested. Never suggest offering anything in return for a referral. Read-only.",
+    input: {},
+    annotations: { readOnlyHint: true, openWorldHint: false },
+    label: "Planned this week's referral outreach",
+    changesData: false,
+    run: async () => {
+      const plan = await outreachPlan();
+      return { content: [{ type: "text", text: plan.summary }, { type: "text", text: JSON.stringify(plan, null, 2) }] };
+    },
+  }),
+
+  tool({
+    name: "log_referral_contact",
+    title: "Log a contact with a referral source",
+    description:
+      "Logs what she did with someone on her Referrals board: called, emailed, met, sent_letter, replied (they answered), note, or " +
+      "referred (they referred someone to her). Name the card as she said it ('Dr. Rivera', 'Lakeview Pediatrics') or pass its id. " +
+      "Reaching out moves the card to Contacted and sets a follow-up a week out unless she gives a date; a reply, meeting or referral " +
+      "moves it to Connected and raises its tier. For 'referred', record NOTHING about who was referred: no name, initials, age or reason; " +
+      "Aeon never tells the referrer someone became a client without that person's written consent. If more than one card fits, ask which.",
+    input: {
+      source: z.string().trim().min(2).max(160).describe("The card's name as she said it, or its id."),
+      kind: z.enum(CONTACT_KINDS),
+      happened_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("YYYY-MM-DD; today when left out."),
+      note: z.string().trim().max(500).optional().describe("Her words about the contact. Never anything about a client. Ignored for 'referred'."),
+      follow_up_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("YYYY-MM-DD for the next follow-up, if she said one."),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: false },
+    label: "Logged a referral contact",
+    changesData: true,
+    run: async ({ source, kind, happened_on, note, follow_up_on }) => {
+      const cards = await listSources();
+      const byId = cards.find((c) => c.id === source);
+      const matches = byId ? [byId] : cardsNamed(source, cards);
+      if (matches.length === 0) return text({ logged: false, why: `No card on her Referrals board is named "${source}".` });
+      if (matches.length > 1 && !byId) {
+        return text({ logged: false, ask_which: matches.slice(0, 5).map((c) => ({ id: c.id, name: c.name, column: STAGE_LABEL[c.stage] })) });
+      }
+      const card = matches[0];
+      try {
+        const r = await logContact(card.id, { kind, happenedOn: happened_on, note, followUpOn: follow_up_on, by: "aeon" });
+        return text({
+          logged: true,
+          name: card.name,
+          what: CONTACT_LABEL[kind],
+          on: r.contact.happened_on,
+          column: STAGE_LABEL[r.stage],
+          next_follow_up_on: r.nextFollowUpOn,
+          ...(kind === "referred" ? { note: REFERRED_NOTE } : {}),
+        });
+      } catch (err) {
+        return text({ logged: false, why: err instanceof Error ? err.message : "Couldn't log that." });
+      }
+    },
+  }),
+
+  tool({
+    name: "recheck_referral_source",
+    title: "Check a referral source again",
+    description:
+      "Checks one card on her Referrals board (by its id) against every free source again: the NPI Registry, the CMS Medicare files, " +
+      "the state license list, OpenStreetMap and their own website (robots.txt honored, never directories like Psychology Today). " +
+      "Returns who confirmed it, how sure Aeon is, conflicts, and any email found with where it came from. Takes up to a minute.",
+    input: { id: z.string().uuid() },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: true },
+    label: "Checked a referral source again",
+    changesData: true,
+    run: async ({ id }) => {
+      const card = await getSource(id);
+      if (!card) return text({ checked: false, why: "No card with that id." });
+      const r = await recheckSource(id, recheckDeps());
+      const ev = (await evidenceFor([{ id, npi_type: card.npi_type }]))[id];
+      return text({
+        name: card.name,
+        confidence: CONFIDENCE_LABEL[ev.confidence],
+        confirmed_by: ev.confirmedBy,
+        conflicts: ev.conflicts,
+        flags: ev.flags,
+        email: ev.fields.email ? { address: ev.fields.email.value, from: ev.fields.email.fact.detail?.label ?? ev.fields.email.origins[0] } : null,
+        did_not_answer: r.unavailable,
+        notes: r.notes,
+      });
+    },
+  }),
+
+  tool({
+    name: "set_referral_email",
+    title: "Save the email for a referral source",
+    description:
+      "Saves the email she gives for one card on her Referrals board (by its id); hers always wins over what Aeon found. " +
+      "An empty email clears hers. Only an email she says; never one you guessed.",
+    input: { id: z.string().uuid(), email: z.union([z.string().trim().email().max(254), z.literal("")]) },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+    label: "Saved a referral source's email",
+    changesData: true,
+    run: async ({ id, email }) => {
+      if (!(await getSource(id))) return text({ saved: false, why: "No card with that id." });
+      const ev = await setTypedEmail(id, email || null);
+      return text({ saved: true, email: ev.fields.email?.value ?? null });
     },
   }),
 
