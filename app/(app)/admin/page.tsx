@@ -4,6 +4,7 @@ import { connection } from "next/server";
 import { Suspense, type ReactNode } from "react";
 import { CheckCheck, ChevronRight } from "lucide-react";
 import { Credentialing, GoodFaithEstimates, Insurance, ReleaseForms, Superbills } from "@/components/admin/panels";
+import { ClientForms } from "@/components/admin/client-forms";
 import { SidePanel } from "@/components/admin/side-panel";
 import { EmptyState } from "@/components/shared/empty-state";
 import { OfficeSettings } from "@/components/office-settings";
@@ -24,6 +25,7 @@ export const metadata: Metadata = { title: "Admin · Practice-OS" };
 // as six cards. Forms open in a side panel (?panel=...), filled with what Aeon knows.
 
 const PANELS: Record<AdminPanel, { title: string; description: string }> = {
+  forms: { title: "Client forms", description: "Every form your practice uses, filled with your practice. Client boxes stay blank." },
   gfe: { title: "Good Faith Estimates", description: "For self-pay clients. Aeon fills in your fees and today's date." },
   superbill: { title: "Superbills", description: "Aeon fills in your practice, codes and fees. Client details stay blank." },
   release: { title: "Release of information", description: "The Illinois consent form. Nothing is saved here." },
@@ -165,6 +167,9 @@ async function Cards() {
         <Card title="Deadlines" href="/admin/deadlines" summary={view ? `${plural(view.due.length, "deadline")} in the next 30 days` : "Your compliance calendar"} />
         <Card title="Client forms" summary={`Estimates, superbills, release forms · ${plural(waitingGfe, "estimate")} waiting, ${plural(notGiven, "superbill")} not given`}>
           <div className="relative mt-2 flex flex-wrap gap-2">
+            <ButtonLink variant="quiet" href="/admin?panel=forms" className="h-10! px-4! text-small!">
+              All client forms
+            </ButtonLink>
             <ButtonLink variant="quiet" href="/admin?panel=gfe" className="h-10! px-4! text-small!">
               Good Faith Estimate
             </ButtonLink>
@@ -203,7 +208,9 @@ async function Panel({ searchParams }: { searchParams: PageProps<"/admin">["sear
   return (
     <SidePanel key={which} title={PANELS[which].title} description={PANELS[which].description}>
       <Suspense fallback={<div aria-hidden className="h-96 animate-pulse rounded-[24px] bg-[var(--hairline)]" />}>
-        {which === "gfe" ? (
+        {which === "forms" ? (
+          <ClientForms form={typeof params.form === "string" ? params.form : undefined} />
+        ) : which === "gfe" ? (
           <GoodFaithEstimates focus={focus} />
         ) : which === "superbill" ? (
           <Superbills focus={focus} />
