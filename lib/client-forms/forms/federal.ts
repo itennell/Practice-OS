@@ -1,5 +1,6 @@
-import { dollars, fullAddress, signedBy } from "../facts";
-import type { FormDef, PracticeFacts } from "../types";
+import { dollars, fullAddress, replyHours, signedBy } from "../facts";
+import { REVIEW } from "../review";
+import { fillIn, type FormDef, type PracticeFacts } from "../types";
 
 // Forms that federal law shapes: the HIPAA Notice of Privacy Practices and its
 // acknowledgment, the records (right of access) request, the nondiscrimination
@@ -28,7 +29,8 @@ const HEADER =
 const OCR = "U.S. Department of Health and Human Services, Office for Civil Rights: 200 Independence Avenue SW, Washington, D.C. 20201; 1-800-368-1019; www.hhs.gov/ocr/complaints";
 
 const privacyContact = (f: PracticeFacts) => `${f.policies.privacy_officer.trim() || signedBy(f)}, ${f.phone}`;
-const usDay = (iso: string) => {
+const usDay = (iso: string | null) => {
+  if (!iso) return fillIn("the date your privacy notice takes effect (Your policies)");
   const [y, m, d] = iso.split("-");
   return `${Number(m)}/${Number(d)}/${y}`;
 };
@@ -42,7 +44,8 @@ export const npp: FormDef = {
   group: "law",
   appliesTo: "Required for HIPAA covered entities: any practice that bills insurance or checks eligibility electronically. Good practice for everyone.",
   topics: ["notice of privacy practices", "npp", "hipaa", "privacy notice", "privacy practices"],
-  note: "Give it to every client by the first session (telehealth too), post it in your office and on your website, and ask for a signed acknowledgment.",
+  note: "Give it to every client by the first session (telehealth too), post it in your office and on your website, and ask for a signed acknowledgment. If you ever contact clients to raise funds, add a paragraph saying so and how to opt out (164.520(b)(1)(iii)(A)).",
+  review: [REVIEW.npp_model, REVIEW.ocr],
   elements: [
     law("header", "The exact header in capitals", "45 CFR 164.520(b)(1)(i)", E_164_520, [/THIS NOTICE DESCRIBES HOW MEDICAL INFORMATION ABOUT YOU MAY BE USED AND DISCLOSED/]),
     law("tpo", "Treatment, payment and operations, with an example of each", "164.520(b)(1)(ii)(A)", E_164_520, [/For treatment/i, /For payment/i, /To run (our|the) practice/i, /for example/i]),
@@ -84,7 +87,6 @@ export const npp: FormDef = {
       id: "authorization",
       text: "We need your written permission before we share psychotherapy notes, use your information for marketing, or sell it. We will not do any of these without it. Any other use not described here also needs your written permission. You can take back your permission in writing at any time; it will not undo what we already shared.",
     },
-    { kind: "clause", id: "optional_limits", editable: true, text: "We do not raise funds or market to clients, and we never sell client information." },
     { kind: "heading", text: "Your rights" },
     { kind: "clause", id: "right_access", text: "See or get a copy of your records. Ask us in writing. We will answer within 30 days, and we charge only a fair, cost-based fee." },
     { kind: "clause", id: "right_amend", text: "Ask us to correct your records if you think they are wrong or missing something. If we say no, we will tell you why in writing." },
@@ -173,13 +175,13 @@ export const recordsRequest: FormDef = {
     { kind: "field", id: "send_to", label: "Their name and address, or secure email", lines: 2 },
     { kind: "heading", text: "What to expect" },
     { kind: "clause", id: "timing", text: "We will answer within 30 days. If we need more time, we will tell you in writing why and when, no more than 30 days later." },
-    { kind: "clause", id: "fees", editable: true, text: `We charge only a fair fee based on our cost to copy and mail your records, and we will tell you the amount before we start. ${f.policies.records_fee_note}` },
+    { kind: "clause", id: "fees", editable: true, label: "Copy fees", review: REVIEW.copy_fees, text: `We charge only a fair fee based on our cost to copy and mail your records, and we will tell you the amount before we start. ${f.policies.records_fee_note}` },
     { kind: "clause", id: "psychotherapy_notes", text: "Your right to records does not include psychotherapy notes, your therapist's separate private notes from sessions. You still get your treatment record." },
     { kind: "clause", id: "denial", text: "If we say no to any part, we will tell you why in writing and how to ask for a review by another licensed professional or make a complaint. We will still give you everything else." },
     {
       kind: "clause",
       id: "illinois_age",
-      text: "Under Illinois law (740 ILCS 110/4), clients 12 and older may see their own records. A parent or guardian may see records of a client under 12. For a client 12 to 17, a parent or guardian may see them if the client is told and does not object.",
+      text: "Under Illinois law (740 ILCS 110/4), clients 12 and older may see their own records. A parent or guardian may see records of a client under 12. For a client 12 to 17, a parent or guardian may see them if the client is told and does not object, or if the therapist does not find compelling reasons to deny it (740 ILCS 110/4(a)(3)).",
     },
     { kind: "signature", caption: "Signature of client, or parent, guardian or personal representative" },
     { kind: "field", id: "representative_authority", label: "If signing for the client: your relationship or authority" },
@@ -198,13 +200,22 @@ export const accessibilityNotice: FormDef = {
     "Section 1557 notice and taglines: required if you take Medicare or Medicaid. ADA Title III duties apply to every office; this notice is good practice.",
   topics: ["nondiscrimination", "section 1557", "ada", "accessibility", "language assistance", "taglines", "disability"],
   note: "If you take Medicare or Medicaid, add HHS's translated taglines for the top 15 languages in Illinois (from hhs.gov/civil-rights) and post this in your office and on your website.",
+  review: [REVIEW.taglines, REVIEW.ocr],
   elements: [
     law("nondiscrimination", "We do not discriminate (race, color, national origin, sex, age, disability)", "45 CFR 92.10(a)(1)(i)", E_92_10, [/race, color, national origin/i, /age/i, /disability/i]),
     law("disability_aids", "Free aids for people with disabilities", "92.10(a)(1)(ii); 28 CFR 36.303", E_36_303, [/sign language interpreters/i, /large print/i, /no cost|free/i]),
     law("language", "Free language help", "92.10(a)(1)(iii)", E_92_10, [/interpreters/i, /translated/i]),
     law("how_to_ask", "How to ask for help", "92.10(a)(1)(iv)", E_92_10, [/To ask for (this )?help/i]),
     law("grievance", "How to complain to us and to HHS OCR", "92.10(a)(1)(vi)-(vii)", E_92_10, [/complain/i, /Office for Civil Rights/]),
-    law("tagline", "Language-help tagline (English and Spanish here)", "92.11(a)-(b)", E_92_11, [/ATENCI/, /free language/i]),
+    // Not a 92.11(b) claim: the 15-language set is not printed, so this element checks only the two taglines that are.
+    {
+      id: "tagline",
+      label: "Language-help tagline in English and Spanish (not the full 15-language set 92.11(b) asks for)",
+      citation: "45 CFR 92.11(a); 92.11(b) not met",
+      url: E_92_11,
+      level: "practice",
+      mustSay: [/ATTENTION: If you speak a language other than English, free language assistance/, /ATENCIÓN: si habla español/],
+    },
     { id: "service_animals", label: "Service animals welcome, no fee", citation: "28 CFR 36.302(c)", url: E_36_302, level: "practice", mustSay: [/Service animals are welcome/i] },
     { id: "relay", label: "Relay calls (711) accepted", citation: "28 CFR 36.303(d)", url: E_36_303, level: "practice", mustSay: [/711/] },
   ],
@@ -222,7 +233,7 @@ export const accessibilityNotice: FormDef = {
     { kind: "clause", id: "language", text: "If English is not your main language, we offer free help, such as qualified interpreters and information translated into your language." },
     { kind: "clause", id: "how_to_ask", text: `To ask for this help, call ${f.phone} or email ${f.email}. We accept relay calls (dial 711).` },
     { kind: "clause", id: "service_animals", text: "Service animals are welcome. There is no fee, and we will not ask for papers." },
-    { kind: "clause", id: "modifications", editable: true, text: "If one of our rules is hard for you to follow because of a disability, tell us and we will work with you to change it." },
+    { kind: "clause", id: "modifications", editable: true, label: "Changing a rule for a disability", text: "If one of our rules is hard for you to follow because of a disability, tell us and we will work with you to change it." },
     {
       kind: "clause",
       id: "grievance",
@@ -269,11 +280,13 @@ export const communicationConsent: FormDef = {
     {
       kind: "clause",
       id: "consent",
-      text: f.policies.texting_ok
+      text: f.policies.texting_ok === null
+        ? fillIn("whether clients may text you about appointments (Your policies)")
+        : f.policies.texting_ok
         ? `By ticking text, you agree that ${f.practiceName} may text or call this number about your appointments. Our texts only say the date and time, never details about your care. You can stop texts at any time by replying STOP or telling us.`
         : `We do not text clients. We call or email about appointments only, and our messages say the date and time, never details about your care. Reply STOP or tell us if you want them to end.`,
     },
-    { kind: "clause", id: "reply_time", editable: true, text: `We reply to messages within ${f.policies.reply_within_hours} hours on days the office is open.` },
+    { kind: "clause", id: "reply_time", editable: true, label: "Reply time", text: `We reply to messages within ${replyHours(f)} hours on days the office is open.` },
     { kind: "clause", id: "not_emergency", text: "Do not use text or email for an emergency. If you are in danger or thinking about hurting yourself, call or text 988, or call 911." },
     { kind: "signature", caption: "Signature of client, or parent or guardian" },
   ],
@@ -309,6 +322,7 @@ export const cardAuthorization: FormDef = {
       kind: "clause",
       id: "what_charged",
       editable: true,
+      label: "What the card may be charged for",
       text: `I allow ${f.practiceName} to charge this card for session fees, copays and unpaid balances${
         f.policies.late_cancel_fee_cents || f.policies.no_show_fee_cents
           ? `, and for a late cancellation fee of ${dollars(f.policies.late_cancel_fee_cents)} or missed session fee of ${dollars(f.policies.no_show_fee_cents)} under the practice policies I signed`

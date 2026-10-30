@@ -14,10 +14,13 @@ import type { Overrides } from "./render";
 import { policiesSchema, type FormId, type Policies, type PracticeFacts } from "./types";
 
 // Her wording for the client forms library (practice_os.client_form_templates,
-// migration 034). Only practice-level text: a client's answers never reach here.
-// Every edit passes the sensitive-info guard (no client names or details) and the
-// required-elements check before it is saved, and each save is audited by form
-// type only, never the text.
+// migration 034). Meant for practice-level text only: a client's answers have no
+// place here. Every free-text field she saves (her wording, her added paragraph,
+// the records-fee note, the privacy contact and the backup colleague) goes through
+// the sensitive-info guard (lib/aeon/guard), which refuses what looks like a client
+// name or detail. The guard is a filter, not a guarantee. Edits also go through
+// the required-elements check, and each save is audited by form type only, never
+// the text.
 
 const overridesSchema = z
   .object({
@@ -26,10 +29,11 @@ const overridesSchema = z
   })
   .strict();
 
-export async function loadPolicies(sql: postgres.Sql = db()): Promise<Partial<Policies>> {
+/** Her saved policies, and whether she has saved them at all. */
+export async function loadPolicies(sql: postgres.Sql = db()): Promise<{ policies: Partial<Policies>; saved: boolean }> {
   const [row] = await sql<{ overrides: unknown }[]>`select overrides from practice_os.client_form_templates where form_type = '_practice'`;
   const parsed = policiesSchema.partial().safeParse(row?.overrides ?? {});
-  return parsed.success ? parsed.data : {};
+  return { policies: parsed.success ? parsed.data : {}, saved: Boolean(row) };
 }
 
 export async function loadOverrides(form: FormId, sql: postgres.Sql = db()): Promise<Overrides> {
@@ -38,11 +42,22 @@ export async function loadOverrides(form: FormId, sql: postgres.Sql = db()): Pro
   return parsed.success ? parsed.data : {};
 }
 
+/** Her saved wording for every form, in one read (the library checks each form before offering its PDF). */
+export async function loadAllOverrides(sql: postgres.Sql = db()): Promise<Partial<Record<FormId, Overrides>>> {
+  const rows = await sql<{ form_type: string; overrides: unknown }[]>`select form_type, overrides from practice_os.client_form_templates where form_type <> '_practice'`;
+  return Object.fromEntries(
+    rows.flatMap((r) => {
+      const parsed = overridesSchema.safeParse(r.overrides);
+      return parsed.success ? [[r.form_type, parsed.data]] : [];
+    }),
+  );
+}
+
 /** Everything a template needs, or null before she has a practice profile. */
 export async function loadFacts(sql: postgres.Sql = db()): Promise<{ facts: PracticeFacts; profile: CredentialingProfile } | null> {
   const [profile, settings, policies, today] = await Promise.all([loadCredentialingProfile(sql), loadPracticeSettings(sql), loadPolicies(sql), practiceToday()]);
   if (!profile) return null;
-  return { facts: practiceFacts(profile, settings.fees, policies, today), profile };
+  return { facts: practiceFacts(profile, settings.fees, policies.policies, today, policies.saved), profile };
 }
 
 async function upsert(form: string, value: object, sql: postgres.Sql) {
@@ -60,15 +75,15 @@ async function refuseClientDetails(texts: string[]) {
 
 export async function savePolicies(input: unknown, sql: postgres.Sql = db()): Promise<Partial<Policies>> {
   const next = policiesSchema.partial().parse(input);
-  // The privacy contact and backup colleague are professionals named on purpose; the fee note is free text.
-  await refuseClientDetails([next.records_fee_note ?? ""]);
-  const merged = { ...(await loadPolicies(sql)), ...next };
+  // Every free-text policy is checked. A colleague's name passes when written with a title ("Jordan Lee, LCSW") or from her Referrals list.
+  await refuseClientDetails([next.records_fee_note ?? "", next.privacy_officer ?? "", next.backup_colleague ?? ""]);
+  const merged = { ...(await loadPolicies(sql)).policies, ...next };
   await upsert("_practice", merged, sql);
   await audit({ actor: "clinician", action: "client_form_policies_saved", subjectType: "client_form", subjectId: "_practice", details: { keys: Object.keys(next) } }, sql);
   return merged;
 }
 
-/** Saves her edits only if every required element is still on the form. */
+/** Saves her edits only if they take out none of the required elements the form says without them. */
 export async function saveOverrides(form: FormId, input: unknown, sql: postgres.Sql = db()) {
   const def = getForm(form);
   if (!def) throw new Error("No such form.");
@@ -80,7 +95,10 @@ export async function saveOverrides(form: FormId, input: unknown, sql: postgres.
   const loaded = await loadFacts(sql);
   if (!loaded) throw new Error("Add your practice details on Admin › Credentialing first.");
   const { check } = prepare(def, loaded.facts, clean);
-  if (!check.ok) throw new Error(`That edit takes out something the form must say: ${check.missing.map((m) => `${m.label} (${m.citation})`).join("; ")}.`);
+  // A gap she hasn't filled yet (no fees set, say) isn't her edit's fault; only refuse what the edit takes out.
+  const before = new Set(prepare(def, loaded.facts).check.missing.map((m) => m.id));
+  const lost = check.missing.filter((m) => !before.has(m.id));
+  if (lost.length || !check.disclaimer) throw new Error(`That edit takes out something the form must say: ${lost.map((m) => `${m.label} (${m.citation})`).join("; ")}.`);
   await upsert(form, clean, sql);
   await audit({ actor: "clinician", action: "client_form_edited", subjectType: "client_form", subjectId: form, details: { clauses: Object.keys(clauses), extra: Boolean(next.extra?.trim()) } }, sql);
   return { overrides: clean, check };

@@ -1,5 +1,6 @@
-import { dollars, ethicsCode, signedBy } from "../facts";
-import type { FormDef, PracticeFacts, RequiredElement } from "../types";
+import { dollars, ethicsCode, isLmft, replyHours, signedBy } from "../facts";
+import { REVIEW } from "../review";
+import { fillIn, type Block, type FormDef, type PracticeFacts, type RequiredElement } from "../types";
 
 // The consent forms: informed consent to treatment (with Illinois limits of
 // confidentiality), telehealth, minors and couples or family therapy. Each
@@ -26,9 +27,31 @@ const el = (id: string, label: string, citation: string, url: string, level: Req
   mustSay,
 });
 
-const backup = (f: PracticeFacts) => f.policies.backup_colleague.trim() || "a colleague I have named in my professional will";
+const backup = (f: PracticeFacts) => f.policies.backup_colleague.trim() || fillIn("the colleague who will contact clients if you can't (Your policies)");
 const fees = (f: PracticeFacts) =>
-  f.fees.length ? f.fees.map((x) => `${x.label}: ${dollars(x.cents)}`).join("; ") : "My fees are listed in my practice policies.";
+  f.fees.length ? f.fees.map((x) => `${x.label}: ${dollars(x.cents)}`).join("; ") : fillIn("your fees (Admin › Office hours and fees)");
+const insuranceLine = (f: PracticeFacts) =>
+  f.policies.accepts_insurance === null
+    ? fillIn("whether you bill insurance (Your policies)")
+    : f.policies.accepts_insurance
+      ? "If you use insurance, your plan may limit how many sessions it pays for or what it covers, and you pay what it does not."
+      : "I do not bill insurance; I can give you a superbill to send to your plan yourself.";
+
+/** Printed for LMFTs only: 405 ILCS 5/3-550(c) does not name their license, so they ask a parent first. */
+const lmftCaveat = (f: PracticeFacts): Block[] =>
+  isLmft(f)
+    ? [
+        {
+          kind: "clause",
+          id: "lmft_caveat",
+          text: "Please note: I am a licensed marriage and family therapist. The law that lets clients 12 and older start therapy on their own lists counselors, social workers and psychologists, and does not name my license (405 ILCS 5/3-550(c)). So I ask a parent or guardian to agree before I see any client under 18.",
+          review: "You are an LMFT: 405 ILCS 5/3-550(c) does not name your license. Ask your attorney whether you may use the 12-and-older path at all.",
+        },
+      ]
+    : [];
+
+const FOID_REVIEW =
+  "Whether the FOID clear-and-present-danger report (430 ILCS 65/8.1) binds your license, and whether Illinois gives you a duty to warn (740 ILCS 110/11 says \"may\"), is unsettled for LCSW, LCPC and LMFT. Ask your attorney before relying on these two limits.";
 
 const LIMITS = [
   "If I believe a child is being abused or neglected, Illinois law requires me to report it to DCFS right away (325 ILCS 5/4).",
@@ -48,6 +71,7 @@ export const informedConsent: FormDef = {
   summary: "What therapy with you involves, fees, risks, your training, limits of confidentiality under Illinois law, and the client's rights.",
   group: "ethics",
   appliesTo: "Every client, every license. Required by the Illinois board rules (68 IAC 1375.225, 1283.100) and every ethics code (NASW 1.03, ACA A.2, AAMFT 1.2, APA 10.01).",
+  review: [REVIEW.aamft, REVIEW.aca, REVIEW.collections],
   topics: ["informed consent", "consent for treatment", "consent to treatment", "consent form", "limits of confidentiality"],
   elements: [
     el("purpose_methods", "Purpose, methods and how therapy usually goes", "NASW 1.03(a); APA 10.01(a); 68 IAC 1375.225(a)(9)", IAC1375, "ethics", [/what (our work|therapy) (together )?is for/i, /how sessions (usually )?go/i]),
@@ -55,6 +79,7 @@ export const informedConsent: FormDef = {
     el("alternatives", "Other kinds of help", "NASW 1.03(a)", NASW, "ethics", [/other kinds of help/i]),
     el("qualifications", "Her license, training and ethics code", "ACA A.2.b; 68 IAC 1375.225(a)(9)", IAC1375, "law", [/licensed/i, /code of ethics/i]),
     el("fees_billing", "Fees, billing, insurance limits and unpaid bills", "NASW 1.03(a); APA 10.01(a); 68 IAC 1283.100(m)", IAC1283, "law", [/fee/i, /insurance/i, /unpaid/i]),
+    el("fee_amounts", "Her actual fee for each kind of session", "APA 6.04(a); 68 IAC 1283.100(m)", IAC1283, "law", [/: \$\d/]),
     el("length", "About how long therapy may last", "68 IAC 1375.225(a)(9); 1283.100(m)", IAC1375, "law", [/how long/i]),
     el("refuse_stop", "Right to refuse or stop at any time", "NASW 1.03(a); ACA A.2.b", NASW, "ethics", [/stop at any time/i, /say no/i]),
     el("questions", "Right to ask questions at any time", "NASW 1.03(a); APA 10.01(a)", APA, "ethics", [/ask questions/i]),
@@ -79,7 +104,7 @@ export const informedConsent: FormDef = {
     { kind: "practice", label: "Therapist", value: signedBy(f) },
     { kind: "practice", label: "License", value: `${f.licenseType}, licensed in Illinois by the ${f.board}` },
     { kind: "clause", id: "qualifications", text: `I am licensed to practice in Illinois, and I follow Illinois law and ${ethicsCode(f)}. You can ask me about my training and experience at any time.` },
-    { kind: "clause", id: "approach", editable: true, text: "In my work I draw on approaches that research supports. If I ever suggest a newer method, I will tell you and explain the risks first." },
+    { kind: "clause", id: "approach", editable: true, label: "Your approach", text: "In my work I draw on approaches that research supports. If I ever suggest a newer method, I will tell you and explain the risks first." },
     { kind: "heading", text: "What therapy involves" },
     { kind: "clause", id: "purpose_methods", text: "At the start, we will talk about what our work together is for and what you hope will change. I will explain how sessions usually go and about how long this kind of work may take." },
     { kind: "clause", id: "risks_benefits", text: "Therapy can help, but talking about hard things can feel uncomfortable at times. There is no promise of a certain result. You can ask me about other kinds of help, and I will tell you about them." },
@@ -87,14 +112,14 @@ export const informedConsent: FormDef = {
     { kind: "clause", id: "questions", text: "You can ask questions now or at any time. If anything here is unclear, I will explain it another way. If you would like an interpreter, I will help arrange one." },
     { kind: "clause", id: "conflicts", text: "If I have any relationship or interest that could affect your care, I will tell you." },
     { kind: "heading", text: "Fees and billing" },
-    { kind: "clause", id: "fees_billing", text: `${fees(f)}. Payment is due at each session. ${f.policies.accepts_insurance ? "If you use insurance, your plan may limit how many sessions it pays for or what it covers, and you pay what it does not." : "I do not bill insurance; I can give you a superbill to send to your plan yourself."} If a bill stays unpaid, I will write to you first and give you time to pay or set up a plan. My practice policies give the details.` },
+    { kind: "clause", id: "fees_billing", text: `${fees(f)}. Payment is due at each session. ${insuranceLine(f)} If a bill stays unpaid, I will write to you first and give you time to pay or set up a plan. My practice policies give the details.` },
     { kind: "clause", id: "length", text: "We will talk about how long therapy may last, and we will check in on it along the way." },
     { kind: "heading", text: "Your privacy and its limits" },
     { kind: "clause", id: "confidentiality", text: "What you say in therapy stays private. Illinois law (740 ILCS 110) protects your records and what you tell me, more strictly than many states. There are a few exceptions, listed here." },
     { kind: "clause", id: "limit_child_abuse", text: LIMITS[0] },
     { kind: "clause", id: "limit_adult_abuse", text: LIMITS[1] },
-    { kind: "clause", id: "limit_danger", text: LIMITS[2] },
-    { kind: "clause", id: "limit_foid", text: LIMITS[3] },
+    { kind: "clause", id: "limit_danger", text: LIMITS[2], review: FOID_REVIEW },
+    { kind: "clause", id: "limit_foid", text: LIMITS[3], review: FOID_REVIEW },
     { kind: "clause", id: "limit_emergency", text: LIMITS[4] },
     { kind: "clause", id: "limit_court", text: LIMITS[5] },
     { kind: "clause", id: "limit_complaint", text: LIMITS[6] },
@@ -122,6 +147,7 @@ export const telehealthConsent: FormDef = {
   summary: "Video and phone sessions: Illinois location rule, privacy, what happens if the call drops, and emergencies.",
   group: "ethics",
   appliesTo: "Every client you see by video or phone. Illinois has no required telehealth form; the ethics codes (ACA H.2.a, AAMFT 6, NASW 1.03(f)) require these disclosures.",
+  review: [REVIEW.aamft, REVIEW.aca],
   topics: ["telehealth", "telehealth consent", "video sessions", "teletherapy", "online therapy", "phone sessions"],
   elements: [
     el("choice", "Telehealth is the client's choice; in person is available", "ACA H.2.a", ACA, "ethics", [/your choice/i, /in person/i]),
@@ -151,7 +177,7 @@ export const telehealthConsent: FormDef = {
     { kind: "clause", id: "emergency", text: "If there is an emergency during a session, I may call 911 to the address you gave me. Between sessions, if you are in danger or thinking about hurting yourself, call or text 988, or call 911." },
     { kind: "heading", text: "Other things to know" },
     { kind: "clause", id: "insurance", text: "Check with your insurance that it pays for video or phone sessions. If it does not, you pay the full fee." },
-    { kind: "clause", id: "response_time", editable: true, text: `I usually reply to messages within ${f.policies.reply_within_hours} hours on business days. Session times are in Central Time.` },
+    { kind: "clause", id: "response_time", editable: true, label: "Reply time and time zone", text: `I usually reply to messages within ${replyHours(f)} hours on business days. Session times are in Central Time.` },
     { kind: "clause", id: "social_media", text: "I do not connect with clients on social media, and I do not reply to messages sent there." },
     { kind: "clause", id: "minor", text: "If you are under 12, a parent or guardian signs for you." },
     { kind: "field", id: "client_name", label: "Client name" },
@@ -166,14 +192,24 @@ export const minorConsent: FormDef = {
   group: "law",
   appliesTo: "Every client under 18. Illinois 405 ILCS 5/3-550 and 740 ILCS 110/4; ACA A.2.d, APA 3.10(b).",
   topics: ["minor consent", "minor", "child", "teen", "adolescent", "parent consent", "guardian consent"],
-  note: "405 ILCS 5/3-550 names counselors, social workers and psychologists; it does not name LMFTs. If you are an LMFT, ask your attorney before seeing a 12 to 16 year old without a parent's consent.",
+  review: [
+    "405 ILCS 5/3-550(c) names counselors, social workers and psychologists, not LMFTs. Whether an LMFT may see a 12 to 16 year old without a parent's consent is unsettled; the form tells LMFT clients you ask a parent first.",
+    "For teens 12 to 17, 750 ILCS 5/602.11(b) gives both parents record access, while 740 ILCS 110/4(a)(3) and 405 ILCS 5/3-550(a-2) protect the teen. Which controls for mental health records is unsettled.",
+    "740 ILCS 110/4(a)(3) is worded \"or\": read literally, either the teen not objecting or your not finding compelling reasons is enough for a parent to see the record. Some read it the other way. The form follows the statute's words.",
+  ],
   elements: [
     el("under_12", "Under 12: a parent or guardian consents and can see records", "740 ILCS 110/4(a)(1)", ilcs("074001100K4"), "law", [/under 12/i, /parent or (legal )?guardian/i]),
     el("twelve_plus", "12 and older can start therapy on their own", "405 ILCS 5/3-550(a)", ilcs("040500050K3-550"), "law", [/12 or older/i, /without a parent/i]),
-    el("eight_sessions", "Under 17: up to 8 sessions of 90 minutes before a parent is involved", "405 ILCS 5/3-550(a)", ilcs("040500050K3-550"), "law", [/8 (times|sessions)/i, /90 minutes/i]),
-    el("parent_not_told", "The parent is not told without the minor's written OK, except as the law requires", "405 ILCS 5/3-550(a-2)", ilcs("040500050K3-550"), "law", [/won't be told|will not be told|not tell your parent/i]),
+    el("eight_sessions", "Under 17: up to 8 sessions of 90 minutes before a parent consents", "405 ILCS 5/3-550(a)", ilcs("040500050K3-550"), "law", [/8 sessions/i, /90 minutes/i]),
+    el("decide_by_8th", "By the 8th session, she decides with the minor whether asking a parent would harm the minor, and tells them", "405 ILCS 5/3-550(a)", ilcs("040500050K3-550"), "law", [/no later than the 8th session/i, /tell you my decision/i]),
+    el("after_eighth", "After session 8: a parent's consent is needed to go on; if the minor won't allow a parent to be contacted, therapy stops and the parent is not told", "405 ILCS 5/3-550(a)(1)-(2)", ilcs("040500050K3-550"), "law", [/consent is needed to keep going/i, /must stop after the 8th session/i, /will not tell your parent or guardian about your therapy/i]),
+    el("two_attempts", "If the minor allows contact: 2 tries to reach a parent, each written in the record, then the minor's written consent", "405 ILCS 5/3-550(a)(3)", ilcs("040500050K3-550"), "law", [/at least 2 times/i, /write down each try/i, /your written consent/i]),
+    el("four_factors", "All four factors must be true to find asking a parent would harm the minor", "405 ILCS 5/3-550(a-1)", ilcs("040500050K3-550"), "law", [/all four/i, /make you refuse therapy/i, /not getting therapy would harm/i, /knowingly and by your own choice/i, /mature enough/i]),
+    el("detrimental_path", "If so: written reasons, a supervisor when possible, the minor's written consent, reviewed every 60 days until 17", "405 ILCS 5/3-550(a)(4)-(5)", ilcs("040500050K3-550"), "law", [/supervisor/i, /every 60 days/i, /turn 17/i]),
+    el("abuse_presumption", "If therapy is about abuse or neglect by a parent, asking that parent is presumed harmful", "405 ILCS 5/3-550(a)(6)", ilcs("040500050K3-550"), "law", [/presumed to harm you/i]),
+    el("parent_not_told", "The parent is not told without the minor's written OK, except as the law requires", "405 ILCS 5/3-550(a-2)", ilcs("040500050K3-550"), "law", [/won't be told|will not be told|not tell your parent/i, /choose to stop/i]),
     el("parent_not_liable", "A parent who did not consent does not pay", "405 ILCS 5/3-550(b)", ilcs("040500050K3-550"), "law", [/does not have to pay/i]),
-    el("records_12_17", "Parent access to records of a 12 to 17 year old", "740 ILCS 110/4(a)(3)", ilcs("074001100K4"), "law", [/12 to 17/i, /(do|does)(n.t| not) object/i]),
+    el("records_12_17", "Parent access to records of a 12 to 17 year old (either condition is enough)", "740 ILCS 110/4(a)(3)", ilcs("074001100K4"), "law", [/12 to 17/i, /(do|does)(n.t| not) object, or if/i, /compelling reasons/i]),
     el("separated_parents", "Separated or divorced parents: both may see records; bring the parenting plan", "750 ILCS 5/602.11", ilcs("075000050K602.11"), "law", [/separated or divorced/i, /parenting plan|allocation/i]),
     el("substance_use", "12 and older may consent to alcohol or drug counseling", "410 ILCS 210/4", ilcs("041002100K4"), "law", [/alcohol or drugs/i]),
     el("emancipated", "Emancipated minors bring the court order", "750 ILCS 30/5", ilcs("075000300K5"), "law", [/emancipat/i]),
@@ -184,12 +220,49 @@ export const minorConsent: FormDef = {
     { kind: "heading", text: "Who can agree to therapy" },
     { kind: "clause", id: "under_12", text: "For a child under 12, a parent or legal guardian signs this form and can see the child's records." },
     { kind: "clause", id: "twelve_plus", text: "If you are 12 or older, you can start therapy without a parent's permission (405 ILCS 5/3-550)." },
+    ...lmftCaveat(f),
+    { kind: "heading", text: "If you are 12 to 16 and came on your own" },
     {
       kind: "clause",
       id: "eight_sessions",
-      text: "If you are 12 to 16, we can meet up to 8 times, 90 minutes each, before we need to involve a parent. By the 8th session we will decide together whether to involve a parent. If involving a parent would hurt you, I may keep seeing you with your written OK, and I will review that every 60 days.",
+      text: "Until a parent or guardian agrees, we can meet for up to 8 sessions at first, each up to 90 minutes long (405 ILCS 5/3-550(a)).",
     },
-    { kind: "clause", id: "parent_not_told", text: "Your parent won't be told you are in therapy unless you agree in writing, except where the law requires it." },
+    {
+      kind: "clause",
+      id: "decide_by_8th",
+      text: "As we go, we will talk about whether asking a parent or guardian to agree would harm you. No later than the 8th session, I will decide and tell you my decision.",
+    },
+    {
+      kind: "clause",
+      id: "after_eighth",
+      text: "If I decide that asking would not harm you, I will tell you that a parent's or guardian's consent is needed to keep going. If you do not let me contact your parent or guardian for consent, our sessions must stop after the 8th session, and I will not tell your parent or guardian about your therapy (405 ILCS 5/3-550(a)(2)).",
+    },
+    {
+      kind: "clause",
+      id: "two_attempts",
+      text: "If you let me contact them, we can keep meeting while I try to get their consent. I will write down each try in your record. If I try at least 2 times and can't reach them, we can go on with your written consent (405 ILCS 5/3-550(a)(3)).",
+    },
+    {
+      kind: "clause",
+      id: "four_factors",
+      text: "I can decide that asking a parent or guardian would harm you only if all four of these are true (405 ILCS 5/3-550(a-1)): (1) needing a parent's consent, or a parent being told, would make you refuse therapy; (2) not getting therapy would harm your well-being; (3) you came to therapy knowingly and by your own choice; and (4) in my opinion, you are mature enough to take part in therapy in a useful way.",
+    },
+    {
+      kind: "clause",
+      id: "detrimental_path",
+      text: "If I decide that, I will write down why in your record and check with a supervisor when I can. Then I may keep seeing you with only your written consent. I will review that decision every 60 days until therapy ends or you turn 17 (405 ILCS 5/3-550(a)(4)-(5)).",
+    },
+    {
+      kind: "clause",
+      id: "abuse_presumption",
+      text: "If therapy is about neglect or abuse by a parent or guardian, asking that parent or guardian to agree is presumed to harm you (405 ILCS 5/3-550(a)(6)).",
+    },
+    { kind: "heading", text: "Your parents and what they are told" },
+    {
+      kind: "clause",
+      id: "parent_not_told",
+      text: "Your parent won't be told you are in therapy unless you agree in writing, except where the law above requires it. If I ever decide I must tell a parent, I will tell you first. If you then choose to stop therapy, your parent will not be told (405 ILCS 5/3-550(a-2)).",
+    },
     { kind: "clause", id: "parent_not_liable", text: "A parent who did not agree to your therapy does not have to pay for it. We will work out a fee you can manage, or no fee." },
     { kind: "clause", id: "substance_use", text: "If you are 12 or older, you can agree on your own to counseling about alcohol or drugs." },
     { kind: "clause", id: "emancipated", text: "If a court has emancipated you, please bring a copy of the order so I know what you can sign." },
@@ -197,7 +270,7 @@ export const minorConsent: FormDef = {
     {
       kind: "clause",
       id: "records_12_17",
-      text: "If you are 12 to 17, a parent or guardian can see your full record only if you are told and do not object, and I find no strong reason to say no. Parents can always ask about the services you get and can go to court (740 ILCS 110/4).",
+      text: "If you are 12 to 17, a parent or guardian may see your record if you are told and do not object, or if I do not find compelling reasons to deny it (740 ILCS 110/4(a)(3)). Even so, I will not let a parent see the record of therapy you started on your own if I find compelling reasons to deny it (405 ILCS 5/3-550(a-2)). The same law lets a parent get basic facts (your condition, diagnosis and the services you get), and a parent who is refused can ask a court.",
     },
     {
       kind: "clause",
@@ -221,10 +294,12 @@ export const couplesFamilyConsent: FormDef = {
   summary: "Who the client is, how private things are handled between you, records, and what happens if you separate.",
   group: "ethics",
   appliesTo: "Couples and family clients, every license. LMFTs: 68 IAC 1283.100(p) makes the all-adults release required.",
+  review: [REVIEW.aamft, "The no-secrets policy is fixed wording: AAMFT 2.2 needs each partner's prior written permission. Have your attorney check the waiver."],
   topics: ["couples", "couples consent", "family therapy", "family consent", "marriage counseling", "no secrets"],
   elements: [
     el("who_is_client", "Who the client is (the couple or family)", "APA 10.02(a); ACA B.4.b", APA, "ethics", [/my client is the (couple|relationship)/i]),
-    el("secrets", "How private things told alone are handled", "NASW 1.07(g); AAMFT 2.2", AAMFT, "ethics", [/(one of you tells me|tell me) something (privately|alone)/i]),
+    el("secrets", "How private things told alone are handled (no-secrets policy)", "NASW 1.07(g); AAMFT 2.2", AAMFT, "ethics", [/no-secrets policy/i, /(one of you tells me|tell me) something (privately|alone)/i]),
+    el("secrets_waiver", "Each partner's written waiver for the no-secrets policy", "AAMFT 2.2", AAMFT, "ethics", [/each adult's written permission/i, /I agree to the no-secrets policy/i]),
     el("no_guarantee", "She can't promise others in the room keep things private", "NASW 1.07(f)", NASW, "ethics", [/cannot promise/i]),
     el("all_sign", "Every adult signs before records or information are released", "68 IAC 1283.100(p)(4); AAMFT 2.2-2.3", IAC1283, "law", [/every adult/i, /sign/i]),
     el("divorce", "If you separate: no sides, no custody evaluation, records not opened by divorce alone", "APA 10.02(b); AAMFT 7.6-7.7; 740 ILCS 110/10(a)(1)", ilcs("074001100K10"), "law", [/separate or divorce/i, /custody/i]),
@@ -235,12 +310,22 @@ export const couplesFamilyConsent: FormDef = {
     { kind: "clause", id: "intro", text: `This form adds to the informed consent for therapy at ${f.practiceName}. Each adult in therapy reads and signs it.` },
     { kind: "clause", id: "who_is_client", text: "In couples or family work, my client is the couple or family as a whole, unless we agree in writing on something else. I will treat each of you fairly." },
     { kind: "clause", id: "individual_sessions", text: "If I meet with one of you alone, that meeting is part of our joint work." },
+    // Locked: AAMFT 2.2 bars sharing one person's confidences without that person's prior written
+    // permission, so a no-secrets policy needs each partner's written waiver (research open question 6).
+    { kind: "heading", text: "No-secrets policy" },
     {
       kind: "clause",
       id: "secrets",
-      editable: true,
-      text: "If one of you tells me something privately, I will not keep secrets that get in the way of our work. I will encourage you to share it in a joint session, and I will not share it myself without your written OK.",
+      text: "I follow a no-secrets policy. If one of you tells me something privately, alone or in a message, that affects our work together, I will not keep it secret from the others in therapy. I will first help you share it yourself in a joint session. If you don't, I may share it.",
     },
+    {
+      kind: "clause",
+      id: "secrets_waiver",
+      text: "This policy needs each adult's written permission. By ticking the box and signing below, each of you gives me your written permission to share with the others in therapy what you tell me alone. If any adult does not give this permission, I will keep what each of you tells me alone private, and I will tell you all if that makes our joint work hard to go on with.",
+    },
+    { kind: "check", id: "waiver_1", label: "Adult 1: I agree to the no-secrets policy and give my written permission above." },
+    { kind: "check", id: "waiver_2", label: "Adult 2: I agree to the no-secrets policy and give my written permission above." },
+    { kind: "check", id: "waiver_3", label: "Adult 3 (if more): I agree to the no-secrets policy and give my written permission above." },
     { kind: "clause", id: "no_guarantee", text: "I keep what is said private, but I cannot promise that others in the room will." },
     { kind: "clause", id: "all_sign", text: "Because the record belongs to all of you, every adult in therapy must sign before I release records or share information outside therapy, unless the law requires it." },
     {

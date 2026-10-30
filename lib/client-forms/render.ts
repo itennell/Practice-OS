@@ -115,13 +115,19 @@ function scaleRow(w: Writer, form: ReturnType<PDFDocument["getForm"]>, name: str
   w.page.drawLine({ start: { x: M, y: w.y + 2 }, end: { x: W - M, y: w.y + 2 }, thickness: 0.4, color: LINE });
 }
 
-/** Helvetica in pdf-lib speaks WinAnsi only: swap the few characters templates use that it can't draw. */
+/**
+ * Helvetica in pdf-lib speaks WinAnsi only: swap the few characters templates use
+ * that it can't draw. Tabs and carriage returns become spaces (pdf-lib can't
+ * encode them, and a pasted paragraph often has them). En and em dashes are
+ * WinAnsi, so they stay (the PHQ-9 prints its em dashes word for word).
+ */
 export function winAnsi(s: string): string {
   return s
+    .replace(/\r\n/g, "\n")
+    .replace(/[\t\r]/g, " ")
     .replace(/[‘’]/g, "'")
     .replace(/[“”]/g, '"')
-    .replace(/–|—/g, "-")
     .replace(/…/g, "...")
     .replace(/≥/g, ">=")
-    .replace(/[^\t\n\r\x20-\x7E\u00A0-\u00FF\u2022]/g, "");
+    .replace(/[^\n\x20-\x7E\u00A0-\u00FF\u2013\u2014\u2022]/g, "");
 }

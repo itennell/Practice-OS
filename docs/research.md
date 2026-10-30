@@ -994,6 +994,26 @@ The library runs the same check on her edits, and refuses an edit that drops a r
 
 **Not legal advice.** Every template prints "This is a template from Practice-OS, not legal advice. Have your own attorney review it before you use it with clients."
 
+### Needs your attorney's review
+
+The research could not settle these, so the library shows them on each form under "Needs your attorney's review" and never presents them as settled (`lib/client-forms/review.ts`):
+
+- **AAMFT citations** come from the 2015 code, read on a state mirror (aamft.org needs a login). The current code may be newer, with different numbers.
+- **ACA citations** are the 2014 code; a revision is under way.
+- **HHS Office for Civil Rights contact details** (address, phone, website) and the **HHS model privacy notice** were not read on hhs.gov, which blocked every fetch.
+- **Section 1557 taglines.** 45 CFR 92.11(b) asks for taglines in English and the state's 15 most common languages. The accessibility notice prints English and Spanish only and does not claim 92.11(b) is met.
+- **Collections.** Whether 740 ILCS 110/11(iv) covers private practice billing is unclear, so the practice policies ask for the client's written consent (740 ILCS 110/5) before a collection agency gets anything; the wording and any interest or late fee need an attorney's check.
+- **Minors.** 405 ILCS 5/3-550(c) does not name LMFTs (the form prints a caveat for LMFTs and they ask a parent first); 740 ILCS 110/4(a)(3) is worded "or", and the form follows its literal words; 750 ILCS 5/602.11 against 110/4 for teens 12 to 17 is unsettled.
+- **Duty to warn and FOID reports** for LCSW, LCPC and LMFT (740 ILCS 110/11 says "may"; 430 ILCS 65/8.1 names qualified examiners).
+- **Couples no-secrets policy.** Fixed wording (not editable), with each adult's written waiver, because AAMFT 2.2 needs prior written permission.
+- **Record copy fees**: 740 ILCS 110/4(b), 735 ILCS 5/8-2001 and HIPAA's cost-based fee may all apply.
+
+**Nothing about her practice is assumed.** Policies she hasn't set print as `[fill in: …]` (insurance, texting, reply time, backup colleague, privacy-notice date, fees), and no form downloads until she has saved her policies once, every gap is filled and the check passes on the text that would print. The PDF route runs the same check and answers with a plain message instead of a PDF. The templates are written on Illinois law: for a practice in another state, a form with Illinois wording shows "This template is written for Illinois; your state's rules haven't been researched yet" and does not download.
+
+**Minor consent, 405 ILCS 5/3-550 (read 2026-10-30, P.A. 102-558).** The form follows the statute section by section: the 8-session, 90-minute cap under 17 (a); the decision by the 8th session (a); after session 8, a parent's consent is needed, and if the minor won't allow contact, therapy stops and the parent is not told (a)(1)-(2); 2 documented attempts plus the minor's written consent (a)(3); all four (a-1) factors (refusal of therapy, harm without it, sought knowingly and voluntarily, mature enough) before a "detrimental" finding, with a supervisor when possible and review every 60 days until 17 (a)(4)-(5); the abuse presumption (a)(6); and the parent-notice rule (a-2). Parent access for ages 12 to 17 quotes 740 ILCS 110/4(a)(3) as written: "if the recipient is informed and does not object or if the therapist does not find that there are compelling reasons for denying the access."
+
+**Screeners.** PHQ-9 and GAD-7 were checked word for word on 2026-10-30 against the official English PDFs on phqscreeners.com (https://www.phqscreeners.com/images/sites/g/files/g10060481/f/201412/PHQ-9_English.pdf and .../GAD-7_English.pdf). Fixes: the PHQ-9 em dashes (items 6 and 8) and the GAD-7's "anxious or on edge" and "afraid as if" (no commas). The official GAD-7 has no difficulty question, so it was taken off. The templates leave out only the "(Use "✔" to indicate your answer)" line and the office scoring row: the copies have tick boxes and Practice-OS never scores them. Aeon gives no clinical advice, so the forms carry no follow-up protocol, only 988 and 911 for the client.
+
 ### Required elements by form (generated from `lib/client-forms`)
 
 #### Notice of Privacy Practices (`npp`)
@@ -1020,6 +1040,11 @@ Required by law. Required for HIPAA covered entities: any practice that bills in
 | Privacy contact name or title and phone | [164.520(b)(1)(vii)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.520) | Law |
 | Effective date | [164.520(b)(1)(viii)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.520) | Law |
 
+Needs your attorney's review:
+
+- HHS's model privacy notice could not be read (hhs.gov blocked our research), and the 2024 reproductive-health paragraphs were left out after Purl v. HHS (2025). Compare with HHS's current model notice.
+- The HHS Office for Civil Rights address, phone and website were not read on hhs.gov (it blocked our research). Check them on hhs.gov/ocr before you use the form.
+
 #### Acknowledgment of Notice of Privacy Practices (`npp_ack`)
 
 Required by law. HIPAA covered entities must make a good-faith effort to get it. Signing is never a condition of care.
@@ -1045,6 +1070,10 @@ Required by law. Every practice. HIPAA (45 CFR 164.524) for covered entities; Il
 | A denial is in writing with the reason and review rights | [164.524(d)(2)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.524) | Law |
 | Illinois: who may see records (12 and older; parents of under 12; 12 to 17 if the client doesn't object) | [740 ILCS 110/4(a)](https://www.ilga.gov/Documents/legislation/ilcs/documents/074001100K4.htm) | Law |
 
+Needs your attorney's review:
+
+- Record copy fees: 740 ILCS 110/4(b) (a reasonable fee), 735 ILCS 5/8-2001 caps and HIPAA's cost-based fee may all apply. Which one limits your fee was not settled.
+
 #### Consent for Therapy with a Minor (`minor_consent`)
 
 Required by law. Every client under 18. Illinois 405 ILCS 5/3-550 and 740 ILCS 110/4; ACA A.2.d, APA 3.10(b).
@@ -1053,14 +1082,26 @@ Required by law. Every client under 18. Illinois 405 ILCS 5/3-550 and 740 ILCS 1
 | --- | --- | --- |
 | Under 12: a parent or guardian consents and can see records | [740 ILCS 110/4(a)(1)](https://www.ilga.gov/legislation/ilcs/documents/074001100K4.htm) | Law |
 | 12 and older can start therapy on their own | [405 ILCS 5/3-550(a)](https://www.ilga.gov/legislation/ilcs/documents/040500050K3-550.htm) | Law |
-| Under 17: up to 8 sessions of 90 minutes before a parent is involved | [405 ILCS 5/3-550(a)](https://www.ilga.gov/legislation/ilcs/documents/040500050K3-550.htm) | Law |
+| Under 17: up to 8 sessions of 90 minutes before a parent consents | [405 ILCS 5/3-550(a)](https://www.ilga.gov/legislation/ilcs/documents/040500050K3-550.htm) | Law |
+| By the 8th session, she decides with the minor whether asking a parent would harm the minor, and tells them | [405 ILCS 5/3-550(a)](https://www.ilga.gov/legislation/ilcs/documents/040500050K3-550.htm) | Law |
+| After session 8: a parent's consent is needed to go on; if the minor won't allow a parent to be contacted, therapy stops and the parent is not told | [405 ILCS 5/3-550(a)(1)-(2)](https://www.ilga.gov/legislation/ilcs/documents/040500050K3-550.htm) | Law |
+| If the minor allows contact: 2 tries to reach a parent, each written in the record, then the minor's written consent | [405 ILCS 5/3-550(a)(3)](https://www.ilga.gov/legislation/ilcs/documents/040500050K3-550.htm) | Law |
+| All four factors must be true to find asking a parent would harm the minor | [405 ILCS 5/3-550(a-1)](https://www.ilga.gov/legislation/ilcs/documents/040500050K3-550.htm) | Law |
+| If so: written reasons, a supervisor when possible, the minor's written consent, reviewed every 60 days until 17 | [405 ILCS 5/3-550(a)(4)-(5)](https://www.ilga.gov/legislation/ilcs/documents/040500050K3-550.htm) | Law |
+| If therapy is about abuse or neglect by a parent, asking that parent is presumed harmful | [405 ILCS 5/3-550(a)(6)](https://www.ilga.gov/legislation/ilcs/documents/040500050K3-550.htm) | Law |
 | The parent is not told without the minor's written OK, except as the law requires | [405 ILCS 5/3-550(a-2)](https://www.ilga.gov/legislation/ilcs/documents/040500050K3-550.htm) | Law |
 | A parent who did not consent does not pay | [405 ILCS 5/3-550(b)](https://www.ilga.gov/legislation/ilcs/documents/040500050K3-550.htm) | Law |
-| Parent access to records of a 12 to 17 year old | [740 ILCS 110/4(a)(3)](https://www.ilga.gov/legislation/ilcs/documents/074001100K4.htm) | Law |
+| Parent access to records of a 12 to 17 year old (either condition is enough) | [740 ILCS 110/4(a)(3)](https://www.ilga.gov/legislation/ilcs/documents/074001100K4.htm) | Law |
 | Separated or divorced parents: both may see records; bring the parenting plan | [750 ILCS 5/602.11](https://www.ilga.gov/legislation/ilcs/documents/075000050K602.11.htm) | Law |
 | 12 and older may consent to alcohol or drug counseling | [410 ILCS 210/4](https://www.ilga.gov/legislation/ilcs/documents/041002100K4.htm) | Law |
 | Emancipated minors bring the court order | [750 ILCS 30/5](https://www.ilga.gov/legislation/ilcs/documents/075000300K5.htm) | Law |
 | Safety and abuse limits still apply | [325 ILCS 5/4; 740 ILCS 110/11](https://www.ilga.gov/legislation/ilcs/documents/032500050K4.htm) | Law |
+
+Needs your attorney's review:
+
+- 405 ILCS 5/3-550(c) names counselors, social workers and psychologists, not LMFTs. Whether an LMFT may see a 12 to 16 year old without a parent's consent is unsettled; the form tells LMFT clients you ask a parent first.
+- For teens 12 to 17, 750 ILCS 5/602.11(b) gives both parents record access, while 740 ILCS 110/4(a)(3) and 405 ILCS 5/3-550(a-2) protect the teen. Which controls for mental health records is unsettled.
+- 740 ILCS 110/4(a)(3) is worded "or": read literally, either the teen not objecting or your not finding compelling reasons is enough for a parent to see the record. Some read it the other way. The form follows the statute's words.
 
 #### Nondiscrimination and Accessibility Notice (`accessibility_notice`)
 
@@ -1073,9 +1114,14 @@ Required by law. Section 1557 notice and taglines: required if you take Medicare
 | Free language help | [92.10(a)(1)(iii)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-A/part-92/subpart-A/section-92.10) | Law |
 | How to ask for help | [92.10(a)(1)(iv)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-A/part-92/subpart-A/section-92.10) | Law |
 | How to complain to us and to HHS OCR | [92.10(a)(1)(vi)-(vii)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-A/part-92/subpart-A/section-92.10) | Law |
-| Language-help tagline (English and Spanish here) | [92.11(a)-(b)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-A/part-92/subpart-A/section-92.11) | Law |
+| Language-help tagline in English and Spanish (not the full 15-language set 92.11(b) asks for) | [45 CFR 92.11(a); 92.11(b) not met](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-A/part-92/subpart-A/section-92.11) | Good practice |
 | Service animals welcome, no fee | [28 CFR 36.302(c)](https://www.ecfr.gov/current/title-28/chapter-I/part-36/subpart-C/section-36.302) | Good practice |
 | Relay calls (711) accepted | [28 CFR 36.303(d)](https://www.ecfr.gov/current/title-28/chapter-I/part-36/subpart-C/section-36.303) | Good practice |
+
+Needs your attorney's review:
+
+- Section 1557 (45 CFR 92.11(b)) asks for taglines in English and the 15 languages most spoken in Illinois. This form prints English and Spanish only: add HHS's translated taglines before you use it, if you take Medicare, Medicaid or other federal money.
+- The HHS Office for Civil Rights address, phone and website were not read on hhs.gov (it blocked our research). Check them on hhs.gov/ocr before you use the form.
 
 #### Consent to Text, Email and Voicemail (`communication_consent`)
 
@@ -1102,6 +1148,7 @@ Required by your ethics code. Every client, every license. Required by the Illin
 | Other kinds of help | [NASW 1.03(a)](https://www.socialworkers.org/About/Ethics/Code-of-Ethics/Code-of-Ethics-English) | Ethics code |
 | Her license, training and ethics code | [ACA A.2.b; 68 IAC 1375.225(a)(9)](https://www.ilga.gov/agencies/JCAR/EntirePart?titlepart=06801375) | Law |
 | Fees, billing, insurance limits and unpaid bills | [NASW 1.03(a); APA 10.01(a); 68 IAC 1283.100(m)](https://www.ilga.gov/agencies/JCAR/EntirePart?titlepart=06801283) | Law |
+| Her actual fee for each kind of session | [APA 6.04(a); 68 IAC 1283.100(m)](https://www.ilga.gov/agencies/JCAR/EntirePart?titlepart=06801283) | Law |
 | About how long therapy may last | [68 IAC 1375.225(a)(9); 1283.100(m)](https://www.ilga.gov/agencies/JCAR/EntirePart?titlepart=06801375) | Law |
 | Right to refuse or stop at any time | [NASW 1.03(a); ACA A.2.b](https://www.socialworkers.org/About/Ethics/Code-of-Ethics/Code-of-Ethics-English) | Ethics code |
 | Right to ask questions at any time | [NASW 1.03(a); APA 10.01(a)](https://www.apa.org/ethics/code) | Ethics code |
@@ -1120,6 +1167,13 @@ Required by your ethics code. Every client, every license. Required by the Illin
 | Not an emergency service: 988 and 911 | [NASW-T 2.13](https://988lifeline.org/) | Good practice |
 | Signed by both, client gets a copy | [APA 3.10(d); ACA A.2.a; 68 IAC 1375.225(a)(9)](https://www.ilga.gov/agencies/JCAR/EntirePart?titlepart=06801375) | Ethics code |
 
+Needs your attorney's review:
+
+- AAMFT Code of Ethics citations come from the 2015 code, read on a state mirror (aamft.org needs a login). The current code may be newer and its numbers may differ.
+- ACA Code of Ethics citations are the 2014 code; a revision is under way and its numbers may change.
+- Whether Illinois lets you give a collection agency anything without the client's written consent (740 ILCS 110/11(iv) may cover only some providers; 740 ILCS 110/5) is unsettled. The form asks for that consent; have your attorney check the wording and any interest or late fee.
+- Whether the FOID clear-and-present-danger report (430 ILCS 65/8.1) binds your license, and whether Illinois gives you a duty to warn (740 ILCS 110/11 says "may"), is unsettled for LCSW, LCPC and LMFT. Ask your attorney before relying on these two limits.
+
 #### Practice Policies and Financial Agreement (`practice_policies`)
 
 Required by your ethics code. Every client. Fee terms agreed early (APA 6.04, AAMFT 8.2, 68 IAC 1283.100(m)); collections notice (APA 6.04(e), ACA A.10.d).
@@ -1127,15 +1181,23 @@ Required by your ethics code. Every client. Fee terms agreed early (APA 6.04, AA
 | Element | Required by | Level |
 | --- | --- | --- |
 | Fees and when payment is due, agreed at the start | [APA 6.04(a); 68 IAC 1283.100(m)](https://www.apa.org/ethics/code) | Ethics code |
+| Her actual fee for each kind of session, in dollars | [APA 6.04(a); AAMFT 8.2; 68 IAC 1283.100(m)](https://www.apa.org/ethics/code) | Ethics code |
 | Cancellation and missed-session fee | [AAMFT 8.2(a)](https://www.aamft.org/AAMFT/Legal_Ethics/Code_of_Ethics.aspx) | Ethics code |
 | Missed-session fee is the same for everyone and never billed to insurance or Medicare | [CMS MM5613](https://www.cms.gov/Regulations-and-Guidance/Guidance/Transmittals/downloads/R1279CP.pdf) | Law |
 | What happens if insurance doesn't pay | [AAMFT 8.2(c)](https://www.aamft.org/AAMFT/Legal_Ethics/Code_of_Ethics.aspx) | Ethics code |
 | Notice before fee changes | [AAMFT 8.2](https://www.aamft.org/AAMFT/Legal_Ethics/Code_of_Ethics.aspx) | Ethics code |
 | Written notice before collections; only minimum information shared | [APA 6.04(e); ACA A.10.d; AAMFT 8.3](https://www.counseling.org/docs/default-source/default-document-library/ethics/2014-aca-code-of-ethics.pdf) | Ethics code |
+| The client's written consent to share that minimum with a collection agency | [740 ILCS 110/5; 110/11(iv) (scope unsettled)](https://www.ilga.gov/legislation/ilcs/documents/074001100K5.htm) | Law |
 | Tell her if the fee is hard to pay | [NASW 1.13(a); ACA A.10.c](https://www.socialworkers.org/About/Ethics/Code-of-Ethics/Code-of-Ethics-English) | Ethics code |
 | No payment for referrals | [NASW 1.16(c); ACA A.10.b; AAMFT 8.1; APA 6.07](https://www.socialworkers.org/About/Ethics/Code-of-Ethics/Code-of-Ethics-English) | Ethics code |
 | How to reach her, reply time, not for emergencies | [NASW-T 2.10; NASW 1.03(e)](https://www.socialworkers.org/About/Ethics/Code-of-Ethics/Code-of-Ethics-English) | Ethics code |
 | If the practice closes: 30 days' notice and how to get records | [735 ILCS 5/8-2001(f)](https://www.ilga.gov/legislation/ilcs/documents/073500050K8-2001.htm) | Law |
+
+Needs your attorney's review:
+
+- Whether Illinois lets you give a collection agency anything without the client's written consent (740 ILCS 110/11(iv) may cover only some providers; 740 ILCS 110/5) is unsettled. The form asks for that consent; have your attorney check the wording and any interest or late fee.
+- AAMFT Code of Ethics citations come from the 2015 code, read on a state mirror (aamft.org needs a login). The current code may be newer and its numbers may differ.
+- ACA Code of Ethics citations are the 2014 code; a revision is under way and its numbers may change.
 
 #### Consent for Telehealth (`telehealth_consent`)
 
@@ -1154,6 +1216,11 @@ Required by your ethics code. Every client you see by video or phone. Illinois h
 | No social media contact | [ACA H.2.a; NASW-T 2.10](https://www.counseling.org/docs/default-source/default-document-library/ethics/2014-aca-code-of-ethics.pdf) | Ethics code |
 | No recording without written permission | [APA 4.03](https://www.apa.org/ethics/code) | Ethics code |
 
+Needs your attorney's review:
+
+- AAMFT Code of Ethics citations come from the 2015 code, read on a state mirror (aamft.org needs a login). The current code may be newer and its numbers may differ.
+- ACA Code of Ethics citations are the 2014 code; a revision is under way and its numbers may change.
+
 #### Consent for Couples and Family Therapy (`couples_family_consent`)
 
 Required by your ethics code. Couples and family clients, every license. LMFTs: 68 IAC 1283.100(p) makes the all-adults release required.
@@ -1161,12 +1228,18 @@ Required by your ethics code. Couples and family clients, every license. LMFTs: 
 | Element | Required by | Level |
 | --- | --- | --- |
 | Who the client is (the couple or family) | [APA 10.02(a); ACA B.4.b](https://www.apa.org/ethics/code) | Ethics code |
-| How private things told alone are handled | [NASW 1.07(g); AAMFT 2.2](https://www.aamft.org/AAMFT/Legal_Ethics/Code_of_Ethics.aspx) | Ethics code |
+| How private things told alone are handled (no-secrets policy) | [NASW 1.07(g); AAMFT 2.2](https://www.aamft.org/AAMFT/Legal_Ethics/Code_of_Ethics.aspx) | Ethics code |
+| Each partner's written waiver for the no-secrets policy | [AAMFT 2.2](https://www.aamft.org/AAMFT/Legal_Ethics/Code_of_Ethics.aspx) | Ethics code |
 | She can't promise others in the room keep things private | [NASW 1.07(f)](https://www.socialworkers.org/About/Ethics/Code-of-Ethics/Code-of-Ethics-English) | Ethics code |
 | Every adult signs before records or information are released | [68 IAC 1283.100(p)(4); AAMFT 2.2-2.3](https://www.ilga.gov/agencies/JCAR/EntirePart?titlepart=06801283) | Law |
 | If you separate: no sides, no custody evaluation, records not opened by divorce alone | [APA 10.02(b); AAMFT 7.6-7.7; 740 ILCS 110/10(a)(1)](https://www.ilga.gov/legislation/ilcs/documents/074001100K10.htm) | Law |
 | Decisions about the relationship are yours | [AAMFT 1.8](https://www.aamft.org/AAMFT/Legal_Ethics/Code_of_Ethics.aspx) | Ethics code |
 | Individual sessions are part of the joint work | [AAMFT (practice guidance)](https://www.aamft.org/AAMFT/Legal_Ethics/Code_of_Ethics.aspx) | Good practice |
+
+Needs your attorney's review:
+
+- AAMFT Code of Ethics citations come from the 2015 code, read on a state mirror (aamft.org needs a login). The current code may be newer and its numbers may differ.
+- The no-secrets policy is fixed wording: AAMFT 2.2 needs each partner's prior written permission. Have your attorney check the waiver.
 
 #### Letter Ending Therapy (`termination_letter`)
 
@@ -1249,9 +1322,10 @@ Screeners (blank copies). Optional, any license. Free to copy.
 
 | Element | Required by | Level |
 | --- | --- | --- |
-| All nine items, word for word | [PHQ-9](https://www.phqscreeners.com/) | Good practice |
-| The four answer choices | [PHQ-9](https://www.phqscreeners.com/) | Good practice |
-| Pfizer attribution and free-use line | [PHQ Screeners terms of use](https://www.phqscreeners.com/) | Good practice |
+| All nine items, word for word | [PHQ-9 (phqscreeners.com)](https://www.phqscreeners.com/select-screener) | Good practice |
+| The four answer choices | [PHQ-9](https://www.phqscreeners.com/select-screener) | Good practice |
+| The difficulty question and its four choices | [PHQ-9](https://www.phqscreeners.com/select-screener) | Good practice |
+| Pfizer attribution and free-use line | [PHQ Screeners terms of use](https://www.phqscreeners.com/select-screener) | Good practice |
 | 988 and 911 next to the self-harm question | [Practice-OS safety rule](https://988lifeline.org/) | Good practice |
 
 #### Generalized Anxiety Disorder scale (GAD-7) (`gad7`)
@@ -1260,7 +1334,6 @@ Screeners (blank copies). Optional, any license. Free to copy.
 
 | Element | Required by | Level |
 | --- | --- | --- |
-| All seven items, word for word | [GAD-7](https://www.phqscreeners.com/) | Good practice |
-| The four answer choices | [GAD-7](https://www.phqscreeners.com/) | Good practice |
-| Pfizer attribution and free-use line | [PHQ Screeners terms of use](https://www.phqscreeners.com/) | Good practice |
-
+| All seven items, word for word | [GAD-7 (phqscreeners.com)](https://www.phqscreeners.com/select-screener) | Good practice |
+| The four answer choices | [GAD-7](https://www.phqscreeners.com/select-screener) | Good practice |
+| Pfizer attribution and free-use line | [PHQ Screeners terms of use](https://www.phqscreeners.com/select-screener) | Good practice |

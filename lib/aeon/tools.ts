@@ -16,6 +16,8 @@ import { recheckRules } from "../compliance/recheck";
 import { TOPICS } from "../compliance/research";
 import * as credActions from "../credentialing/actions";
 import * as cred from "../credentialing/store";
+import { getForm } from "../client-forms";
+import { FORM_IDS, type FormId } from "../client-forms/types";
 import { db } from "../db";
 import { isDryRun } from "../env";
 import { money } from "../gfe/build";
@@ -164,6 +166,18 @@ function withCards(said: Record<string, unknown>, cards: DocumentCard[]): ToolRe
 }
 
 const OPEN_CARD = "Her card in the chat opens it, already filled in; don't name a page.";
+
+/** A client form template from the library: saves nothing, holds no client details. */
+async function makeClientForm(form: FormId): Promise<ToolResult> {
+  const def = getForm(form);
+  const [made] = def ? await documents.clientFormCards(def) : [];
+  if (!def || !made) return { content: [{ type: "text", text: "Add the practice details on Admin › Credentialing first; client forms use them." }], isError: true };
+  // A form that can't download yet (policies never saved, a gap to fill, not Illinois) comes back without a PDF and says why.
+  const say = made.pdf
+    ? `${OPEN_CARD} It is a template: her practice is filled in and the client's boxes are blank. Recommend her own attorney reads it once.`
+    : `${OPEN_CARD} It can't be downloaded yet: ${made.needs_her} Tell her that plainly; her card opens the form so she can finish it.`;
+  return withCards({ made: def.title, say }, [made]);
+}
 
 async function makeGfe(input: z.infer<z.ZodObject<typeof gfeInput>>, ctx: ToolContext): Promise<ToolResult> {
   // It saves an estimate row and an approval, so the view-only demo copy refuses it like any change.
@@ -380,15 +394,18 @@ export const TOOLS: AeonTool[] = [
     title: "Make a document",
     description:
       "Makes one document and shows it as a card: a Good Faith Estimate (gfe, queued for her approval), a superbill, an Illinois release of information form " +
-      "(release_form; needs the date the consent ends), or a payer enrollment form (payer_form: Medicare's CMS-855I from her credentialing profile). " +
+      "(release_form; needs the date the consent ends), a payer enrollment form (payer_form: Medicare's CMS-855I from her credentialing profile), " +
+      "or a client form template (client_form: privacy notice, informed consent, telehealth consent, practice policies, intake, minor consent and the rest of the library, " +
+      "filled with her practice and blank for the client; never fill in a client's answers). " +
       "Pass the fields for that kind only, the same as draft_gfe, draft_superbill and make_release_form take. Takes no client details. " +
       "It prepares; it never signs, sends or submits anything: she does that herself.",
     input: {
-      kind: z.enum(["gfe", "superbill", "release_form", "payer_form"]),
+      kind: z.enum(["gfe", "superbill", "release_form", "payer_form", "client_form"]),
       gfe: z.object(gfeInput).optional().describe("For kind gfe."),
       superbill: z.object(superbillInput).optional().describe("For kind superbill."),
       release_form: z.object(releaseInput).optional().describe("For kind release_form."),
       payer_form: z.object({ form: z.enum(["cms855i"]) }).optional().describe("For kind payer_form."),
+      client_form: z.object({ form: z.enum(FORM_IDS) }).optional().describe("For kind client_form: which template, e.g. telehealth_consent."),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: false },
     label: "Made a document",
@@ -400,6 +417,7 @@ export const TOOLS: AeonTool[] = [
       if (input.kind === "gfe") return makeGfe(input.gfe!, ctx);
       if (input.kind === "superbill") return makeSuperbill(input.superbill!, ctx);
       if (input.kind === "release_form") return makeRelease(input.release_form!);
+      if (input.kind === "client_form") return makeClientForm(input.client_form!.form);
       return makeCms855i(ctx);
     },
   }),
