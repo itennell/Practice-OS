@@ -11,6 +11,7 @@ import { guard, REFUSAL } from "../aeon/guard";
 import { loadCredentialingProfile } from "../credentialing/store";
 import { loadPracticeSettings } from "../gfe/store";
 import { listPayerApplications } from "../payers/store";
+import { parsePt, type PtAnswers } from "./pt-answers";
 
 export type MediaAnswers = {
   /** Why she does this work, in her words. */
@@ -50,8 +51,12 @@ export type MediaFacts = {
   website: string | null;
   /** From the marketing interview: has a site, would like one, or not for her. */
   websiteStatus: "has" | "wants" | "no" | null;
+  /** School, degree and year lines from her credentialing profile. */
+  education: string[];
   isSample: boolean;
   answers: MediaAnswers;
+  /** Her Psychology Today interview answers (pick-lists and short facts). */
+  pt: PtAnswers;
 };
 
 /** The questions Aeon asks before drafting (the words a profile can't do without). */
@@ -153,16 +158,19 @@ export async function loadMediaFacts(): Promise<MediaFacts> {
     whoIHelp: typeof a.who_i_help === "string" ? a.who_i_help : "",
     website: typeof marketing.website_url === "string" ? marketing.website_url : null,
     websiteStatus: marketing.website === "has" || marketing.website === "wants" || marketing.website === "no" ? marketing.website : null,
+    education: (cred?.education ?? []).filter((e) => e.school).map((e) => [e.degree, e.school, e.graduated].filter(Boolean).join(", ")),
     isSample: p.is_sample,
     answers: parseAnswers(media.answers),
+    pt: parsePt(media.pt),
   };
 }
 
 export const money = (cents: number) => `$${(cents / 100).toFixed(cents % 100 ? 2 : 0)}`;
 
-/** The plain session fee to quote: the first fee line (her most common session). */
+/** The plain session fee to quote: her first regular session fee (an intake or first-session fee is skipped). */
 export function mainFee(f: MediaFacts): string | null {
-  return f.fees[0] ? money(f.fees[0].cents) : null;
+  const fee = f.fees.find((x) => !/\b(intake|first session|initial|evaluation|assessment)\b/i.test(x.label)) ?? f.fees[0];
+  return fee ? money(fee.cents) : null;
 }
 
 export function place(f: MediaFacts): string {
