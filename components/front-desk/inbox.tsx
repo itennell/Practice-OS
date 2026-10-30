@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarCheck, Eye, MessageSquare, MessageSquareReply, Phone, PhoneMissed, Play, Voicemail } from "lucide-react";
+import { CalendarCheck, Eye, Globe, MessageSquare, MessageSquareReply, Phone, PhoneMissed, Play, Voicemail } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { notify } from "@/components/shared/toaster";
@@ -16,6 +16,8 @@ const KIND_LABEL: Record<InboxItem["kind"], string> = {
   voicemail: "Voicemail",
   text_in: "Text from caller",
   text_out: "Text sent",
+  chat_in: "Website chat",
+  chat_out: "Website chat reply",
   booking: "Consult booked",
 };
 
@@ -41,7 +43,7 @@ const length = (s: number | null) => (s ? `${Math.floor(s / 60)}:${String(s % 60
 
 function KindIcon({ item }: { item: InboxItem }) {
   const Icon =
-    item.kind === "call" ? (item.seconds ? Phone : PhoneMissed) : item.kind === "voicemail" ? Voicemail : item.kind === "text_in" ? MessageSquare : item.kind === "text_out" ? MessageSquareReply : CalendarCheck;
+    item.kind === "call" ? (item.seconds ? Phone : PhoneMissed) : item.kind === "voicemail" ? Voicemail : item.kind === "text_in" ? MessageSquare : item.kind === "text_out" ? MessageSquareReply : item.kind === "chat_in" || item.kind === "chat_out" ? Globe : CalendarCheck;
   return (
     <span aria-hidden className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-full border border-border bg-[var(--chip-off-bg)]">
       <Icon size={16} />
@@ -126,7 +128,7 @@ export function InboxList({ items }: { items: InboxItem[] }) {
               </Link>
             )}
           </div>
-          {item.status && item.kind !== "text_out" && item.kind !== "call" && (
+          {item.status && item.kind !== "text_out" && item.kind !== "chat_out" && item.kind !== "call" && (
             <StatusPill status={STATUS[item.status].status} className="hidden self-start sm:inline-flex">
               {STATUS[item.status].label}
             </StatusPill>

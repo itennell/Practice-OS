@@ -6,10 +6,10 @@ import { prettyPhone } from "./phone/numbers";
 // numbers are still private, so the page gets the last four digits only; the
 // full number comes from /api/front-desk/reveal, one at a time, written to the log.
 
-export const INBOX_FILTERS = ["all", "needs_you", "calls", "voicemails", "texts", "bookings"] as const;
+export const INBOX_FILTERS = ["all", "needs_you", "calls", "voicemails", "texts", "web_chat", "bookings"] as const;
 export type InboxFilter = (typeof INBOX_FILTERS)[number];
 
-export type InboxKind = "call" | "voicemail" | "text_in" | "text_out" | "booking";
+export type InboxKind = "call" | "voicemail" | "text_in" | "text_out" | "chat_in" | "chat_out" | "booking";
 
 export type Safety = { crisis: string | null; private: string[] };
 
@@ -52,6 +52,7 @@ const KIND_FILTER: Partial<Record<InboxFilter, InboxKind[]>> = {
   calls: ["call"],
   voicemails: ["voicemail"],
   texts: ["text_in", "text_out"],
+  web_chat: ["chat_in", "chat_out"],
   bookings: ["booking"],
 };
 
@@ -80,6 +81,7 @@ export async function frontDeskInbox(filter: InboxFilter = "all", limit = 100): 
       select m.id, case
                when m.channel = 'call' then 'call'
                when m.channel = 'voicemail' then 'voicemail'
+               when m.channel = 'web_chat' then case when m.direction = 'inbound' then 'chat_in' else 'chat_out' end
                when m.direction = 'inbound' then 'text_in'
                else 'text_out' end as kind,
              m.created_at as at, i.contact_phone as phone, i.contact_name as name, m.body,
@@ -87,7 +89,7 @@ export async function frontDeskInbox(filter: InboxFilter = "all", limit = 100): 
              m.vendor, m.provider_sid, m.meta, null::text as reference, null::timestamptz as starts_at
       from practice_os.messages m
       join practice_os.inquiries i on i.id = m.inquiry_id
-      where m.channel in ('call', 'voicemail', 'sms')
+      where m.channel in ('call', 'voicemail', 'sms', 'web_chat')
         -- a call that left a voicemail shows once, as the voicemail
         and not (m.channel = 'call' and exists (
           select 1 from practice_os.messages v
@@ -99,13 +101,13 @@ export async function frontDeskInbox(filter: InboxFilter = "all", limit = 100): 
       from practice_os.consult_bookings b
       left join practice_os.inquiries i on i.id = b.inquiry_id
     )
-    select t.*, (t.kind in ('voicemail', 'text_in') and exists (
+    select t.*, (t.kind in ('voicemail', 'text_in', 'chat_in') and exists (
              select 1 from practice_os.approvals a
              where a.status = 'pending' and a.payload ->> 'inquiry_id' = t.inquiry_id::text)) as reply_waiting
     from timeline t
     where at > now() - interval '60 days'
       ${KIND_FILTER[filter] ? db()`and kind in ${db()(KIND_FILTER[filter]!)}` : db()``}
-      ${filter === "needs_you" ? db()`and status in ('new', 'needs_clinician') and kind <> 'text_out'` : db()``}
+      ${filter === "needs_you" ? db()`and status in ('new', 'needs_clinician') and kind not in ('text_out', 'chat_out')` : db()``}
     order by at desc
     limit ${limit}`;
   return rows.map((r) => {
@@ -115,7 +117,7 @@ export async function frontDeskInbox(filter: InboxFilter = "all", limit = 100): 
       id: r.id,
       kind: r.kind,
       at: new Date(r.at).toISOString(),
-      caller: maskPhone(r.phone),
+      caller: r.kind === "chat_in" || r.kind === "chat_out" ? (r.phone ? `Website visitor · ${maskPhone(r.phone)}` : "Website visitor") : maskPhone(r.phone),
       hasNumber: Boolean(r.phone),
       name: r.name,
       body: r.body,

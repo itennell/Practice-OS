@@ -3,8 +3,8 @@
 // is open, so each adapter must be able to LIST them; webhooks are optional.
 
 export type PhoneVendor = "spruce" | "twilio"; // "quo" is the documented fallback, not built
-/** "sample" is the stand-in phone behind "Simulate a voicemail": it never texts anyone. */
-export type MessageVendor = PhoneVendor | "sample";
+/** "sample" is the stand-in phone behind "Simulate a voicemail": it never texts anyone. "web" is the website chat. */
+export type MessageVendor = PhoneVendor | "sample" | "web";
 
 export type Voicemail = {
   /** The company's own id; stored with the vendor so two companies never collide. */

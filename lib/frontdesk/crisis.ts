@@ -21,7 +21,7 @@ export async function alertPhone(): Promise<string | null> {
 // (CLINICIAN_ALERT_PHONE), both written to audit_log. No model sees the words.
 export async function handleCrisis(input: {
   inquiryId: string;
-  channel: "voicemail" | "sms";
+  channel: "voicemail" | "sms" | "web_chat";
   from: string | null;
   category: CrisisCategory;
   phone: PhoneAdapter | null;

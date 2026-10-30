@@ -84,7 +84,38 @@ export function helpText(p: Practice): string {
 }
 
 /** The urgent alert to the clinician's own verified phone. Never quotes the caller's words. */
-export function crisisAlertText(channel: "voicemail" | "sms", callerPhone: string | null): string {
+export function crisisAlertText(channel: "voicemail" | "sms" | "web_chat", callerPhone: string | null): string {
+  if (channel === "web_chat") {
+    return "URGENT from Practice-OS Front Desk: a website chat message mentioned danger or self-harm. The visitor got the 988/911 message. Please check Front Desk now.";
+  }
   const who = callerPhone ?? "a hidden number";
   return `URGENT from Practice-OS Front Desk: a ${channel === "voicemail" ? "voicemail" : "text"} from ${who} mentioned danger or self-harm. The caller got the 988/911 message. Please check Front Desk now.`;
+}
+
+// ---- website chat (typing only; same rules: logistics, AI disclosure first, no empathy phrases)
+
+/** The first thing the website chat says, before the visitor types. */
+export function webChatGreeting(p: Practice): string {
+  return `Hi, I'm the AI assistant for ${p.practiceName}. I can help with booking a free ${p.consultMinutes}-minute phone consult and pass questions to ${p.clinicianFirstName}. I can't give advice. In an emergency call 911, or call or text 988.`;
+}
+
+export function webChatCheckingTimes(p: Practice): string {
+  return `I'll get open consult times for you. ${p.clinicianFirstName} checks them first, so they'll show here in a few minutes. You can leave a phone number or email too.`;
+}
+
+/** Shown once she approves; `labels` are "Tue 10am". */
+export function webChatTimes(p: Practice, labels: string[]): string {
+  return `Open consult times with ${p.practiceName}: ${labels.map((l, i) => `${i + 1}) ${l}`).join(" ")}. Reply with a number and a phone number or email, and ${p.clinicianFirstName} will confirm.`;
+}
+
+export function webChatNoTimes(p: Practice): string {
+  return `There are no open consult times this week. ${p.clinicianFirstName} will follow up if you leave a phone number or email.`;
+}
+
+export function webChatPassedOn(p: Practice): string {
+  return `I've passed your message to ${p.clinicianFirstName}. Leave a phone number or email if you'd like a reply outside this chat.`;
+}
+
+export function webChatPicked(p: Practice): string {
+  return `Got it. ${p.clinicianFirstName} will confirm the time. Leave a phone number or email if you haven't yet.`;
 }
