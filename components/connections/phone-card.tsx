@@ -32,6 +32,9 @@ type ConnectOut = { ok: boolean; label?: string; fix?: string; choose?: TwilioNu
 
 const TICKS_KEY = "practice-os:twilio-setup";
 const newTab = <span className="sr-only"> (opens in a new tab)</span>;
+// The voicemail buttons have long labels: on a narrow card they wrap to two lines and the pill
+// grows with them (at least 44px tall) instead of the words spilling out of a fixed height.
+const LONG_LABEL = "h-auto! min-h-touch max-w-full py-2.5 text-center";
 
 function readTicks(): TwilioStepId[] {
   try {
@@ -296,19 +299,19 @@ export function PhoneCard({ initial }: { initial: PhoneCardStatus }) {
               <section aria-label="Voicemail on your number" className="flex flex-col items-start gap-3 rounded-[20px] border border-border bg-[var(--chip-off-bg)] p-4">
                 <p className="font-medium">{VOICEMAIL_OFFER.title}</p>
                 <p className="max-w-[60ch] text-small">{VOICEMAIL_OFFER.body}</p>
-                <Button variant="primary" disabled={busy !== null} onClick={() => void voicemail("on")}>
+                <Button variant="primary" className="h-auto! min-h-btn-primary max-w-full py-3 text-center" disabled={busy !== null} onClick={() => void voicemail("on")}>
                   {busy === "on" ? "Changing…" : VOICEMAIL_OFFER.button}
                 </Button>
               </section>
             )}
             <div className="flex flex-wrap gap-3">
               {view.canRefreshGreeting && (
-                <Button variant="quiet" disabled={busy !== null} onClick={() => void voicemail("greeting")}>
+                <Button variant="quiet" className={LONG_LABEL} disabled={busy !== null} onClick={() => void voicemail("greeting")}>
                   {busy === "greeting" ? "Updating…" : "Put my latest greeting on the number"}
                 </Button>
               )}
               {view.canUndoVoicemail && (
-                <Button variant="quiet" disabled={busy !== null} onClick={() => void voicemail("undo")}>
+                <Button variant="quiet" className={LONG_LABEL} disabled={busy !== null} onClick={() => void voicemail("undo")}>
                   {busy === "undo" ? "Putting it back…" : VOICEMAIL_OFFER.undo}
                 </Button>
               )}
