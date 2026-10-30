@@ -11,6 +11,8 @@ import { looksResidential } from "@/lib/referrals/nppes";
 import { STAGES, STAGE_LABEL, type Stage } from "@/lib/referrals/stages";
 import type { LetterState, ReferralSource } from "@/lib/referrals/store";
 import type { TierResult } from "@/lib/referrals/tier";
+import type { Evidence } from "@/lib/referrals/evidence/merge";
+import { EvidenceBox } from "./evidence-box";
 import { TierBadge } from "./tier-badge";
 
 // The Referrals board (Isaiah's pipeline, AGENTS.md > Referrals). Cards move by
@@ -145,14 +147,18 @@ function Card({
   card,
   tier,
   letter,
+  evidence,
   drafting,
   demo,
   onMove,
   onDraft,
+  onUpdate,
 }: {
   card: ReferralSource;
   tier: TierResult | undefined;
   letter: LetterState | undefined;
+  evidence: Evidence | undefined;
+  onUpdate: (card: ReferralSource, evidence: Evidence) => void;
   drafting: boolean;
   demo: boolean;
   onMove: (stage: Stage) => void;
@@ -201,6 +207,7 @@ function Card({
       {card.next_follow_up_on && card.stage !== "connected" && card.stage !== "not_a_fit" && (
         <p className="text-small font-medium">Follow up {dateLabel(card.next_follow_up_on)}</p>
       )}
+      <EvidenceBox card={card} evidence={evidence} onUpdate={onUpdate} />
       {letter && <LetterBox letter={letter} name={card.name} demo={demo} />}
       <SettingSelect
         compact
@@ -283,16 +290,20 @@ export function ReferralBoard({
   initial,
   letters: initialLetters,
   tiers,
+  evidence: initialEvidence,
   demo,
 }: {
   initial: ReferralSource[];
   letters: Record<string, LetterState>;
   tiers: Record<string, TierResult>;
+  /** What each source said about each card, merged (lib/referrals/evidence). */
+  evidence: Record<string, Evidence>;
   /** The fictional demo practice: letters must never reach a real provider. */
   demo: boolean;
 }) {
   const [cards, setCards] = useState(initial);
   const [letters, setLetters] = useState(initialLetters);
+  const [evidence, setEvidence] = useState(initialEvidence);
   const [drafting, setDrafting] = useState<string | null>(null);
   const [announce, setAnnounce] = useState("");
   // A new search refreshes the server data; take it when it arrives.
@@ -301,6 +312,12 @@ export function ReferralBoard({
     setSeen(initial);
     setCards(initial);
     setLetters(initialLetters);
+    setEvidence(initialEvidence);
+  }
+
+  function updated(card: ReferralSource, ev: Evidence) {
+    setCards((all) => all.map((c) => (c.id === card.id ? { ...c, ...card, stage: c.stage } : c)));
+    setEvidence((all) => ({ ...all, [card.id]: ev }));
   }
 
   async function move(id: string, stage: Stage) {
@@ -360,6 +377,8 @@ export function ReferralBoard({
                     card={c}
                     tier={tiers[c.id]}
                     letter={letters[c.id]}
+                    evidence={evidence[c.id]}
+                    onUpdate={updated}
                     drafting={drafting === c.id}
                     demo={demo}
                     onMove={(s) => move(c.id, s)}

@@ -126,3 +126,9 @@ export function jaroWinkler(a: string, b: string): number {
   while (prefix < Math.min(4, a.length, b.length) && a[prefix] === b[prefix]) prefix++;
   return jaro + prefix * 0.1 * (1 - jaro);
 }
+
+/** A card's address as one line: "2400 N Lincoln Ave, Suite 210, Chicago, IL 60614". */
+export function addressLine(street: string | null | undefined, city: string | null | undefined, state: string | null | undefined, zip: string | null | undefined): string {
+  const tail = [state, zip].filter(Boolean).join(" ");
+  return [street, city, tail].filter((s) => s && s.trim()).join(", ");
+}

@@ -4,15 +4,12 @@
 import type postgres from "postgres";
 import { db } from "../../db";
 import type { Provider } from "../nppes";
+import { addressLine } from "./normalize";
 import { mergeEvidence, type Evidence, type Fact, type Field, type Origin } from "./merge";
 
-const NPPES_PAGE = "https://npiregistry.cms.hhs.gov/provider-view/";
+export { addressLine };
 
-/** A card's address as one line: "2400 N Lincoln Ave, Suite 210, Chicago, IL 60614". */
-export function addressLine(street: string | null | undefined, city: string | null | undefined, state: string | null | undefined, zip: string | null | undefined): string {
-  const tail = [state, zip].filter(Boolean).join(" ");
-  return [street, city, tail].filter((s) => s && s.trim()).join(", ");
-}
+const NPPES_PAGE = "https://npiregistry.cms.hhs.gov/provider-view/";
 
 /** What the NPI Registry says about a provider, as facts. */
 export function nppesFacts(p: Provider, checkedAt = new Date().toISOString()): Fact[] {
@@ -126,4 +123,16 @@ export async function evidenceFor(
 ): Promise<Record<string, Evidence>> {
   const facts = await factsFor(cards.map((c) => c.id), sql);
   return Object.fromEntries(cards.map((c) => [c.id, mergeEvidence(facts.get(c.id) ?? [], { isOrg: c.npi_type === "organization", now })]));
+}
+
+/** The email she typed for a card (null clears it, and the card falls back to what Aeon found). */
+export async function setTypedEmail(sourceId: string, email: string | null, sql: postgres.Sql = db()): Promise<Evidence> {
+  if (email === null) {
+    await sql`delete from practice_os.referral_facts where source_id = ${sourceId} and origin = 'clinician' and field = 'email'`;
+    await sql`update practice_os.referral_sources set email = null where id = ${sourceId}`;
+    return summarize(sourceId, sql);
+  }
+  const fact: Fact = { field: "email", value: email.toLowerCase(), origin: "clinician", method: "manual", checkedAt: new Date().toISOString(), detail: { label: "you typed it" } };
+  const others = ((await factsFor([sourceId], sql)).get(sourceId) ?? []).filter((f) => f.origin === "clinician" && f.field !== "email");
+  return saveFacts(sourceId, [...others, fact], { checked: ["clinician"], sql });
 }
