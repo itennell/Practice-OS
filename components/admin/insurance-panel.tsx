@@ -83,8 +83,9 @@ export async function Insurance() {
             Dates for each application
           </h2>
           <p className="max-w-[65ch] text-[var(--fg-muted)]">
-            Aeon reminds you to follow up 30 days after you apply and to recredential 36 months after approval. You can also tell
-            Aeon, like “I sent my BCBSIL application today”.
+            Aeon reminds you to follow up 30 days after you apply and to recredential 36 months after approval. When you send an
+            application, open Edit on its row and set Status to Applied yourself — only your own change records the sent date. Telling
+            Aeon in chat never marks it sent.
           </p>
         </div>
         {dates.length > 0 && (

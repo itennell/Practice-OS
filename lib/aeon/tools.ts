@@ -709,14 +709,16 @@ export const TOOLS: AeonTool[] = [
     name: "update_payer_application",
     title: "Add or update an insurance application",
     description:
-      "Adds a payer (no id) or updates one (with id from list_payer_applications). Status: not_started, preparing, applied, pending, follow_up, approved, denied, withdrawn. " +
+      "Adds a payer (no id) or updates one (with id from list_payer_applications). Status: not_started, preparing, pending, follow_up, approved, denied, withdrawn. " +
       "Applied with no follow_up_on sets a follow-up 30 days out; approved with no recredential_on sets 36 months out. " +
-      "Example: 'I sent my BCBSIL application today' -> {payer: 'BCBSIL', status: 'applied'}. Never a license number or client detail.",
+      "Example: 'I started my Aetna application' -> {payer: 'Aetna', status: 'preparing'}. Never set status to applied from chat: only her own change " +
+      "on the Insurance page records that an application was sent, so when she says she sent one, ask her to mark its row Applied herself. " +
+      "Never a license number or client detail.",
     input: {
       id: z.string().uuid().optional(),
       payer: z.string().min(2).max(120),
       form: z.enum(["cms855i"]).optional(),
-      status: z.enum(payers.STATUSES),
+      status: z.enum(payers.CHAT_SET_STATUSES),
       applied_on: isoDay.optional(),
       follow_up_on: isoDay.optional(),
       approved_on: isoDay.optional(),
