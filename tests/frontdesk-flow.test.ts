@@ -11,15 +11,13 @@ const localDb = /@(localhost|127\.0\.0\.1)[:/]/.test(url);
 
 vi.mock("../lib/frontdesk/extract", async (orig) => {
   const real = await orig<typeof import("../lib/frontdesk/extract")>();
-  return {
-    ...real,
-    // Stands in for muse-spark-1.3: a name if "it's <Name>" is said, intent from keywords.
-    extractVoicemail: vi.fn(async (text: string, callerId: string | null) => {
-      const name = /it's (\w+)/i.exec(text)?.[1] ?? null;
-      const intent = /appointment|consult|book/i.test(text) ? "book" : /insurance|fee|cost/i.test(text) ? "question" : "other";
-      return real.vetExtraction({ name, callback_number: null, intent, summary: "Wants a first consult" }, callerId);
-    }),
-  };
+  // Stands in for muse-spark-1.3: a name if "it's <Name>" is said, intent from keywords.
+  const fake = vi.fn(async (text: string, callerId: string | null) => {
+    const name = /it's (\w+)/i.exec(text)?.[1] ?? null;
+    const intent = /appointment|consult|book/i.test(text) ? "book" : /insurance|fee|cost/i.test(text) ? "question" : "other";
+    return real.vetExtraction({ name, callback_number: null, intent, summary: "Wants a first consult" }, callerId);
+  });
+  return { ...real, extractVoicemail: fake, readIntent: fake };
 });
 
 const { db, closeDb } = await import("../lib/db");
@@ -30,13 +28,15 @@ const { checkFrontDesk } = await import("../lib/frontdesk/check");
 const { offerTimes } = await import("../lib/frontdesk/offers");
 const { extractVoicemail } = await import("../lib/frontdesk/extract");
 const { CRISIS_REPLY } = await import("../lib/safety");
+const { bookFromOffer } = await import("../lib/frontdesk/booking");
 
 const SAM = "+13125550144";
 const RILEY = "+13125550145";
 const ALEX = "+13125550146";
 const DEMO = "+13125550147";
+const SAMPLE = "+13125550148";
 const CLINICIAN = "+13125550199";
-const PHONES = [SAM, RILEY, ALEX, DEMO];
+const PHONES = [SAM, RILEY, ALEX, DEMO, SAMPLE];
 
 const sent: Array<{ to: string; body: string }> = [];
 const booked: string[] = [];
@@ -189,10 +189,38 @@ describe.skipIf(!localDb)("Front Desk flow (local database only)", () => {
       { to: CLINICIAN, body: expect.stringMatching(/^URGENT from Practice-OS Front Desk: a voicemail from \+13125550146/) },
     ]);
     expect(sent[1].body).not.toContain("live");
-    const [alert] = await db()`select kind from practice_os.alerts where inquiry_id = ${inq.id}`;
+    const [alert] = await db()`select kind, message from practice_os.alerts where inquiry_id = ${inq.id}`;
     expect(alert.kind).toBe("crisis");
+    // Only the text to her own phone has the full number; the stored alert has the last four.
+    expect(alert.message).toContain("(•••) •••-0146");
+    expect(alert.message).not.toMatch(/3125550146|555-0146|\+1312/);
     const actions = (await db()`select action from practice_os.audit_log where subject_id = ${inq.id}::text`).map((r) => r.action);
     expect(actions).toEqual(expect.arrayContaining(["crisis_detected", "crisis_reply_sent"]));
+  });
+
+  it("a voicemail Front Desk couldn't read leaves an alert with the masked number only", async () => {
+    const unreadable = { ...vm(DEMO, ""), providerTranscript: undefined };
+    expect(await processVoicemail(unreadable, phone)).toBe("done");
+    const [a] = await db()`select message from practice_os.alerts where inquiry_id = ${(await inquiryOf(DEMO)).id}`;
+    expect(a.message).toBe("New voicemail from (•••) •••-0147. Front Desk couldn't read it; listen in your phone app.");
+  });
+
+  it("a [Sample] booking never calls the real calendar's book, even with DRY_RUN off", async () => {
+    const [inq] = await db()`
+      insert into practice_os.inquiries (channel, contact_phone, contact_name, status, is_sample)
+      values ('voicemail', ${SAMPLE}, '[Sample] caller', 'options_sent', true) returning id`;
+    const [offer] = await db()`
+      insert into practice_os.consult_offers (inquiry_id, purpose, slots, status, is_sample)
+      values (${inq.id}, 'book', ${db().json(SLOTS.map((s) => ({ start: s.start.toISOString(), end: s.end.toISOString() })) as never)}, 'sent', true)
+      returning id`;
+    const before = booked.length;
+    const out = await bookFromOffer("00000000-0000-0000-0000-000000000000", { offer_id: offer.id, index: 1 });
+    expect(out).toMatchObject({ dryRun: true });
+    expect(booked.length).toBe(before);
+    const [b] = await db()`select external_id, is_sample from practice_os.consult_bookings where contact_phone = ${SAMPLE}`;
+    expect(b.is_sample).toBe(true);
+    expect(b.external_id).toMatch(/^dry-run-FD-/);
+    expect(sent.filter((s) => s.to === SAMPLE)).toEqual([]); // the confirmation is logged, not texted
   });
 
   it("a crisis text is caught before the reply parser", async () => {

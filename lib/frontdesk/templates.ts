@@ -83,7 +83,10 @@ export function helpText(p: Practice): string {
   return `${p.practiceName} scheduling texts. For help call the practice line. In an emergency call 911; call or text 988 for the Suicide and Crisis Lifeline. ${STOP_LINE}`;
 }
 
-/** The urgent alert to the clinician's own verified phone. Never quotes the caller's words. */
+/**
+ * The urgent alert. Never quotes the caller's words. The text to her own verified
+ * phone gets the full number; the alert row on the page gets the masked one.
+ */
 export function crisisAlertText(channel: "voicemail" | "sms", callerPhone: string | null): string {
   const who = callerPhone ?? "a hidden number";
   return `URGENT from Practice-OS Front Desk: a ${channel === "voicemail" ? "voicemail" : "text"} from ${who} mentioned danger or self-harm. The caller got the 988/911 message. Please check Front Desk now.`;
