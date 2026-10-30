@@ -6,9 +6,13 @@ import { AlertList } from "@/components/front-desk/alert-list";
 import { CalendarCard } from "@/components/front-desk/calendar-card";
 import { CheckNow } from "@/components/front-desk/check-now";
 import { InboxList } from "@/components/front-desk/inbox";
+import { TestConsole } from "@/components/front-desk/test-console";
 import { ChipLink, GlassCard } from "@/components/ui";
 import { loadApprovalSettings } from "@/lib/approval-settings";
+import { isDryRun } from "@/lib/env";
 import { calendarStatus, phoneStatus } from "@/lib/frontdesk/connect";
+import { alertPhone } from "@/lib/frontdesk/crisis";
+import { prettyPhone } from "@/lib/frontdesk/phone/numbers";
 import { defaultGreeting, loadFrontDeskSetup } from "@/lib/frontdesk/setup";
 import { frontDeskInbox, INBOX_FILTERS, maskPhone, lastCheck, type InboxFilter } from "@/lib/frontdesk/inbox";
 import { frontDeskView } from "@/lib/frontdesk/view";
@@ -46,7 +50,7 @@ async function FrontDesk({ searchParams }: { searchParams: PageProps<"/front-des
   await connection(); // read the database per request, never at build time
   const q = (await searchParams).filter;
   const filter: InboxFilter = (INBOX_FILTERS as readonly string[]).includes(String(q)) ? (q as InboxFilter) : "all";
-  const [view, inbox, last, phone, calendar, settings, setup, greeting] = await Promise.all([
+  const [view, inbox, last, phone, calendar, settings, setup, greeting, ownPhone] = await Promise.all([
     frontDeskView(),
     frontDeskInbox(filter),
     lastCheck(),
@@ -55,7 +59,13 @@ async function FrontDesk({ searchParams }: { searchParams: PageProps<"/front-des
     loadApprovalSettings(),
     loadFrontDeskSetup(),
     defaultGreeting(),
+    alertPhone(),
   ]);
+  const texting = !phone.connected
+    ? { ok: false, note: "connect your phone below first." }
+    : phone.note
+      ? { ok: false, note: phone.note }
+      : { ok: true, note: "working now." };
   const calcom = calendar.provider === "calcom" && calendar.connected;
   return (
     <>
@@ -65,6 +75,14 @@ async function FrontDesk({ searchParams }: { searchParams: PageProps<"/front-des
         </h2>
         <AlertList initial={view.alerts} />
       </GlassCard>
+
+      <TestConsole
+        line={phone.connected && phone.number ? prettyPhone(phone.number) : null}
+        texting={texting}
+        alertPhone={ownPhone ? `ending ${ownPhone.slice(-4)}` : null}
+        dryRun={isDryRun()}
+        open={filter === "all" && inbox.every((i) => i.isSample)}
+      />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <GlassCard aria-labelledby="inbox" className="flex min-w-0 flex-col gap-4 p-6 md:p-8">

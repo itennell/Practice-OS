@@ -34,6 +34,8 @@ export type InboxItem = {
   safety: Safety | null;
   /** Texts out: logged instead of sent (DRY_RUN or a [Sample]). */
   dryRun: boolean;
+  /** A text for this caller is waiting in Approvals. */
+  replyWaiting: boolean;
   /** Bookings: the reference ("FD-1042") and when. */
   reference: string | null;
   startsAt: string | null;
@@ -69,6 +71,7 @@ type Row = {
   meta: Record<string, unknown> | null;
   reference: string | null;
   starts_at: Date | null;
+  reply_waiting: boolean;
 };
 
 export async function frontDeskInbox(filter: InboxFilter = "all", limit = 100): Promise<InboxItem[]> {
@@ -96,7 +99,10 @@ export async function frontDeskInbox(filter: InboxFilter = "all", limit = 100): 
       from practice_os.consult_bookings b
       left join practice_os.inquiries i on i.id = b.inquiry_id
     )
-    select * from timeline
+    select t.*, (t.kind in ('voicemail', 'text_in') and exists (
+             select 1 from practice_os.approvals a
+             where a.status = 'pending' and a.payload ->> 'inquiry_id' = t.inquiry_id::text)) as reply_waiting
+    from timeline t
     where at > now() - interval '60 days'
       ${KIND_FILTER[filter] ? db()`and kind in ${db()(KIND_FILTER[filter]!)}` : db()``}
       ${filter === "needs_you" ? db()`and status in ('new', 'needs_clinician') and kind <> 'text_out'` : db()``}
@@ -121,6 +127,7 @@ export async function frontDeskInbox(filter: InboxFilter = "all", limit = 100): 
       seconds: typeof meta.seconds === "number" ? meta.seconds : null,
       safety,
       dryRun: meta.dryRun === true,
+      replyWaiting: r.reply_waiting,
       reference: r.reference,
       startsAt: r.starts_at ? new Date(r.starts_at).toISOString() : null,
     };

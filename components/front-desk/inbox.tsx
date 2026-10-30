@@ -1,6 +1,7 @@
 "use client";
 
 import { CalendarCheck, Eye, MessageSquare, MessageSquareReply, Phone, PhoneMissed, Play, Voicemail } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { notify } from "@/components/shared/toaster";
 import { StatusPill, type Status } from "@/components/shared/status-mark";
@@ -59,7 +60,7 @@ function Caller({ item }: { item: InboxItem }) {
   return (
     <span className="flex flex-wrap items-center gap-x-2">
       <span className="font-medium">
-        {item.isSample && "[Sample] "}
+        {item.isSample && !item.name?.startsWith("[Sample]") && "[Sample] "}
         {item.name ? `${item.name} · ` : ""}
         <span className="tabular-nums">{shown ?? item.caller}</span>
       </span>
@@ -119,6 +120,11 @@ export function InboxList({ items }: { items: InboxItem[] }) {
             {item.kind !== "call" && item.kind !== "booking" && <p className="max-w-[65ch] whitespace-pre-line break-words">{item.body}</p>}
             {item.kind === "voicemail" && <Recording item={item} />}
             <SafetyLine item={item} />
+            {item.replyWaiting && (
+              <Link href="/approvals" className="inline-flex min-h-touch items-center self-start text-small text-[var(--link)] underline underline-offset-2">
+                A reply to this caller is waiting for you in Approvals
+              </Link>
+            )}
           </div>
           {item.status && item.kind !== "text_out" && item.kind !== "call" && (
             <StatusPill status={STATUS[item.status].status} className="hidden self-start sm:inline-flex">

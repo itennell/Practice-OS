@@ -10,6 +10,7 @@ import { db } from "../db";
 import { transcribe, transcriptText } from "../meta";
 import { checkIdentity, type PhiKind } from "../aeon/identity-filter";
 import { checkCrisis, type CrisisResult } from "../safety";
+import type { CalendarAdapter } from "./calendar/types";
 import { handleCrisis } from "./crisis";
 import { deps } from "./deps";
 import { readIntent, type Extracted } from "./extract";
@@ -71,7 +72,7 @@ async function rules() {
   return (await loadApprovalSettings()).frontDesk;
 }
 
-async function actOnIntent(inquiryId: string, phone: string | null, intent: Extracted["intent"], note: string) {
+async function actOnIntent(inquiryId: string, phone: string | null, intent: Extracted["intent"], note: string, calendar?: CalendarAdapter) {
   const now = deps().now();
   if ((intent === "reschedule" || intent === "cancel") && phone) {
     const booking = await activeBookingFor(phone, now);
@@ -87,10 +88,15 @@ async function actOnIntent(inquiryId: string, phone: string | null, intent: Extr
     }
   }
   if (intent === "question" || intent === "other") return passToClinician(inquiryId, note);
-  return offerTimes(inquiryId, { purpose: "book" });
+  return offerTimes(inquiryId, { purpose: "book", calendar });
 }
 
-export async function processVoicemail(v: Voicemail, phone: PhoneAdapter): Promise<"skipped" | "crisis" | "done"> {
+export async function processVoicemail(
+  v: Voicemail,
+  phone: PhoneAdapter,
+  /** "Simulate a voicemail": the calendar to read times from when hers isn't connected. */
+  opts: { calendar?: CalendarAdapter } = {},
+): Promise<"skipped" | "crisis" | "done"> {
   if (await hasMessage(phone.vendor, v.id)) return "skipped";
   const { text, source } = await voicemailTranscript(v);
   const sample = phone.vendor === "sample";
@@ -127,9 +133,10 @@ export async function processVoicemail(v: Voicemail, phone: PhoneAdapter): Promi
     set contact_name = ${x.name}, contact_phone = ${x.callbackNumber}, summary = ${x.summary}
     where id = ${inquiry.id}`;
   const who = x.name ?? (x.callbackNumber ? prettyPhone(x.callbackNumber) : "A caller");
-  await withOrigin({ rule: "front_desk", rules: await rules() }, () =>
-    actOnIntent(inquiry.id, x.callbackNumber, x.intent, `${who} left a voicemail: ${x.summary}`),
-  );
+  const act = () => actOnIntent(inquiry.id, x.callbackNumber, x.intent, `${who} left a voicemail: ${x.summary}`, opts.calendar);
+  // A [Sample] always waits for her tap, so the test shows the approval step.
+  if (sample) await act();
+  else await withOrigin({ rule: "front_desk", rules: await rules() }, act);
   return "done";
 }
 
