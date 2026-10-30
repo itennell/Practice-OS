@@ -220,7 +220,7 @@ export function Canvas({
   assets: DrawAssets;
   busy: boolean;
   act: CanvasActions;
-  /** Her own video's editor (PR B); shown for a video. */
+  /** Her own video's editor (video-editor.tsx); shown for a video. */
   videoEditor?: ReactNode;
 }) {
   const doc = project.doc;
@@ -268,7 +268,7 @@ export function Canvas({
       </div>
 
       {doc.kind === "video" ? (
-        (videoEditor ?? <p className="text-[var(--fg-muted)]">The video editor is loading…</p>)
+        videoEditor
       ) : (
         <>
           <div className="flex justify-center">

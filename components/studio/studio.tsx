@@ -17,6 +17,7 @@ import { ThoughtLine } from "../shared/thought-line";
 import type { ThoughtStep } from "../shared/thought-line-steps";
 import { Canvas, type CanvasActions } from "./canvas";
 import type { DrawAssets } from "./slide-draw";
+import { VideoEditor } from "./video-editor";
 
 type Entry =
   | { who: "me"; text: string }
@@ -106,7 +107,7 @@ async function post(url: string, body: unknown): Promise<{ ok: boolean; project?
   }
 }
 
-export function Studio({ profile, initial, videoEditor }: { profile: StudioProfile; initial: Project | null; videoEditor?: (p: { project: Project; busy: boolean; apply: (ops: unknown[]) => Promise<boolean> }) => ReactNode }) {
+export function Studio({ profile, initial }: { profile: StudioProfile; initial: Project | null }) {
   const [project, setProject] = useState<Project | null>(initial);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [busy, setBusy] = useState(false);
@@ -281,7 +282,7 @@ export function Studio({ profile, initial, videoEditor }: { profile: StudioProfi
 
       <div className="min-w-0">
         {project ? (
-          <Canvas project={project} assets={assets} busy={busy} act={act} videoEditor={videoEditor?.({ project, busy, apply })} />
+          <Canvas project={project} assets={assets} busy={busy} act={act} videoEditor={project.doc.kind === "video" ? <VideoEditor doc={project.doc} busy={busy} apply={apply} projectId={project.id} /> : undefined} />
         ) : (
           <section aria-label="Canvas" className="flex min-h-[360px] flex-col items-center justify-center gap-3 rounded-[24px] border border-dashed border-[var(--hairline)] p-6 text-center">
             {words ? (
