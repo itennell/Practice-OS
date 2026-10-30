@@ -222,6 +222,8 @@ export type GraphicDeps = {
   chat?: ChatFn;
   /** Her "never show" picks from onboarding: "face" leaves her photo out; the rest stay out of the background. */
   neverShow?: string[];
+  /** A new picture she asked for in the studio ("swap the picture"): what should be different. */
+  idea?: string;
 };
 
 export type Graphic = { jpeg: Buffer; check: GraphicCheck; tries: number; backgroundPrompt: string };
@@ -239,7 +241,7 @@ export async function designPost(pillar: Pillar, words: Words, deps: GraphicDeps
   const never = deps.neverShow ?? [];
   const cutout = never.includes("face") ? null : await (deps.cutout ?? danaCutout)();
   const draw = deps.background ?? (async (prompt: string) => (await generateImage("instagram.background", prompt)).image);
-  let note: string | undefined;
+  let note: string | undefined = deps.idea;
   let last: Graphic | null = null;
   for (let tries = 1; tries <= 2; tries++) {
     const prompt = backgroundPrompt(pillar, note, never);

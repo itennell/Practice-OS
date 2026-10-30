@@ -10,7 +10,7 @@ import type { ChatFn, CriticResult } from "./critic";
 import { designPost, type GraphicDeps } from "./graphic";
 import { GOALS, instagramDeclined, loadInstagramPrefs, weekTopics } from "./onboarding";
 import { PILLAR_BY_ID, type PillarId } from "./pillars";
-import { research, type Research, type ResearchAngle, type SearchFn } from "./research";
+import { research, type OnResearchStep, type Research, type ResearchAngle, type SearchFn } from "./research";
 import { gateTopic, illnessTopic, type Angle } from "./topic-gate";
 import { writeRequested, writeSeveral, writeWeek, type Draft, type PracticeFacts } from "./write";
 
@@ -180,7 +180,7 @@ export async function requestPost(
   by: string,
   request: string,
   pillar: PillarId | null,
-  opts: { chat?: ChatFn; graphic?: GraphicDeps; research?: PickedResearch } = {},
+  opts: { chat?: ChatFn; graphic?: GraphicDeps; research?: PickedResearch; onWritten?: (d: Draft) => void } = {},
 ): Promise<RequestResult> {
   if (await instagramDeclined()) return { outcome: "declined", why: DECLINED };
   const gate = await checkRequest(request, by);
@@ -194,6 +194,7 @@ export async function requestPost(
     // A self-harm hit on the draft always answers with the fixed crisis text, never a reworded message.
     return { outcome: "blocked", why: CRISIS_REPLY };
   }
+  opts.onWritten?.(out.draft);
   const post = await saveDraft(out.draft, { by, facts, graphic: opts.graphic && { chat: opts.chat, ...opts.graphic } });
   await linkResearch([post.id], angle);
   if (post.status === "blocked") return { outcome: "blocked_after_rewrite", post, headline: out.draft.headline, why: blockedSummary(out.draft.critic) };
@@ -206,7 +207,7 @@ export async function requestPost(
  * (the fixed 988 reply and the urgent alert, like chat), the PHI guard (no client
  * names or details leave the app), then the logistics-only topic gate.
  */
-async function checkRequest(request: string, by: string): Promise<Extract<RequestResult, { outcome: "blocked" | "off_topic" }> | null> {
+export async function checkRequest(request: string, by: string): Promise<Extract<RequestResult, { outcome: "blocked" | "off_topic" }> | null> {
   const crisis = checkCrisis(request);
   if (crisis.crisis) {
     await audit({ actor: "safety", action: "crisis_reply", subjectType: "post", details: { category: crisis.category, by } });
@@ -295,7 +296,7 @@ export type ResearchResult =
   | { outcome: "researched"; research: Research };
 
 /** Research first: the topic gate, then three small web searches and 2-3 angles she picks from. */
-export async function researchPost(by: string, topic: string, opts: { search?: SearchFn; chat?: ChatFn } = {}): Promise<ResearchResult> {
+export async function researchPost(by: string, topic: string, opts: { search?: SearchFn; chat?: ChatFn; onStep?: OnResearchStep } = {}): Promise<ResearchResult> {
   if (await instagramDeclined()) return { outcome: "declined", why: DECLINED };
   const gate = await checkRequest(topic, by);
   if (gate) return gate;

@@ -3,17 +3,20 @@ import { Suspense } from "react";
 import { Lightbulb } from "lucide-react";
 import { ListCard, ListRow } from "@/components/shared/list-card";
 import { InstagramBoard } from "@/components/instagram/instagram-board";
+import { Studio } from "@/components/studio/studio";
 import { latestIdeas } from "@/lib/instagram/coach";
 import { instagramDeclined } from "@/lib/instagram/onboarding";
 import { PILLAR_BY_ID } from "@/lib/instagram/pillars";
-import { listPosts } from "@/lib/instagram/store";
+import { listPosts, practiceFacts } from "@/lib/instagram/store";
 import { getProfile } from "@/lib/profile";
+import { getProject, listProjects } from "@/lib/studio/store";
 
 export const metadata = { title: "Instagram · Practice-OS" };
 
-// Instagram (AGENTS.md > The four helpers): the content studio. She types what a
-// post is about; each post shows as it will look in the feed, waits for her
-// approval, then she downloads it and posts it herself.
+// Instagram (AGENTS.md > The four helpers): the content studio. Chat-first: she
+// tells Aeon what to make and what to change, and the canvas shows it as it will
+// look; each post waits for her approval, then she downloads it and posts it
+// herself. Her posts are listed under it.
 export default function InstagramPage() {
   return (
     <div className="mx-auto flex w-full max-w-[860px] flex-col gap-6">
@@ -36,15 +39,23 @@ export default function InstagramPage() {
 
 async function Board() {
   await connection(); // read the database per request, never at build time
-  const [posts, ideas, profile] = await Promise.all([
+  const [posts, ideas, profile, latest, facts] = await Promise.all([
     listPosts({ limit: 30 }),
     // After "Not for me" her old ideas don't show.
     instagramDeclined().then((no) => (no ? [] : latestIdeas())).catch(() => []),
     getProfile().catch(() => null),
+    listProjects(1)
+      .then(([p]) => (p ? getProject(p.id) : null))
+      .catch(() => null),
+    practiceFacts().catch(() => null),
   ]);
   const sample = profile?.is_sample ? "[Sample] " : "";
   return (
     <>
+      <Studio
+        initial={latest}
+        profile={{ practiceName: profile?.practice_name ?? "Your practice", licenseLine: facts?.licenseLine ?? "", isSample: Boolean(profile?.is_sample) }}
+      />
       {/* Aeon's latest post ideas (post_ideas / weekly_plan in chat); shown only when there are some. */}
       {ideas.length > 0 && (
         <ListCard id="ideas-heading" label="Post ideas">
