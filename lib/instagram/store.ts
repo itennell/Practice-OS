@@ -207,7 +207,7 @@ export async function requestPost(
  * (the fixed 988 reply and the urgent alert, like chat), the PHI guard (no client
  * names or details leave the app), then the logistics-only topic gate.
  */
-async function checkRequest(request: string, by: string): Promise<Extract<RequestResult, { outcome: "blocked" | "off_topic" }> | null> {
+export async function checkRequest(request: string, by: string): Promise<Extract<RequestResult, { outcome: "blocked" | "off_topic" }> | null> {
   const crisis = checkCrisis(request);
   if (crisis.crisis) {
     await audit({ actor: "safety", action: "crisis_reply", subjectType: "post", details: { category: crisis.category, by } });

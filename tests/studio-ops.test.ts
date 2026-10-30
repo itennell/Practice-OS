@@ -92,6 +92,27 @@ describe("studio ops", () => {
     expect(moved.clips.map((c) => c.id)).toEqual(["c2", "c1"]);
   });
 
+  // Review (PR #103): a cut at the start moves captions and the cover frame too, and says what it took out.
+  it("cut_start moves captions and the cover frame, and reports texts in the cut part", () => {
+    const d = {
+      ...video(),
+      overlays: [
+        { id: "o1", text: "Welcome", start: 4, end: 6, position: "bottom" as const },
+        { id: "o2", text: "Hi there", start: 0, end: 2, position: "top" as const },
+      ],
+      captions: { on: true, cues: [{ start: 0, end: 2, text: "hello" }, { start: 5, end: 7, text: "this is the office" }] },
+      cover: { time: 6 },
+    };
+    const r = applyOps(d, [{ op: "cut_start", seconds: 3 }]);
+    if (!r.ok) throw new Error(r.why);
+    expect(r.doc.overlays.map((o) => o.id)).toEqual(["o1"]);
+    expect(r.doc.captions.cues).toEqual([{ start: 2, end: 4, text: "this is the office" }]);
+    expect(r.doc.cover).toEqual({ time: 3 });
+    expect(r.notes).toEqual(['took out the text "Hi there" that was in the cut part', "took out 1 caption in the cut part"]);
+    const plain = applyOps(video(), [{ op: "set_palette", palette: "warm" }]);
+    expect(plain.ok && plain.notes).toEqual([]);
+  });
+
   it("adds text at the start, captions on, a cover frame", () => {
     const d = ok(applyOps(video(), [{ op: "add_text", text: "How booking works", start: 0, end: 3 }, { op: "set_captions", on: true }, { op: "set_cover", time: 2 }]));
     expect(d.overlays.at(-1)).toMatchObject({ text: "How booking works", start: 0, end: 3, position: "bottom" });

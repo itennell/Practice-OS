@@ -79,9 +79,14 @@ export function Finished({ project, assets, state, onChange }: { project: Projec
       setMaking(null);
     }
   }
-  async function slides() {
+  // One click per slide: browsers block a burst of downloads from one click.
+  async function slide(i: number) {
     setProblem("");
-    for (let i = 0; i < doc.slides.length; i++) saveBlob(await slideJpeg(doc, i, assets), `${name}-${i + 1}.jpg`);
+    try {
+      saveBlob(await slideJpeg(doc, i, assets), `${name}-${i + 1}.jpg`);
+    } catch {
+      setProblem(`Slide ${i + 1} didn't download. Try again.`);
+    }
   }
 
   return (
@@ -112,11 +117,12 @@ export function Finished({ project, assets, state, onChange }: { project: Projec
             </ButtonLink>
           </>
         )}
-        {doc.kind === "carousel" && (
-          <Button variant="primary" className="w-full" onClick={slides}>
-            <Download aria-hidden size={18} /> Download {doc.slides.length} slides
-          </Button>
-        )}
+        {doc.kind === "carousel" &&
+          doc.slides.map((s, i) => (
+            <Button key={s.id} variant="primary" className="w-full" onClick={() => slide(i)}>
+              <Download aria-hidden size={18} /> Download slide {i + 1} of {doc.slides.length}
+            </Button>
+          ))}
         {doc.kind === "reel" && (
           <Button variant="primary" className="w-full" onClick={video} disabled={making !== null}>
             <Film aria-hidden size={18} /> {making === null ? "Download video" : "Making the video…"}
