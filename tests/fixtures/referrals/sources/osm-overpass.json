@@ -1,0 +1,4 @@
+{"elements":[
+ {"type":"node","id":101,"lat":41.9250,"lon":-87.6480,"tags":{"name":"Dr. Maria Rivera","healthcare":"doctor","addr:housenumber":"2400","addr:street":"North Lincoln Avenue","addr:postcode":"60614","addr:city":"Chicago","website":"https://riverafm.example","phone":"+1 312 555 0199","contact:email":"Office@RiveraFM.example"}},
+ {"type":"node","id":102,"lat":41.9300,"lon":-87.6400,"tags":{"name":"Rivera Dental","healthcare":"dentist","addr:housenumber":"10","addr:street":"West Fullerton Avenue","addr:postcode":"60614"}}
+]}

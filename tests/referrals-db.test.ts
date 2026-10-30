@@ -125,6 +125,22 @@ describe.skipIf(!hasDb)("referral letters", () => {
     expect(await moveDueFollowUps()).toBeGreaterThanOrEqual(1);
     expect((await getSource(sourceId))!.stage).toBe("follow_up");
   });
+
+  it("reading the board, the week's plan and the brief shows a due follow-up without writing anything", async () => {
+    const { listSources } = await import("../lib/referrals/store");
+    const { outreachPlan, referralFollowUps } = await import("../lib/referrals/plan");
+    const sourceId = await makeSource();
+    await db()`update practice_os.referral_sources set stage = 'contacted', next_follow_up_on = current_date - 1 where id = ${sourceId}`;
+    const [{ n: auditsBefore }] = await db()`select count(*)::int as n from practice_os.audit_log where subject_id = ${sourceId}`;
+    expect((await listSources()).find((c) => c.id === sourceId)!.stage).toBe("follow_up");
+    expect((await getSource(sourceId))!.stage).toBe("follow_up");
+    expect((await referralFollowUps()).some((f) => f.id === sourceId)).toBe(true);
+    expect((await outreachPlan()).follow_ups.some((f) => f.id === sourceId)).toBe(true);
+    const [row] = await db()`select stage from practice_os.referral_sources where id = ${sourceId}`;
+    expect(row.stage).toBe("contacted"); // still as saved: the reads computed the column
+    const [{ n: auditsAfter }] = await db()`select count(*)::int as n from practice_os.audit_log where subject_id = ${sourceId}`;
+    expect(auditsAfter).toBe(auditsBefore);
+  });
 });
 
 describe.skipIf(!hasDb)("Add to board", () => {

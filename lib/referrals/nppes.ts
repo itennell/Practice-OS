@@ -352,6 +352,29 @@ export async function fetchProviders(specialties: SpecialtyId[], zips: string[],
   return (await searchProviders(specialties, zips, { fetcher, maxRequests: 400 })).providers;
 }
 
+/**
+ * What the registry says about one NPI, from its raw answer: `not_found` only
+ * when it returns no record at all, `deactivated` when the record's status
+ * isn't "A", and `active` otherwise, even when the record is one the board
+ * wouldn't list (another specialty, no practice address), so `provider` is null.
+ */
+export type NpiLookup = { status: "active" | "deactivated" | "not_found"; provider: Provider | null };
+
+export function npiStatusFrom(npi: string, res: NppesResponse): NpiLookup {
+  const record = (res.results ?? []).find((r) => String(r.number) === npi);
+  if (!record) return { status: "not_found", provider: null };
+  const raw = record.basic?.status;
+  if (raw && raw !== "A") return { status: "deactivated", provider: null };
+  return { status: "active", provider: parseResult(record) };
+}
+
+export async function lookupNpi(npi: string, fetcher: Fetcher = cachedFetch()): Promise<NpiLookup> {
+  if (!/^\d{10}$/.test(npi)) return { status: "not_found", provider: null };
+  const res = await fetcher(npiUrl(npi));
+  if (res.Errors?.length) throw new Error(`NPI Registry: ${res.Errors[0].description}`);
+  return npiStatusFrom(npi, res);
+}
+
 /** One provider by NPI, or null when NPPES has no active one we'd list. */
 export async function providerByNpi(npi: string, fetcher: Fetcher = cachedFetch()): Promise<Provider | null> {
   if (!/^\d{10}$/.test(npi)) return null;
