@@ -19,7 +19,7 @@ import { frontDeskView } from "@/lib/frontdesk/view";
 
 export const metadata = { title: "Front Desk · Practice-OS" };
 
-const FILTER_LABEL: Record<InboxFilter, string> = { all: "All", needs_you: "Needs you", calls: "Calls", voicemails: "Voicemails", texts: "Texts", bookings: "Bookings" };
+const FILTER_LABEL: Record<InboxFilter, string> = { all: "All", needs_you: "Needs you", calls: "Calls", voicemails: "Voicemails", texts: "Texts", web_chat: "Website chat", bookings: "Bookings" };
 
 const when = (iso: string) =>
   new Date(iso).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });

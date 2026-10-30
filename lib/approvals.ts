@@ -164,16 +164,57 @@ export async function queueApproval(input: {
     values (${input.kind}, ${input.title}, ${db().json((input.preview ?? {}) as never)},
             ${db().json((input.payload ?? {}) as never)}, 'pending', ${input.createdBy})
     returning id`;
+  await finishQueuedApproval(row.id, input);
+  return row.id;
+}
+
+async function finishQueuedApproval(
+  id: string,
+  input: { kind: ApprovalKind; title: string; createdBy: string },
+): Promise<void> {
   await audit({
     actor: "aeon",
     action: "approval_queued",
-    approvalId: row.id,
+    approvalId: id,
     subjectType: input.kind,
     details: { created_by: input.createdBy, title: input.title },
   });
   const origin = currentOrigin();
   if (shouldAutoRun(input.kind, origin)) {
-    await approve(row.id, { by: `auto:${origin && "mode" in origin ? origin.mode : "front_desk"}`, auto: true });
+    await approve(id, { by: `auto:${origin && "mode" in origin ? origin.mode : "front_desk"}`, auto: true });
   }
-  return row.id;
+}
+
+/**
+ * Queues at most one pending/running approval for the same payload value. The
+ * transaction lock makes two simultaneous public requests take turns without
+ * requiring a new database index or migration.
+ */
+export async function queueApprovalOnce(
+  input: {
+    kind: ApprovalKind;
+    title: string;
+    preview?: Record<string, unknown>;
+    payload?: Record<string, unknown>;
+    createdBy: string;
+  },
+  dedupe: { payloadField: string; value: string },
+): Promise<{ id: string; created: boolean }> {
+  const result = (await db().begin(async (sql) => {
+    await sql`select pg_advisory_xact_lock(hashtext(${`${input.kind}:${dedupe.payloadField}:${dedupe.value}`}))`;
+    const [existing] = await sql<{ id: string }[]>`
+      select id from practice_os.approvals
+      where kind = ${input.kind} and status in ('pending', 'running')
+        and payload ->> ${dedupe.payloadField} = ${dedupe.value}
+      order by created_at desc limit 1`;
+    if (existing) return { id: existing.id, created: false };
+    const [row] = await sql<{ id: string }[]>`
+      insert into practice_os.approvals (kind, title, preview, payload, status, created_by)
+      values (${input.kind}, ${input.title}, ${sql.json((input.preview ?? {}) as never)},
+              ${sql.json((input.payload ?? {}) as never)}, 'pending', ${input.createdBy})
+      returning id`;
+    return { id: row.id, created: true };
+  })) as { id: string; created: boolean };
+  if (result.created) await finishQueuedApproval(result.id, input);
+  return result;
 }

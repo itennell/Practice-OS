@@ -86,7 +86,7 @@ export async function hasMessage(vendor: string, providerId: string): Promise<bo
 export async function addMessage(m: {
   inquiryId: string;
   direction: "inbound" | "outbound";
-  channel: "voicemail" | "sms" | "call";
+  channel: "voicemail" | "sms" | "call" | "web_chat";
   body: string;
   vendor: MessageVendor;
   providerId: string | null;
