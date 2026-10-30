@@ -1,6 +1,7 @@
 // Muse Spark writes the words of a post; plain code adds the license line and
-// the critic decides. A blocked draft gets one logistics rewrite; suicide or
-// self-harm gets none.
+// the critic decides. A blocked draft gets one logistics rewrite. A request
+// about suicide or self-harm is never written (store.ts stops it first); a
+// draft that adds it on its own is held back and replaced by one fresh post.
 import { chat as metaChat } from "../meta";
 import { codeCritic, critique, RULE_TEXT, type ChatFn, type CriticContext, type CriticResult, type Finding } from "./critic";
 import { PILLAR_BY_ID, PILLARS, type Pillar, type PillarId } from "./pillars";
@@ -63,6 +64,8 @@ function system(f: PracticeFacts): string {
   return [
     `You write Instagram posts for ${f.practiceName}, the private practice of ${f.clinicianName}, ${f.credential}, in ${[f.neighborhood, f.city].filter(Boolean).join(", ")}. This is a fictional demo practice.`,
     "Posts cover practice logistics ONLY. Never: mental health advice, coping tips, symptoms, therapy techniques or exercises, any client or patient story (real, composite or hypothetical), testimonials or reviews, promises of results, or anything about suicide, self-harm or crisis.",
+    // Muse adds a 988 line to posts about an illness on its own; the critic then holds the whole draft back.
+    "Do not add crisis lines, hotline numbers (such as 988) or emergency instructions; the app handles safety separately.",
     `Prices: use only these, exactly: ${fees}.`,
     ...voiceLines(f.voice),
     "Do not add a license line or credentials line at the end; it is added for you.",
@@ -132,14 +135,16 @@ async function critiqueWords(words: DraftWords, caption: string, f: PracticeFact
 async function checked(words: DraftWords, f: PracticeFacts, ctx: CriticContext, callModel: ChatFn): Promise<Draft> {
   const caption = captionOf(words.body, f.licenseLine);
   let critic = await critiqueWords(words, caption, f, ctx, callModel);
-  if (critic.ok || critic.hardStop) return { ...words, caption, critic, rewritten: false };
+  if (critic.ok) return { ...words, caption, critic, rewritten: false };
   const pillar = PILLAR_BY_ID.get(words.pillar)!;
-  const [again] = await writeWords(
-    f,
-    `Rewrite this post so it is pure practice logistics about ${pillarAsk(pillar)}. It broke these rules: ${critic.findings.map((x) => x.message).join(" ")}\n` +
-      `Old headline: ${words.headline}\nOld caption: ${words.body}\nReturn exactly one post.`,
-    callModel,
-  );
+  // Her request already passed the crisis check (store.ts), so a self-harm hit here is the model's
+  // own addition (a 988 line on a depression post). That draft is held back, never posted or shown,
+  // and never sent back to the model: Aeon writes one fresh logistics post on the same pillar instead.
+  const ask = critic.hardStop
+    ? `Write one new post that is pure practice logistics about ${pillarAsk(pillar)}. Do not mention suicide, self-harm, crisis, hotlines or 988. Return exactly one post.`
+    : `Rewrite this post so it is pure practice logistics about ${pillarAsk(pillar)}. It broke these rules: ${critic.findings.map((x) => x.message).join(" ")}\n` +
+      `Old headline: ${words.headline}\nOld caption: ${words.body}\nReturn exactly one post.`;
+  const [again] = await writeWords(f, ask, callModel);
   if (!again) return { ...words, caption, critic, rewritten: false };
   const newCaption = captionOf(again.body, f.licenseLine);
   critic = await critiqueWords(again, newCaption, f, ctx, callModel);
@@ -195,19 +200,18 @@ export async function writeRequested(f: PracticeFacts, request: string, pillar: 
 }
 
 /**
- * "Plan several": 2 or 3 posts on what she typed, each a different logistics
+ * "Plan several": 1 to 5 posts on what she typed, each a different logistics
  * angle, each checked like any other draft. Her request has passed the topic
  * gate (topic-gate.ts) before this runs.
  */
-export async function writeSeveral(f: PracticeFacts, request: string, count: 2 | 3, opts: { chat?: ChatFn } = {}): Promise<Draft[]> {
+export async function writeSeveral(f: PracticeFacts, request: string, count: number, opts: { chat?: ChatFn } = {}): Promise<Draft[]> {
   const callModel = opts.chat ?? metaChat;
   const ctx = criticContext(f);
-  const words = await writeWords(
-    f,
-    `Write ${count} different posts on her topic, each from a different angle (for example what to expect, cost, how to book), ` +
-      `each on the pillar it fits best, from:\n${PILLARS.map(pillarAsk).join("\n")}\nKeep to her topic. Her request, in her words: "${request.slice(0, 500)}"`,
-    callModel,
-  );
+  const how =
+    count === 1
+      ? "Write 1 post on her topic, from the angle that fits it best (for example what to expect, cost, how to book), on the pillar it fits best, from:"
+      : `Write ${count} different posts on her topic, each from a different angle (for example what to expect, cost, how to book), each on the pillar it fits best, from:`;
+  const words = await writeWords(f, `${how}\n${PILLARS.map(pillarAsk).join("\n")}\nKeep to her topic. Her request, in her words: "${request.slice(0, 500)}"`, callModel);
   if (!words.length) throw new Error("Aeon couldn't write those posts. Try asking again.");
   const drafts: Draft[] = [];
   for (const w of words.slice(0, count)) {

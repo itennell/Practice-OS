@@ -22,8 +22,14 @@ const logistics: Record<string, { headline: string; body: string }> = {
   office_telehealth: { headline: "Office and video", body: "See us in Lincoln Park or by secure video anywhere in Illinois." },
 };
 
-/** Answers by feature, like the real models would. `firstWrite` lets one test feed a bad first draft. */
-function stubModels(opts: { firstWrite?: { pillar: string; headline: string; body: string } } = {}) {
+/** What Muse tends to add on its own to a post about an illness (safe-messaging habit). */
+const CRISIS_LINE = " If you're in crisis, call or text 988, the Suicide & Crisis Lifeline.";
+
+/**
+ * Answers by feature, like the real models would. `firstWrite` lets one test feed a bad first draft;
+ * `crisisLineFirst` makes the first write add a 988 crisis line to every post, as Muse does for depression.
+ */
+function stubModels(opts: { firstWrite?: { pillar: string; headline: string; body: string }; crisisLineFirst?: boolean } = {}) {
   const seen: string[] = [];
   let writes = 0;
   const chat = (async (feature: string, params: { messages: { content: unknown }[] }) => {
@@ -34,8 +40,9 @@ function stubModels(opts: { firstWrite?: { pillar: string; headline: string; bod
       const ask = String(params.messages.at(-1)?.content);
       if (opts.firstWrite && writes === 1) return reply({ posts: [{ ...opts.firstWrite, alt_text: "Dana smiling" }] });
       const ids = PILLARS.map((p) => p.id).filter((id) => ask.includes(`"${id}"`));
+      const extra = opts.crisisLineFirst && writes === 1 ? CRISIS_LINE : "";
       return reply({
-        posts: ids.map((id) => ({ pillar: id, ...logistics[id], body: logistics[id].body.replace("FEE", FEE), alt_text: "Dana smiling beside the headline" })),
+        posts: ids.map((id) => ({ pillar: id, ...logistics[id], body: logistics[id].body.replace("FEE", FEE) + extra, alt_text: "Dana smiling beside the headline" })),
       });
     }
     if (feature === "instagram.critic") return reply({ breaks: [] });
@@ -98,6 +105,11 @@ describe.skipIf(!hasDb)("Instagram posts", () => {
       outcome: "off_topic",
       why: "Posts stay on how your practice works, so Aeon can't write advice about anxiety.",
       angle: { label: "What a first session for anxiety looks like", pillar: "first_session" },
+      angles: [
+        { label: "What a first session for anxiety looks like", pillar: "first_session" },
+        { label: "What sessions for anxiety cost", pillar: "fees_superbills" },
+        { label: "How to book a first session for anxiety", pillar: "how_to_book" },
+      ],
     });
     expect(seen).toEqual([]);
     // Picking the offered angle writes it.
@@ -127,6 +139,44 @@ describe.skipIf(!hasDb)("Instagram posts", () => {
     expect(r.saved.every((s) => s.status === "pending_approval" && s.approvalId)).toBe(true);
     const off = await planSeveral("test", "tips for coping with grief", 2, { chat, graphic });
     expect(off).toMatchObject({ outcome: "off_topic", angle: { label: "What a first session for grief looks like" } });
+  });
+
+  // QA (Isaiah, 2026-10-29): "a post about depression" -> "nothing came up... There was an error".
+  it("a depression post where Muse adds a 988 crisis line is rewritten once, never an empty result", async () => {
+    const { chat } = stubModels({ crisisLineFirst: true });
+    const one = await requestPost("test", "What a first session for depression looks like", "first_session", { chat, graphic });
+    expect(one.outcome).toBe("rewritten");
+    if (one.outcome !== "rewritten") throw new Error("unreachable");
+    expect(one.post.status).toBe("pending_approval");
+
+    const { chat: chat2 } = stubModels({ crisisLineFirst: true });
+    const several = await planSeveral("test", "what therapy for depression costs and how to book", 2, { chat: chat2, graphic });
+    expect(several.outcome).toBe("planned");
+    if (several.outcome !== "planned") throw new Error("unreachable");
+    expect(several.saved.filter((s) => s.status === "pending_approval")).toHaveLength(2);
+  });
+
+  it("an illness topic gets a plain reason and three logistics angles, with nothing written", async () => {
+    for (const ask of ["a post about depression", "depression", "how to cope with depression"]) {
+      const { chat, seen } = stubModels();
+      const r = await requestPost("test", ask, null, { chat, graphic });
+      expect(r.outcome).toBe("off_topic");
+      if (r.outcome !== "off_topic") throw new Error("unreachable");
+      expect(r.why).toMatch(/^Posts stay on how your practice works/);
+      expect(r.angles.map((a) => a.pillar)).toEqual(["first_session", "fees_superbills", "how_to_book"]);
+      expect(r.angles[0].label).toBe("What a first session for depression looks like");
+      expect(seen).toEqual([]);
+      const plan = await planSeveral("test", ask, 3, { chat, graphic });
+      expect(plan).toMatchObject({ outcome: "off_topic" });
+    }
+  });
+
+  it("plans one post, or five", async () => {
+    const { chat } = stubModels();
+    const one = await planSeveral("test", "how superbills work", 1, { chat, graphic });
+    expect(one.outcome === "planned" && one.saved).toHaveLength(1);
+    const five = await planSeveral("test", "how superbills work", 5, { chat, graphic });
+    expect(five.outcome === "planned" && five.saved).toHaveLength(5);
   });
 
   it("rewrites a draft that tells a story, once", async () => {

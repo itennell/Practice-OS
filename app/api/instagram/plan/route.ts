@@ -1,18 +1,18 @@
 import { z } from "zod";
 import { canDecide } from "@/lib/admin-guard";
 import { isSameOrigin } from "@/lib/connect/local-only";
-import { planSeveral } from "@/lib/instagram/store";
+import { PLAN_COUNT, planSeveral } from "@/lib/instagram/store";
 
 const body = z
   .object({
     request: z.string().trim().min(3).max(600),
-    count: z.union([z.literal(2), z.literal(3)]),
+    count: z.number().int().min(PLAN_COUNT.min).max(PLAN_COUNT.max),
     research_id: z.string().uuid().optional(),
     angle: z.number().int().min(0).max(2).optional(),
   })
   .strict();
 
-// Plan several: 2 or 3 posts on what she typed, each checked, drawn and waiting
+// Plan several: 1 to 5 posts on what she typed, each checked, drawn and waiting
 // for her approval. Takes a few minutes (three model calls per post); nothing is posted here.
 export const maxDuration = 300;
 
