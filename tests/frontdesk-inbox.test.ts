@@ -12,7 +12,7 @@ const localDb = /@(localhost|127\.0\.0\.1)[:/]/.test(url);
 const { db, closeDb } = await import("../lib/db");
 const { setFrontDeskDeps } = await import("../lib/frontdesk/deps");
 const { checkFrontDesk } = await import("../lib/frontdesk/check");
-const { frontDeskInbox, maskPhone, revealNumber } = await import("../lib/frontdesk/inbox");
+const { frontDeskInbox, maskPhone, revealBody, revealNumber } = await import("../lib/frontdesk/inbox");
 const { safetyResult } = await import("../lib/frontdesk/ingest");
 const { checkCrisis } = await import("../lib/safety");
 
@@ -115,6 +115,16 @@ describe.skipIf(!localDb)("Front Desk inbox (local database only)", () => {
     expect(vm).toMatchObject({ caller: "(•••) •••-0161", seconds: 33, playable: true });
     expect(vm.safety).toEqual({ crisis: null, private: ["contact"] });
     expect(JSON.stringify(items)).not.toContain("+13125550161");
+    // The number the caller said inside the voicemail is masked the same way.
+    expect(vm.body).toBe("Hi, this is a question about whether you take Blue Cross. Call me back at (•••) •••-0161.");
+    expect(vm.bodyHidden).toBe(true);
+    expect(JSON.stringify(items)).not.toContain("555 0161");
+    expect(items.filter((i) => i.kind === "text_in").every((i) => i.bodyHidden === false)).toBe(true);
+  });
+
+  it("Show reveals the full words of one voicemail", async () => {
+    const vm = (await frontDeskInbox("voicemails")).find((i) => i.caller.endsWith("0161"))!;
+    expect(await revealBody(vm.id)).toContain("Call me back at 312 555 0161.");
   });
 
   it("filters by kind", async () => {

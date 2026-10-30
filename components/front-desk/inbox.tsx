@@ -1,6 +1,7 @@
 "use client";
 
 import { CalendarCheck, Eye, MessageSquare, MessageSquareReply, Phone, PhoneMissed, Play, Voicemail } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { notify } from "@/components/shared/toaster";
 import { StatusPill, type Status } from "@/components/shared/status-mark";
@@ -8,7 +9,8 @@ import { Button } from "@/components/ui";
 import type { InboxItem } from "@/lib/frontdesk/inbox";
 
 // The Front Desk inbox rows: one hairline list, newest first. Logistics words
-// only, never a caller's mood (HB 1806). Numbers stay masked until she asks.
+// only, never a caller's mood (HB 1806). Numbers stay masked until she asks,
+// in the caller line and inside the words of a voicemail or text.
 
 const KIND_LABEL: Record<InboxItem["kind"], string> = {
   call: "Call",
@@ -59,7 +61,7 @@ function Caller({ item }: { item: InboxItem }) {
   return (
     <span className="flex flex-wrap items-center gap-x-2">
       <span className="font-medium">
-        {item.isSample && "[Sample] "}
+        {item.isSample && !item.name?.startsWith("[Sample]") && "[Sample] "}
         {item.name ? `${item.name} · ` : ""}
         <span className="tabular-nums">{shown ?? item.caller}</span>
       </span>
@@ -69,6 +71,26 @@ function Caller({ item }: { item: InboxItem }) {
         </button>
       )}
     </span>
+  );
+}
+
+function Body({ item }: { item: InboxItem }) {
+  const [shown, setShown] = useState<string | null>(null);
+  const reveal = async () => {
+    const res = await fetch("/api/front-desk/reveal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: item.id, part: "body" }) }).catch(() => null);
+    const out = (await res?.json().catch(() => null)) as { body?: string; error?: string } | null;
+    if (typeof out?.body === "string") setShown(out.body);
+    else notify.error("Couldn't show the message.", { description: out?.error ?? "Try again." });
+  };
+  return (
+    <>
+      <p className="max-w-[65ch] whitespace-pre-line break-words">{shown ?? item.body}</p>
+      {item.bodyHidden && shown == null && (
+        <button type="button" onClick={reveal} className="inline-flex min-h-touch items-center gap-1 self-start rounded-full px-2 text-small text-[var(--link)] underline-offset-2 hover:underline">
+          <Eye aria-hidden size={14} /> Show numbers and emails
+        </button>
+      )}
+    </>
   );
 }
 
@@ -116,9 +138,14 @@ export function InboxList({ items }: { items: InboxItem[] }) {
               {item.kind === "booking" && item.startsAt ? ` · ${when(item.startsAt)}${item.reference ? ` · ${item.reference}` : ""}` : ""}
               {item.crisis && <span className="ml-2 font-semibold text-[var(--danger-fg)]">Urgent</span>}
             </span>
-            {item.kind !== "call" && item.kind !== "booking" && <p className="max-w-[65ch] whitespace-pre-line break-words">{item.body}</p>}
+            {item.kind !== "call" && item.kind !== "booking" && <Body item={item} />}
             {item.kind === "voicemail" && <Recording item={item} />}
             <SafetyLine item={item} />
+            {item.replyWaiting && (
+              <Link href="/approvals" className="inline-flex min-h-touch items-center self-start text-small text-[var(--link)] underline underline-offset-2">
+                A reply to this caller is waiting for you in Approvals
+              </Link>
+            )}
           </div>
           {item.status && item.kind !== "text_out" && item.kind !== "call" && (
             <StatusPill status={STATUS[item.status].status} className="hidden self-start sm:inline-flex">

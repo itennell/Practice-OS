@@ -1,4 +1,5 @@
 import { chat } from "../meta";
+import { maskForModel, selfName, spokenNumber } from "./mask";
 import { toE164 } from "./phone/numbers";
 
 // muse-spark-1.3 pulls the caller's name, callback number and what they want
@@ -78,12 +79,18 @@ export function keywordExtraction(transcript: string, callerId: string | null): 
   return { name: null, callbackNumber: callerId, intent, summary };
 }
 
-/** Muse first; the keyword fallback if Muse can't answer. */
+/**
+ * Muse first, on the masked words only (mask.ts): plain code keeps the caller's
+ * name and number. The keyword fallback if the name-finder or Muse can't answer.
+ */
 export async function readIntent(transcript: string, callerId: string | null): Promise<Extracted> {
+  const own = { name: selfName(transcript), callbackNumber: spokenNumber(transcript) ?? callerId };
   try {
-    return await extractVoicemail(transcript, callerId);
+    const masked = await maskForModel(transcript);
+    const x = await extractVoicemail(masked.text, callerId);
+    return { ...x, ...own };
   } catch (e) {
     console.warn("front desk: Muse couldn't read the message, using keywords:", e instanceof Error ? e.message : e);
-    return keywordExtraction(transcript, callerId);
+    return { ...keywordExtraction(transcript, callerId), ...own };
   }
 }

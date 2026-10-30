@@ -3,6 +3,7 @@ import { db } from "../db";
 import { isDryRun } from "../env";
 import { deps } from "./deps";
 import { PhoneError, type MessageVendor, type PhoneAdapter } from "./phone/types";
+import { blankContacts } from "./redact";
 import type { Practice } from "./templates";
 
 // Database helpers for the Front Desk tables (migrations 001 and 016).
@@ -16,6 +17,7 @@ export type InquiryRow = {
   status: "new" | "options_sent" | "booked" | "needs_clinician" | "closed";
   crisis_flag: boolean;
   ai_disclosed_at: Date | null;
+  is_sample: boolean;
 };
 
 export type OfferRow = {
@@ -26,6 +28,7 @@ export type OfferRow = {
   slots: Array<{ start: string; end: string }>;
   status: "pending" | "sent" | "chosen" | "superseded" | "expired";
   expires_at: Date | null;
+  is_sample: boolean;
 };
 
 export type BookingRow = {
@@ -39,6 +42,7 @@ export type BookingRow = {
   status: string;
   contact_name: string | null;
   contact_phone: string | null;
+  is_sample: boolean;
 };
 
 /** How texts name the practice: "Reyes Counseling" (no PLLC/LLC), her first name, consult length, and demo mode. */
@@ -115,8 +119,12 @@ export async function isOptedOut(phone: string): Promise<boolean> {
   return Boolean(row);
 }
 
+/**
+ * One line for "What needs you". Stored and shown with caller numbers down to the
+ * last four digits and emails blanked; only the text to her own phone has the full number.
+ */
 export async function addAlert(kind: "crisis" | "question" | "system", message: string, inquiryId: string | null): Promise<void> {
-  await db()`insert into practice_os.alerts (kind, inquiry_id, message) values (${kind}, ${inquiryId}, ${message})`;
+  await db()`insert into practice_os.alerts (kind, inquiry_id, message) values (${kind}, ${inquiryId}, ${blankContacts(message).text})`;
 }
 
 export async function activeBookingFor(phone: string, now: Date): Promise<BookingRow | null> {
