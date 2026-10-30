@@ -31,16 +31,18 @@ export type Project = {
   canRedo: boolean;
   postStatus: string | null;
   approvalId: string | null;
+  approvalStatus: string | null;
   isSample: boolean;
   updatedAt: string;
 };
 
-type Row = { id: string; post_id: string | null; doc: unknown; cursor: number; is_sample: boolean; updated_at: Date; post_status: string | null; approval_id: string | null };
+type Row = { id: string; post_id: string | null; doc: unknown; cursor: number; is_sample: boolean; updated_at: Date; post_status: string | null; approval_id: string | null; approval_status: string | null };
 
 export async function getProject(id: string): Promise<Project | null> {
   const [row] = await db()<Row[]>`
-    select s.id, s.post_id, s.doc, s.cursor, s.is_sample, s.updated_at, p.status as post_status, p.approval_id
+    select s.id, s.post_id, s.doc, s.cursor, s.is_sample, s.updated_at, p.status as post_status, p.approval_id, a.status as approval_status
       from practice_os.studio_projects s left join practice_os.posts p on p.id = s.post_id
+      left join practice_os.approvals a on a.id = p.approval_id
      where s.id = ${id}`;
   if (!row) return null;
   const doc = parseDoc(row.doc);
@@ -56,6 +58,7 @@ export async function getProject(id: string): Promise<Project | null> {
     canRedo: steps.some((s) => s.seq > row.cursor),
     postStatus: row.post_status,
     approvalId: row.approval_id,
+    approvalStatus: row.approval_status,
     isSample: row.is_sample,
     updatedAt: new Date(row.updated_at).toISOString(),
   };
