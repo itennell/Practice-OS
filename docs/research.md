@@ -942,3 +942,325 @@ Recommendation:
 - **Already has one:** keep it and run the checklist (booking link, fees, consult offer, same name, address and phone, designation, no health form, 988 line, accessibility basics, details block if her builder allows code).
 - **Do it yourself:** a small static site that a coding agent builds and deploys on her own Vercel Pro. Only for someone who will always have an agent to edit it. Not built in the app now; the research does not show it beats the default for her.
 - **Done for you:** Brighter Vision, if she wants no work at all.
+
+## Client forms: what every outpatient therapy form must say (checked 2026-10-29)
+
+The client forms library (Admin › Client forms, `lib/client-forms`) has a template for every form a solo outpatient practice uses. Each template is filled with her practice details and leaves blank boxes for the client. Three research passes read the primary sources:
+
+- Federal: eCFR, Federal Register, govinfo, FCC and PCI SSC ([full notes](research/client-forms/federal.md)).
+- Illinois: ilga.gov statutes and the JCAR board rules ([full notes](research/client-forms/illinois.md)).
+- Ethics codes and practice guidance: NASW, ACA, AAMFT, APA and CMS ([full notes](research/client-forms/ethics-and-practice.md)).
+
+Each set of notes quotes the exact text (25 words or fewer) behind every element. Its open questions are listed at the end.
+
+**How the check works.** Every form type lists its required elements below. Each element carries one or more plain-code patterns that the template text must match (`lib/client-forms/check.ts`). `tests/client-forms.test.ts` renders every form for the fictional demo practice and reads the text back out of the PDF with mupdf. It then checks four things:
+
+- Every element is present, along with the attorney-review line.
+- Cutting any one element's words makes the check fail.
+- Every client box is empty.
+- The prose reads at grade 10 or lower (Flesch-Kincaid; most forms land at grade 6 to 8).
+
+The library runs the same check on her edits, and refuses an edit that drops a required element.
+
+**Which forms are required, and for whom**
+
+| Form | Required? | For whom |
+| --- | --- | --- |
+| Notice of Privacy Practices | Law (45 CFR 164.520) | HIPAA covered entities. That means any practice that sends even one electronic claim or eligibility check, itself or through a biller. A cash-only practice that only hands out superbills is probably not covered; for it, the notice is good practice. |
+| NPP acknowledgment | Law: a good-faith effort (164.520(c)(2)(ii)) | Covered entities. Signing is never a condition of care. |
+| Request for records | Law (45 CFR 164.524; 740 ILCS 110/4; 735 ILCS 5/8-2001) | Every Illinois practice. Answer within 30 days (60 at most); Illinois sets the copy-fee caps. |
+| Minor consent | Law (405 ILCS 5/3-550; 740 ILCS 110/4) | Clients under 18. The 3-550 rule (up to 8 sessions of 90 minutes without a parent, ages 12-16) names counselors, social workers and psychologists, but not LMFTs. |
+| Nondiscrimination and accessibility notice | Law, if she takes Medicare or Medicaid (45 CFR 92.10-92.11); ADA Title III duties for everyone | Since the 2024 Section 1557 rule, Medicare Part B counts as federal financial assistance. Taglines must cover the state's top 15 languages. |
+| Consent to text, email and voicemail | Law (47 USC 227; 47 CFR 64.1200; 45 CFR 164.522(b)) | Any practice that texts or emails clients |
+| Informed consent | Board rules (68 IAC 1375.225 LCPC; 1283.100 LMFT) and every ethics code (NASW 1.03, ACA A.2, AAMFT 1.2, APA 10.01) | Every client, every license. It also lists Illinois's limits of confidentiality: DCFS reports, elder abuse reports within 24 hours, the permissive duty to warn (740 ILCS 110/11), FOID reports (430 ILCS 65/8.1), and that a subpoena alone isn't enough (110/10). |
+| Practice policies and financial agreement | Ethics codes (APA 6.04, AAMFT 8.2-8.3, ACA A.10); CMS MM5613 | Every client. A missed-session fee must be the same for everyone and never billed to Medicare. |
+| Telehealth consent | Ethics codes (ACA H.2.a, AAMFT 6, NASW 1.03(f)) | Video or phone clients. Illinois requires no telehealth form, but the client must be in Illinois (225 ILCS 150/10). Illinois is in PSYPACT; there is no counseling, social work or MFT compact as of 2026-10-29. |
+| Couples and family consent | Ethics codes; required for LMFTs (68 IAC 1283.100(p)) | Couples and family clients. Every adult signs any release. |
+| Letter ending therapy | Ethics codes; abandonment is grounds for discipline (225 ILCS 20/19, 107/80, 55/85) | Any ending. Practice closure needs 30 days' notice (735 ILCS 5/8-2001(f)). |
+| Credit card authorization | PCI DSS (never store the CVV); Reg E for recurring debit | Practices that keep a card on file |
+| Intake, emergency contact, insurance information | Good practice | Every client. Clinical questions are blank boxes only. |
+| Sliding scale application | Good practice. Illinois has no rule; NASW 1.13(a) and ACA A.10.c ask her to weigh ability to pay. | Only if she offers reduced fees. It is a blank self-report: income never comes back to Practice-OS. |
+| PHQ-9, GAD-7 | Optional | Free to copy: "no permission is required to reproduce, translate, display or distribute them" (phqscreeners.com). |
+| Good Faith Estimate, superbill, release of information | Law (see the sections above) | Already built; they have their own panels. |
+
+**Findings that changed the templates**
+
+- **Purl v. HHS** (N.D. Tex. No. 2:24-CV-228-Z, June 18, 2025) vacated the 2024 reproductive-health HIPAA rule. The court kept that rule's privacy-notice changes but vacated 164.520(b)(1)(ii)(F), (G) and (H). The notice therefore leaves out the reproductive-health attestation language, and the general redisclosure warning is optional. The 42 CFR Part 2 statements apply from 2026-02-16, and only to records she receives from a Part 2 program.
+- **405 ILCS 5/3-501 is repealed.** Minors' outpatient consent now sits in 405 ILCS 5/3-550 (P.A. 102-558).
+- **Illinois record retention** is set only for LCPCs: 7 years, and for minors 7 years after age 18 (68 IAC 1375.225(c)(4)). The templates use it for every license.
+- **Ending over an unpaid bill** follows NASW 1.17(c) for every license: the fee terms were clear up front, the client is not in danger, and she talked with the client about it first.
+
+**Not verified (human check needed).** hhs.gov blocked every fetch, so the HHS model notice's section headings and the OCR email FAQ come from search extracts. The AAMFT code was read from a 2015 state mirror, because aamft.org needs a login. The PCI DSS requirement numbers were not fetched. The Illinois copy fees adjust every year.
+
+**Not legal advice.** Every template prints "This is a template from Practice-OS, not legal advice. Have your own attorney review it before you use it with clients."
+
+### Required elements by form (generated from `lib/client-forms`)
+
+#### Notice of Privacy Practices (`npp`)
+
+Required by law. Required for HIPAA covered entities: any practice that bills insurance or checks eligibility electronically. Good practice for everyone.
+
+| Element | Required by | Level |
+| --- | --- | --- |
+| The exact header in capitals | [45 CFR 164.520(b)(1)(i)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.520) | Law |
+| Treatment, payment and operations, with an example of each | [164.520(b)(1)(ii)(A)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.520) | Law |
+| Other uses allowed without permission | [164.520(b)(1)(ii)(B), (D)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.520) | Law |
+| Stricter law is followed (Illinois mental health law, 42 CFR Part 2) | [164.520(b)(1)(ii)(C); 740 ILCS 110](https://www.ilga.gov/Documents/legislation/ilcs/documents/074001100K11.htm) | Law |
+| Other uses need written permission (psychotherapy notes, marketing, sale), and permission can be taken back | [164.520(b)(1)(ii)(E)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.520) | Law |
+| Right to ask for limits; must agree to self-pay limits to a health plan | [164.520(b)(1)(iv)(A); 164.522(a)(1)(vi)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.520) | Law |
+| Right to confidential communications | [164.520(b)(1)(iv)(B)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.520) | Law |
+| Right to see and get a copy | [164.520(b)(1)(iv)(C)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.520) | Law |
+| Right to ask for a correction | [164.520(b)(1)(iv)(D)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.520) | Law |
+| Right to a list of disclosures | [164.520(b)(1)(iv)(E)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.520) | Law |
+| Right to a paper copy of this notice | [164.520(b)(1)(iv)(F)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.520) | Law |
+| Duty to keep information private, give this notice and report breaches | [164.520(b)(1)(v)(A)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.520) | Law |
+| Duty to follow the notice in effect | [164.520(b)(1)(v)(B)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.520) | Law |
+| May change the notice, and how clients get the new one | [164.520(b)(1)(v)(C)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.520) | Law |
+| Complain to the practice or HHS; no retaliation | [164.520(b)(1)(vi)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.520) | Law |
+| Privacy contact name or title and phone | [164.520(b)(1)(vii)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.520) | Law |
+| Effective date | [164.520(b)(1)(viii)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.520) | Law |
+
+#### Acknowledgment of Notice of Privacy Practices (`npp_ack`)
+
+Required by law. HIPAA covered entities must make a good-faith effort to get it. Signing is never a condition of care.
+
+| Element | Required by | Level |
+| --- | --- | --- |
+| Client got the notice (and which version) | [45 CFR 164.520(c)(2)(ii)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.520) | Law |
+| Signing is not a condition of care | [45 CFR 164.506(b)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.520) | Good practice |
+| If not signed: the effort and the reason, for the office | [164.520(c)(2)(ii)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.520) | Law |
+
+#### Request for Your Records (`records_request`)
+
+Required by law. Every practice. HIPAA (45 CFR 164.524) for covered entities; Illinois 740 ILCS 110/4 for all mental health records.
+
+| Element | Required by | Level |
+| --- | --- | --- |
+| Requests in writing, and the client is told | [45 CFR 164.524(b)(1)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.524) | Law |
+| Inspect, copy or both, in the form and format asked for | [164.524(c)(1)-(2)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.524) | Law |
+| Send to someone else: signed, names the person and where | [164.524(c)(3)(ii)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.524) | Law |
+| Answer within 30 days, one 30-day extension in writing | [164.524(b)(2)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.524) | Law |
+| Only a reasonable, cost-based fee, told in advance | [164.524(c)(4)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.524) | Law |
+| Psychotherapy notes are not included | [164.524(a)(1)(i)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.524) | Law |
+| A denial is in writing with the reason and review rights | [164.524(d)(2)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.524) | Law |
+| Illinois: who may see records (12 and older; parents of under 12; 12 to 17 if the client doesn't object) | [740 ILCS 110/4(a)](https://www.ilga.gov/Documents/legislation/ilcs/documents/074001100K4.htm) | Law |
+
+#### Consent for Therapy with a Minor (`minor_consent`)
+
+Required by law. Every client under 18. Illinois 405 ILCS 5/3-550 and 740 ILCS 110/4; ACA A.2.d, APA 3.10(b).
+
+| Element | Required by | Level |
+| --- | --- | --- |
+| Under 12: a parent or guardian consents and can see records | [740 ILCS 110/4(a)(1)](https://www.ilga.gov/legislation/ilcs/documents/074001100K4.htm) | Law |
+| 12 and older can start therapy on their own | [405 ILCS 5/3-550(a)](https://www.ilga.gov/legislation/ilcs/documents/040500050K3-550.htm) | Law |
+| Under 17: up to 8 sessions of 90 minutes before a parent is involved | [405 ILCS 5/3-550(a)](https://www.ilga.gov/legislation/ilcs/documents/040500050K3-550.htm) | Law |
+| The parent is not told without the minor's written OK, except as the law requires | [405 ILCS 5/3-550(a-2)](https://www.ilga.gov/legislation/ilcs/documents/040500050K3-550.htm) | Law |
+| A parent who did not consent does not pay | [405 ILCS 5/3-550(b)](https://www.ilga.gov/legislation/ilcs/documents/040500050K3-550.htm) | Law |
+| Parent access to records of a 12 to 17 year old | [740 ILCS 110/4(a)(3)](https://www.ilga.gov/legislation/ilcs/documents/074001100K4.htm) | Law |
+| Separated or divorced parents: both may see records; bring the parenting plan | [750 ILCS 5/602.11](https://www.ilga.gov/legislation/ilcs/documents/075000050K602.11.htm) | Law |
+| 12 and older may consent to alcohol or drug counseling | [410 ILCS 210/4](https://www.ilga.gov/legislation/ilcs/documents/041002100K4.htm) | Law |
+| Emancipated minors bring the court order | [750 ILCS 30/5](https://www.ilga.gov/legislation/ilcs/documents/075000300K5.htm) | Law |
+| Safety and abuse limits still apply | [325 ILCS 5/4; 740 ILCS 110/11](https://www.ilga.gov/legislation/ilcs/documents/032500050K4.htm) | Law |
+
+#### Nondiscrimination and Accessibility Notice (`accessibility_notice`)
+
+Required by law. Section 1557 notice and taglines: required if you take Medicare or Medicaid. ADA Title III duties apply to every office; this notice is good practice.
+
+| Element | Required by | Level |
+| --- | --- | --- |
+| We do not discriminate (race, color, national origin, sex, age, disability) | [45 CFR 92.10(a)(1)(i)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-A/part-92/subpart-A/section-92.10) | Law |
+| Free aids for people with disabilities | [92.10(a)(1)(ii); 28 CFR 36.303](https://www.ecfr.gov/current/title-28/chapter-I/part-36/subpart-C/section-36.303) | Law |
+| Free language help | [92.10(a)(1)(iii)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-A/part-92/subpart-A/section-92.10) | Law |
+| How to ask for help | [92.10(a)(1)(iv)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-A/part-92/subpart-A/section-92.10) | Law |
+| How to complain to us and to HHS OCR | [92.10(a)(1)(vi)-(vii)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-A/part-92/subpart-A/section-92.10) | Law |
+| Language-help tagline (English and Spanish here) | [92.11(a)-(b)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-A/part-92/subpart-A/section-92.11) | Law |
+| Service animals welcome, no fee | [28 CFR 36.302(c)](https://www.ecfr.gov/current/title-28/chapter-I/part-36/subpart-C/section-36.302) | Good practice |
+| Relay calls (711) accepted | [28 CFR 36.303(d)](https://www.ecfr.gov/current/title-28/chapter-I/part-36/subpart-C/section-36.303) | Good practice |
+
+#### Consent to Text, Email and Voicemail (`communication_consent`)
+
+Required by law. Every practice that texts or emails clients (TCPA; HIPAA 164.522(b) for covered entities).
+
+| Element | Required by | Level |
+| --- | --- | --- |
+| The client picks how to be reached, without saying why | [45 CFR 164.522(b)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.522) | Law |
+| Regular email and text are not fully secure; the client accepts the risk | [45 CFR 164.530(c); HHS OCR guidance](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.522) | Law |
+| Consent to appointment texts and calls at this number | [47 USC 227(b); FCC 15-72](https://www.ecfr.gov/current/title-47/chapter-I/subchapter-B/part-64/subpart-L/section-64.1200) | Law |
+| Stop texts at any time (reply STOP) | [47 CFR 64.1200(a)(10)](https://www.ecfr.gov/current/title-47/chapter-I/subchapter-B/part-64/subpart-L/section-64.1200) | Law |
+| Texts carry only the time, never care details | [HHS OCR guidance](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.522) | Good practice |
+| Not for emergencies; 988 and 911 | [Practice-OS safety rule](https://988lifeline.org/) | Good practice |
+| When to expect a reply | [Practice guidance](https://www.apaservices.org/practice/business) | Good practice |
+
+#### Informed Consent for Therapy (`informed_consent`)
+
+Required by your ethics code. Every client, every license. Required by the Illinois board rules (68 IAC 1375.225, 1283.100) and every ethics code (NASW 1.03, ACA A.2, AAMFT 1.2, APA 10.01).
+
+| Element | Required by | Level |
+| --- | --- | --- |
+| Purpose, methods and how therapy usually goes | [NASW 1.03(a); APA 10.01(a); 68 IAC 1375.225(a)(9)](https://www.ilga.gov/agencies/JCAR/EntirePart?titlepart=06801375) | Ethics code |
+| Risks and benefits | [NASW 1.03(a); ACA A.2.b](https://www.counseling.org/docs/default-source/default-document-library/ethics/2014-aca-code-of-ethics.pdf) | Ethics code |
+| Other kinds of help | [NASW 1.03(a)](https://www.socialworkers.org/About/Ethics/Code-of-Ethics/Code-of-Ethics-English) | Ethics code |
+| Her license, training and ethics code | [ACA A.2.b; 68 IAC 1375.225(a)(9)](https://www.ilga.gov/agencies/JCAR/EntirePart?titlepart=06801375) | Law |
+| Fees, billing, insurance limits and unpaid bills | [NASW 1.03(a); APA 10.01(a); 68 IAC 1283.100(m)](https://www.ilga.gov/agencies/JCAR/EntirePart?titlepart=06801283) | Law |
+| About how long therapy may last | [68 IAC 1375.225(a)(9); 1283.100(m)](https://www.ilga.gov/agencies/JCAR/EntirePart?titlepart=06801375) | Law |
+| Right to refuse or stop at any time | [NASW 1.03(a); ACA A.2.b](https://www.socialworkers.org/About/Ethics/Code-of-Ethics/Code-of-Ethics-English) | Ethics code |
+| Right to ask questions at any time | [NASW 1.03(a); APA 10.01(a)](https://www.apa.org/ethics/code) | Ethics code |
+| Privacy is protected by Illinois law (740 ILCS 110) | [740 ILCS 110/3; 68 IAC 1375.225(b)(1)](https://www.ilga.gov/legislation/ilcs/documents/074001100K3.htm) | Law |
+| Limit: child abuse reporting | [325 ILCS 5/4](https://www.ilga.gov/legislation/ilcs/documents/032500050K4.htm) | Law |
+| Limit: elder and disabled adult abuse reporting | [320 ILCS 20/4](https://www.ilga.gov/legislation/ilcs/documents/032000200K4.htm) | Law |
+| Limit: danger to self or others, duty to warn | [740 ILCS 110/11; NASW 1.07(c)](https://www.ilga.gov/legislation/ilcs/documents/074001100K11.htm) | Law |
+| Limit: clear and present danger report (FOID) | [430 ILCS 65/8.1](https://www.ilga.gov/legislation/ilcs/documents/043000650K8.1.htm) | Law |
+| Limit: court orders (a subpoena alone is not enough) | [740 ILCS 110/10](https://www.ilga.gov/legislation/ilcs/documents/074001100K10.htm) | Law |
+| Technology, email and text risks | [68 IAC 1375.225(c)(4)-(5); NASW 1.03(e)](https://www.ilga.gov/agencies/JCAR/EntirePart?titlepart=06801375) | Law |
+| Records kept, how long, and access | [68 IAC 1375.225(c)(4); NASW 1.08](https://www.ilga.gov/agencies/JCAR/EntirePart?titlepart=06801375) | Law |
+| Plan if she becomes ill or dies | [68 IAC 1375.225(a)(9); ACA A.2.b; APA 3.12](https://www.ilga.gov/agencies/JCAR/EntirePart?titlepart=06801375) | Law |
+| No recording without written permission | [NASW 1.03(h); APA 4.03](https://www.socialworkers.org/About/Ethics/Code-of-Ethics/Code-of-Ethics-English) | Ethics code |
+| No looking clients up online without permission | [NASW 1.03(i)](https://www.socialworkers.org/About/Ethics/Code-of-Ethics/Code-of-Ethics-English) | Ethics code |
+| She tells the client about any conflict of interest | [68 IAC 1470.96(a)(13); 1283.100(i)](https://www.ilga.gov/agencies/JCAR/EntirePart?titlepart=06801470) | Law |
+| Not an emergency service: 988 and 911 | [NASW-T 2.13](https://988lifeline.org/) | Good practice |
+| Signed by both, client gets a copy | [APA 3.10(d); ACA A.2.a; 68 IAC 1375.225(a)(9)](https://www.ilga.gov/agencies/JCAR/EntirePart?titlepart=06801375) | Ethics code |
+
+#### Practice Policies and Financial Agreement (`practice_policies`)
+
+Required by your ethics code. Every client. Fee terms agreed early (APA 6.04, AAMFT 8.2, 68 IAC 1283.100(m)); collections notice (APA 6.04(e), ACA A.10.d).
+
+| Element | Required by | Level |
+| --- | --- | --- |
+| Fees and when payment is due, agreed at the start | [APA 6.04(a); 68 IAC 1283.100(m)](https://www.apa.org/ethics/code) | Ethics code |
+| Cancellation and missed-session fee | [AAMFT 8.2(a)](https://www.aamft.org/AAMFT/Legal_Ethics/Code_of_Ethics.aspx) | Ethics code |
+| Missed-session fee is the same for everyone and never billed to insurance or Medicare | [CMS MM5613](https://www.cms.gov/Regulations-and-Guidance/Guidance/Transmittals/downloads/R1279CP.pdf) | Law |
+| What happens if insurance doesn't pay | [AAMFT 8.2(c)](https://www.aamft.org/AAMFT/Legal_Ethics/Code_of_Ethics.aspx) | Ethics code |
+| Notice before fee changes | [AAMFT 8.2](https://www.aamft.org/AAMFT/Legal_Ethics/Code_of_Ethics.aspx) | Ethics code |
+| Written notice before collections; only minimum information shared | [APA 6.04(e); ACA A.10.d; AAMFT 8.3](https://www.counseling.org/docs/default-source/default-document-library/ethics/2014-aca-code-of-ethics.pdf) | Ethics code |
+| Tell her if the fee is hard to pay | [NASW 1.13(a); ACA A.10.c](https://www.socialworkers.org/About/Ethics/Code-of-Ethics/Code-of-Ethics-English) | Ethics code |
+| No payment for referrals | [NASW 1.16(c); ACA A.10.b; AAMFT 8.1; APA 6.07](https://www.socialworkers.org/About/Ethics/Code-of-Ethics/Code-of-Ethics-English) | Ethics code |
+| How to reach her, reply time, not for emergencies | [NASW-T 2.10; NASW 1.03(e)](https://www.socialworkers.org/About/Ethics/Code-of-Ethics/Code-of-Ethics-English) | Ethics code |
+| If the practice closes: 30 days' notice and how to get records | [735 ILCS 5/8-2001(f)](https://www.ilga.gov/legislation/ilcs/documents/073500050K8-2001.htm) | Law |
+
+#### Consent for Telehealth (`telehealth_consent`)
+
+Required by your ethics code. Every client you see by video or phone. Illinois has no required telehealth form; the ethics codes (ACA H.2.a, AAMFT 6, NASW 1.03(f)) require these disclosures.
+
+| Element | Required by | Level |
+| --- | --- | --- |
+| Telehealth is the client's choice; in person is available | [ACA H.2.a](https://www.counseling.org/docs/default-source/default-document-library/ethics/2014-aca-code-of-ethics.pdf) | Ethics code |
+| The client must be in Illinois (or where she is licensed); location checked each session | [225 ILCS 150/10; AAMFT 6.5; NASW 1.03(f)](https://www.ilga.gov/legislation/ilcs/documents/022501500K10.htm) | Law |
+| Same standard of care as in person | [225 ILCS 150/15(a)](https://www.ilga.gov/legislation/ilcs/documents/022501500K15.htm) | Law |
+| Secure platform; private place; no technology is fully private | [225 ILCS 150/15(b); AAMFT 6.3; ACA H.2.b](https://www.ilga.gov/legislation/ilcs/documents/022501500K15.htm) | Law |
+| If the connection drops: the backup plan | [ACA H.2.a; NASW-T 2.12](https://www.counseling.org/docs/default-source/default-document-library/ethics/2014-aca-code-of-ethics.pdf) | Ethics code |
+| Emergency plan, 988 and 911, the client's location and a contact | [ACA H.2.a; NASW-T 2.13](https://www.counseling.org/docs/default-source/default-document-library/ethics/2014-aca-code-of-ethics.pdf) | Ethics code |
+| Insurance may not pay for telehealth | [ACA H.2.a; 215 ILCS 5/356z.22](https://www.ilga.gov/legislation/ilcs/documents/021500050K356z.22.htm) | Ethics code |
+| When she replies to messages | [ACA H.2.a](https://www.counseling.org/docs/default-source/default-document-library/ethics/2014-aca-code-of-ethics.pdf) | Ethics code |
+| No social media contact | [ACA H.2.a; NASW-T 2.10](https://www.counseling.org/docs/default-source/default-document-library/ethics/2014-aca-code-of-ethics.pdf) | Ethics code |
+| No recording without written permission | [APA 4.03](https://www.apa.org/ethics/code) | Ethics code |
+
+#### Consent for Couples and Family Therapy (`couples_family_consent`)
+
+Required by your ethics code. Couples and family clients, every license. LMFTs: 68 IAC 1283.100(p) makes the all-adults release required.
+
+| Element | Required by | Level |
+| --- | --- | --- |
+| Who the client is (the couple or family) | [APA 10.02(a); ACA B.4.b](https://www.apa.org/ethics/code) | Ethics code |
+| How private things told alone are handled | [NASW 1.07(g); AAMFT 2.2](https://www.aamft.org/AAMFT/Legal_Ethics/Code_of_Ethics.aspx) | Ethics code |
+| She can't promise others in the room keep things private | [NASW 1.07(f)](https://www.socialworkers.org/About/Ethics/Code-of-Ethics/Code-of-Ethics-English) | Ethics code |
+| Every adult signs before records or information are released | [68 IAC 1283.100(p)(4); AAMFT 2.2-2.3](https://www.ilga.gov/agencies/JCAR/EntirePart?titlepart=06801283) | Law |
+| If you separate: no sides, no custody evaluation, records not opened by divorce alone | [APA 10.02(b); AAMFT 7.6-7.7; 740 ILCS 110/10(a)(1)](https://www.ilga.gov/legislation/ilcs/documents/074001100K10.htm) | Law |
+| Decisions about the relationship are yours | [AAMFT 1.8](https://www.aamft.org/AAMFT/Legal_Ethics/Code_of_Ethics.aspx) | Ethics code |
+| Individual sessions are part of the joint work | [AAMFT (practice guidance)](https://www.aamft.org/AAMFT/Legal_Ethics/Code_of_Ethics.aspx) | Good practice |
+
+#### Letter Ending Therapy (`termination_letter`)
+
+Required by your ethics code. Any time you end therapy. Abandonment is grounds for discipline in Illinois (225 ILCS 20/19, 107/80, 55/85); APA 10.10, ACA A.11, NASW 1.17, AAMFT 1.11.
+
+| Element | Required by | Level |
+| --- | --- | --- |
+| The reason, in plain words | [APA 10.10(a); ACA A.11.c; NASW 1.17(a)](https://www.apa.org/ethics/code) | Ethics code |
+| The last session date | [NASW 1.17(e)](https://www.socialworkers.org/About/Ethics/Code-of-Ethics/Code-of-Ethics-English) | Ethics code |
+| Offer of a closing session | [APA 10.10(c); 68 IAC 1283.100(i)](https://www.apa.org/ethics/code) | Ethics code |
+| Referrals to other providers | [APA 10.10(c); 68 IAC 1375.225(c)(2); 1283.100(i)](https://www.ilga.gov/agencies/JCAR/EntirePart?titlepart=06801375) | Law |
+| Not left without care; help with the transfer | [225 ILCS 107/80(a)(14); ACA A.12; NASW 1.16(b)](https://www.ilga.gov/legislation/ilcs/documents/022501070K80.htm) | Law |
+| How to get records later | [NASW 1.08; 740 ILCS 110/4](https://www.socialworkers.org/About/Ethics/Code-of-Ethics/Code-of-Ethics-English) | Ethics code |
+| How to come back | [Practice guidance](https://www.socialworkers.org/About/Ethics/Code-of-Ethics/Code-of-Ethics-English) | Good practice |
+| 988 and 911 | [NASW-T 2.13](https://988lifeline.org/) | Good practice |
+
+#### New Client Information (`intake`)
+
+Good practice. Every new client, any license.
+
+| Element | Required by | Level |
+| --- | --- | --- |
+| Name, birth date, pronouns | [Practice guidance](https://www.apaservices.org/practice/business) | Good practice |
+| Address, phone, email | [Practice guidance](https://www.apaservices.org/practice/business) | Good practice |
+| Permission to leave messages, by channel | [45 CFR 164.522(b)](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.522) | Law |
+| What brings you in (a blank box, never filled by Aeon) | [Practice guidance](https://www.apaservices.org/practice/business) | Good practice |
+| 988 and 911 for emergencies | [Practice-OS safety rule](https://988lifeline.org/) | Good practice |
+
+#### Emergency Contact (`emergency_contact`)
+
+Good practice. Every client, any license.
+
+| Element | Required by | Level |
+| --- | --- | --- |
+| Name, relationship, phone | [Practice guidance](https://www.apaservices.org/practice/business) | Good practice |
+| Only in an emergency, and only what is needed | [740 ILCS 110/11; 45 CFR 164.510(b)](https://www.ilga.gov/Documents/legislation/ilcs/documents/074001100K11.htm) | Law |
+| You can change or remove this person at any time | [Practice guidance](https://www.apaservices.org/practice/business) | Good practice |
+
+#### Insurance Information (`insurance_info`)
+
+Good practice. Clients using insurance. Skip if you are private pay only.
+
+| Element | Required by | Level |
+| --- | --- | --- |
+| Insurance company, member ID, group number, payer phone | [CMS-1500 items 1a, 4, 11](https://www.nucc.org/index.php/1500-claim-form-mainmenu-35) | Good practice |
+| Subscriber name, birth date, relationship | [CMS-1500 items 4, 6, 11a](https://www.nucc.org/index.php/1500-claim-form-mainmenu-35) | Good practice |
+| Second insurance plan | [CMS-1500 item 9](https://www.nucc.org/index.php/1500-claim-form-mainmenu-35) | Good practice |
+| Assignment of benefits (pay the practice directly) | [CMS-1500 item 13](https://www.nucc.org/index.php/1500-claim-form-mainmenu-35) | Good practice |
+| OK to share what the plan needs to pay the claim | [CMS-1500 item 12; 45 CFR 164.506](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.506) | Good practice |
+| You pay what insurance doesn't (copay, deductible, denied claims) | [Practice guidance](https://www.apaservices.org/practice/business) | Good practice |
+
+#### Credit Card Authorization (`card_authorization`)
+
+Good practice. Practices that keep a card on file. PCI DSS applies to anyone who takes cards.
+
+| Element | Required by | Level |
+| --- | --- | --- |
+| No security code (CVV) asked for or kept | [PCI DSS Req. 3.3.1; PCI FAQ 1280](https://www.pcisecuritystandards.org/faq/articles/Frequently_Asked_Question/Can-card-verification-codes-values-be-stored-for-card-on-file-or-recurring-transactions) | Law |
+| Only the last 4 digits on the form | [PCI DSS Req. 3.4.1](https://www.pcisecuritystandards.org/faq/articles/Frequently_Asked_Question/Can-card-verification-codes-values-be-stored-for-card-on-file-or-recurring-transactions) | Law |
+| Exactly what may be charged | [Card network stored-credential rules](https://www.pcisecuritystandards.org/faq/articles/Frequently_Asked_Question/Can-card-verification-codes-values-be-stored-for-card-on-file-or-recurring-transactions) | Good practice |
+| Cancel in writing at any time | [12 CFR 1005.10(c)](https://www.ecfr.gov/current/title-12/chapter-X/part-1005/subpart-A/section-1005.10) | Good practice |
+| The client gets a copy | [12 CFR 1005.10(b)](https://www.ecfr.gov/current/title-12/chapter-X/part-1005/subpart-A/section-1005.10) | Law |
+
+#### Sliding Scale Fee Application (`sliding_scale`)
+
+Good practice. Only if you offer reduced fees. Illinois has no sliding-scale rule; the ethics codes ask you to weigh ability to pay (NASW 1.13(a), ACA A.10.c).
+
+| Element | Required by | Level |
+| --- | --- | --- |
+| Same written criteria for everyone | [68 IAC 1470.96(a)(14); practice guidance](https://www.ilga.gov/agencies/JCAR/EntirePart?titlepart=06801470) | Good practice |
+| Household size and income range, self-reported | [Practice guidance](https://www.socialworkers.org/About/Ethics/Code-of-Ethics/Code-of-Ethics-English) | Good practice |
+| Reviewed every 12 months or when things change | [Practice guidance](https://www.socialworkers.org/About/Ethics/Code-of-Ethics/Code-of-Ethics-English) | Good practice |
+| Insurance may not allow a reduced fee; real fee reported to insurers | [68 IAC 1470.96(a)(12); 1375.225(c)(7)](https://www.ilga.gov/agencies/JCAR/EntirePart?titlepart=06801375) | Law |
+| The Good Faith Estimate shows the reduced fee | [45 CFR 149.610](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-B/part-149/subpart-G/section-149.610) | Law |
+| What you share about money stays private | [NASW 1.07](https://www.socialworkers.org/About/Ethics/Code-of-Ethics/Code-of-Ethics-English) | Ethics code |
+
+#### Patient Health Questionnaire (PHQ-9) (`phq9`)
+
+Screeners (blank copies). Optional, any license. Free to copy.
+
+| Element | Required by | Level |
+| --- | --- | --- |
+| All nine items, word for word | [PHQ-9](https://www.phqscreeners.com/) | Good practice |
+| The four answer choices | [PHQ-9](https://www.phqscreeners.com/) | Good practice |
+| Pfizer attribution and free-use line | [PHQ Screeners terms of use](https://www.phqscreeners.com/) | Good practice |
+| 988 and 911 next to the self-harm question | [Practice-OS safety rule](https://988lifeline.org/) | Good practice |
+
+#### Generalized Anxiety Disorder scale (GAD-7) (`gad7`)
+
+Screeners (blank copies). Optional, any license. Free to copy.
+
+| Element | Required by | Level |
+| --- | --- | --- |
+| All seven items, word for word | [GAD-7](https://www.phqscreeners.com/) | Good practice |
+| The four answer choices | [GAD-7](https://www.phqscreeners.com/) | Good practice |
+| Pfizer attribution and free-use line | [PHQ Screeners terms of use](https://www.phqscreeners.com/) | Good practice |
+
