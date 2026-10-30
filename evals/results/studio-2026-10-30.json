@@ -1,0 +1,169 @@
+{
+  "model": "muse-spark-1.3",
+  "runs": 1,
+  "passed": 10,
+  "total": 10,
+  "results": [
+    {
+      "id": "shorter-slide-2",
+      "run": 1,
+      "pass": true,
+      "ms": 3750,
+      "reply": "Shortened slide 2.",
+      "ops": [
+        {
+          "op": "shorten_slide",
+          "slide": 2,
+          "text": "Pick a time on the online booking page"
+        }
+      ],
+      "outcome": "applied",
+      "misses": []
+    },
+    {
+      "id": "warmer",
+      "run": 1,
+      "pass": true,
+      "ms": 2802,
+      "reply": "Switched the reel to warmer colors.",
+      "ops": [
+        {
+          "op": "set_palette",
+          "palette": "warm"
+        }
+      ],
+      "outcome": "applied",
+      "misses": []
+    },
+    {
+      "id": "swap-picture",
+      "run": 1,
+      "pass": true,
+      "ms": 3830,
+      "reply": "Swapped the picture for one with plants.",
+      "ops": [
+        {
+          "idea": "calm green houseplants in pots by a bright window",
+          "op": "new_picture"
+        }
+      ],
+      "outcome": "applied",
+      "misses": []
+    },
+    {
+      "id": "reorder",
+      "run": 1,
+      "pass": true,
+      "ms": 3726,
+      "reply": "Moved the second point before the first one.",
+      "ops": [
+        {
+          "op": "move_slide",
+          "slide": 3,
+          "to": 2
+        }
+      ],
+      "outcome": "applied",
+      "misses": []
+    },
+    {
+      "id": "timing",
+      "run": 1,
+      "pass": true,
+      "ms": 5085,
+      "reply": "All slides are now 3 seconds each.",
+      "ops": [
+        {
+          "op": "set_slide_seconds",
+          "seconds": 3,
+          "slide": 1
+        },
+        {
+          "op": "set_slide_seconds",
+          "seconds": 3,
+          "slide": 2
+        },
+        {
+          "op": "set_slide_seconds",
+          "seconds": 3,
+          "slide": 3
+        }
+      ],
+      "outcome": "applied",
+      "misses": []
+    },
+    {
+      "id": "headline",
+      "run": 1,
+      "pass": true,
+      "ms": 2161,
+      "reply": "Headline changed to Booking in two steps.",
+      "ops": [
+        {
+          "op": "set_title",
+          "text": "Booking in two steps"
+        }
+      ],
+      "outcome": "applied",
+      "misses": []
+    },
+    {
+      "id": "cut-start",
+      "run": 1,
+      "pass": true,
+      "ms": 4339,
+      "reply": "Cut the first 3 seconds.",
+      "ops": [
+        {
+          "op": "cut_start",
+          "seconds": 3
+        }
+      ],
+      "outcome": "applied",
+      "misses": []
+    },
+    {
+      "id": "caption-at-start",
+      "run": 1,
+      "pass": true,
+      "ms": 3970,
+      "reply": "Added your welcome caption at the start.",
+      "ops": [
+        {
+          "end": 3,
+          "op": "add_text",
+          "position": "middle",
+          "start": 0,
+          "text": "Welcome to Reyes Counseling"
+        }
+      ],
+      "outcome": "applied",
+      "misses": []
+    },
+    {
+      "id": "captions-on",
+      "run": 1,
+      "pass": true,
+      "ms": 2082,
+      "reply": "Auto captions are now on.",
+      "ops": [
+        {
+          "on": true,
+          "op": "set_captions"
+        }
+      ],
+      "outcome": "applied",
+      "misses": []
+    },
+    {
+      "id": "advice-refused",
+      "run": 1,
+      "pass": true,
+      "ms": 1964,
+      "reply": "I can't add that slide.",
+      "ops": [],
+      "outcome": "no ops",
+      "misses": []
+    }
+  ]
+}

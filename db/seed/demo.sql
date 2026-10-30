@@ -167,13 +167,31 @@ values (
   true
 );
 
--- [Sample] insurance applications (migration 009): Medicare being prepared,
--- BCBSIL waiting (follow up 30 days after applying), Aetna approved (recredential in 36 months).
+-- [Sample] insurance applications (migrations 009, 031, 032): Medicare being prepared,
+-- BCBSIL waiting (follow up 30 days after applying), Aetna approved and contracted
+-- (recredential in 36 months). catalog_id ties each to data/payers; the Insurance tab
+-- adds every other payer that fits an LCPC in Illinois as "not started" when it opens.
+-- payer_steps are the checklist steps Dana has checked off.
 insert into practice_os.payer_applications
-  (payer, form, status, applied_on, follow_up_on, approved_on, effective_on, recredential_on, reference, notes, is_sample) values
-  ('Medicare', 'cms855i', 'preparing', null, null, null, null, null, null, '[Sample] Prepare the CMS-855I or apply in PECOS.', true),
-  ('BCBSIL', null, 'applied', '2026-10-05', '2026-11-04', null, null, null, '[Sample] APP-1042', null, true),
-  ('Aetna', null, 'approved', '2026-01-12', null, '2026-03-16', '2026-04-01', '2029-03-16', null, null, true);
+  (payer, form, catalog_id, network, stage, status, applied_on, follow_up_on, approved_on, effective_on, recredential_on, reference, notes, is_sample) values
+  ('Medicare', 'cms855i', 'medicare', 'Medicare Part B', 'credentialing', 'preparing', null, null, null, null, null, null, '[Sample] Prepare the CMS-855I or apply in PECOS.', true),
+  ('BCBSIL', null, 'bcbsil', 'PPO', 'credentialing', 'applied', '2026-10-05', '2026-11-04', null, null, null, '[Sample] APP-1042', null, true),
+  ('Aetna', null, 'aetna', 'Commercial', 'contracting', 'approved', '2026-01-12', null, '2026-03-16', '2026-04-01', '2029-03-16', null, null, true);
+insert into practice_os.payer_steps (scope, step_id, done_on, done_by, is_sample) values
+  ('prerequisites', 'npi1', '2025-12-01', 'clinician', true),
+  ('prerequisites', 'taxonomy', '2025-12-01', 'clinician', true),
+  ('prerequisites', 'caqh', '2025-12-15', 'clinician', true),
+  ('prerequisites', 'malpractice', '2025-12-10', 'clinician', true),
+  ('prerequisites', 'il-license', '2025-12-01', 'clinician', true),
+  ('medicare', 'medicare-npi', '2026-10-20', 'clinician', true),
+  ('bcbsil', 'caqh-ready', '2026-10-01', 'clinician', true),
+  ('bcbsil', 'onboarding-form', '2026-10-05', 'clinician', true),
+  ('aetna', 'caqh-ready', '2026-01-05', 'clinician', true),
+  ('aetna', 'request-form', '2026-01-12', 'clinician', true),
+  ('aetna', 'need-review', '2026-02-20', 'clinician', true),
+  ('aetna', 'sign-contract', '2026-03-16', 'clinician', true),
+  ('aetna', 'fee-schedule', '2026-03-16', 'clinician', true),
+  ('aetna', 'effective-date', '2026-04-01', 'clinician', true);
 
 -- Two [Sample] Good Faith Estimates, with no client identity (migration 006): one
 -- already issued, one waiting for her approval. Dates are fixed, like the CMS example.
@@ -219,3 +237,25 @@ select setval('practice_os.superbill_number_seq', greatest((select last_value fr
 
 insert into practice_os.audit_log (actor, action, details)
 values ('system', 'demo_data_seeded', '{"practice": "Reyes Counseling PLLC (fictional demo practice)"}'::jsonb);
+
+-- Referrals v2 (023, 024): what each made-up source said about the sample cards, and Dana's contact log.
+-- All [Sample]: example.com addresses, no real providers. "They referred someone" keeps a date only.
+insert into practice_os.referral_facts (source_id, field, value, origin, origin_url, match_method, match_score, detail, checked_at) values
+  ('00000000-0000-4000-8000-000000000201', 'name', '[Sample] Lakeview Family Medicine', 'osm', 'https://www.openstreetmap.org/node/1', 'name_address', 0.95, '{}', now() - interval '3 days'),
+  ('00000000-0000-4000-8000-000000000201', 'website', 'https://lakeview-fm.example.com', 'website', 'https://lakeview-fm.example.com', 'name_address', null, '{"robots": "robots.txt allows /contact", "robotsAllowed": true}', now() - interval '3 days'),
+  ('00000000-0000-4000-8000-000000000201', 'email', 'frontdesk@example.com', 'website', 'https://lakeview-fm.example.com/contact', 'name_address', null, '{"label": "on their contact page", "how": "mailto"}', now() - interval '3 days'),
+  ('00000000-0000-4000-8000-000000000202', 'name', '[Sample] Dr. Alex Example', 'state_license', 'https://data.illinois.gov/d/pzzh-kp68', 'name_city', 0.9, '{}', now() - interval '40 days'),
+  ('00000000-0000-4000-8000-000000000202', 'license_status', 'ACTIVE', 'state_license', 'https://data.illinois.gov/d/pzzh-kp68', 'name_city', 0.9, '{"state": "IL"}', now() - interval '40 days'),
+  ('00000000-0000-4000-8000-000000000202', 'medicare', 'enrolled', 'cms_dac', 'https://data.cms.gov/provider-data/dataset/mj5m-pzi6', 'name_address', 0.95, '{}', now() - interval '40 days');
+update practice_os.referral_sources set checked_at = now() - interval '3 days', confidence = 'confirmed', website = 'https://lakeview-fm.example.com'
+ where id = '00000000-0000-4000-8000-000000000201';
+update practice_os.referral_sources set checked_at = now() - interval '40 days', confidence = 'confirmed'
+ where id = '00000000-0000-4000-8000-000000000202';
+update practice_os.referral_sources set introduced_by = '[Sample] my old supervisor'
+ where id = '00000000-0000-4000-8000-000000000204';
+
+insert into practice_os.referral_contacts (source_id, kind, happened_on, note, created_by, is_sample) values
+  ('00000000-0000-4000-8000-000000000202', 'sent_letter', current_date - 8, '[Sample] Sent the intro letter.', 'clinician', true),
+  ('00000000-0000-4000-8000-000000000203', 'called', current_date - 20, '[Sample] Left a message with the office manager.', 'clinician', true),
+  ('00000000-0000-4000-8000-000000000204', 'met', current_date - 35, '[Sample] Coffee near the office.', 'clinician', true),
+  ('00000000-0000-4000-8000-000000000204', 'referred', current_date - 12, null, 'clinician', true);

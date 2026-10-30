@@ -3,7 +3,9 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense, type ReactNode } from "react";
 import { CheckCheck, ChevronRight } from "lucide-react";
-import { Credentialing, GoodFaithEstimates, Insurance, ReleaseForms, Superbills } from "@/components/admin/panels";
+import { Insurance } from "@/components/admin/insurance-panel";
+import { Credentialing, GoodFaithEstimates, ReleaseForms, Superbills } from "@/components/admin/panels";
+import { ClientForms } from "@/components/admin/client-forms";
 import { SidePanel } from "@/components/admin/side-panel";
 import { EmptyState } from "@/components/shared/empty-state";
 import { OfficeSettings } from "@/components/office-settings";
@@ -14,7 +16,7 @@ import { deadlinesView } from "@/lib/compliance/view";
 import { loadCredentialingProfile } from "@/lib/credentialing/store";
 import { listEstimates, loadPracticeSettings } from "@/lib/gfe/store";
 import { allGuides } from "@/lib/guides";
-import { listPayerApplications } from "@/lib/payers/store";
+import { WAITING, listPayerApplications } from "@/lib/payers/store";
 import { listSuperbills } from "@/lib/superbill/store";
 
 export const metadata: Metadata = { title: "Admin · Practice-OS" };
@@ -24,6 +26,7 @@ export const metadata: Metadata = { title: "Admin · Practice-OS" };
 // as six cards. Forms open in a side panel (?panel=...), filled with what Aeon knows.
 
 const PANELS: Record<AdminPanel, { title: string; description: string }> = {
+  forms: { title: "Client forms", description: "Every form your practice uses, filled with your practice. Client boxes stay blank." },
   gfe: { title: "Good Faith Estimates", description: "For self-pay clients. Aeon fills in your fees and today's date." },
   superbill: { title: "Superbills", description: "Aeon fills in your practice, codes and fees. Client details stay blank." },
   release: { title: "Release of information", description: "The Illinois consent form. Nothing is saved here." },
@@ -153,7 +156,8 @@ async function Cards() {
   const notGiven = bills.filter((b) => !b.issued_on).length;
   const waitingGfe = estimates.filter((e) => !e.issued_on && e.approval_status === "pending").length;
   const missing = profile ? [!profile.npi.number && "NPI", !profile.tin && "tax ID"].filter(Boolean) : [];
-  const pending = apps.filter((a) => a.status === "applied" || a.status === "pending").length;
+  const pending = apps.filter((a) => WAITING.includes(a.status)).length;
+  const started = apps.filter((a) => a.status !== "not_started").length;
   const days = settings?.hours.weekdays.map((d) => WEEKDAY[d]).join(", ");
 
   return (
@@ -165,13 +169,16 @@ async function Cards() {
         <Card title="Deadlines" href="/admin/deadlines" summary={view ? `${plural(view.due.length, "deadline")} in the next 30 days` : "Your compliance calendar"} />
         <Card title="Client forms" summary={`Estimates, superbills, release forms · ${plural(waitingGfe, "estimate")} waiting, ${plural(notGiven, "superbill")} not given`}>
           <div className="relative mt-2 flex flex-wrap gap-2">
-            <ButtonLink variant="quiet" href="/admin?panel=gfe" className="h-10! px-4! text-small!">
+            <ButtonLink variant="quiet" href="/admin?panel=forms" className="px-4! text-small!">
+              All client forms
+            </ButtonLink>
+            <ButtonLink variant="quiet" href="/admin?panel=gfe" className="px-4! text-small!">
               Good Faith Estimate
             </ButtonLink>
-            <ButtonLink variant="quiet" href="/admin?panel=superbill" className="h-10! px-4! text-small!">
+            <ButtonLink variant="quiet" href="/admin?panel=superbill" className="px-4! text-small!">
               Superbill
             </ButtonLink>
-            <ButtonLink variant="quiet" href="/admin?panel=release" className="h-10! px-4! text-small!">
+            <ButtonLink variant="quiet" href="/admin?panel=release" className="px-4! text-small!">
               Release form
             </ButtonLink>
           </div>
@@ -181,7 +188,7 @@ async function Cards() {
           href="/admin?panel=credentialing"
           summary={!profile ? "Set up your profile" : missing.length ? `Missing your ${missing.join(" and ")}` : "NPI and tax ID on file · CAQH prep"}
         />
-        <Card title="Insurance" href="/admin?panel=insurance" summary={`${plural(apps.length, "application")} · ${pending} waiting to hear back`} />
+        <Card title="Insurance" href="/admin?panel=insurance" summary={started ? `${plural(started, "application")} · ${pending} waiting to hear back` : "Every insurer you can join, step by step"} />
         <Card title="How do I" href="/admin/how-do-i" summary={`${plural(allGuides().length, "step-by-step guide")}`} />
         <Card
           title="Office hours and fees"
@@ -203,7 +210,9 @@ async function Panel({ searchParams }: { searchParams: PageProps<"/admin">["sear
   return (
     <SidePanel key={which} title={PANELS[which].title} description={PANELS[which].description}>
       <Suspense fallback={<div aria-hidden className="h-96 animate-pulse rounded-[24px] bg-[var(--hairline)]" />}>
-        {which === "gfe" ? (
+        {which === "forms" ? (
+          <ClientForms form={typeof params.form === "string" ? params.form : undefined} />
+        ) : which === "gfe" ? (
           <GoodFaithEstimates focus={focus} />
         ) : which === "superbill" ? (
           <Superbills focus={focus} />

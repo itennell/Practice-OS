@@ -193,7 +193,8 @@ export function ReelEditor({ postId }: { postId: string }) {
         </p>
       ) : (
         <Button variant="primary" className="w-full" disabled={busy} onClick={download}>
-          <Download aria-hidden size={18} /> Download reel (MP4)
+          <Download aria-hidden size={18} /> Download video
+          <span className="sr-only"> (your reel, MP4)</span>
         </Button>
       )}
       {state === "making" && <ThoughtLine working label={`Making your reel… ${Math.round(progress * 100)}%`} />}

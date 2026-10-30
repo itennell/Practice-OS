@@ -15,7 +15,7 @@ type App = {
   id: string;
   payer: string;
   form: "cms855i" | null;
-  status: "preparing" | "applied" | "pending" | "approved" | "denied" | "withdrawn";
+  status: "not_started" | "preparing" | "applied" | "pending" | "follow_up" | "approved" | "denied" | "withdrawn";
   applied_on: string | null;
   follow_up_on: string | null;
   approved_on: string | null;
@@ -27,17 +27,21 @@ type App = {
 };
 
 const LABEL: Record<App["status"], string> = {
+  not_started: "Not started",
   preparing: "Preparing",
   applied: "Applied",
   pending: "Pending with payer",
+  follow_up: "Follow up",
   approved: "Approved",
   denied: "Denied",
   withdrawn: "Withdrawn",
 };
 const MARK: Record<App["status"], Status> = {
+  not_started: "pending",
   preparing: "pending",
   applied: "running",
   pending: "running",
+  follow_up: "running",
   approved: "done",
   denied: "failed",
   withdrawn: "declined",

@@ -17,6 +17,7 @@ import { readIntent, type Extracted } from "./extract";
 import { offerTimes, passToClinician } from "./offers";
 import { prettyPhone } from "./phone/numbers";
 import type { Call, InboundText, MessageVendor, PhoneAdapter, Voicemail } from "./phone/types";
+import { maskPhone } from "./redact";
 import { parseReply } from "./reply";
 import { activeBookingFor, addAlert, addMessage, addMessageMeta, hasMessage, inquiryForPhone, openOfferFor, practice, sendText } from "./store";
 import { helpText, noBookingText, pickHelpText, startText, stopText } from "./templates";
@@ -115,7 +116,7 @@ export async function processVoicemail(
   await audit({ actor: "system", action: "voicemail_received", subjectType: "inquiry", subjectId: inquiry.id, details: { vendor: phone.vendor, transcript: source } });
 
   if (!text) {
-    await addAlert("question", `New voicemail from ${v.from ? prettyPhone(v.from) : "a hidden number"}. Front Desk couldn't read it; listen in your phone app.`, inquiry.id);
+    await addAlert("question", `New voicemail from ${v.from ? maskPhone(v.from) : "a hidden number"}. Front Desk couldn't read it; listen in your phone app.`, inquiry.id);
     await db()`update practice_os.inquiries set status = 'needs_clinician' where id = ${inquiry.id}`;
     return "done";
   }

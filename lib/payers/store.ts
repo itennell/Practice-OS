@@ -4,6 +4,7 @@ import { audit } from "../audit";
 import { addDays, addMonths, daysBetween, toDate, type ISODate } from "../compliance/dates";
 import { practiceToday } from "../compliance/store";
 import { db } from "../db";
+import { catalogIdFor } from "./catalog";
 
 // Her insurance (payer) applications (migration 009). Aeon prepares forms and
 // tracks dates; she applies, signs and submits. Follow-ups and recredential
@@ -14,12 +15,16 @@ export const FOLLOW_UP_DAYS = 30;
 /** Payers recredential every 36 months (NCQA standard; BCBSIL 3 years). */
 export const RECREDENTIAL_MONTHS = 36;
 
-export const STATUSES = ["preparing", "applied", "pending", "approved", "denied", "withdrawn"] as const;
+export const STATUSES = ["not_started", "preparing", "applied", "pending", "follow_up", "approved", "denied", "withdrawn"] as const;
 export type PayerStatus = (typeof STATUSES)[number];
+/** Statuses that mean she's waiting to hear back from the payer. */
+export const WAITING: readonly PayerStatus[] = ["applied", "pending", "follow_up"];
 export const STATUS_LABEL: Record<PayerStatus, string> = {
+  not_started: "Not started",
   preparing: "Preparing",
   applied: "Applied",
   pending: "Pending with payer",
+  follow_up: "Follow up",
   approved: "Approved",
   denied: "Denied",
   withdrawn: "Withdrawn",
@@ -39,6 +44,9 @@ export const applicationSchema = z
     id: z.string().uuid().optional(),
     payer: z.string().trim().min(2).max(120),
     form: z.enum(["cms855i"]).nullable().optional(),
+    catalog_id: z.string().regex(/^[a-z0-9-]{2,60}$/).nullable().optional(),
+    network: z.string().trim().min(2).max(120).nullable().optional(),
+    stage: z.enum(["credentialing", "contracting"]).optional(),
     status: z.enum(STATUSES).default("preparing"),
     applied_on: isoDate.nullable().optional(),
     follow_up_on: isoDate.nullable().optional(),
@@ -54,6 +62,9 @@ export type PayerApplication = {
   id: string;
   payer: string;
   form: "cms855i" | null;
+  catalog_id: string | null;
+  network: string | null;
+  stage: "credentialing" | "contracting";
   status: PayerStatus;
   applied_on: ISODate | null;
   follow_up_on: ISODate | null;
@@ -78,17 +89,21 @@ const toRow = (r: Record<string, unknown>): PayerApplication => ({
 /** Fills in the dates she didn't give: applied today, follow up in 30 days, recredential in 36 months. Pure. */
 export function withDefaults(a: z.infer<typeof applicationSchema>, today: ISODate) {
   const status = a.status;
-  const applied_on = a.applied_on ?? (status === "preparing" ? null : today);
-  const waiting = status === "applied" || status === "pending";
+  const applied_on = a.applied_on ?? (status === "preparing" || status === "not_started" ? null : today);
+  const waiting = WAITING.includes(status);
   const follow_up_on = a.follow_up_on ?? (waiting && applied_on ? addDays(applied_on, FOLLOW_UP_DAYS) : null);
   const approved_on = a.approved_on ?? (status === "approved" ? today : null);
   const recredential_on = a.recredential_on ?? (status === "approved" && approved_on ? addMonths(approved_on, RECREDENTIAL_MONTHS) : null);
   return {
     payer: a.payer,
     form: a.form ?? null,
+    catalog_id: a.catalog_id ?? null,
+    network: a.network ?? null,
+    stage: a.stage ?? "credentialing",
     status,
     applied_on,
-    follow_up_on: waiting ? follow_up_on : null,
+    // A date she (or an unchecked submit step) passes in is kept; only the default is limited to waiting statuses.
+    follow_up_on: waiting ? follow_up_on : (a.follow_up_on ?? null),
     approved_on,
     effective_on: a.effective_on ?? null,
     recredential_on,
@@ -104,19 +119,29 @@ export async function listPayerApplications(sql: postgres.Sql = db()): Promise<P
 
 /** Adds a payer, or updates one by id. Audited (payer and status, never notes). */
 export async function savePayerApplication(input: unknown, by: string, sql: postgres.Sql = db()): Promise<PayerApplication> {
-  const a = applicationSchema.parse(input);
+  let a = applicationSchema.parse(input);
+  // Saved by name ("Aetna", "BCBSIL"): link it to the catalog payer on an exact name or alias match,
+  // and update that payer's row if it already has one, so the checklist never lists it twice.
+  const catalogId = a.catalog_id ?? catalogIdFor(a.payer, a.form);
+  if (catalogId && !a.catalog_id) {
+    const [held] = await sql<{ id: string }[]>`select id from practice_os.payer_applications where catalog_id = ${catalogId}`;
+    if (!held) a = { ...a, catalog_id: catalogId };
+    else if (!a.id) a = { ...a, id: held.id, catalog_id: catalogId };
+    else if (held.id === a.id) a = { ...a, catalog_id: catalogId };
+  }
   const v = withDefaults(a, await practiceToday(sql));
   const [row] = a.id
     ? await sql`
         update practice_os.payer_applications set
-          payer = ${v.payer}, form = ${v.form}, status = ${v.status}, applied_on = ${v.applied_on},
+          payer = ${v.payer}, form = ${v.form}, catalog_id = coalesce(${v.catalog_id}, catalog_id), network = coalesce(${v.network}, network),
+          stage = ${v.stage}, status = ${v.status}, applied_on = ${v.applied_on},
           follow_up_on = ${v.follow_up_on}, approved_on = ${v.approved_on}, effective_on = ${v.effective_on},
           recredential_on = ${v.recredential_on}, reference = ${v.reference}, notes = ${v.notes}
         where id = ${a.id} returning *`
     : await sql`
         insert into practice_os.payer_applications
-          (payer, form, status, applied_on, follow_up_on, approved_on, effective_on, recredential_on, reference, notes)
-        values (${v.payer}, ${v.form}, ${v.status}, ${v.applied_on}, ${v.follow_up_on}, ${v.approved_on},
+          (payer, form, catalog_id, network, stage, status, applied_on, follow_up_on, approved_on, effective_on, recredential_on, reference, notes)
+        values (${v.payer}, ${v.form}, ${v.catalog_id}, ${v.network}, ${v.stage}, ${v.status}, ${v.applied_on}, ${v.follow_up_on}, ${v.approved_on},
                 ${v.effective_on}, ${v.recredential_on}, ${v.reference}, ${v.notes})
         returning *`;
   if (!row) throw new Error("That application doesn't exist.");
@@ -133,7 +158,7 @@ export type PayerDate = { id: string; payer: string; kind: "follow_up" | "recred
 export function payerDates(apps: PayerApplication[], today: ISODate, days: number): PayerDate[] {
   const out: PayerDate[] = [];
   for (const a of apps) {
-    if ((a.status === "applied" || a.status === "pending") && a.follow_up_on) {
+    if (WAITING.includes(a.status) && a.follow_up_on) {
       out.push({
         id: a.id,
         payer: a.payer,

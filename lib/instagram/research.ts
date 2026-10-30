@@ -32,6 +32,8 @@ const UNSAFE_WEB_TEXT =
   /https?:|www\.|\b[\w-]+\.(com|org|net|io|co|ai)\b|@[\w-]+\.|\b(ignore|disregard|forget)\b.*\b(instructions?|rules?|above|previous)\b|\b(system prompt|you are an? (ai|assistant|model)|as an ai)\b/i;
 
 export type SearchFn = (feature: string, input: string) => Promise<GroundedAnswer>;
+/** Live progress for the studio: each helper as it answers, then "angles" when the merge starts. */
+export type OnResearchStep = (step: { helper: "posts" | "hooks" | "formats" | "angles" }) => void;
 
 /** Hosts whose pages are never used: Instagram's terms forbid scraping it, and Meta's other apps the same. */
 const BLOCKED_HOST = /(^|\.)(instagram\.com|cdninstagram\.com|facebook\.com|fb\.com|threads\.net)$/i;
@@ -131,10 +133,15 @@ async function standInSearch(feature: string): Promise<GroundedAnswer> {
 }
 
 /** Runs the three helpers in parallel, then merges their notes into angles. Throws only if every helper fails. */
-export async function researchTopic(topic: string, deps: { search?: SearchFn; chat?: ChatFn } = {}): Promise<Omit<Research, "id">> {
+export async function researchTopic(topic: string, deps: { search?: SearchFn; chat?: ChatFn; onStep?: OnResearchStep } = {}): Promise<Omit<Research, "id">> {
   const standIn = process.env.PLAYWRIGHT_RESEARCH_STANDIN === "1";
   const search = deps.search ?? (standIn ? standInSearch : webSearch);
-  const settled = await Promise.allSettled(HELPERS.map((h) => search(`instagram.research.${h.id}`, h.ask(topic))));
+  const settled = await Promise.allSettled(
+    HELPERS.map((h) =>
+      search(`instagram.research.${h.id}`, h.ask(topic)).finally(() => deps.onStep?.({ helper: h.id })),
+    ),
+  );
+  deps.onStep?.({ helper: "angles" });
   const notes = settled.flatMap((s, i) => (s.status === "fulfilled" && s.value.searched ? [{ id: HELPERS[i].id, answer: s.value }] : []));
   if (!notes.length) throw new Error("The web search didn't answer.");
 
@@ -213,7 +220,7 @@ export async function recentResearch(topic: string): Promise<Research | null> {
 }
 
 /** Research her topic (or reuse this week's), save it, and return it. Never throws for a search problem: fixed angles instead. */
-export async function research(topic: string, opts: { search?: SearchFn; chat?: ChatFn; isSample?: boolean } = {}): Promise<Research> {
+export async function research(topic: string, opts: { search?: SearchFn; chat?: ChatFn; isSample?: boolean; onStep?: OnResearchStep } = {}): Promise<Research> {
   const t = topic.trim().slice(0, 300);
   const cached = await recentResearch(t);
   if (cached) return cached;

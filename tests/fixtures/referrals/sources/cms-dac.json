@@ -1,0 +1,4 @@
+{"count":2,"results":[
+ {"npi":"1900000001","ind_pac_id":"0000000001","provider_last_name":"RIVERA","provider_first_name":"MARIA","cred":"MD","pri_spec":"FAMILY PRACTICE","facility_name":"NORTHSIDE FAMILY MEDICINE LLC","org_pac_id":"0000000009","adr_ln_1":"2400 N LINCOLN AVE","adr_ln_2":"STE 210","citytown":"CHICAGO","state":"IL","zip_code":"606143301","telephone_number":"3125550100","telehlth":"Y"},
+ {"npi":"1900000001","provider_last_name":"RIVERA","provider_first_name":"MARIA","facility_name":"LAKE SHORE CLINIC","adr_ln_1":"900 W BELMONT AVE","citytown":"CHICAGO","state":"IL","zip_code":"606570000","telephone_number":"7735550111"}
+]}
