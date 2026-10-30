@@ -1,6 +1,10 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { execFileSync, execSync } from "node:child_process";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { LIMIT, makeTestVideo, watchNetwork } from "./video-fixture";
 
 // The chat-first studio on Media > Instagram, with the studio stand-ins
 // (PLAYWRIGHT_STUDIO_STANDIN=1: fixed model answers, a plain background, the
@@ -125,4 +129,29 @@ test("The studio passes axe in light and dark", async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme });
     await axe(page);
   }
+});
+
+test("Her own video in the studio: add it, cut the start from chat, Undo; the file never leaves her computer", async ({ page }) => {
+  test.setTimeout(180_000);
+  const sent = watchNetwork(page);
+  await page.goto("/media/instagram");
+  await say(page, "edit my own video");
+  const editor = page.getByRole("region", { name: "Your video" });
+  await expect(editor).toBeVisible({ timeout: 30_000 });
+  const dir = mkdtempSync(path.join(tmpdir(), "studio-chat-video-"));
+  const clip = path.join(dir, "office-tour.mp4");
+  writeFileSync(clip, await makeTestVideo(page, 4));
+  await editor.getByLabel("Choose a video from your computer").setInputFiles(clip);
+  await expect(editor.getByRole("button", { name: /^Clip 1: office-tour\.mp4, 4 seconds/ })).toBeVisible({ timeout: 20_000 });
+
+  await say(page, "cut the first 1 seconds");
+  await expect(chat(page).getByText("Cut.")).toBeVisible();
+  await expect(editor.getByRole("button", { name: /^Clip 1: office-tour\.mp4, 3 seconds/ })).toBeVisible();
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect(editor.getByRole("button", { name: /^Clip 1: office-tour\.mp4, 4 seconds/ })).toBeVisible();
+  // Captions are off until she taps Make captions, and it says what is sent.
+  await expect(editor.getByRole("button", { name: /Make captions/ })).toBeVisible();
+  await expect(editor.getByText(/sound \(not the video\) goes to Meta/)).toBeVisible();
+  expect(sent.filter((s) => s.mp4 || s.bytes > LIMIT)).toEqual([]);
+  await axe(page);
 });
