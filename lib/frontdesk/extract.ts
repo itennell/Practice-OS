@@ -57,3 +57,33 @@ export async function extractVoicemail(transcript: string, callerId: string | nu
   }
   return vetExtraction(parsed, callerId);
 }
+
+/**
+ * When Muse can't answer (no key, offline, an error): plain-code keywords pick
+ * the intent and the summary stays generic, so a voicemail is never stuck half
+ * handled. Anything unclear goes to her as a question.
+ */
+export function keywordExtraction(transcript: string, callerId: string | null): Extracted {
+  const t = transcript.toLowerCase();
+  const intent: Intent = /\b(reschedul|move my|change my)/.test(t)
+    ? "reschedule"
+    : /\bcancel/.test(t)
+      ? "cancel"
+      : /\b(appointment|consult|book|schedule|get started|first session)/.test(t)
+        ? "book"
+        : /\b(insurance|fee|cost|price|hours|located|address|superbill)/.test(t)
+          ? "question"
+          : "other";
+  const summary = { book: "Wants a first consult", reschedule: "Wants to move a consult", cancel: "Wants to cancel a consult", question: "Has a logistics question", other: "Left a message" }[intent];
+  return { name: null, callbackNumber: callerId, intent, summary };
+}
+
+/** Muse first; the keyword fallback if Muse can't answer. */
+export async function readIntent(transcript: string, callerId: string | null): Promise<Extracted> {
+  try {
+    return await extractVoicemail(transcript, callerId);
+  } catch (e) {
+    console.warn("front desk: Muse couldn't read the message, using keywords:", e instanceof Error ? e.message : e);
+    return keywordExtraction(transcript, callerId);
+  }
+}

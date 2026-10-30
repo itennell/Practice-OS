@@ -11,15 +11,13 @@ const localDb = /@(localhost|127\.0\.0\.1)[:/]/.test(url);
 
 vi.mock("../lib/frontdesk/extract", async (orig) => {
   const real = await orig<typeof import("../lib/frontdesk/extract")>();
-  return {
-    ...real,
-    // Stands in for muse-spark-1.3: a name if "it's <Name>" is said, intent from keywords.
-    extractVoicemail: vi.fn(async (text: string, callerId: string | null) => {
-      const name = /it's (\w+)/i.exec(text)?.[1] ?? null;
-      const intent = /appointment|consult|book/i.test(text) ? "book" : /insurance|fee|cost/i.test(text) ? "question" : "other";
-      return real.vetExtraction({ name, callback_number: null, intent, summary: "Wants a first consult" }, callerId);
-    }),
-  };
+  // Stands in for muse-spark-1.3: a name if "it's <Name>" is said, intent from keywords.
+  const fake = vi.fn(async (text: string, callerId: string | null) => {
+    const name = /it's (\w+)/i.exec(text)?.[1] ?? null;
+    const intent = /appointment|consult|book/i.test(text) ? "book" : /insurance|fee|cost/i.test(text) ? "question" : "other";
+    return real.vetExtraction({ name, callback_number: null, intent, summary: "Wants a first consult" }, callerId);
+  });
+  return { ...real, extractVoicemail: fake, readIntent: fake };
 });
 
 const { db, closeDb } = await import("../lib/db");
