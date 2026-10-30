@@ -1,0 +1,36 @@
+{
+  "license": "Psychologist",
+  "state": "IL",
+  "first_three": [
+    "medicare",
+    "aetna",
+    "bcbsil"
+  ],
+  "payers": [
+    "medicare",
+    "aetna",
+    "bcbsil",
+    "ambetter-il",
+    "cigna-evernorth",
+    "humana",
+    "uhc-optum",
+    "il-medicaid",
+    "aetna-better-health-il",
+    "bcchp-il",
+    "countycare",
+    "meridian-il",
+    "molina-il",
+    "tricare-west"
+  ],
+  "platforms": [
+    "alma",
+    "grow-therapy",
+    "headway",
+    "rula",
+    "sondermind"
+  ],
+  "taxonomy": "103TC0700X",
+  "medicare_specialty": "Clinical Psychologist",
+  "license_only_steps": [],
+  "medicare_steps": 8
+}

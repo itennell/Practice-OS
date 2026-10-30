@@ -86,7 +86,7 @@ describe("application dates", () => {
   });
 
   it("lists follow-ups and recredential dates in the window, overdue included", () => {
-    const base = { form: null, effective_on: null, reference: null, notes: null, is_sample: true, approved_on: null, recredential_on: null };
+    const base = { form: null, catalog_id: null, network: null, stage: "credentialing" as const, effective_on: null, reference: null, notes: null, is_sample: true, approved_on: null, recredential_on: null };
     const apps: PayerApplication[] = [
       { ...base, id: "a", payer: "BCBSIL", status: "applied", applied_on: "2026-10-05", follow_up_on: "2026-11-04" },
       { ...base, id: "b", payer: "Old", status: "pending", applied_on: "2026-08-01", follow_up_on: "2026-08-31" },

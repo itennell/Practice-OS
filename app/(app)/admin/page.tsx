@@ -3,7 +3,8 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense, type ReactNode } from "react";
 import { CheckCheck, ChevronRight } from "lucide-react";
-import { Credentialing, GoodFaithEstimates, Insurance, ReleaseForms, Superbills } from "@/components/admin/panels";
+import { Insurance } from "@/components/admin/insurance-panel";
+import { Credentialing, GoodFaithEstimates, ReleaseForms, Superbills } from "@/components/admin/panels";
 import { ClientForms } from "@/components/admin/client-forms";
 import { SidePanel } from "@/components/admin/side-panel";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -15,7 +16,7 @@ import { deadlinesView } from "@/lib/compliance/view";
 import { loadCredentialingProfile } from "@/lib/credentialing/store";
 import { listEstimates, loadPracticeSettings } from "@/lib/gfe/store";
 import { allGuides } from "@/lib/guides";
-import { listPayerApplications } from "@/lib/payers/store";
+import { WAITING, listPayerApplications } from "@/lib/payers/store";
 import { listSuperbills } from "@/lib/superbill/store";
 
 export const metadata: Metadata = { title: "Admin · Practice-OS" };
@@ -155,7 +156,8 @@ async function Cards() {
   const notGiven = bills.filter((b) => !b.issued_on).length;
   const waitingGfe = estimates.filter((e) => !e.issued_on && e.approval_status === "pending").length;
   const missing = profile ? [!profile.npi.number && "NPI", !profile.tin && "tax ID"].filter(Boolean) : [];
-  const pending = apps.filter((a) => a.status === "applied" || a.status === "pending").length;
+  const pending = apps.filter((a) => WAITING.includes(a.status)).length;
+  const started = apps.filter((a) => a.status !== "not_started").length;
   const days = settings?.hours.weekdays.map((d) => WEEKDAY[d]).join(", ");
 
   return (
@@ -186,7 +188,7 @@ async function Cards() {
           href="/admin?panel=credentialing"
           summary={!profile ? "Set up your profile" : missing.length ? `Missing your ${missing.join(" and ")}` : "NPI and tax ID on file · CAQH prep"}
         />
-        <Card title="Insurance" href="/admin?panel=insurance" summary={`${plural(apps.length, "application")} · ${pending} waiting to hear back`} />
+        <Card title="Insurance" href="/admin?panel=insurance" summary={started ? `${plural(started, "application")} · ${pending} waiting to hear back` : "Every insurer you can join, step by step"} />
         <Card title="How do I" href="/admin/how-do-i" summary={`${plural(allGuides().length, "step-by-step guide")}`} />
         <Card
           title="Office hours and fees"

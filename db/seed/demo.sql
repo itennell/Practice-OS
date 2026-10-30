@@ -167,13 +167,31 @@ values (
   true
 );
 
--- [Sample] insurance applications (migration 009): Medicare being prepared,
--- BCBSIL waiting (follow up 30 days after applying), Aetna approved (recredential in 36 months).
+-- [Sample] insurance applications (migrations 009, 031, 032): Medicare being prepared,
+-- BCBSIL waiting (follow up 30 days after applying), Aetna approved and contracted
+-- (recredential in 36 months). catalog_id ties each to data/payers; the Insurance tab
+-- adds every other payer that fits an LCPC in Illinois as "not started" when it opens.
+-- payer_steps are the checklist steps Dana has checked off.
 insert into practice_os.payer_applications
-  (payer, form, status, applied_on, follow_up_on, approved_on, effective_on, recredential_on, reference, notes, is_sample) values
-  ('Medicare', 'cms855i', 'preparing', null, null, null, null, null, null, '[Sample] Prepare the CMS-855I or apply in PECOS.', true),
-  ('BCBSIL', null, 'applied', '2026-10-05', '2026-11-04', null, null, null, '[Sample] APP-1042', null, true),
-  ('Aetna', null, 'approved', '2026-01-12', null, '2026-03-16', '2026-04-01', '2029-03-16', null, null, true);
+  (payer, form, catalog_id, network, stage, status, applied_on, follow_up_on, approved_on, effective_on, recredential_on, reference, notes, is_sample) values
+  ('Medicare', 'cms855i', 'medicare', 'Medicare Part B', 'credentialing', 'preparing', null, null, null, null, null, null, '[Sample] Prepare the CMS-855I or apply in PECOS.', true),
+  ('BCBSIL', null, 'bcbsil', 'PPO', 'credentialing', 'applied', '2026-10-05', '2026-11-04', null, null, null, '[Sample] APP-1042', null, true),
+  ('Aetna', null, 'aetna', 'Commercial', 'contracting', 'approved', '2026-01-12', null, '2026-03-16', '2026-04-01', '2029-03-16', null, null, true);
+insert into practice_os.payer_steps (scope, step_id, done_on, done_by, is_sample) values
+  ('prerequisites', 'npi1', '2025-12-01', 'clinician', true),
+  ('prerequisites', 'taxonomy', '2025-12-01', 'clinician', true),
+  ('prerequisites', 'caqh', '2025-12-15', 'clinician', true),
+  ('prerequisites', 'malpractice', '2025-12-10', 'clinician', true),
+  ('prerequisites', 'il-license', '2025-12-01', 'clinician', true),
+  ('medicare', 'medicare-npi', '2026-10-20', 'clinician', true),
+  ('bcbsil', 'caqh-ready', '2026-10-01', 'clinician', true),
+  ('bcbsil', 'onboarding-form', '2026-10-05', 'clinician', true),
+  ('aetna', 'caqh-ready', '2026-01-05', 'clinician', true),
+  ('aetna', 'request-form', '2026-01-12', 'clinician', true),
+  ('aetna', 'need-review', '2026-02-20', 'clinician', true),
+  ('aetna', 'sign-contract', '2026-03-16', 'clinician', true),
+  ('aetna', 'fee-schedule', '2026-03-16', 'clinician', true),
+  ('aetna', 'effective-date', '2026-04-01', 'clinician', true);
 
 -- Two [Sample] Good Faith Estimates, with no client identity (migration 006): one
 -- already issued, one waiting for her approval. Dates are fixed, like the CMS example.

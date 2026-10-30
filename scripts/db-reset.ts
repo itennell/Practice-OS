@@ -18,6 +18,8 @@ export const DEMO_TABLES = [
   "superbills",
   "credentialing_profile",
   "payer_applications",
+  // Insurance checklists (032)
+  "payer_steps",
   "obligations",
   "compliance_facts",
   "compliance_rules",
