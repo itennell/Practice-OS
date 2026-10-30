@@ -4,9 +4,16 @@
 // browser has no private folder, the file is kept in memory for this visit only.
 
 const DIR = "studio-clips";
+/** Her clips may keep this much of her browser's storage; more is refused with plain words. */
+export const MAX_CLIP_BYTES = 500 * 1024 * 1024;
 const memory = new Map<string, File>();
 
 export type SaveResult = { key: string; kept: "browser" | "memory" };
+
+/** Pure check, tested on its own: the new file must fit under the cap. */
+export function fitsCap(usedBytes: number, incomingBytes: number, cap: number = MAX_CLIP_BYTES): boolean {
+  return usedBytes + incomingBytes <= cap;
+}
 
 async function folder(): Promise<FileSystemDirectoryHandle | null> {
   try {
@@ -23,8 +30,22 @@ function newKey(name: string): string {
   return `${crypto.randomUUID()}.${ext}`;
 }
 
-/** Keeps the file in her browser under a new random key. */
+/** How much of her browser storage her clips already use, when the browser can say. */
+async function usedBytes(): Promise<number | null> {
+  try {
+    const estimate = await navigator.storage?.estimate?.();
+    return typeof estimate?.usage === "number" ? estimate.usage : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Keeps the file in her browser under a new random key. Refuses when it would pass the storage cap. */
 export async function saveClip(file: File): Promise<SaveResult> {
+  const used = await usedBytes();
+  if (used !== null && !fitsCap(used, file.size)) {
+    throw new Error("That video doesn't fit in the clips storage (500 MB). Remove a clip first, then add it again.");
+  }
   const key = newKey(file.name);
   const dir = await folder();
   if (dir) {
@@ -41,6 +62,17 @@ export async function saveClip(file: File): Promise<SaveResult> {
   }
   memory.set(key, file);
   return { key, kept: "memory" };
+}
+
+/**
+ * Forgets in-memory copies of files no clip uses any more, so a long visit
+ * doesn't hold every removed clip in RAM. The private-folder copy stays: Undo
+ * and the version list can bring a removed clip back, and the missing-clip
+ * notice already covers files the browser cleared on its own.
+ */
+export function evictUnreferenced(keepKeys: readonly string[]): void {
+  const keep = new Set(keepKeys);
+  for (const key of [...memory.keys()]) if (!keep.has(key)) memory.delete(key);
 }
 
 /** The file for a key, or null when it's on another computer or was cleared. */

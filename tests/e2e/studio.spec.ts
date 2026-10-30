@@ -161,13 +161,13 @@ test("Her own video in the studio: add it, cut the start from chat, Undo; the fi
   const clip = path.join(dir, "office-tour.mp4");
   writeFileSync(clip, await makeTestVideo(page, 4));
   await editor.getByLabel("Choose a video from your computer").setInputFiles(clip);
-  await expect(editor.getByRole("button", { name: /^Clip 1: office-tour\.mp4, 4 seconds/ })).toBeVisible({ timeout: 20_000 });
+  await expect(editor.getByRole("button", { name: /^Clip 1, 4 seconds/ })).toBeVisible({ timeout: 20_000 });
 
   await say(page, "cut the first 1 seconds");
   await expect(chat(page).getByText("Cut.")).toBeVisible();
-  await expect(editor.getByRole("button", { name: /^Clip 1: office-tour\.mp4, 3 seconds/ })).toBeVisible();
+  await expect(editor.getByRole("button", { name: /^Clip 1, 3 seconds/ })).toBeVisible();
   await page.getByRole("button", { name: "Undo" }).click();
-  await expect(editor.getByRole("button", { name: /^Clip 1: office-tour\.mp4, 4 seconds/ })).toBeVisible();
+  await expect(editor.getByRole("button", { name: /^Clip 1, 4 seconds/ })).toBeVisible();
   // Captions are off until she taps Make captions, and it says what is sent.
   await expect(editor.getByRole("button", { name: /Make captions/ })).toBeVisible();
   await expect(editor.getByText(/sound \(not the video\) goes to Meta/)).toBeVisible();

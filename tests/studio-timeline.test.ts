@@ -43,8 +43,9 @@ describe("timeline maths", () => {
     expect(locate(r.doc.clips, 0)).toMatchObject({ seg: { clip: { id: "c2" } }, sourceTime: 1 });
     expect(locate(r.doc.clips, 3)).toMatchObject({ seg: { clip: { id: "c1" } }, sourceTime: 3 });
     expect(totalSeconds(r.doc.clips)).toBe(6);
-    // The text moved with the cut.
-    expect(r.doc.overlays[0]).toMatchObject({ start: 0, end: 2 });
+    // The text stays on its footage: "Welcome" is on c1's file seconds 3-5,
+    // which play at 0-2 after the cut and at 3-5 once c1 moves second.
+    expect(r.doc.overlays[0]).toMatchObject({ start: 3, end: 5 });
   });
 
   it("shows text and captions only inside their times", () => {

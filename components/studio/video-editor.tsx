@@ -17,7 +17,7 @@ import { ThoughtLine } from "@/components/shared/thought-line";
 import { ASPECTS, LIMITS, POSITIONS, allIds, newId, type Clip, type StudioDoc } from "@/lib/studio/doc";
 import { clock, coverCrop, locate, OUTPUT, segments, spokenSeconds, totalSeconds } from "@/lib/studio/timeline";
 import { cn } from "@/lib/utils";
-import { loadClip, saveClip } from "./clip-store";
+import { evictUnreferenced, loadClip, saveClip } from "./clip-store";
 import { makeCaptions } from "./captions";
 import { canMakeVideo, drawWords, exportVideo, probeClip } from "./video-export";
 
@@ -100,8 +100,8 @@ export function VideoEditor({ doc, busy, apply, projectId }: VideoEditorProps) {
   const sources = useMemo(() => [...new Set(clips.map((c) => c.source))].sort().join("|"), [clips]);
   useEffect(() => {
     let live = true;
+    const keys = sources ? sources.split("|") : [];
     (async () => {
-      const keys = sources ? sources.split("|") : [];
       const found = new Map<string, File>();
       const gone = new Set<string>();
       for (const k of keys) {
@@ -129,6 +129,8 @@ export function VideoEditor({ doc, busy, apply, projectId }: VideoEditorProps) {
       }
       setFiles(found);
       setMissing(gone);
+      // In-memory copies of files no clip uses any more are forgotten.
+      evictUnreferenced(keys);
     })();
     return () => {
       live = false;
@@ -230,7 +232,9 @@ export function VideoEditor({ doc, busy, apply, projectId }: VideoEditorProps) {
       const clip: Clip = {
         id: newId("c", allIds(doc)),
         source: saved.key,
-        name: file.name.slice(0, 120) || "Video",
+        // The file's real name is never stored: the document keeps a blank
+        // label and the list below numbers the clips.
+        name: "",
         duration: info.duration,
         in: 0,
         out: r3(Math.min(info.duration, room)),
@@ -313,11 +317,12 @@ export function VideoEditor({ doc, busy, apply, projectId }: VideoEditorProps) {
     exportAbort.current = ac;
     setMaking(0);
     try {
-      const blob = await exportVideo(
+      const made = await exportVideo(
         { clips, overlays: doc.overlays, cues: doc.captions.on ? doc.captions.cues : null, aspect: doc.aspect, files },
         (share) => setMaking(share),
         ac.signal,
       );
+      const blob = made.blob;
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -326,7 +331,7 @@ export function VideoEditor({ doc, busy, apply, projectId }: VideoEditorProps) {
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      setSavedNote("Your video is saved in Downloads.");
+      setSavedNote(made.muted ? "Your video is saved in Downloads, but it has no sound." : "Your video is saved in Downloads.");
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") setSavedNote("Stopped. Nothing was saved.");
       else setError(err instanceof Error ? err.message : "Couldn't make the video. Try again.");
@@ -337,6 +342,8 @@ export function VideoEditor({ doc, busy, apply, projectId }: VideoEditorProps) {
   }
 
   const missingCount = clips.filter((c) => missing.has(c.source)).length;
+  // Clips whose files haven't come back yet: Download and Make captions wait for them.
+  const loading = clips.some((c) => !files.has(c.source) && !missing.has(c.source));
   const locked = working || making !== null || captioning !== null;
   const cover = doc.cover && "time" in doc.cover ? doc.cover.time : null;
 
@@ -432,7 +439,7 @@ export function VideoEditor({ doc, busy, apply, projectId }: VideoEditorProps) {
                     <button
                       type="button"
                       aria-pressed={selected === id}
-                      aria-label={`Clip ${i + 1}: ${c.name}, ${spokenSeconds(len)}${gone ? ", missing" : ""}`}
+                      aria-label={`Clip ${i + 1}${c.name ? `: ${c.name}` : ""}, ${spokenSeconds(len)}${gone ? ", missing" : ""}`}
                       onClick={() => {
                         setSelected(id);
                         if (!playing) seek(segs[i]?.start ?? 0);
@@ -445,7 +452,7 @@ export function VideoEditor({ doc, busy, apply, projectId }: VideoEditorProps) {
                     >
                       <span className="flex w-full items-center gap-1 font-medium">
                         <Film aria-hidden size={14} className="shrink-0" />
-                        <span className="truncate">{i + 1}. {c.name}</span>
+                        <span className="truncate">{i + 1}. {c.name || "Video clip"}</span>
                       </span>
                       <span className="tabular-nums">{gone ? "Missing" : clock(len)}</span>
                     </button>
@@ -592,9 +599,10 @@ export function VideoEditor({ doc, busy, apply, projectId }: VideoEditorProps) {
               <SettingSwitch label="Show captions" description={`${doc.captions.cues.length} lines from the sound.`} checked={doc.captions.on} disabled={locked} onCheckedChange={(on) => void send([{ op: "set_captions", on }])} />
             ) : null}
             <div className="flex flex-wrap items-center gap-3">
-              <Button variant="quiet" disabled={locked || !projectId || missingCount > 0} onClick={() => void captions()}>
+              <Button variant="quiet" disabled={locked || loading || !projectId || missingCount > 0} onClick={() => void captions()}>
                 {doc.captions.cues.length ? "Make captions again" : "Make captions"}
               </Button>
+              {loading && <p className="text-small text-[var(--fg-muted)]">Finding your clips…</p>}
               {captioning && (
                 <Button variant="quiet" onClick={() => capAbort.current?.abort()}>
                   Cancel
@@ -636,9 +644,10 @@ export function VideoEditor({ doc, busy, apply, projectId }: VideoEditorProps) {
 
           {/* Export */}
           <div className="flex flex-col gap-3">
-            <Button variant="primary" className="w-full sm:w-auto sm:self-start" disabled={locked || missingCount > 0 || total <= 0} onClick={() => void download()}>
+            <Button variant="primary" className="w-full sm:w-auto sm:self-start" disabled={locked || loading || missingCount > 0 || total <= 0} onClick={() => void download()}>
               <Download aria-hidden size={18} /> Download video
             </Button>
+            {loading && <p className="text-small text-[var(--fg-muted)]">Finding your clips…</p>}
             {missingCount > 0 && <p className="text-small text-[var(--fg-muted)]">Add the missing clip again before you download.</p>}
             {making !== null && (
               <div className="flex items-center gap-3">

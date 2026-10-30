@@ -475,6 +475,20 @@ export async function applyEdit(
     }
     return { ok: false, status: 422, why: check.hardStop ? check.why : `I didn't change it: ${check.why}`, project, hardStop: check.hardStop };
   }
+  // Words typed directly onto the canvas reach the database without passing a
+  // chat message, so new or changed overlay text gets the client-detail guard
+  // here. (Chat's own words were already guarded before Muse proposed them.)
+  if (opts.source === "canvas") {
+    const beforeText = new Map(project.doc.overlays.map((o) => [o.id, o.text]));
+    for (const o of applied.doc.overlays) {
+      if (beforeText.get(o.id) === o.text) continue;
+      const guarded = await guard(o.text, "message");
+      if (!guarded.ok) {
+        await audit({ actor: "safety", action: "phi_refused", subjectType: "studio_project", subjectId: id, details: { kind: guarded.kind, by: opts.by } });
+        return { ok: false, status: 422, why: REFUSAL[guarded.kind], project };
+      }
+    }
+  }
   const did = ops.map((o) => describeOp(OpSchema.parse(o))).join(", ");
   const summary = applied.notes.length ? `${did} (${applied.notes.join("; ")})` : did;
   // The step is saved first (only one tab can win), then the picture is drawn for it.

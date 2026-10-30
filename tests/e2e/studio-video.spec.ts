@@ -81,18 +81,19 @@ test("Add her own video, cut the first second, add words, download a real 1080x1
   writeFileSync(clipFile, await makeTestVideo(page, 4));
 
   await page.getByLabel("Choose a video from your computer").setInputFiles(clipFile);
-  await expect(page.getByRole("button", { name: /^Clip 1: office-tour\.mp4, 4 seconds/ })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("button", { name: /^Clip 1, 4 seconds/ })).toBeVisible({ timeout: 20_000 });
   let doc = await docOf(page);
-  expect(doc.clips[0]).toMatchObject({ name: "office-tour.mp4", in: 0, out: 4 });
-  // Only a key into the browser's private folder is in the document.
+  expect(doc.clips[0]).toMatchObject({ name: "", in: 0, out: 4 });
+  // Only a key into the browser's private folder is in the document: the file's real name is never stored.
   expect(doc.clips[0].source).toMatch(/^[0-9a-f-]{36}\.mp4/);
+  expect(JSON.stringify(doc)).not.toContain("office-tour.mp4");
   await expect(page.getByText("be here after you reload")).toHaveCount(0);
 
   // Cut the first second: exact number in "Starts at".
   const starts = page.getByLabel("Starts at (seconds)");
   await starts.fill("1");
   await starts.press("Enter");
-  await expect(page.getByRole("button", { name: /^Clip 1: office-tour\.mp4, 3 seconds/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Clip 1, 3 seconds/ })).toBeVisible();
   doc = await docOf(page);
   expect(doc.clips[0]).toMatchObject({ in: 1, out: 4 });
   await expect(page.getByRole("slider", { name: "Start of clip 1" })).toHaveAttribute("aria-valuetext", "1 second");
@@ -161,11 +162,11 @@ test("A phone clip (HEVC .mov with a rotation flag) makes a 1080x1920 H.264 MP4"
   const sent = watchNetwork(page);
   await page.goto("/ui-lab/studio-video");
   await page.getByLabel("Choose a video from your computer").setInputFiles(mov);
-  const added = page.getByRole("button", { name: /^Clip 1: phone\.mov/ });
+  const added = page.getByRole("button", { name: /^Clip 1, / });
   const cannot = page.getByText("play that kind of video");
   await expect(added.or(cannot)).toBeVisible({ timeout: 20_000 });
   test.skip(await cannot.isVisible(), "This browser cannot decode HEVC");
-  await expect(page.getByRole("button", { name: /^Clip 1: phone\.mov, 4 seconds/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Clip 1, 4 seconds/ })).toBeVisible();
 
   const [download] = await Promise.all([page.waitForEvent("download", { timeout: 180_000 }), page.getByRole("button", { name: "Download video" }).click()]);
   const out = path.join(dir, "phone-" + info.project.name + ".mp4");

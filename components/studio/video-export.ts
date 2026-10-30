@@ -146,8 +146,8 @@ export async function renderSound(clips: Clip[], files: Map<string, Blob>, sampl
 
 export type ExportInput = { clips: Clip[]; overlays: Overlay[]; cues: Cue[] | null; aspect: Aspect; files: Map<string, Blob> };
 
-/** Makes the MP4 (H.264, 30 fps, Instagram's size for the shape). `onProgress` gets 0..1. */
-export async function exportVideo(job: ExportInput, onProgress?: (share: number) => void, signal?: AbortSignal): Promise<Blob> {
+/** Makes the MP4 (H.264, 30 fps, Instagram's size for the shape). `onProgress` gets 0..1. `muted` says the clips gave no sound, so the caller can say so instead of handing over a silent video quietly. */
+export async function exportVideo(job: ExportInput, onProgress?: (share: number) => void, signal?: AbortSignal): Promise<{ blob: Blob; muted: boolean }> {
   const { width: W, height: H } = OUTPUT[job.aspect];
   const total = totalSeconds(job.clips);
   if (total <= 0) throw new Error("There's no video to make yet.");
@@ -214,5 +214,6 @@ export async function exportVideo(job: ExportInput, onProgress?: (share: number)
     throw err;
   }
   onProgress?.(1);
-  return new Blob([output.target.buffer!], { type: "video/mp4" });
+  const anyFile = segments(job.clips).some((s) => s.end > s.start && job.files.has(s.clip.source));
+  return { blob: new Blob([output.target.buffer!], { type: "video/mp4" }), muted: anyFile && !sound };
 }

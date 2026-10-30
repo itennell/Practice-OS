@@ -92,8 +92,12 @@ export async function checkStep(before: StudioDoc | null, next: StudioDoc, limit
   const joined = joinedText(next);
   const joinedChanged = !before || joinedText(before) !== joined;
   const captionChanged = before?.caption !== next.caption;
-  if (!changed.length && !joinedChanged && !captionChanged) return { ok: true };
-  if ([...changed, joined].some((w) => checkCrisis(w).crisis)) return fail([RULE_TEXT.self_harm]);
+  // The captions' whole run as one transcript: a crisis phrase split across two
+  // caption pieces reads safe in each piece alone.
+  const transcript = next.captions.cues.map((c) => c.text).join(" ");
+  const transcriptChanged = !before || before.captions.cues.map((c) => c.text).join(" ") !== transcript;
+  if (!changed.length && !joinedChanged && !captionChanged && !transcriptChanged) return { ok: true };
+  if ([...changed, joined].some((w) => checkCrisis(w).crisis) || (transcriptChanged && !!transcript && checkCrisis(transcript).crisis)) return fail([RULE_TEXT.self_harm]);
   const problems: string[] = [];
   for (const w of changed) {
     if (w === next.caption) continue;
