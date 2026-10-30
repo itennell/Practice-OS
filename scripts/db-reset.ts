@@ -25,6 +25,10 @@ export const DEMO_TABLES = [
   "posts",
   // Instagram studio (021)
   "post_research",
+  // Chat-first studio (026-028)
+  "studio_projects",
+  "studio_steps",
+  "studio_pictures",
   "inquiries",
   "messages",
   "consult_bookings",

@@ -10,7 +10,7 @@ import type { ChatFn, CriticResult } from "./critic";
 import { designPost, type GraphicDeps } from "./graphic";
 import { GOALS, instagramDeclined, loadInstagramPrefs, weekTopics } from "./onboarding";
 import { PILLAR_BY_ID, type PillarId } from "./pillars";
-import { research, type Research, type ResearchAngle, type SearchFn } from "./research";
+import { research, type OnResearchStep, type Research, type ResearchAngle, type SearchFn } from "./research";
 import { gateTopic, illnessTopic, nearestAngles, type Angle } from "./topic-gate";
 import { writeRequested, writeSeveral, writeWeek, type Draft, type PracticeFacts } from "./write";
 
@@ -180,7 +180,7 @@ export async function requestPost(
   by: string,
   request: string,
   pillar: PillarId | null,
-  opts: { chat?: ChatFn; graphic?: GraphicDeps; research?: PickedResearch } = {},
+  opts: { chat?: ChatFn; graphic?: GraphicDeps; research?: PickedResearch; onWritten?: (d: Draft) => void } = {},
 ): Promise<RequestResult> {
   if (await instagramDeclined()) return { outcome: "declined", why: DECLINED };
   const gate = await checkRequest(request, by);
@@ -194,6 +194,7 @@ export async function requestPost(
     // Her request passed the crisis check, so the model's own draft wandered: offer logistics angles, never a dead end.
     return heldBack(request);
   }
+  opts.onWritten?.(out.draft);
   const post = await saveDraft(out.draft, { by, facts, graphic: opts.graphic && { chat: opts.chat, ...opts.graphic } });
   await linkResearch([post.id], angle);
   if (post.status === "blocked") return { outcome: "blocked_after_rewrite", post, headline: out.draft.headline, why: blockedSummary(out.draft.critic) };
@@ -302,7 +303,7 @@ export type ResearchResult =
   | { outcome: "researched"; research: Research };
 
 /** Research first: the topic gate, then three small web searches and 2-3 angles she picks from. */
-export async function researchPost(by: string, topic: string, opts: { search?: SearchFn; chat?: ChatFn } = {}): Promise<ResearchResult> {
+export async function researchPost(by: string, topic: string, opts: { search?: SearchFn; chat?: ChatFn; onStep?: OnResearchStep } = {}): Promise<ResearchResult> {
   if (await instagramDeclined()) return { outcome: "declined", why: DECLINED };
   const gate = await checkRequest(topic, by);
   if (gate) return gate;
