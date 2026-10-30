@@ -4,7 +4,7 @@ import { pickThree } from "./calendar/slots";
 import type { CalendarAdapter } from "./calendar/types";
 import { shortSlotLabel } from "./calendar/zone";
 import { deps } from "./deps";
-import { prettyPhone } from "./phone/numbers";
+import { approvalWho, maskPhone } from "./redact";
 import { addAlert, getInquiry, isOptedOut, practice } from "./store";
 import { consultOptionsText, noTimesText, passedOnText } from "./templates";
 
@@ -34,7 +34,7 @@ export async function offerTimes(
   const cal = opts.calendar ?? (await calendar());
   const p = await practice();
   const firstContact = inquiry.ai_disclosed_at == null;
-  const who = inquiry.contact_name ?? prettyPhone(inquiry.contact_phone);
+  const who = approvalWho(inquiry.contact_name, inquiry.contact_phone);
   if (!cal) {
     await addAlert("system", `Front Desk couldn't offer times to ${who}: no calendar is connected.`, inquiryId);
     await db()`update practice_os.inquiries set status = 'needs_clinician' where id = ${inquiryId}`;
@@ -56,7 +56,7 @@ export async function offerTimes(
     const approvalId = await queueApproval({
       kind: "sms_reply",
       title: `Tell ${who} there are no open times`,
-      preview: { to: prettyPhone(inquiry.contact_phone), text: noTimesText(p, firstContact, inquiry.contact_name) },
+      preview: { to: maskPhone(inquiry.contact_phone), text: noTimesText(p, firstContact, inquiry.contact_name) },
       payload: { inquiry_id: inquiryId, to: inquiry.contact_phone, body: noTimesText(p, firstContact, inquiry.contact_name) },
       createdBy: opts.createdBy ?? "front_desk",
     });
@@ -73,7 +73,7 @@ export async function offerTimes(
   const approvalId = await queueApproval({
     kind: "text_consult_options",
     title: `Text ${who} ${slots.length} consult time${slots.length === 1 ? "" : "s"}`,
-    preview: { to: prettyPhone(inquiry.contact_phone), text: body, times: labels },
+    preview: { to: maskPhone(inquiry.contact_phone), text: body, times: labels },
     payload: { offer_id: offer.id, inquiry_id: inquiryId, to: inquiry.contact_phone, body },
     createdBy: opts.createdBy ?? "front_desk",
   });
@@ -95,8 +95,8 @@ export async function passToClinician(inquiryId: string, note: string): Promise<
   const body = passedOnText(p, inquiry.ai_disclosed_at == null);
   return queueApproval({
     kind: "sms_reply",
-    title: `Tell ${inquiry.contact_name ?? prettyPhone(inquiry.contact_phone)} you'll reply`,
-    preview: { to: prettyPhone(inquiry.contact_phone), text: body },
+    title: `Tell ${approvalWho(inquiry.contact_name, inquiry.contact_phone)} you'll reply`,
+    preview: { to: maskPhone(inquiry.contact_phone), text: body },
     payload: { inquiry_id: inquiryId, to: inquiry.contact_phone, body, purpose: "passed_on" },
     createdBy: "front_desk",
   });
