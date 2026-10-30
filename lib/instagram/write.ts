@@ -1,7 +1,7 @@
 // Muse Spark writes the words of a post; plain code adds the license line and
 // the critic decides. A blocked draft gets one logistics rewrite. A request
 // about suicide or self-harm is never written (store.ts stops it first); a
-// draft that adds it on its own is held back and replaced by one fresh post.
+// draft that adds it on its own is held back and answered with CRISIS_REPLY.
 import { chat as metaChat } from "../meta";
 import { codeCritic, critique, RULE_TEXT, type ChatFn, type CriticContext, type CriticResult, type Finding } from "./critic";
 import { PILLAR_BY_ID, PILLARS, type Pillar, type PillarId } from "./pillars";
@@ -135,15 +135,13 @@ async function critiqueWords(words: DraftWords, caption: string, f: PracticeFact
 async function checked(words: DraftWords, f: PracticeFacts, ctx: CriticContext, callModel: ChatFn): Promise<Draft> {
   const caption = captionOf(words.body, f.licenseLine);
   let critic = await critiqueWords(words, caption, f, ctx, callModel);
-  if (critic.ok) return { ...words, caption, critic, rewritten: false };
+  // A self-harm hit is never rewritten or sent back to the model: the draft is held back and
+  // the caller answers with the fixed crisis text (CRISIS_REPLY), never a reworded post.
+  if (critic.ok || critic.hardStop) return { ...words, caption, critic, rewritten: false };
   const pillar = PILLAR_BY_ID.get(words.pillar)!;
-  // Her request already passed the crisis check (store.ts), so a self-harm hit here is the model's
-  // own addition (a 988 line on a depression post). That draft is held back, never posted or shown,
-  // and never sent back to the model: Aeon writes one fresh logistics post on the same pillar instead.
-  const ask = critic.hardStop
-    ? `Write one new post that is pure practice logistics about ${pillarAsk(pillar)}. Do not mention suicide, self-harm, crisis, hotlines or 988. Return exactly one post.`
-    : `Rewrite this post so it is pure practice logistics about ${pillarAsk(pillar)}. It broke these rules: ${critic.findings.map((x) => x.message).join(" ")}\n` +
-      `Old headline: ${words.headline}\nOld caption: ${words.body}\nReturn exactly one post.`;
+  const ask =
+    `Rewrite this post so it is pure practice logistics about ${pillarAsk(pillar)}. It broke these rules: ${critic.findings.map((x) => x.message).join(" ")}\n` +
+    `Old headline: ${words.headline}\nOld caption: ${words.body}\nReturn exactly one post.`;
   const [again] = await writeWords(f, ask, callModel);
   if (!again) return { ...words, caption, critic, rewritten: false };
   const newCaption = captionOf(again.body, f.licenseLine);
