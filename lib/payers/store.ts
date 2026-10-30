@@ -17,6 +17,8 @@ export const RECREDENTIAL_MONTHS = 36;
 
 export const STATUSES = ["not_started", "preparing", "applied", "pending", "follow_up", "approved", "denied", "withdrawn"] as const;
 export type PayerStatus = (typeof STATUSES)[number];
+/** Statuses Aeon may set from chat: everything but applied. Only her own change on the Insurance page records that an application was sent. */
+export const CHAT_SET_STATUSES = ["not_started", "preparing", "pending", "follow_up", "approved", "denied", "withdrawn"] as const;
 /** Statuses that mean she's waiting to hear back from the payer. */
 export const WAITING: readonly PayerStatus[] = ["applied", "pending", "follow_up"];
 export const STATUS_LABEL: Record<PayerStatus, string> = {

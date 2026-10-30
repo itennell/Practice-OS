@@ -16,6 +16,10 @@ test("Insurance panel: three sample payers, the prepared CMS-855I, and what she 
   await expect(page.getByRole("listitem", { name: "Aetna", exact: true }).getByText("Approved", { exact: true })).toBeVisible();
   await expect(page.getByText(/writes in Mental Health Counselor \(MHC\)/)).toBeVisible();
   await expect(page.getByText(/Section 15: the certification statement and your signature/)).toBeVisible();
+  // Only her own change marks an application sent: the panel says so, and the old wording is gone.
+  await expect(page.getByText(/only your own change records the sent date/)).toBeVisible();
+  await expect(page.getByText(/Telling Aeon in chat never marks it sent/)).toBeVisible();
+  await expect(page.getByText(/I sent my/)).toHaveCount(0);
 
   const pdf = await request.get("/api/payers/cms855i");
   expect(pdf.headers()["content-type"]).toBe("application/pdf");
