@@ -942,3 +942,24 @@ Recommendation:
 - **Already has one:** keep it and run the checklist (booking link, fees, consult offer, same name, address and phone, designation, no health form, 988 line, accessibility basics, details block if her builder allows code).
 - **Do it yourself:** a small static site that a coding agent builds and deploys on her own Vercel Pro. Only for someone who will always have an agent to edit it. Not built in the app now; the research does not show it beats the default for her.
 - **Done for you:** Brighter Vision, if she wants no work at all.
+
+## Insurance: every payer, every way to apply, by license (checked 2026-10-29)
+
+The full research is data, not prose: `data/payers/national.json`, `data/payers/il.json` and `data/payers/prerequisites.json`. Every fact there carries its official source URL, a short quote, the day it was checked and whether the quote was read on the page itself (`verified`). The Insurance tab shows anything unverified as "Aeon researched, please confirm". `npx tsx scripts/check-payer-links.ts` opens every link. Illinois is the first state; another state adds `data/payers/<st>.json` in the same shape, and until then she sees the national payers only, marked as not researched.
+
+How a top credentialing specialist runs this, and so how the tab is built:
+- **Prerequisites first, in order.** Type 1 NPI ([NPPES](https://nppes.cms.hhs.gov)), a type 2 NPI only if she bills as a PLLC, the NUCC taxonomy for her license (LCSW 1041C0700X, LCPC 101YP2500X, LMFT 106H00000X, psychologist 103TC0700X; Medicare files counselors as 101YM0800X, per CMS's MFT/MHC FAQ), a complete and attested [CAQH ProView](https://proview.caqh.org) profile (every 120 days; 180 in Illinois), malpractice at the payer's minimum, an EIN and W-9.
+- **Two stages per payer.** Credentialing (the payer checks her) and contracting (she signs the contract, checks the fee schedule, notes the effective date, asks about billing back to it). Passing credentialing alone doesn't make her in network.
+- **Networks, not just payers.** BCBSIL's HMO is joined through a medical group or IPA; Illinois Medicaid is IMPACT enrollment first, then each HealthChoice Illinois plan separately (Aetna Better Health, Blue Cross Community Health Plans, CountyCare in Cook County, Meridian, Molina).
+- **Panel status goes stale.** Each network keeps "open / closed / limited / not confirmed" with the source and date, never a bare yes or no.
+- **Follow-up routine.** A reference number per application, a follow-up 30 days after she applies, recredentialing every 36 months (BCBSIL and TriWest: 3 years) and Medicare revalidation every 5 years.
+
+What changes by license (Illinois):
+- Medicare enrolls all four since 2024-01-01: clinical psychologist ([42 CFR 410.71](https://www.law.cornell.edu/cfr/text/42/410.71)), clinical social worker ([410.73](https://www.law.cornell.edu/cfr/text/42/410.73)), marriage and family therapist ([410.53](https://www.law.cornell.edu/cfr/text/42/410.53)) and mental health counselor ([410.54](https://www.law.cornell.edu/cfr/text/42/410.54)), which is how an LCPC enrolls. MFTs and MHCs show 2 years or 3,000 hours of supervised experience. Each license sees its own Medicare specialty in the PECOS step. Billing can start up to 30 days before she files ([42 CFR 424.520(d)](https://www.law.cornell.edu/cfr/text/42/424.520)).
+- TRICARE West (TriWest; Illinois has been in the West region since the T-5 contracts): an LCPC must meet TRICARE's certified mental health counselor standards ([32 CFR 199.6](https://www.law.cornell.edu/cfr/text/32/199.6)), so only an LCPC sees that step.
+- LPC, LSW and LAMFT are supervised licenses in Illinois (225 ILCS 107, 20 and 55), so they get no payer list and a plain reason instead.
+- No commercial payer or platform was found to exclude one of the four licenses in Illinois; each eligibility note says what the payer's own page says.
+
+Payers in the catalog: Medicare Part B (J6, National Government Services), Illinois Medicaid (HFS IMPACT) and five HealthChoice Illinois plans, BCBSIL, Aetna, Cigna/Evernorth, UnitedHealthcare/Optum, Humana (Medicare Advantage behavioral health; its site refuses scripts, so most of it is unverified), Ambetter of Illinois, TRICARE West, and the platforms Headway, Alma, Grow Therapy, Rula and SonderMind as an alternative path (they credential her and take a share or a fee).
+
+Still to confirm by hand: most panel statuses, malpractice minimums for BCBSIL, Aetna, Optum, Humana and Ambetter, IMPACT provider-type codes, Medicare's MFT and MHC specialty code numbers, and the TRICARE Policy Manual itself. Aeon never signs, attests or submits any of these applications.

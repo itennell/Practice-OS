@@ -1,0 +1,2328 @@
+[
+  {
+    "id": "medicare",
+    "name": "Medicare Part B (J6, National Government Services)",
+    "kind": "medicare",
+    "states": [
+      "IL"
+    ],
+    "networks": [
+      {
+        "id": "part-b-ffs",
+        "name": "Original Medicare Part B",
+        "panel": {
+          "status": "open",
+          "note": "Enroll or opt out; there is no panel closure. Medicare Advantage plans credential separately.",
+          "source": {
+            "url": "https://www.cms.gov/files/document/marriage-and-family-therapists-and-mental-health-counselors-faq.pdf",
+            "quote": "If I don't enroll, do I need to opt-out to continue to see Medicare beneficiaries?",
+            "checked_on": "2026-10-29",
+            "verified": true
+          }
+        }
+      }
+    ],
+    "eligibility": {
+      "LCSW": {
+        "eligible": true,
+        "note": "Clinical social workers are a Medicare benefit category (42 CFR 410.73): master's or doctorate in social work plus 2 years of supervised clinical work, and your Illinois LCSW. Enroll as Licensed Clinical Social Worker (Medicare specialty 80). You sign the same agreement to consult with the patient's doctor as psychologists do.",
+        "source": {
+          "url": "https://www.law.cornell.edu/cfr/text/42/410.73",
+          "quote": "After obtaining the degree, has performed at least 2 years of supervised clinical social work",
+          "checked_on": "2026-10-29",
+          "verified": true
+        }
+      },
+      "LCPC": {
+        "eligible": true,
+        "note": "Your Illinois LCPC enrolls as a Mental Health Counselor (42 CFR 410.54), covered since 2024-01-01. Needs 2 years or 3,000 hours of post-master's supervised counseling experience (usually met by the LCPC itself) and the full license. The supervised LPC level is not the independent path. Counselor taxonomy for Medicare: 101YM0800X.",
+        "source": {
+          "url": "https://www.cms.gov/files/document/marriage-and-family-therapists-and-mental-health-counselors-faq.pdf",
+          "quote": "Per 42 CFR § 410.54(a)(3), an MHC must be licensed or certified as an MHC, clinical professional counselor, professional counselor",
+          "checked_on": "2026-10-29",
+          "verified": true
+        }
+      },
+      "LMFT": {
+        "eligible": true,
+        "note": "Marriage and family therapists are covered since 2024-01-01 (42 CFR 410.53). Needs 2 years or 3,000 hours of post-master's supervised experience in marriage and family therapy and your full Illinois LMFT. Enroll as Marriage and Family Therapist (NUCC 106H00000X).",
+        "source": {
+          "url": "https://www.law.cornell.edu/cfr/text/42/410.53",
+          "quote": "at least 2 years or 3,000 hours of post master's degree clinical supervised experience in marriage and family therapy",
+          "checked_on": "2026-10-29",
+          "verified": true
+        }
+      },
+      "Psychologist": {
+        "eligible": true,
+        "note": "Clinical psychologists are a Medicare benefit category (42 CFR 410.71): a doctorate in psychology and a license at the independent practice level. Enroll as Clinical Psychologist (Medicare specialty 68). Signing the enrollment form is your agreement to the doctor-consultation rules.",
+        "source": {
+          "url": "https://www.law.cornell.edu/cfr/text/42/410.71",
+          "quote": "at the independent practice level of psychology to furnish diagnostic, assessment, preventive, and therapeutic services directly to individuals",
+          "checked_on": "2026-10-29",
+          "verified": true
+        }
+      }
+    },
+    "requirements": {
+      "caqh": false,
+      "npi": "type1 (type2 too if a PLLC bills as a group)",
+      "ein": "SSN or EIN for a sole practitioner; EIN required for a PLLC group",
+      "malpractice": "No set Medicare minimum found; carry your own coverage",
+      "other": [
+        "Active full Illinois license",
+        "CMS-855I (individual) via PECOS or paper; PLLC group also files CMS-855B and each clinician reassigns benefits",
+        "I&A (Identity and Access) account needed for PECOS",
+        "MFT/MHC: proof of the 2-year/3,000-hour experience may be requested from the licensing board on letterhead",
+        "MFTs and MHCs are limited screening risk",
+        "Opt-out alternative: file affidavit with the MAC and use private contracts; renews every 2 years"
+      ],
+      "source": {
+        "url": "https://www.cms.gov/files/document/marriage-and-family-therapists-and-mental-health-counselors-faq.pdf",
+        "quote": "MFTs and MHCs are limited risk.",
+        "checked_on": "2026-10-29",
+        "verified": true
+      }
+    },
+    "timeline": {
+      "text": "About 15 days for a clean web application, 30 days for a clean paper one (MAC processing); allow more if development letters are needed",
+      "source": {
+        "url": "https://www.cms.gov/files/document/marriage-and-family-therapists-and-mental-health-counselors-faq.pdf",
+        "quote": "all clean web applications will be processed within 15 calendar days following receipt, and all clean paper applications will be processed within 30 calendar days",
+        "checked_on": "2026-10-29",
+        "verified": true
+      }
+    },
+    "fees": {
+      "text": "No application fee for MFTs and MHCs; the same is generally true for individual practitioners (psychologists, CSWs not confirmed this run)",
+      "source": {
+        "url": "https://www.cms.gov/files/document/marriage-and-family-therapists-and-mental-health-counselors-faq.pdf",
+        "quote": "MFTs and MHCs are not required to pay an application fee.",
+        "checked_on": "2026-10-29",
+        "verified": true
+      }
+    },
+    "recredential": {
+      "text": "Revalidate about every 5 years; MAC sends notice 3-4 months before due date",
+      "months": 60,
+      "source": {
+        "url": "https://www.cms.gov/files/document/marriage-and-family-therapists-and-mental-health-counselors-faq.pdf",
+        "quote": "In general, providers and suppliers revalidate every five years",
+        "checked_on": "2026-10-29",
+        "verified": true
+      }
+    },
+    "steps": [
+      {
+        "id": "medicare-npi",
+        "stage": "credentialing",
+        "title": "Confirm your NPI and PECOS login",
+        "how": "Make sure your individual NPI is active and uses the right taxonomy code: LCSW 1041C0700X, LCPC 101YM0800X (Medicare counselor code), LMFT 106H00000X, psychologist 103TC0700X. Then create or sign in to your Identity and Access (I&A) account, which lets you use PECOS.",
+        "portal_url": "https://nppes.cms.hhs.gov/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://www.cms.gov/files/document/marriage-and-family-therapists-and-mental-health-counselors-faq.pdf",
+          "quote": "MFTs and MHCs can enroll electronically using the Provider Enrollment, Chain, and Ownership System (PECOS) or the paper CMS-855I enrollment application.",
+          "checked_on": "2026-10-29",
+          "verified": true
+        }
+      },
+      {
+        "id": "medicare-prep",
+        "stage": "credentialing",
+        "title": "Gather your enrollment details",
+        "how": "Have ready your Illinois license number, degree and school, practice address, tax ID and banking details for payment.",
+        "portal_url": "https://pecos.cms.hhs.gov/",
+        "aeon_can": "cms855i",
+        "submits": false,
+        "source": {
+          "url": "https://www.cms.gov/files/document/marriage-and-family-therapists-and-mental-health-counselors-faq.pdf",
+          "quote": "MFTs and MHCs can enroll electronically using the Provider Enrollment, Chain, and Ownership System (PECOS) or the paper CMS-855I enrollment application.",
+          "checked_on": "2026-10-29",
+          "verified": true
+        },
+        "how_by_license": {
+          "LCSW": "Have ready your Illinois LCSW number, your MSW or doctorate and school, practice address, tax ID and banking details for payment.",
+          "Psychologist": "Have ready your Illinois clinical psychologist license number, your doctorate in psychology and school, practice address, tax ID and banking details for payment.",
+          "LMFT": "Have ready your Illinois LMFT number, degree and school, practice address, tax ID and banking details. Also line up proof of your 2 years or 3,000 hours of supervised experience (next step).",
+          "LCPC": "Have ready your Illinois LCPC number, degree and school, practice address, tax ID and banking details. Also line up proof of your 2 years or 3,000 hours of supervised counseling experience (next step)."
+        }
+      },
+      {
+        "id": "medicare-experience",
+        "stage": "credentialing",
+        "title": "Show your 2 years of supervised experience",
+        "how": "If Illinois already required that experience for your license, do nothing: the Medicare contractor checks it. If not, send a signed letter on letterhead (not email) from a past employer or supervisor, or from your licensing body, confirming 2 years or 3,000 hours.",
+        "portal_url": "https://pecos.cms.hhs.gov/",
+        "aeon_can": "none",
+        "submits": false,
+        "licenses": [
+          "LCPC",
+          "LMFT"
+        ],
+        "source": {
+          "url": "https://www.cms.gov/files/document/marriage-and-family-therapists-and-mental-health-counselors-faq.pdf",
+          "quote": "If the clinical experience is not part of obtaining a license, the practitioner will need to submit documentation with their application",
+          "checked_on": "2026-10-29",
+          "verified": true
+        }
+      },
+      {
+        "id": "medicare-submit",
+        "stage": "credentialing",
+        "title": "Submit your Medicare enrollment",
+        "how": "Log in to PECOS and answer the questions; it builds the CMS-855I for you. Only you may sign it. If you have a PLLC billing as a group, the group also files a CMS-855B and you reassign your benefits to it.",
+        "portal_url": "https://pecos.cms.hhs.gov/",
+        "aeon_can": "cms855i",
+        "submits": true,
+        "source": {
+          "url": "https://www.cms.gov/files/document/marriage-and-family-therapists-and-mental-health-counselors-faq.pdf",
+          "quote": "MFTs and MHCs can enroll electronically using the Provider Enrollment, Chain, and Ownership System (PECOS) or the paper CMS-855I enrollment application.",
+          "checked_on": "2026-10-29",
+          "verified": true
+        },
+        "how_by_license": {
+          "Psychologist": "Log in to PECOS and answer the questions; it builds the CMS-855I for you. Choose the specialty Clinical Psychologist. Only you may sign it, and your signature is your agreement to the doctor-consultation rules. With a PLLC billing as a group, the group also files a CMS-855B and you reassign your benefits to it.",
+          "LCSW": "Log in to PECOS and answer the questions; it builds the CMS-855I for you. Choose the specialty Clinical Social Worker. Only you may sign it. With a PLLC billing as a group, the group also files a CMS-855B and you reassign your benefits to it.",
+          "LMFT": "Log in to PECOS and answer the questions; it builds the CMS-855I for you. Choose the specialty Marriage and Family Therapist. If you use the paper form instead, pick Undefined Non-Physician Practitioner in section 2H and write MFT. Only you may sign it. A PLLC billing as a group also files a CMS-855B.",
+          "LCPC": "Log in to PECOS and answer the questions; it builds the CMS-855I for you. Choose the specialty Mental Health Counselor (you enroll as MHC, not LCPC). On the paper form, pick Undefined Non-Physician Practitioner in section 2H and write MHC. Only you may sign it. A PLLC billing as a group also files a CMS-855B."
+        }
+      },
+      {
+        "id": "medicare-wait",
+        "stage": "credentialing",
+        "title": "Answer any request from the MAC",
+        "how": "National Government Services (the Illinois Medicare contractor) may email or mail you for missing items. You have 30 days to answer.",
+        "portal_url": null,
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://www.cms.gov/files/document/marriage-and-family-therapists-and-mental-health-counselors-faq.pdf",
+          "quote": "The provider will have 30 calendar days to respond.",
+          "checked_on": "2026-10-29",
+          "verified": true
+        }
+      },
+      {
+        "id": "medicare-contract",
+        "stage": "contracting",
+        "title": "Sign and return the contract",
+        "how": "When the payer sends the participation agreement, read it, sign it and return it the way they say. Keep a copy.",
+        "portal_url": null,
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://www.cms.gov/files/document/marriage-and-family-therapists-and-mental-health-counselors-faq.pdf",
+          "quote": "Not applicable: Medicare has no contract; you receive an approval letter and a PTAN instead",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "medicare-fees",
+        "stage": "contracting",
+        "title": "Check the fee schedule",
+        "how": "Look up the rates for the codes you bill (for example 90791, 90834, 90837) and make sure they work for your practice before you sign.",
+        "portal_url": null,
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://www.cms.gov/files/document/marriage-and-family-therapists-and-mental-health-counselors-faq.pdf",
+          "quote": "Not applicable: Medicare has no contract; you receive an approval letter and a PTAN instead",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "medicare-effective",
+        "stage": "contracting",
+        "title": "Note your effective date",
+        "how": "Your Medicare billing start is the day you filed an application that was later approved (or the day you began at a new location, if later). Write it down from your approval letter.",
+        "portal_url": null,
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://www.law.cornell.edu/cfr/text/42/424.520",
+          "quote": "The date of filing of a Medicare enrollment application that was subsequently approved by a Medicare contractor",
+          "checked_on": "2026-10-29",
+          "verified": true
+        }
+      },
+      {
+        "id": "medicare-retro",
+        "stage": "contracting",
+        "title": "Ask about billing back to the effective date",
+        "how": "Medicare lets you bill for visits up to 30 days before your effective date if you could not enroll first and met every requirement. Ask your contractor how to send those claims.",
+        "portal_url": null,
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://www.law.cornell.edu/cfr/text/42/424.521",
+          "quote": "Thirty days prior to their effective date if circumstances precluded enrollment in advance of providing services to Medicare",
+          "checked_on": "2026-10-29",
+          "verified": true
+        }
+      }
+    ],
+    "notes": [
+      "Illinois Part B MAC is J6, National Government Services (verified on cms.gov). The old WPS assumption is outdated: WPS handed Part B to NGS on 2021-01-01.",
+      "Contracting steps for Medicare are really: accept assignment or not (participating vs non-participating), review the Medicare Physician Fee Schedule, note effective date. No separate contract.",
+      "Medicare pays MFT/MHC at 75% of the clinical psychologist rate (secondary sources, unverified).",
+      "CMS-855R reassignment is possibly folded into 855I/PECOS (commercial source only); confirm.",
+      "NGS site now sits under a Wellpoint Federal address; enrollment details there were not readable this run.",
+      "Retroactive billing: up to 30 days before the effective date if circumstances precluded enrolling first (42 CFR 424.521(a)(1)(i), read on law.cornell.edu). Effective date is the filing date of an application later approved (424.520(d)).",
+      "Paper CMS-855I has no MFT/MHC line: pick Undefined Non-Physician Practitioner in section 2H and write MFT or MHC (CMS MFT/MHC FAQ, read). PECOS lists the specialties.",
+      "Illinois LCPC qualifies as MHC (CMS FAQ lists clinical professional counselor); it must meet the 2 years/3,000 hours rule. CMS taxonomy: MFT 106H00000X, MHC 101YM0800X (FAQ, read). Specialty codes: psychologist 68, licensed clinical social worker 80 (CMS crosswalk, read); MFT/MHC codes not found on a CMS page."
+    ]
+  },
+  {
+    "id": "il-medicaid",
+    "name": "Illinois Medicaid (HFS IMPACT)",
+    "kind": "medicaid",
+    "states": [
+      "IL"
+    ],
+    "networks": [
+      {
+        "id": "ffs",
+        "name": "Fee-for-service (IMPACT enrollment)",
+        "panel": {
+          "status": "unknown",
+          "note": "IMPACT enrollment is required before MCO credentialing. Open/closed status not published.",
+          "source": {
+            "url": "https://hfs.illinois.gov/impact/revalidationfaqs.html",
+            "quote": "Not confirmed from an official page",
+            "checked_on": "2026-10-29",
+            "verified": false
+          }
+        }
+      }
+    ],
+    "eligibility": {
+      "LCSW": {
+        "eligible": true,
+        "note": "Enroll under Behavioral Health Services as a Licensed Clinical Social Worker (MCO guides list type 086; confirm in IMPACT). Provisional licenses are not eligible.",
+        "source": {
+          "url": "https://hfs.illinois.gov/medicalproviders/notices/notice.prn230824a.html",
+          "quote": "appropriate Provider Type and Specialty corresponding to their licensure",
+          "checked_on": "2026-10-29",
+          "verified": true
+        }
+      },
+      "LCPC": {
+        "eligible": true,
+        "note": "Enroll under Behavioral Health Services as an LCPC (HFS notice names LCPCs among licensed practitioners who enroll by their licensure). MCO guides list type 088; confirm in IMPACT. The supervised LPC is not reimbursed on its own.",
+        "source": {
+          "url": "https://hfs.illinois.gov/medicalproviders/notices/notice.prn230824a.html",
+          "quote": "appropriate Provider Type and Specialty corresponding to their licensure",
+          "checked_on": "2026-10-29",
+          "verified": true
+        }
+      },
+      "LMFT": {
+        "eligible": true,
+        "note": "Enroll under Behavioral Health Services as an LMFT (HFS notice names LMFTs; MCO guides list type 088; confirm in IMPACT).",
+        "source": {
+          "url": "https://hfs.illinois.gov/medicalproviders/notices/notice.prn230824a.html",
+          "quote": "appropriate Provider Type and Specialty corresponding to their licensure",
+          "checked_on": "2026-10-29",
+          "verified": true
+        }
+      },
+      "Psychologist": {
+        "eligible": true,
+        "note": "Enroll under Psychologist, specialty Licensed Clinical Psychologist (MCO guides list type 087). Psychotherapy needs this specialty; the general 103T00000X taxonomy is denied.",
+        "source": {
+          "url": "https://hfs.illinois.gov/medicalproviders/notices/notice.prn230824a.html",
+          "quote": "appropriate Provider Type and Specialty corresponding to their licensure",
+          "checked_on": "2026-10-29",
+          "verified": true
+        }
+      }
+    },
+    "requirements": {
+      "caqh": null,
+      "npi": "type1",
+      "ein": "SSN or EIN; certified W-9 through the Illinois Comptroller is needed to enroll as an individual/sole proprietor (secondary source)",
+      "malpractice": "Not confirmed",
+      "other": [
+        "Full Illinois license; provisional license not eligible (HFS notices)",
+        "Enrollment is conditional for the first year unless HFS says otherwise (practitioner handbook, via search)",
+        "Start in IMPACT before applying to HealthChoice MCOs"
+      ],
+      "source": {
+        "url": "https://hfs.illinois.gov/medicalproviders/notices/notice.prn230824a.html",
+        "quote": "Not confirmed from an official page",
+        "checked_on": "2026-10-29",
+        "verified": false
+      }
+    },
+    "timeline": {
+      "text": "Not published; confirm with the IMPACT help line",
+      "source": {
+        "url": "https://hfs.illinois.gov/impact/revalidationfaqs.html",
+        "quote": "Not confirmed from an official page",
+        "checked_on": "2026-10-29",
+        "verified": false
+      }
+    },
+    "fees": {
+      "text": "Not confirmed; the federal application fee applies to institutional providers, not individual practitioners (general knowledge, unverified)",
+      "source": {
+        "url": "https://hfs.illinois.gov/impact/revalidationfaqs.html",
+        "quote": "Not confirmed from an official page",
+        "checked_on": "2026-10-29",
+        "verified": false
+      }
+    },
+    "recredential": {
+      "text": "Revalidate at least every 5 years; HFS notices at 90 and 30 days; missing the cycle means disenrollment",
+      "months": 60,
+      "source": {
+        "url": "https://hfs.illinois.gov/impact/revalidationfaqs.html",
+        "quote": "Not fetched; from a search summary of this HFS page and 42 CFR 455.414",
+        "checked_on": "2026-10-29",
+        "verified": false
+      }
+    },
+    "steps": [
+      {
+        "id": "ilmed-w9",
+        "stage": "credentialing",
+        "title": "Get your IL Comptroller W-9 ready",
+        "how": "Individual enrollment asks for a certified W-9 through the Illinois Comptroller's vendor system. Have your tax ID and bank details to hand.",
+        "portal_url": "https://impact.illinois.gov/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/medicalproviders/notices/notice.prn230824a.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "ilmed-apply",
+        "stage": "credentialing",
+        "title": "Start your IMPACT application",
+        "how": "Go to IMPACT, make an account, choose a new individual enrollment, pick the provider type and specialty that match your license, and upload your license. Only you submit it.",
+        "portal_url": "https://impact.illinois.gov/",
+        "aeon_can": "none",
+        "submits": true,
+        "source": {
+          "url": "https://hfs.illinois.gov/medicalproviders/notices/notice.prn230824a.html",
+          "quote": "appropriate Provider Type and Specialty corresponding to their licensure",
+          "checked_on": "2026-10-29",
+          "verified": true
+        }
+      },
+      {
+        "id": "ilmed-help",
+        "stage": "credentialing",
+        "title": "Call IMPACT help if stuck",
+        "how": "The IMPACT help line is 1-877-782-5565 and the email is IMPACT.Help@illinois.gov.",
+        "portal_url": "https://impact.illinois.gov/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/impact/revalidationfaqs.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "ilmed-contract",
+        "stage": "contracting",
+        "title": "Sign and return the contract",
+        "how": "When the payer sends the participation agreement, read it, sign it and return it the way they say. Keep a copy.",
+        "portal_url": "https://impact.illinois.gov/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/impact/revalidationfaqs.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "ilmed-fees",
+        "stage": "contracting",
+        "title": "Check the fee schedule",
+        "how": "Look up the rates for the codes you bill (for example 90791, 90834, 90837) and make sure they work for your practice before you sign.",
+        "portal_url": "https://impact.illinois.gov/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/impact/revalidationfaqs.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "ilmed-effective",
+        "stage": "contracting",
+        "title": "Note your effective date",
+        "how": "Write down the date the payer says you are in network. Claims for earlier dates may be denied.",
+        "portal_url": "https://impact.illinois.gov/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/impact/revalidationfaqs.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "ilmed-retro",
+        "stage": "contracting",
+        "title": "Ask about billing back to the effective date",
+        "how": "Ask the payer in writing whether you may bill for visits from your effective date forward, and how to send those claims.",
+        "portal_url": "https://impact.illinois.gov/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/impact/revalidationfaqs.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      }
+    ],
+    "notes": [
+      "Provider-type numbers (086/087/088) come from MCO billing guides (Meridian, CountyCare), not an IMPACT table; confirm the dropdown in IMPACT.",
+      "HFS notice table was garbled; it lists Behavioral Health Services for LCPC/LMFT/LCSW and Psychologist > Licensed Clinical Psychologist for LCP.",
+      "Fee-for-service Medicaid has no separate contract; the MCO steps are listed per plan.",
+      "Most Illinois Medicaid members are in a HealthChoice MCO, so the MCO entries matter more than FFS."
+    ]
+  },
+  {
+    "id": "aetna-better-health-il",
+    "name": "Aetna Better Health of Illinois",
+    "kind": "mco",
+    "states": [
+      "IL"
+    ],
+    "networks": [
+      {
+        "id": "aetna-better-health-il-medicaid",
+        "name": "HealthChoice Illinois (Medicaid)",
+        "panel": {
+          "status": "unknown",
+          "note": "Panel openness not published. Plan must be Medicaid-enrolled first.",
+          "source": {
+            "url": "https://hfs.illinois.gov/content/dam/soi/en/web/hfs/medicalproviders/cc/documents/managedcaremap.pdf",
+            "quote": "These health plans serve all counties in the state, including Cook County:",
+            "checked_on": "2026-10-29",
+            "verified": true
+          }
+        }
+      }
+    ],
+    "eligibility": {
+      "LCSW": {
+        "eligible": true,
+        "note": "Must first be enrolled in IL Medicaid (IMPACT) under the matching provider type. Plan credentialing criteria not read.",
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      "LCPC": {
+        "eligible": true,
+        "note": "Must first be enrolled in IL Medicaid (IMPACT) under the matching provider type. Plan credentialing criteria not read.",
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      "LMFT": {
+        "eligible": true,
+        "note": "Must first be enrolled in IL Medicaid (IMPACT) under the matching provider type. Plan credentialing criteria not read.",
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      "Psychologist": {
+        "eligible": true,
+        "note": "Must first be enrolled in IL Medicaid (IMPACT) under the matching provider type. Plan credentialing criteria not read.",
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      }
+    },
+    "requirements": {
+      "caqh": true,
+      "npi": "type1",
+      "ein": "SSN or EIN",
+      "malpractice": "Not confirmed (commonly $1M/$3M)",
+      "other": [
+        "Active IMPACT enrollment ID",
+        "Full Illinois license",
+        "CAQH ProView profile is commonly used; confirm with the plan"
+      ],
+      "source": {
+        "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+        "quote": "Not confirmed from an official page",
+        "checked_on": "2026-10-29",
+        "verified": false
+      }
+    },
+    "timeline": {
+      "text": "Not published; plan-specific",
+      "source": {
+        "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+        "quote": "Not confirmed from an official page",
+        "checked_on": "2026-10-29",
+        "verified": false
+      }
+    },
+    "fees": {
+      "text": "Not published; no fee expected",
+      "source": {
+        "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+        "quote": "Not confirmed from an official page",
+        "checked_on": "2026-10-29",
+        "verified": false
+      }
+    },
+    "recredential": {
+      "text": "Commonly every 36 months (NCQA); confirm with plan",
+      "months": 36,
+      "source": {
+        "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+        "quote": "Not confirmed from an official page",
+        "checked_on": "2026-10-29",
+        "verified": false
+      }
+    },
+    "steps": [
+      {
+        "id": "aetna-better-health-il-impact",
+        "stage": "credentialing",
+        "title": "Finish IMPACT enrollment first",
+        "how": "The plan needs your Illinois Medicaid ID before it can credential you. If you are not in IMPACT yet, do that first.",
+        "portal_url": "https://impact.illinois.gov/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "aetna-better-health-il-caqh",
+        "stage": "credentialing",
+        "title": "Update CAQH and authorize the plan",
+        "how": "Make sure your CAQH profile is complete and re-attested, then give this plan access to it.",
+        "portal_url": "https://proview.caqh.org/",
+        "aeon_can": "caqh_prep",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "aetna-better-health-il-apply",
+        "stage": "credentialing",
+        "title": "Send the plan your join request",
+        "how": "Open the plan's provider page, find the join or credentialing request, and submit it. Only you submit.",
+        "portal_url": "https://www.aetnabetterhealth.com/illinois-medicaid/providers/index.html",
+        "aeon_can": "none",
+        "submits": true,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "aetna-better-health-il-contract",
+        "stage": "contracting",
+        "title": "Sign and return the contract",
+        "how": "When the payer sends the participation agreement, read it, sign it and return it the way they say. Keep a copy.",
+        "portal_url": "https://www.aetnabetterhealth.com/illinois-medicaid/providers/index.html",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "aetna-better-health-il-fees",
+        "stage": "contracting",
+        "title": "Check the fee schedule",
+        "how": "Look up the rates for the codes you bill (for example 90791, 90834, 90837) and make sure they work for your practice before you sign.",
+        "portal_url": "https://www.aetnabetterhealth.com/illinois-medicaid/providers/index.html",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "aetna-better-health-il-effective",
+        "stage": "contracting",
+        "title": "Note your effective date",
+        "how": "Write down the date the payer says you are in network. Claims for earlier dates may be denied.",
+        "portal_url": "https://www.aetnabetterhealth.com/illinois-medicaid/providers/index.html",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "aetna-better-health-il-retro",
+        "stage": "contracting",
+        "title": "Ask about billing back to the effective date",
+        "how": "Ask the payer in writing whether you may bill for visits from your effective date forward, and how to send those claims.",
+        "portal_url": "https://www.aetnabetterhealth.com/illinois-medicaid/providers/index.html",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      }
+    ],
+    "notes": [
+      "Plan list from HFS Managed Care Program Map dated 2026-01-01 (verified). Plan-specific credentialing details not read; step text is generic."
+    ]
+  },
+  {
+    "id": "bcchp-il",
+    "name": "Blue Cross Community Health Plans (Illinois)",
+    "kind": "mco",
+    "states": [
+      "IL"
+    ],
+    "networks": [
+      {
+        "id": "bcchp-il-medicaid",
+        "name": "HealthChoice Illinois (Medicaid)",
+        "panel": {
+          "status": "unknown",
+          "note": "Panel openness not published. Plan must be Medicaid-enrolled first.",
+          "source": {
+            "url": "https://hfs.illinois.gov/content/dam/soi/en/web/hfs/medicalproviders/cc/documents/managedcaremap.pdf",
+            "quote": "These health plans serve all counties in the state, including Cook County:",
+            "checked_on": "2026-10-29",
+            "verified": true
+          }
+        }
+      }
+    ],
+    "eligibility": {
+      "LCSW": {
+        "eligible": true,
+        "note": "Must first be enrolled in IL Medicaid (IMPACT) under the matching provider type. Plan credentialing criteria not read.",
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      "LCPC": {
+        "eligible": true,
+        "note": "Must first be enrolled in IL Medicaid (IMPACT) under the matching provider type. Plan credentialing criteria not read.",
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      "LMFT": {
+        "eligible": true,
+        "note": "Must first be enrolled in IL Medicaid (IMPACT) under the matching provider type. Plan credentialing criteria not read.",
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      "Psychologist": {
+        "eligible": true,
+        "note": "Must first be enrolled in IL Medicaid (IMPACT) under the matching provider type. Plan credentialing criteria not read.",
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      }
+    },
+    "requirements": {
+      "caqh": true,
+      "npi": "type1",
+      "ein": "SSN or EIN",
+      "malpractice": "Not confirmed (commonly $1M/$3M)",
+      "other": [
+        "Active IMPACT enrollment ID",
+        "Full Illinois license",
+        "CAQH ProView profile is commonly used; confirm with the plan"
+      ],
+      "source": {
+        "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+        "quote": "Not confirmed from an official page",
+        "checked_on": "2026-10-29",
+        "verified": false
+      }
+    },
+    "timeline": {
+      "text": "Not published; plan-specific",
+      "source": {
+        "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+        "quote": "Not confirmed from an official page",
+        "checked_on": "2026-10-29",
+        "verified": false
+      }
+    },
+    "fees": {
+      "text": "Not published; no fee expected",
+      "source": {
+        "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+        "quote": "Not confirmed from an official page",
+        "checked_on": "2026-10-29",
+        "verified": false
+      }
+    },
+    "recredential": {
+      "text": "Commonly every 36 months (NCQA); confirm with plan",
+      "months": 36,
+      "source": {
+        "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+        "quote": "Not confirmed from an official page",
+        "checked_on": "2026-10-29",
+        "verified": false
+      }
+    },
+    "steps": [
+      {
+        "id": "bcchp-il-impact",
+        "stage": "credentialing",
+        "title": "Finish IMPACT enrollment first",
+        "how": "The plan needs your Illinois Medicaid ID before it can credential you. If you are not in IMPACT yet, do that first.",
+        "portal_url": "https://impact.illinois.gov/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "bcchp-il-caqh",
+        "stage": "credentialing",
+        "title": "Update CAQH and authorize the plan",
+        "how": "Make sure your CAQH profile is complete and re-attested, then give this plan access to it.",
+        "portal_url": "https://proview.caqh.org/",
+        "aeon_can": "caqh_prep",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "bcchp-il-apply",
+        "stage": "credentialing",
+        "title": "Send the plan your join request",
+        "how": "Open the plan's provider page, find the join or credentialing request, and submit it. Only you submit.",
+        "portal_url": "https://www.bcbsil.com/provider/",
+        "aeon_can": "none",
+        "submits": true,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "bcchp-il-contract",
+        "stage": "contracting",
+        "title": "Sign and return the contract",
+        "how": "When the payer sends the participation agreement, read it, sign it and return it the way they say. Keep a copy.",
+        "portal_url": "https://www.bcbsil.com/provider/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "bcchp-il-fees",
+        "stage": "contracting",
+        "title": "Check the fee schedule",
+        "how": "Look up the rates for the codes you bill (for example 90791, 90834, 90837) and make sure they work for your practice before you sign.",
+        "portal_url": "https://www.bcbsil.com/provider/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "bcchp-il-effective",
+        "stage": "contracting",
+        "title": "Note your effective date",
+        "how": "Write down the date the payer says you are in network. Claims for earlier dates may be denied.",
+        "portal_url": "https://www.bcbsil.com/provider/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "bcchp-il-retro",
+        "stage": "contracting",
+        "title": "Ask about billing back to the effective date",
+        "how": "Ask the payer in writing whether you may bill for visits from your effective date forward, and how to send those claims.",
+        "portal_url": "https://www.bcbsil.com/provider/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      }
+    ],
+    "notes": [
+      "Plan list from HFS Managed Care Program Map dated 2026-01-01 (verified). Plan-specific credentialing details not read; step text is generic."
+    ]
+  },
+  {
+    "id": "countycare",
+    "name": "CountyCare Health Plan (Cook County only)",
+    "kind": "mco",
+    "states": [
+      "IL"
+    ],
+    "networks": [
+      {
+        "id": "countycare-medicaid",
+        "name": "HealthChoice Illinois (Medicaid)",
+        "panel": {
+          "status": "unknown",
+          "note": "Panel openness not published. Plan must be Medicaid-enrolled first.",
+          "source": {
+            "url": "https://hfs.illinois.gov/content/dam/soi/en/web/hfs/medicalproviders/cc/documents/managedcaremap.pdf",
+            "quote": "This plan only serves Cook County:",
+            "checked_on": "2026-10-29",
+            "verified": true
+          }
+        }
+      }
+    ],
+    "eligibility": {
+      "LCSW": {
+        "eligible": true,
+        "note": "Must first be enrolled in IL Medicaid (IMPACT) under the matching provider type. Plan credentialing criteria not read.",
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      "LCPC": {
+        "eligible": true,
+        "note": "Must first be enrolled in IL Medicaid (IMPACT) under the matching provider type. Plan credentialing criteria not read.",
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      "LMFT": {
+        "eligible": true,
+        "note": "Must first be enrolled in IL Medicaid (IMPACT) under the matching provider type. Plan credentialing criteria not read.",
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      "Psychologist": {
+        "eligible": true,
+        "note": "Must first be enrolled in IL Medicaid (IMPACT) under the matching provider type. Plan credentialing criteria not read.",
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      }
+    },
+    "requirements": {
+      "caqh": true,
+      "npi": "type1",
+      "ein": "SSN or EIN",
+      "malpractice": "Not confirmed (commonly $1M/$3M)",
+      "other": [
+        "Active IMPACT enrollment ID",
+        "Full Illinois license",
+        "CAQH ProView profile is commonly used; confirm with the plan"
+      ],
+      "source": {
+        "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+        "quote": "Not confirmed from an official page",
+        "checked_on": "2026-10-29",
+        "verified": false
+      }
+    },
+    "timeline": {
+      "text": "Not published; plan-specific",
+      "source": {
+        "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+        "quote": "Not confirmed from an official page",
+        "checked_on": "2026-10-29",
+        "verified": false
+      }
+    },
+    "fees": {
+      "text": "Not published; no fee expected",
+      "source": {
+        "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+        "quote": "Not confirmed from an official page",
+        "checked_on": "2026-10-29",
+        "verified": false
+      }
+    },
+    "recredential": {
+      "text": "Commonly every 36 months (NCQA); confirm with plan",
+      "months": 36,
+      "source": {
+        "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+        "quote": "Not confirmed from an official page",
+        "checked_on": "2026-10-29",
+        "verified": false
+      }
+    },
+    "steps": [
+      {
+        "id": "countycare-impact",
+        "stage": "credentialing",
+        "title": "Finish IMPACT enrollment first",
+        "how": "The plan needs your Illinois Medicaid ID before it can credential you. If you are not in IMPACT yet, do that first.",
+        "portal_url": "https://impact.illinois.gov/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "countycare-caqh",
+        "stage": "credentialing",
+        "title": "Update CAQH and authorize the plan",
+        "how": "Make sure your CAQH profile is complete and re-attested, then give this plan access to it.",
+        "portal_url": "https://proview.caqh.org/",
+        "aeon_can": "caqh_prep",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "countycare-apply",
+        "stage": "credentialing",
+        "title": "Send the plan your join request",
+        "how": "Open the plan's provider page, find the join or credentialing request, and submit it. Only you submit.",
+        "portal_url": "https://www.countycare.com/providers",
+        "aeon_can": "none",
+        "submits": true,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "countycare-contract",
+        "stage": "contracting",
+        "title": "Sign and return the contract",
+        "how": "When the payer sends the participation agreement, read it, sign it and return it the way they say. Keep a copy.",
+        "portal_url": "https://www.countycare.com/providers",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "countycare-fees",
+        "stage": "contracting",
+        "title": "Check the fee schedule",
+        "how": "Look up the rates for the codes you bill (for example 90791, 90834, 90837) and make sure they work for your practice before you sign.",
+        "portal_url": "https://www.countycare.com/providers",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "countycare-effective",
+        "stage": "contracting",
+        "title": "Note your effective date",
+        "how": "Write down the date the payer says you are in network. Claims for earlier dates may be denied.",
+        "portal_url": "https://www.countycare.com/providers",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "countycare-retro",
+        "stage": "contracting",
+        "title": "Ask about billing back to the effective date",
+        "how": "Ask the payer in writing whether you may bill for visits from your effective date forward, and how to send those claims.",
+        "portal_url": "https://www.countycare.com/providers",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      }
+    ],
+    "notes": [
+      "Plan list from HFS Managed Care Program Map dated 2026-01-01 (verified). Plan-specific credentialing details not read; step text is generic.",
+      "Cook County only; members live in Cook County."
+    ]
+  },
+  {
+    "id": "meridian-il",
+    "name": "Meridian (Illinois Medicaid)",
+    "kind": "mco",
+    "states": [
+      "IL"
+    ],
+    "networks": [
+      {
+        "id": "meridian-il-medicaid",
+        "name": "HealthChoice Illinois (Medicaid)",
+        "panel": {
+          "status": "unknown",
+          "note": "Panel openness not published. Plan must be Medicaid-enrolled first.",
+          "source": {
+            "url": "https://hfs.illinois.gov/content/dam/soi/en/web/hfs/medicalproviders/cc/documents/managedcaremap.pdf",
+            "quote": "These health plans serve all counties in the state, including Cook County:",
+            "checked_on": "2026-10-29",
+            "verified": true
+          }
+        }
+      }
+    ],
+    "eligibility": {
+      "LCSW": {
+        "eligible": true,
+        "note": "Must first be enrolled in IL Medicaid (IMPACT) under the matching provider type. Plan credentialing criteria not read.",
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      "LCPC": {
+        "eligible": true,
+        "note": "Must first be enrolled in IL Medicaid (IMPACT) under the matching provider type. Plan credentialing criteria not read.",
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      "LMFT": {
+        "eligible": true,
+        "note": "Must first be enrolled in IL Medicaid (IMPACT) under the matching provider type. Plan credentialing criteria not read.",
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      "Psychologist": {
+        "eligible": true,
+        "note": "Must first be enrolled in IL Medicaid (IMPACT) under the matching provider type. Plan credentialing criteria not read.",
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      }
+    },
+    "requirements": {
+      "caqh": true,
+      "npi": "type1",
+      "ein": "SSN or EIN",
+      "malpractice": "Not confirmed (commonly $1M/$3M)",
+      "other": [
+        "Active IMPACT enrollment ID",
+        "Full Illinois license",
+        "CAQH ProView profile is commonly used; confirm with the plan"
+      ],
+      "source": {
+        "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+        "quote": "Not confirmed from an official page",
+        "checked_on": "2026-10-29",
+        "verified": false
+      }
+    },
+    "timeline": {
+      "text": "Not published; plan-specific",
+      "source": {
+        "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+        "quote": "Not confirmed from an official page",
+        "checked_on": "2026-10-29",
+        "verified": false
+      }
+    },
+    "fees": {
+      "text": "Not published; no fee expected",
+      "source": {
+        "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+        "quote": "Not confirmed from an official page",
+        "checked_on": "2026-10-29",
+        "verified": false
+      }
+    },
+    "recredential": {
+      "text": "Commonly every 36 months (NCQA); confirm with plan",
+      "months": 36,
+      "source": {
+        "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+        "quote": "Not confirmed from an official page",
+        "checked_on": "2026-10-29",
+        "verified": false
+      }
+    },
+    "steps": [
+      {
+        "id": "meridian-il-impact",
+        "stage": "credentialing",
+        "title": "Finish IMPACT enrollment first",
+        "how": "The plan needs your Illinois Medicaid ID before it can credential you. If you are not in IMPACT yet, do that first.",
+        "portal_url": "https://impact.illinois.gov/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "meridian-il-caqh",
+        "stage": "credentialing",
+        "title": "Update CAQH and authorize the plan",
+        "how": "Make sure your CAQH profile is complete and re-attested, then give this plan access to it.",
+        "portal_url": "https://proview.caqh.org/",
+        "aeon_can": "caqh_prep",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "meridian-il-apply",
+        "stage": "credentialing",
+        "title": "Send the plan your join request",
+        "how": "Open the plan's provider page, find the join or credentialing request, and submit it. Only you submit.",
+        "portal_url": null,
+        "aeon_can": "none",
+        "submits": true,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "meridian-il-contract",
+        "stage": "contracting",
+        "title": "Sign and return the contract",
+        "how": "When the payer sends the participation agreement, read it, sign it and return it the way they say. Keep a copy.",
+        "portal_url": null,
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "meridian-il-fees",
+        "stage": "contracting",
+        "title": "Check the fee schedule",
+        "how": "Look up the rates for the codes you bill (for example 90791, 90834, 90837) and make sure they work for your practice before you sign.",
+        "portal_url": null,
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "meridian-il-effective",
+        "stage": "contracting",
+        "title": "Note your effective date",
+        "how": "Write down the date the payer says you are in network. Claims for earlier dates may be denied.",
+        "portal_url": null,
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "meridian-il-retro",
+        "stage": "contracting",
+        "title": "Ask about billing back to the effective date",
+        "how": "Ask the payer in writing whether you may bill for visits from your effective date forward, and how to send those claims.",
+        "portal_url": null,
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      }
+    ],
+    "notes": [
+      "Plan list from HFS Managed Care Program Map dated 2026-01-01 (verified). Plan-specific credentialing details not read; step text is generic.",
+      "No portal link on HFS provider contacts page for Meridian; look up the Meridian Illinois provider site."
+    ]
+  },
+  {
+    "id": "molina-il",
+    "name": "Molina Healthcare of Illinois",
+    "kind": "mco",
+    "states": [
+      "IL"
+    ],
+    "networks": [
+      {
+        "id": "molina-il-medicaid",
+        "name": "HealthChoice Illinois (Medicaid)",
+        "panel": {
+          "status": "unknown",
+          "note": "Panel openness not published. Plan must be Medicaid-enrolled first.",
+          "source": {
+            "url": "https://hfs.illinois.gov/content/dam/soi/en/web/hfs/medicalproviders/cc/documents/managedcaremap.pdf",
+            "quote": "These health plans serve all counties in the state, including Cook County:",
+            "checked_on": "2026-10-29",
+            "verified": true
+          }
+        }
+      }
+    ],
+    "eligibility": {
+      "LCSW": {
+        "eligible": true,
+        "note": "Must first be enrolled in IL Medicaid (IMPACT) under the matching provider type. Plan credentialing criteria not read.",
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      "LCPC": {
+        "eligible": true,
+        "note": "Must first be enrolled in IL Medicaid (IMPACT) under the matching provider type. Plan credentialing criteria not read.",
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      "LMFT": {
+        "eligible": true,
+        "note": "Must first be enrolled in IL Medicaid (IMPACT) under the matching provider type. Plan credentialing criteria not read.",
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      "Psychologist": {
+        "eligible": true,
+        "note": "Must first be enrolled in IL Medicaid (IMPACT) under the matching provider type. Plan credentialing criteria not read.",
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      }
+    },
+    "requirements": {
+      "caqh": true,
+      "npi": "type1",
+      "ein": "SSN or EIN",
+      "malpractice": "Not confirmed (commonly $1M/$3M)",
+      "other": [
+        "Active IMPACT enrollment ID",
+        "Full Illinois license",
+        "CAQH ProView profile is commonly used; confirm with the plan"
+      ],
+      "source": {
+        "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+        "quote": "Not confirmed from an official page",
+        "checked_on": "2026-10-29",
+        "verified": false
+      }
+    },
+    "timeline": {
+      "text": "Not published; plan-specific",
+      "source": {
+        "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+        "quote": "Not confirmed from an official page",
+        "checked_on": "2026-10-29",
+        "verified": false
+      }
+    },
+    "fees": {
+      "text": "Not published; no fee expected",
+      "source": {
+        "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+        "quote": "Not confirmed from an official page",
+        "checked_on": "2026-10-29",
+        "verified": false
+      }
+    },
+    "recredential": {
+      "text": "Commonly every 36 months (NCQA); confirm with plan",
+      "months": 36,
+      "source": {
+        "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+        "quote": "Not confirmed from an official page",
+        "checked_on": "2026-10-29",
+        "verified": false
+      }
+    },
+    "steps": [
+      {
+        "id": "molina-il-impact",
+        "stage": "credentialing",
+        "title": "Finish IMPACT enrollment first",
+        "how": "The plan needs your Illinois Medicaid ID before it can credential you. If you are not in IMPACT yet, do that first.",
+        "portal_url": "https://impact.illinois.gov/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "molina-il-caqh",
+        "stage": "credentialing",
+        "title": "Update CAQH and authorize the plan",
+        "how": "Make sure your CAQH profile is complete and re-attested, then give this plan access to it.",
+        "portal_url": "https://proview.caqh.org/",
+        "aeon_can": "caqh_prep",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "molina-il-apply",
+        "stage": "credentialing",
+        "title": "Send the plan your join request",
+        "how": "Open the plan's provider page, find the join or credentialing request, and submit it. Only you submit.",
+        "portal_url": "https://www.molinahealthcare.com/providers/il/medicaid/home.aspx",
+        "aeon_can": "none",
+        "submits": true,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "molina-il-contract",
+        "stage": "contracting",
+        "title": "Sign and return the contract",
+        "how": "When the payer sends the participation agreement, read it, sign it and return it the way they say. Keep a copy.",
+        "portal_url": "https://www.molinahealthcare.com/providers/il/medicaid/home.aspx",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "molina-il-fees",
+        "stage": "contracting",
+        "title": "Check the fee schedule",
+        "how": "Look up the rates for the codes you bill (for example 90791, 90834, 90837) and make sure they work for your practice before you sign.",
+        "portal_url": "https://www.molinahealthcare.com/providers/il/medicaid/home.aspx",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "molina-il-effective",
+        "stage": "contracting",
+        "title": "Note your effective date",
+        "how": "Write down the date the payer says you are in network. Claims for earlier dates may be denied.",
+        "portal_url": "https://www.molinahealthcare.com/providers/il/medicaid/home.aspx",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "molina-il-retro",
+        "stage": "contracting",
+        "title": "Ask about billing back to the effective date",
+        "how": "Ask the payer in writing whether you may bill for visits from your effective date forward, and how to send those claims.",
+        "portal_url": "https://www.molinahealthcare.com/providers/il/medicaid/home.aspx",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://hfs.illinois.gov/healthchoice/providercontacts.html",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      }
+    ],
+    "notes": [
+      "Plan list from HFS Managed Care Program Map dated 2026-01-01 (verified). Plan-specific credentialing details not read; step text is generic.",
+      "HFS also lists YouthCare (former youth in care only); not included."
+    ]
+  },
+  {
+    "id": "tricare-west",
+    "name": "TRICARE West Region (TriWest Healthcare Alliance)",
+    "kind": "military",
+    "states": [
+      "IL"
+    ],
+    "networks": [
+      {
+        "id": "tricare-west-network",
+        "name": "TriWest TRICARE network",
+        "panel": {
+          "status": "unknown",
+          "note": "TriWest takes interest forms; behavioral health openings not published. Being TRICARE-authorized lets you bill out of network without joining.",
+          "source": {
+            "url": "https://tricare.triwest.com/en/provider/join-our-network/tricare-provider-contracting-q--a/",
+            "quote": "TriWest is accepting interest forms from providers who wish to join the TriWest network.",
+            "checked_on": "2026-10-29",
+            "verified": true
+          }
+        }
+      }
+    ],
+    "eligibility": {
+      "LCSW": {
+        "eligible": true,
+        "note": "Certified clinical social worker (32 CFR 199.6(c)(3)(iii)(F)): MSW from a CSWE-accredited school, 2 years or 3,000 hours post-master's supervised clinical practice, and your Illinois LCSW. No physician referral needed.",
+        "source": {
+          "url": "https://www.law.cornell.edu/cfr/text/32/199.6",
+          "quote": "A clinical social worker may provide covered services independent of physician referral and supervision",
+          "checked_on": "2026-10-29",
+          "verified": true
+        }
+      },
+      "LCPC": {
+        "eligible": true,
+        "note": "Must meet TRICARE's counselor standard (TCMHC): independent mental health counseling license, CACREP-accredited master's, NCMHCE (an NCE was accepted before 2017), and 2 years with 3,000 supervised hours and 100 hours face-to-face supervision. Counselors who fall short are only 'supervised' counselors, who need a physician referral and oversight and are excluded by TriWest. Check your degree and exam.",
+        "source": {
+          "url": "https://www.law.cornell.edu/cfr/text/32/199.6",
+          "quote": "must be licensed for independent practice in mental health counseling by the jurisdiction where practicing",
+          "checked_on": "2026-10-29",
+          "verified": true
+        }
+      },
+      "LMFT": {
+        "eligible": true,
+        "note": "Certified marriage and family therapist (32 CFR 199.6(c)(3)(iv)(A)): master's degree, supervised training hours (for example 200 supervision hours and 1,000 clinical hours), your Illinois LMFT, and a participation agreement accepting TRICARE's allowed charge as payment in full.",
+        "source": {
+          "url": "https://www.law.cornell.edu/cfr/text/32/199.6",
+          "quote": "Is licensed or certified to practice as a marriage and family therapist by the jurisdiction where practicing",
+          "checked_on": "2026-10-29",
+          "verified": true
+        }
+      },
+      "Psychologist": {
+        "eligible": true,
+        "note": "Clinical psychologist (32 CFR 199.6(c)(3)(iii)(A)): doctorate in psychology from a regionally accredited school, 2 years supervised experience (1 post-doctoral) or listing in the National Register, plus your independent Illinois license. No physician referral needed.",
+        "source": {
+          "url": "https://www.law.cornell.edu/cfr/text/32/199.6",
+          "quote": "a clinical psychologist is an individual who is licensed or certified by the state for the independent practice of psychology",
+          "checked_on": "2026-10-29",
+          "verified": true
+        }
+      }
+    },
+    "requirements": {
+      "caqh": true,
+      "npi": "type1",
+      "ein": "SSN or EIN",
+      "malpractice": "Not confirmed",
+      "other": [
+        "TriWest uses Aperture Credentialing; CAQH or TriWest application form FS42045 (search summary)",
+        "Credentialing approval and signed contract both required for network status"
+      ],
+      "source": {
+        "url": "https://tricare.triwest.com/en/provider/tricare-provider-handbook/provider-information/",
+        "quote": "Providers who are contracted to the network must also be certified and credentialed.",
+        "checked_on": "2026-10-29",
+        "verified": true
+      }
+    },
+    "timeline": {
+      "text": "Not published; the T-5 transition page said joining takes several months",
+      "source": {
+        "url": "https://tricare.triwest.com/en/provider/join-our-network/tricare-provider-contracting-q--a/",
+        "quote": "It is expected that this process will take several months to complete.",
+        "checked_on": "2026-10-29",
+        "verified": true
+      }
+    },
+    "fees": {
+      "text": "No application fee found (unconfirmed); rates mostly follow CMAC",
+      "source": {
+        "url": "https://tricare.triwest.com/en/provider/tricare-provider-handbook/provider-information/",
+        "quote": "Not confirmed from an official page",
+        "checked_on": "2026-10-29",
+        "verified": false
+      }
+    },
+    "recredential": {
+      "text": "Every 3 years",
+      "months": 36,
+      "source": {
+        "url": "https://tricare.triwest.com/en/provider/tricare-provider-handbook/provider-information/",
+        "quote": "Network providers must be re-credentialed every three years.",
+        "checked_on": "2026-10-29",
+        "verified": true
+      }
+    },
+    "steps": [
+      {
+        "id": "tw-tcmhc",
+        "stage": "credentialing",
+        "title": "Check you meet TRICARE's counselor standards",
+        "how": "TRICARE has its own bar for counselors. You need: your independent LCPC; a master's from a CACREP-accredited counseling program; a passing NCMHCE score (an NCE score counted before 2017); and 2 years of post-master's work with 3,000 supervised hours and 100 hours of face-to-face supervision. If any piece is missing, TRICARE treats you as a 'supervised' counselor, who needs physician referral and oversight and cannot join the TriWest network. Ask TriWest to confirm before you apply.",
+        "portal_url": "https://tricare.triwest.com/en/provider/join-our-network/tricare-provider-contracting-q--a/",
+        "aeon_can": "none",
+        "submits": false,
+        "licenses": [
+          "LCPC"
+        ],
+        "source": {
+          "url": "https://www.law.cornell.edu/cfr/text/32/199.6",
+          "quote": "must be licensed for independent practice in mental health counseling by the jurisdiction where practicing",
+          "checked_on": "2026-10-29",
+          "verified": true
+        }
+      },
+      {
+        "id": "tw-caqh",
+        "stage": "credentialing",
+        "title": "Get your CAQH profile current",
+        "how": "Complete and re-attest your CAQH ProView profile; TriWest can pull from it.",
+        "portal_url": "https://proview.caqh.org/",
+        "aeon_can": "caqh_prep",
+        "submits": false,
+        "source": {
+          "url": "https://tricare.triwest.com/en/provider/tricare-provider-handbook/provider-information/",
+          "quote": "Not confirmed from an official page",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "tw-interest",
+        "stage": "credentialing",
+        "title": "Send TriWest your interest form",
+        "how": "On the TriWest 'Join Our Network' page, fill the interest form. A provider relations rep follows up with the credentialing and contract steps. Only you submit.",
+        "portal_url": "https://tricare.triwest.com/en/provider/join-our-network/tricare-provider-contracting-q--a/",
+        "aeon_can": "none",
+        "submits": true,
+        "source": {
+          "url": "https://tricare.triwest.com/en/provider/join-our-network/tricare-provider-contracting-q--a/",
+          "quote": "TriWest is accepting interest forms from providers who wish to join the TriWest network.",
+          "checked_on": "2026-10-29",
+          "verified": true
+        }
+      },
+      {
+        "id": "tw-contract",
+        "stage": "contracting",
+        "title": "Sign and return the contract",
+        "how": "When the payer sends the participation agreement, read it, sign it and return it the way they say. Keep a copy.",
+        "portal_url": "https://tricare.triwest.com/en/provider/join-our-network/tricare-provider-contracting-q--a/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://tricare.triwest.com/en/provider/tricare-provider-handbook/provider-information/",
+          "quote": "Credentialing approval is sent separately from the fully executed contract.",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "tw-fees",
+        "stage": "contracting",
+        "title": "Check the fee schedule",
+        "how": "Look up the rates for the codes you bill (for example 90791, 90834, 90837) and make sure they work for your practice before you sign.",
+        "portal_url": "https://tricare.triwest.com/en/provider/join-our-network/tricare-provider-contracting-q--a/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://tricare.triwest.com/en/provider/tricare-provider-handbook/provider-information/",
+          "quote": "Credentialing approval is sent separately from the fully executed contract.",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "tw-effective",
+        "stage": "contracting",
+        "title": "Note your effective date",
+        "how": "Write down the date the payer says you are in network. Claims for earlier dates may be denied.",
+        "portal_url": "https://tricare.triwest.com/en/provider/join-our-network/tricare-provider-contracting-q--a/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://tricare.triwest.com/en/provider/tricare-provider-handbook/provider-information/",
+          "quote": "Credentialing approval is sent separately from the fully executed contract.",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "tw-retro",
+        "stage": "contracting",
+        "title": "Ask about billing back to the effective date",
+        "how": "Ask the payer in writing whether you may bill for visits from your effective date forward, and how to send those claims.",
+        "portal_url": "https://tricare.triwest.com/en/provider/join-our-network/tricare-provider-contracting-q--a/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://tricare.triwest.com/en/provider/tricare-provider-handbook/provider-information/",
+          "quote": "Credentialing approval is sent separately from the fully executed contract.",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      }
+    ],
+    "notes": [
+      "Illinois moved from East (Humana Military) to West (TriWest) on 2025-01-01. tricare.mil lists Illinois in the West Region (verified).",
+      "Contact: 888-874-9378; TRICAREProviderInquiries@triwest.com.",
+      "Reimbursement mostly CHAMPUS Maximum Allowable Charge (CMAC) rates.",
+      "Check whether you even need the network: authorized providers can bill TRICARE as non-network.",
+      "TRICARE counselor rules above are from the 32 CFR 199.6 text on law.cornell.edu (read); the TRICARE Policy Manual may be newer, so TriWest should confirm for your case."
+    ]
+  },
+  {
+    "id": "bcbsil",
+    "name": "Blue Cross and Blue Shield of Illinois (BCBSIL)",
+    "kind": "commercial",
+    "states": [
+      "IL"
+    ],
+    "networks": [
+      {
+        "id": "ppo",
+        "name": "PPO",
+        "panel": {
+          "status": "unknown",
+          "note": "BCBSIL does not publish whether its PPO panel is open. You apply on the Provider Onboarding Form and choose the networks you want to join.",
+          "source": {
+            "url": "https://www.bcbsil.com/provider/network/network/join-bcbsil-network",
+            "quote": "To apply to join our networks, fill out the online Provider Onboarding Form.",
+            "checked_on": "2026-10-30",
+            "verified": true
+          }
+        }
+      },
+      {
+        "id": "blue-choice-ppo",
+        "name": "Blue Choice PPO",
+        "panel": {
+          "status": "unknown",
+          "note": "The join page does not name Blue Choice PPO. It says you choose networks on the Provider Onboarding Form; confirm Blue Choice PPO is offered there.",
+          "source": {
+            "url": "https://www.bcbsil.com/provider/network/network/join-bcbsil-network",
+            "quote": "Not named on the join page.",
+            "checked_on": "2026-10-30",
+            "verified": false
+          }
+        }
+      },
+      {
+        "id": "hmo",
+        "name": "HMO Illinois / BlueAdvantage HMO",
+        "panel": {
+          "status": "unknown",
+          "note": "You reach the HMO networks (HMO Illinois, Blue Advantage HMO, BlueCare Direct, Blue Precision HMO) through a participating medical group or IPA, not directly.",
+          "source": {
+            "url": "https://www.bcbsil.com/provider/network/network/join-bcbsil-network",
+            "quote": "To join a commercial HMO network, first contract with a participating HMO Medical Group or Independent Association.",
+            "checked_on": "2026-10-30",
+            "verified": true
+          }
+        }
+      },
+      {
+        "id": "medicare-advantage",
+        "name": "BCBSIL Medicare Advantage (PPO/HMO)",
+        "panel": {
+          "status": "unknown",
+          "note": "BCBSIL's join page does not cover Medicare Advantage. Confirm with BCBSIL.",
+          "source": {
+            "url": "https://www.bcbsil.com/provider/network/network/join-bcbsil-network",
+            "quote": "Not covered on the page.",
+            "checked_on": "2026-10-30",
+            "verified": false
+          }
+        }
+      }
+    ],
+    "eligibility": {
+      "LCSW": {
+        "eligible": true,
+        "note": "BCBSIL's join page lists no license types and no exclusions. Behavioral health clinicians use the same Provider Onboarding Form; confirm your license type is accepted when you apply.",
+        "source": {
+          "url": "https://www.bcbsil.com/provider/network/network/join-bcbsil-network",
+          "quote": "No license types are listed on the join page.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      "LCPC": {
+        "eligible": true,
+        "note": "BCBSIL's join page lists no license types and no exclusions. Behavioral health clinicians use the same Provider Onboarding Form; confirm your license type is accepted when you apply.",
+        "source": {
+          "url": "https://www.bcbsil.com/provider/network/network/join-bcbsil-network",
+          "quote": "No license types are listed on the join page.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      "LMFT": {
+        "eligible": true,
+        "note": "BCBSIL's join page lists no license types and no exclusions. Behavioral health clinicians use the same Provider Onboarding Form; confirm your license type is accepted when you apply.",
+        "source": {
+          "url": "https://www.bcbsil.com/provider/network/network/join-bcbsil-network",
+          "quote": "No license types are listed on the join page.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      "Psychologist": {
+        "eligible": true,
+        "note": "BCBSIL's join page lists no license types and no exclusions. Behavioral health clinicians use the same Provider Onboarding Form; confirm your license type is accepted when you apply.",
+        "source": {
+          "url": "https://www.bcbsil.com/provider/network/network/join-bcbsil-network",
+          "quote": "No license types are listed on the join page.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      }
+    },
+    "requirements": {
+      "caqh": true,
+      "npi": "type1",
+      "ein": "Tax ID (SSN or EIN) as on W-9; EIN needed if billing under an entity (PLLC)",
+      "malpractice": "Not stated on the join page; see the BCBSIL Provider Manual",
+      "other": [
+        "Active Illinois license",
+        "Authorize BCBSIL to access your credentialing information in CAQH",
+        "Verisys verifies your data and may ask you to re-attest",
+        "Check status with the Credentialing Status Checker (NPI or license number)",
+        "Keep your CAQH profile current; BCBSIL asks you to verify your directory listing every 90 days"
+      ],
+      "source": {
+        "url": "https://www.bcbsil.com/provider/network/network/join-bcbsil-network",
+        "quote": "Authorize BCBSIL so we can access your credentialing information.",
+        "checked_on": "2026-10-30",
+        "verified": true
+      }
+    },
+    "timeline": {
+      "text": "Total time not published by BCBSIL (third-party guides say 60-120 days). You get 30 calendar days to fix errors found in verification.",
+      "source": {
+        "url": "https://www.bcbsil.com/provider/network/network/join-bcbsil-network",
+        "quote": "Applicants will be granted 30 calendar days to correct erroneous and/or conflicting information",
+        "checked_on": "2026-10-30",
+        "verified": true
+      }
+    },
+    "fees": {
+      "text": "No application fee stated on the page; not confirmed either way.",
+      "source": {
+        "url": "https://www.bcbsil.com/provider/network/network/join-bcbsil-network",
+        "quote": "No fee is mentioned on the join page.",
+        "checked_on": "2026-10-30",
+        "verified": false
+      }
+    },
+    "recredential": {
+      "text": "Every 3 years",
+      "months": 36,
+      "source": {
+        "url": "https://www.bcbsil.com/provider/network/network/join-bcbsil-network",
+        "quote": "BCBSIL recredentials network providers every three years.",
+        "checked_on": "2026-10-30",
+        "verified": true
+      }
+    },
+    "steps": [
+      {
+        "id": "caqh-ready",
+        "stage": "credentialing",
+        "title": "Finish and attest your CAQH profile",
+        "how": "Log in to CAQH, complete every section, upload license and malpractice certificate, and attest. Then authorize BCBSIL to see it.",
+        "portal_url": "https://proview.caqh.org",
+        "aeon_can": "caqh_prep",
+        "submits": false,
+        "source": {
+          "url": "https://www.bcbsil.com/provider/network/network/join-bcbsil-network",
+          "quote": "Authorize BCBSIL so we can access your credentialing information.",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      {
+        "id": "onboarding-form",
+        "stage": "credentialing",
+        "title": "Submit the BCBSIL Provider Onboarding Form",
+        "how": "On the BCBSIL Join Our Network page open the online Provider Onboarding Form, answer every question and upload the documents. You submit it yourself.",
+        "portal_url": "https://www.bcbsil.com/provider/network/network/join-bcbsil-network",
+        "aeon_can": "none",
+        "submits": true,
+        "source": {
+          "url": "https://www.bcbsil.com/provider/network/network/join-bcbsil-network",
+          "quote": "To apply to join our networks, fill out the online Provider Onboarding Form.",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      {
+        "id": "verisys",
+        "stage": "credentialing",
+        "title": "Answer Verisys or CAQH requests",
+        "how": "BCBSIL uses a company called Verisys to check your data. If Verisys asks you to re-attest in CAQH or add missing information, do it promptly. If BCBSIL finds an error, you have 30 calendar days to fix it.",
+        "portal_url": "https://www.bcbsil.com/provider/network/network/join-bcbsil-network",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://www.bcbsil.com/provider/network/network/join-bcbsil-network",
+          "quote": "Verisys may contact you on behalf of BCBSIL and request that you:",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      {
+        "id": "check-status",
+        "stage": "credentialing",
+        "title": "Check your status",
+        "how": "Use the Credentialing Status Checker on bcbsil.com with your NPI or license number. For the application itself, use the Case Status Checker with the case number from your confirmation email. You get written notice when credentialing is done.",
+        "portal_url": "https://provider.bcbsil.com/ILCredentialStatus",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://www.bcbsil.com/provider/network/network/join-bcbsil-network",
+          "quote": "To check the status of your credentialing process, enter your NPI or license number in our Credentialing Status Checker.",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      {
+        "id": "sign-contract",
+        "stage": "contracting",
+        "title": "Sign and return the contract",
+        "how": "Contracting is part of the same BCBSIL process. If you are accepted you get a welcome letter or email. Read anything BCBSIL asks you to sign before returning it.",
+        "portal_url": "https://www.bcbsil.com/provider/network/network/join-bcbsil-network",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://www.bcbsil.com/provider/network/network/join-bcbsil-network",
+          "quote": "To join our networks, follow the process for contracting.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      {
+        "id": "fee-schedule",
+        "stage": "contracting",
+        "title": "Check the fee schedule",
+        "how": "Ask for the rate sheet for your license type and CPT codes (90791, 90834, 90837) before signing.",
+        "portal_url": null,
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://www.bcbsil.com/provider/network/network/join-bcbsil-network",
+          "quote": "Not stated on the BCBSIL join page.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      {
+        "id": "effective-date",
+        "stage": "contracting",
+        "title": "Note your effective date",
+        "how": "If you are accepted, a welcome letter or email shows your network effective date. Write it down and do not bill in-network before it.",
+        "portal_url": null,
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://www.bcbsil.com/provider/network/network/join-bcbsil-network",
+          "quote": "you'll receive a welcome letter or email with your network effective date",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      {
+        "id": "retro",
+        "stage": "contracting",
+        "title": "Ask about retro billing",
+        "how": "Ask BCBSIL whether claims can be billed back to the effective date. Policy not published; get the answer in writing.",
+        "portal_url": null,
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://www.bcbsil.com/provider/network/network/join-bcbsil-network",
+          "quote": "Not stated on the BCBSIL join page.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      }
+    ],
+    "notes": [
+      "Behavioral health: BCBSIL runs BH utilization management itself for commercial non-HMO members (Behavioral Health Program page); no separate BH network vendor application found. Official path is the BCBSIL Provider Onboarding Form plus CAQH (not Availity).",
+      "The join page was read on 2026-10-30. It gives no malpractice minimum, application fee, total timeline, license types, fee schedule or retro-billing policy, so those are unverified.",
+      "HMO networks are reached through a medical group or IPA."
+    ]
+  },
+  {
+    "id": "ambetter-il",
+    "name": "Ambetter of Illinois (Centene)",
+    "kind": "commercial",
+    "states": [
+      "IL"
+    ],
+    "networks": [
+      {
+        "id": "marketplace",
+        "name": "Ambetter Marketplace",
+        "panel": {
+          "status": "unknown",
+          "note": "Ambetter does not publish whether its panel is open. Filling out the form does not guarantee you are accepted; the form is the only way in.",
+          "source": {
+            "url": "https://www.ambetterhealth.com/en/il/provider-resources/join-our-network/",
+            "quote": "Completion of this form does not guarantee inclusion into the provider network.",
+            "checked_on": "2026-10-30",
+            "verified": true
+          }
+        }
+      }
+    ],
+    "eligibility": {
+      "LCSW": {
+        "eligible": true,
+        "note": "The join form lists Individual Provider as a type but its specialty list has no social work, counseling, marriage and family therapy or psychology option. That is not a stated exclusion; call 1-855-745-5507 to ask how behavioral health clinicians join.",
+        "source": {
+          "url": "https://www.ambetterhealth.com/en/il/provider-resources/join-our-network/",
+          "quote": "Select your provider type.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      "LCPC": {
+        "eligible": true,
+        "note": "The join form lists Individual Provider as a type but its specialty list has no social work, counseling, marriage and family therapy or psychology option. That is not a stated exclusion; call 1-855-745-5507 to ask how behavioral health clinicians join.",
+        "source": {
+          "url": "https://www.ambetterhealth.com/en/il/provider-resources/join-our-network/",
+          "quote": "Select your provider type.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      "LMFT": {
+        "eligible": true,
+        "note": "The join form lists Individual Provider as a type but its specialty list has no social work, counseling, marriage and family therapy or psychology option. That is not a stated exclusion; call 1-855-745-5507 to ask how behavioral health clinicians join.",
+        "source": {
+          "url": "https://www.ambetterhealth.com/en/il/provider-resources/join-our-network/",
+          "quote": "Select your provider type.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      "Psychologist": {
+        "eligible": true,
+        "note": "The join form lists Individual Provider as a type but its specialty list has no social work, counseling, marriage and family therapy or psychology option. That is not a stated exclusion; call 1-855-745-5507 to ask how behavioral health clinicians join.",
+        "source": {
+          "url": "https://www.ambetterhealth.com/en/il/provider-resources/join-our-network/",
+          "quote": "Select your provider type.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      }
+    },
+    "requirements": {
+      "caqh": null,
+      "npi": "type1",
+      "ein": "Tax ID entered on the form and a completed W-9 uploaded",
+      "malpractice": "Not asked on the join form; ask if Ambetter requests it at credentialing",
+      "other": [
+        "Illinois Medicaid number must be active in IMPACT only if you choose a Medicaid product",
+        "Contact the Contracting Department: ILJoinOurNetwork@CENTENE.COM or 1-855-745-5507",
+        "The form asks for a credentialing contact (name, phone, fax, email)"
+      ],
+      "source": {
+        "url": "https://www.ambetterhealth.com/en/il/provider-resources/join-our-network/",
+        "quote": "Please upload your completed W9 form.",
+        "checked_on": "2026-10-30",
+        "verified": true
+      }
+    },
+    "timeline": {
+      "text": "About 20 business days to review the form and decide whether a contract starts; the rest of credentialing is not published.",
+      "source": {
+        "url": "https://www.ambetterhealth.com/en/il/provider-resources/join-our-network/",
+        "quote": "It generally takes 20 business days to analyze the form",
+        "checked_on": "2026-10-30",
+        "verified": true
+      }
+    },
+    "fees": {
+      "text": "No fee stated on the page; not confirmed either way.",
+      "source": {
+        "url": "https://www.ambetterhealth.com/en/il/provider-resources/join-our-network/",
+        "quote": "No fee is mentioned on the join page.",
+        "checked_on": "2026-10-30",
+        "verified": false
+      }
+    },
+    "recredential": {
+      "text": "Not published on the join page; 36 months is a common industry cycle but unconfirmed.",
+      "months": 36,
+      "source": {
+        "url": "https://www.ambetterhealth.com/en/il/provider-resources/join-our-network/",
+        "quote": "Not stated on this page.",
+        "checked_on": "2026-10-30",
+        "verified": false
+      }
+    },
+    "steps": [
+      {
+        "id": "form",
+        "stage": "credentialing",
+        "title": "Submit the Join Our Network form",
+        "how": "Fill in Ambetter's online Join Our Network form (8 short steps): choose Individual Provider, pick Ambetter as the product, enter your NPI and Tax ID, add your practice and credentialing contact details, and upload a W-9. You submit it yourself and pass the CAPTCHA.",
+        "portal_url": "https://www.ambetterhealth.com/en/il/provider-resources/join-our-network/",
+        "aeon_can": "none",
+        "submits": true,
+        "source": {
+          "url": "https://www.ambetterhealth.com/en/il/provider-resources/join-our-network/",
+          "quote": "We will outreach to the contact person listed once a review of your data is completed.",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      {
+        "id": "credentialing",
+        "stage": "credentialing",
+        "title": "Complete credentialing application",
+        "how": "If Ambetter moves forward, answer the credentialing requests sent to the contact you listed. Whether CAQH is used is not stated on the page; ask.",
+        "portal_url": "https://www.ambetterhealth.com/en/il/provider-resources/join-our-network/",
+        "aeon_can": "caqh_prep",
+        "submits": false,
+        "source": {
+          "url": "https://www.ambetterhealth.com/en/il/provider-resources/join-our-network/",
+          "quote": "Step 7 - Credentialing Contact Information",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      {
+        "id": "sign-contract",
+        "stage": "contracting",
+        "title": "Sign and return the contract",
+        "how": "If Ambetter decides to go ahead, a contract process starts. Read and sign what they send.",
+        "portal_url": "https://www.ambetterhealth.com/en/il/provider-resources/join-our-network/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://www.ambetterhealth.com/en/il/provider-resources/join-our-network/",
+          "quote": "make a determination if the contract process will commence",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      {
+        "id": "fee-schedule",
+        "stage": "contracting",
+        "title": "Check the fee schedule",
+        "how": "Review rates by CPT code.",
+        "portal_url": null,
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://www.ambetterhealth.com/en/il/provider-resources/join-our-network/",
+          "quote": "Not stated on the Ambetter join page.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      {
+        "id": "effective-date",
+        "stage": "contracting",
+        "title": "Note your effective date",
+        "how": "Record it from the welcome letter.",
+        "portal_url": null,
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://www.ambetterhealth.com/en/il/provider-resources/join-our-network/",
+          "quote": "Not stated on the Ambetter join page.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      {
+        "id": "retro",
+        "stage": "contracting",
+        "title": "Ask about retro billing",
+        "how": "Ask if back billing to effective date is allowed.",
+        "portal_url": null,
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://www.ambetterhealth.com/en/il/provider-resources/join-our-network/",
+          "quote": "Not stated on the Ambetter join page.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      }
+    ],
+    "notes": [
+      "The Ambetter join form was read on 2026-10-30. Its specialty list has no social worker, counselor, MFT or psychologist option, so ask the Contracting Department how therapists join.",
+      "No separate Envolve behavioral health application found for Ambetter Illinois. The form also offers Meridian, Wellcare products.",
+      "Malpractice, CAQH requirement, fee schedule, effective date and recredential cadence are not on the page: unverified."
+    ]
+  }
+]
