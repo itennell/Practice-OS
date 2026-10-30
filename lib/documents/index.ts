@@ -7,7 +7,8 @@ import type { CredentialingProfile } from "../credentialing/profile";
 import { loadCredentialingProfile } from "../credentialing/store";
 import { money } from "../gfe/build";
 import { SERVICE_KINDS, estimateStatus, getEstimate, listEstimates, type EstimateRow } from "../gfe/store";
-import { formList, getForm } from "../client-forms";
+import { formList, getForm, prepare } from "../client-forms";
+import { loadAllOverrides, loadFacts } from "../client-forms/store";
 import { isFormId, type FormDef } from "../client-forms/types";
 import { allGuides, getGuide, type Guide } from "../guides";
 import { CMS855I_SOURCE, LEFT_FOR_YOU } from "../payers/cms855i";
@@ -145,20 +146,32 @@ function releaseTemplateCards(isSample: boolean): DocumentCard[] {
   ];
 }
 
-/** A client form template from the library (lib/client-forms): her practice filled in, client boxes blank. */
-export function clientFormCard(def: FormDef, isSample: boolean): DocumentCard {
+/**
+ * A client form template from the library (lib/client-forms): her practice filled in, client boxes blank.
+ * `blockers` are the plain reasons it can't download yet (prepare()); then the card has no PDF and says why.
+ */
+export function clientFormCard(def: FormDef, isSample: boolean, blockers: string[] = []): DocumentCard {
   return card({
     id: `client_form:${def.id}`,
     kind: "client_form",
     title: def.title,
     subtitle: def.summary.slice(0, 240),
-    status: "Template",
+    status: blockers.length ? "Not ready" : "Template",
     topics: words(...def.topics, "client form template"),
     open: `/admin?panel=forms&form=${def.id}`,
-    pdf: `/api/client-forms/${def.id}/pdf`,
-    needs_her: "Read it once with your attorney. Hand it to the client to fill in and sign; their copy is never saved in Practice-OS.",
+    pdf: blockers.length ? null : `/api/client-forms/${def.id}/pdf`,
+    needs_her: blockers.length
+      ? blockers[0].slice(0, 240)
+      : "Read it once with your attorney. Hand it to the client to fill in and sign; their copy is never saved in Practice-OS.",
     is_sample: isSample,
   });
+}
+
+/** Every client form's card, each checked on what would print. Empty before she has a practice profile. */
+export async function clientFormCards(only?: FormDef): Promise<DocumentCard[]> {
+  const [loaded, overrides] = await Promise.all([loadFacts(), loadAllOverrides()]);
+  if (!loaded) return [];
+  return (only ? [only] : formList()).map((def) => clientFormCard(def, loaded.facts.isSample, prepare(def, loaded.facts, overrides[def.id] ?? {}).blockers));
 }
 
 export function payerCard(a: PayerApplication, today: ISODate): DocumentCard {
@@ -287,7 +300,7 @@ export function uploadedCard(d: Pick<StoredDocument, "id" | "kind" | "title" | "
 /** Every document Practice-OS holds or can make, built from the live rows. */
 export async function allDocuments(): Promise<DocumentCard[]> {
   const today = await practiceToday();
-  const [deadlines, estimates, bills, apps, profile, caqh, uploads] = await Promise.all([
+  const [deadlines, estimates, bills, apps, profile, caqh, uploads, clientForms] = await Promise.all([
     deadlinesView(365),
     listEstimates(20),
     listSuperbills(20).catch(() => []),
@@ -295,6 +308,7 @@ export async function allDocuments(): Promise<DocumentCard[]> {
     loadCredentialingProfile(),
     caqhCard(),
     listStoredDocuments(30),
+    clientFormCards().catch(() => []),
   ]);
   return [
     ...deadlines.due.map((o) => deadlineCard(o, today)),
@@ -305,7 +319,7 @@ export async function allDocuments(): Promise<DocumentCard[]> {
     ...estimates.map((e) => gfeCard(e, today)),
     ...bills.map(superbillCard),
     ...releaseTemplateCards(profile?.isSample ?? false),
-    ...(profile ? formList().map((f) => clientFormCard(f, profile.isSample)) : []),
+    ...clientForms,
     ...allGuides().map(guideCard),
     ...uploads.map(uploadedCard),
   ];
@@ -410,8 +424,7 @@ export async function openDocument(id: string): Promise<DocumentCard | null> {
     }
     case "client_form": {
       const def = isFormId(key) ? getForm(key) : undefined;
-      const profile = def ? await loadCredentialingProfile() : null;
-      return def && profile ? clientFormCard(def, profile.isSample) : null;
+      return def ? ((await clientFormCards(def))[0] ?? null) : null;
     }
     case "uploaded": {
       const d = UUID.test(key) ? await getStoredDocument(key) : null;

@@ -130,6 +130,7 @@ export const insuranceInfo: FormDef = {
       kind: "clause",
       id: "assignment",
       editable: true,
+      label: "Insurance pays you directly",
       text: `I ask my insurance company to pay ${f.practiceName} directly for my sessions.`,
     },
     {
@@ -141,6 +142,7 @@ export const insuranceInfo: FormDef = {
       kind: "clause",
       id: "responsibility",
       editable: true,
+      label: "What the client pays",
       text: "I pay my copay at each session. I also pay what my plan puts toward my deductible. If my plan says no to a claim, or my plan ends, I pay the full fee for those sessions. Please tell us right away if your insurance changes.",
     },
     { kind: "clause", id: "address", text: `${f.practiceName}, ${fullAddress(f)}`, small: true },

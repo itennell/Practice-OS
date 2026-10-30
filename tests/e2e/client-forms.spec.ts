@@ -11,8 +11,29 @@ import * as mupdf from "mupdf";
 // that conversation is replayed from Muse's recorded replies
 // (tests/fixtures/aeon-chat/client-form.json), so no live model call.
 
-test.beforeEach(() => {
+const ORIGIN = () => ({ Origin: new URL(test.info().project.use.baseURL!).origin });
+
+/** The fictional demo practice's policies, saved once: no form downloads before that. */
+const POLICIES = {
+  cancel_hours: 24,
+  late_cancel_fee_cents: 0,
+  no_show_fee_cents: 0,
+  reply_within_hours: 48,
+  returned_payment_fee_cents: 0,
+  records_fee_note: "",
+  privacy_officer: "",
+  backup_colleague: "Jordan Lee, LCSW",
+  accepts_insurance: false,
+  offers_sliding_scale: false,
+  texting_ok: true,
+  npp_effective_on: "2026-11-01",
+};
+
+test.beforeEach(async ({ request }) => {
   execSync("npm run db:reset", { stdio: "ignore" });
+  // Policies aren't demo data, so db:reset keeps them: set them to a known state.
+  const saved = await request.put("/api/client-forms/policies", { headers: ORIGIN(), data: POLICIES });
+  expect(saved.ok(), await saved.text()).toBe(true);
 });
 
 async function axeViolations(page: Page) {
@@ -70,10 +91,10 @@ test("Client forms library: three templates open, pass their check and download 
 
 test("Editing a template: her wording saves and prints; taking out a required part is refused", async ({ page, request }) => {
   // Her wording isn't demo data, so db:reset keeps it: start from Aeon's wording.
-  expect((await request.delete("/api/client-forms/practice_policies", { headers: { Origin: new URL(page.url() === "about:blank" ? test.info().project.use.baseURL! : page.url()).origin } })).ok()).toBe(true);
+  expect((await request.delete("/api/client-forms/practice_policies", { headers: ORIGIN() })).ok()).toBe(true);
   await page.goto("/admin?panel=forms&form=practice_policies");
   const panel = page.getByRole("dialog", { name: "Client forms" });
-  const cancel = panel.getByLabel("Paragraph 2");
+  const cancel = panel.getByLabel("Cancellation policy");
   await expect(cancel).toHaveValue(/cancel at least 24 hours/i);
 
   await cancel.fill("Please call me.");
@@ -88,8 +109,29 @@ test("Editing a template: her wording saves and prints; taking out a required pa
   const doc = mupdf.Document.openDocument(await pdf.body(), "application/pdf");
   expect(doc.loadPage(0).toStructuredText("preserve-whitespace").asText().replace(/\s+/g, " ")).toContain("someone on my waitlist");
 
+  // A blank paragraph prints Aeon's wording, and the editor says so.
+  await cancel.fill("");
+  await expect(panel.getByText(/Uses Aeon's default wording/)).toBeVisible();
+
   await panel.getByRole("button", { name: "Use Aeon’s wording" }).click();
   await expect(panel.getByRole("status")).toContainText("Back to Aeon");
+});
+
+test("A form that isn't ready says why in plain words, and its PDF link gives the reason instead of a PDF", async ({ page, request }) => {
+  const unset = await request.put("/api/client-forms/policies", { headers: ORIGIN(), data: { backup_colleague: "" } });
+  expect(unset.ok()).toBe(true);
+  await page.goto("/admin?panel=forms&form=informed_consent");
+  const panel = page.getByRole("dialog", { name: "Client forms" });
+  await expect(panel.getByRole("heading", { name: "Not ready to download yet" })).toBeVisible();
+  await expect(panel.getByText(/the colleague who will contact clients/).first()).toBeVisible();
+  await expect(panel.getByRole("link", { name: "Download PDF" })).toHaveCount(0);
+  await expect(panel.getByRole("heading", { name: "Needs your attorney's review" })).toBeVisible();
+  expect(await axeViolations(page)).toEqual([]);
+
+  const pdf = await request.get("/api/client-forms/informed_consent/pdf");
+  expect(pdf.status()).toBe(409);
+  expect(pdf.headers()["content-type"]).toContain("text/plain");
+  expect(await pdf.text()).toContain("can't be downloaded yet");
 });
 
 test("Asking Aeon for a telehealth consent form gives the template as a card with Open and Download", async ({ page }) => {

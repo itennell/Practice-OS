@@ -167,16 +167,16 @@ async function Cards() {
         <Card title="Deadlines" href="/admin/deadlines" summary={view ? `${plural(view.due.length, "deadline")} in the next 30 days` : "Your compliance calendar"} />
         <Card title="Client forms" summary={`Estimates, superbills, release forms · ${plural(waitingGfe, "estimate")} waiting, ${plural(notGiven, "superbill")} not given`}>
           <div className="relative mt-2 flex flex-wrap gap-2">
-            <ButtonLink variant="quiet" href="/admin?panel=forms" className="h-10! px-4! text-small!">
+            <ButtonLink variant="quiet" href="/admin?panel=forms" className="px-4! text-small!">
               All client forms
             </ButtonLink>
-            <ButtonLink variant="quiet" href="/admin?panel=gfe" className="h-10! px-4! text-small!">
+            <ButtonLink variant="quiet" href="/admin?panel=gfe" className="px-4! text-small!">
               Good Faith Estimate
             </ButtonLink>
-            <ButtonLink variant="quiet" href="/admin?panel=superbill" className="h-10! px-4! text-small!">
+            <ButtonLink variant="quiet" href="/admin?panel=superbill" className="px-4! text-small!">
               Superbill
             </ButtonLink>
-            <ButtonLink variant="quiet" href="/admin?panel=release" className="h-10! px-4! text-small!">
+            <ButtonLink variant="quiet" href="/admin?panel=release" className="px-4! text-small!">
               Release form
             </ButtonLink>
           </div>

@@ -170,12 +170,13 @@ const OPEN_CARD = "Her card in the chat opens it, already filled in; don't name 
 /** A client form template from the library: saves nothing, holds no client details. */
 async function makeClientForm(form: FormId): Promise<ToolResult> {
   const def = getForm(form);
-  const profile = await cred.loadCredentialingProfile();
-  if (!def || !profile) return { content: [{ type: "text", text: "Add the practice details on Admin › Credentialing first; client forms use them." }], isError: true };
-  return withCards(
-    { made: def.title, say: `${OPEN_CARD} It is a template: her practice is filled in and the client's boxes are blank. Recommend her own attorney reads it once.` },
-    [documents.clientFormCard(def, profile.isSample)],
-  );
+  const [made] = def ? await documents.clientFormCards(def) : [];
+  if (!def || !made) return { content: [{ type: "text", text: "Add the practice details on Admin › Credentialing first; client forms use them." }], isError: true };
+  // A form that can't download yet (policies never saved, a gap to fill, not Illinois) comes back without a PDF and says why.
+  const say = made.pdf
+    ? `${OPEN_CARD} It is a template: her practice is filled in and the client's boxes are blank. Recommend her own attorney reads it once.`
+    : `${OPEN_CARD} It can't be downloaded yet: ${made.needs_her} Tell her that plainly; her card opens the form so she can finish it.`;
+  return withCards({ made: def.title, say }, [made]);
 }
 
 async function makeGfe(input: z.infer<z.ZodObject<typeof gfeInput>>, ctx: ToolContext): Promise<ToolResult> {
