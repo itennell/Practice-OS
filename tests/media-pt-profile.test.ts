@@ -1,14 +1,33 @@
 import { describe, expect, it, vi } from "vitest";
 vi.mock("../lib/audit", () => ({ audit: vi.fn(async () => {}) }));
 vi.mock("../lib/aeon/guard", () => ({
-  guard: vi.fn(async (t: string) => (/\bmy client (maria|john)\b/i.test(t) ? { ok: false, kind: "phi" } : { ok: true, text: t })),
+  // Stands in for the name finder: a client name, or a method name read as a person's.
+  guard: vi.fn(async (t: string) =>
+    /\bmy client (maria|john)\b|\bGottman\b/i.test(t) || /\bmy client [A-Z][a-z]+ [A-Z][a-z]+/.test(t) ? { ok: false, kind: "phi" } : { ok: true, text: t },
+  ),
   REFUSAL: { phi: "Please leave out anything about a client." },
 }));
 const alertCrisis = vi.hoisted(() => vi.fn(async () => ({ alerted: true })));
 vi.mock("../lib/safety", async (orig) => ({ ...(await orig<typeof import("../lib/safety")>()), alertCrisis }));
 
 import { CRISIS_REPLY } from "../lib/safety";
-import { buildProfileView, exportAll, interviewState, MAKE_IT_YOURS, previousStep, SECTIONS, STEPS, validateStep, valueOf, STEP, WELCOME } from "../lib/media/pt-profile";
+import {
+  buildProfileView,
+  exportAll,
+  interviewState,
+  MAKE_IT_YOURS,
+  maskMethods,
+  previousStep,
+  saveStep,
+  SECTIONS,
+  STEPS,
+  stepNotAnswerable,
+  validateStep,
+  valueOf,
+  STEP,
+  WELCOME,
+} from "../lib/media/pt-profile";
+import { EMPTY_PT, parsePt } from "../lib/media/pt-answers";
 import { HOOK_CHARS, PT_LISTS } from "../lib/media/schema";
 import { DANA } from "./media-fixtures";
 
@@ -97,8 +116,51 @@ describe("PT interview answers", () => {
     expect(alertCrisis).toHaveBeenCalled();
   });
 
+  it("doesn't mistake a method named after a person for a client's name", async () => {
+    expect((await validateStep("extraCredentials", "Gottman Level 1 training, 2022", DANA)).pt.extraCredentials).toBe("Gottman Level 1 training, 2022");
+  });
+
   it("refuses client details", async () => {
     await expect(validateStep("focus", "Helping my client Maria with her divorce", DANA)).rejects.toThrow("client");
+  });
+
+  it.each(["nearby", "education", "extraCredentials"])("refuses a client name that looks like a method word in %s", async (id) => {
+    await expect(validateStep(id, "my client Christian Lopez", DANA)).rejects.toThrow("client");
+  });
+
+  it("refuses a client name typed as her own chip label", async () => {
+    await expect(validateStep("expertise", ["Anxiety", "my client Christian Lopez"], DANA)).rejects.toThrow("client");
+    await expect(validateStep("therapyTypes", ["my client Play Person"], DANA)).rejects.toThrow("client");
+  });
+
+  it("masks only whole method phrases, never single words", () => {
+    expect(maskMethods("Christian Counseling and Gottman Method")).toBe("method and method");
+    expect(maskMethods("my client Christian Lopez")).toBe("my client Christian Lopez");
+    expect(maskMethods("Play with Person")).toBe("Play with Person");
+  });
+
+  it.each(["focus", "approach", "firstSession", "why"])("refuses an empty answer for %s", async (id) => {
+    await expect(validateStep(id, "   ", DANA)).rejects.toThrow("type an answer");
+  });
+
+  it("still takes an empty answer for optional text", async () => {
+    expect((await validateStep("nearby", "", DANA)).pt.nearby).toBe("");
+  });
+
+  it.each(["topSpecialties", "ages", "participants", "therapyTypes", "sessionFormat"])("won't skip %s", async (id) => {
+    await expect(saveStep(DANA, id, { skip: true })).rejects.toThrow("can't be skipped");
+    expect(interviewState(DANA, id).step?.required).toBe(true);
+  });
+
+  it("lets her skip an optional step", () => {
+    expect(interviewState(DANA, "expertise").step?.required).toBe(false);
+  });
+
+  it("only lets the chat answer the step she's on, or one she already saw", () => {
+    expect(stepNotAnswerable(DANA, "header")).toBeNull();
+    expect(stepNotAnswerable(DANA, "therapyTypes")).toMatch(/isn't the question we're on/);
+    expect(stepNotAnswerable(DANA, "made-up")).toMatch(/isn't part of the profile/);
+    expect(stepNotAnswerable({ ...DANA, pt: { ...DANA.pt, seen: ["header", "focus"] } }, "focus")).toBeNull();
   });
 
   it("only accepts listed choices", async () => {
@@ -127,10 +189,23 @@ describe("PT profile view and export", () => {
     expect(v.source).toBe("live");
   });
 
+  it("quotes her regular session fee, not the intake fee", () => {
+    const f = { ...FILLED, fees: [{ label: "First session (intake)", cents: 20000 }, { label: "Therapy, 38-52 minutes", cents: 15000 }] };
+    expect(buildProfileView(f, null).glance.feeLine).toMatch(/^\$150 per session/);
+  });
+
   it("never shows a license number or a made-up endorsement", () => {
     expect(v.qualifications.licenseLine).toBe("Licensed by the State of Illinois (LCPC)");
     expect(JSON.stringify(v)).not.toMatch(/\b\d{3}[.-]\d{6}\b/);
     expect(v.sections.find((s) => s.id === "endorsements")!.copy).toMatch(/Ask a colleague/);
+  });
+
+  it("copies the At a Glance rows the preview shows", () => {
+    const glance = v.sections.find((s) => s.id === "glance")!.copy;
+    expect(glance).toContain("I specialize in Anxiety, Life Transitions and Relationship Issues");
+    expect(glance).toContain("I see: Individuals, Couples");
+    expect(exportAll(v)).toContain("I specialize in Anxiety, Life Transitions and Relationship Issues");
+    expect(v.exportText).toContain("I see: Individuals, Couples");
   });
 
   it("exports every section in order", () => {
@@ -139,5 +214,21 @@ describe("PT profile view and export", () => {
     expect(all).toContain(MAKE_IT_YOURS);
     const at = SECTIONS.map((s) => all.indexOf(`${s.title.toUpperCase()}\n`));
     expect(at.every((n, i) => n > 0 && (i === 0 || n > at[i - 1]))).toBe(true);
+  });
+});
+
+describe("PT answers parsing", () => {
+  it("keeps the good answers when one field is bad", () => {
+    const pt = parsePt({ topSpecialties: ["Anxiety", "Stress", "Grief"], nearby: "x".repeat(500), availability: "sometimes", ages: ["Adults"], junk: 1 });
+    expect(pt.topSpecialties).toEqual(["Anxiety", "Stress", "Grief"]);
+    expect(pt.ages).toEqual(["Adults"]);
+    expect(pt.nearby).toBe(EMPTY_PT.nearby);
+    expect(pt.availability).toBeNull();
+    expect("junk" in pt).toBe(false);
+  });
+
+  it("starts empty from nothing", () => {
+    expect(parsePt(null)).toEqual(EMPTY_PT);
+    expect(parsePt("bad")).toEqual(EMPTY_PT);
   });
 });

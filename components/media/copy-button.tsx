@@ -9,13 +9,13 @@ import { Button } from "@/components/ui";
  * Copies one box's words so she can paste them in herself. The visible word ("Copy",
  * "Copied") starts the accessible name. `blockedBecause` turns it off and says why.
  */
-export function CopyButton({ text, what, blockedBecause }: { text: string; what: string; blockedBecause?: string | null }) {
+export function CopyButton({ text, what, blockedBecause, label = "Copy", variant = "quiet" }: { text: string; what: string; blockedBecause?: string | null; label?: string; variant?: "quiet" | "accent" }) {
   const [done, setDone] = useState(false);
   return (
     <div className="flex flex-col gap-1">
       <Button
         type="button"
-        variant="quiet"
+        variant={variant}
         className="w-fit"
         disabled={!text || Boolean(blockedBecause)}
         onClick={async () => {
@@ -30,7 +30,7 @@ export function CopyButton({ text, what, blockedBecause }: { text: string; what:
         }}
       >
         {done ? <Check size={16} aria-hidden /> : <Copy size={16} aria-hidden />}
-        {done ? "Copied" : "Copy"}
+        {done ? "Copied" : label}
         <span className="sr-only"> {what}</span>
       </Button>
       {blockedBecause && <p className="text-small text-[var(--fg-muted)]">{blockedBecause}</p>}
