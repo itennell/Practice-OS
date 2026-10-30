@@ -4,7 +4,7 @@
 // section in the same order and card structure as a PT public profile. Built only
 // from our own components and tokens: no PT logo, colours, CSS or images. Nothing
 // here is clickable except the Copy buttons; Email, Website and Share are plain labels.
-// "Verified" is never shown: PT adds it itself after checking her license.
+// No "Verified" badge is shown: Aeon can't vouch for one (PT may add its own).
 
 import { useId, type ReactNode } from "react";
 import { ImagePlus, Quote } from "lucide-react";
@@ -111,7 +111,7 @@ function StatementBox({ box, snippetChars, first }: { box: Box; snippetChars: nu
       ) : (
         <Missing />
       )}
-      {first && box.text && <p className={MUTED}>The bold part shows in search results.</p>}
+      {first && box.text && <p className={MUTED}>In bold: the first {snippetChars} characters, Aeon&rsquo;s estimate of what a search results card shows (unverified).</p>}
       <Findings box={box} />
       <CopyButton text={box.text} what={box.label} />
     </div>
@@ -157,8 +157,7 @@ export function PtPreview({ view }: { view: ProfileView }) {
             </div>
           </div>
         </div>
-        <p className={MUTED}>Psychology Today adds Verified after it checks your license.</p>
-        <p className={MUTED}>Endorsements: none yet</p>
+        <p className={MUTED}>Psychology Today may show a verified badge after it checks your license (not confirmed).</p>
       </Section>
 
       {/* 2 + 5. Statement with At a Glance beside it on wide containers */}

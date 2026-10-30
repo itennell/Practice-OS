@@ -42,6 +42,8 @@ const ANSWERS: Record<string, string | number | string[] | null> = {
 };
 
 test.beforeEach(() => {
+  // db:reset wipes the demo tables, so never point it at a shared database.
+  test.skip(Boolean(process.env.DATABASE_URL), "DATABASE_URL is set: refusing to run db:reset against it. Unset it to use the built-in test database.");
   execSync("npm run db:reset", { stdio: "ignore" });
 });
 

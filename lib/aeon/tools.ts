@@ -1262,6 +1262,12 @@ export const TOOLS: AeonTool[] = [
       const current = pt.interviewState(f).step?.id;
       const step = input.step ?? current;
       if (step && (input.skip || input.answer !== undefined)) {
+        // Only the question she's on (or one she already saw, after Back) can be answered.
+        const wrong = pt.stepNotAnswerable(f, step);
+        if (wrong) {
+          const s = pt.interviewState(f);
+          return text({ refused: wrong, progress: `${s.answered} of ${s.total} answered`, ...(s.step ? { question: { step: s.step.id, ask: s.step.ask } } : { done: true }) });
+        }
         try {
           f = await pt.saveStep(f, step, input.skip ? { skip: true } : { value: typeof input.answer === "boolean" ? null : input.answer });
         } catch (err) {

@@ -202,7 +202,7 @@ export function PtInterview({ initial, canWrite, onChange, onWrite, writing }: {
                 Back
               </Button>
             )}
-            {step.kind !== "confirm" && step.kind !== "info" && (
+            {step.kind !== "confirm" && step.kind !== "info" && !step.required && (
               <Button type="button" variant="quiet" disabled={busy || !canWrite} onClick={() => go({ step: step.id, skip: true })}>
                 Skip
               </Button>

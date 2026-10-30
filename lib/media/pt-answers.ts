@@ -70,7 +70,15 @@ export const ptSchema = z
   })
   .strict();
 
+/** Checks each answer on its own: one bad field falls back to empty, the rest are kept. */
 export function parsePt(raw: unknown): PtAnswers {
-  const r = ptSchema.partial().safeParse(raw ?? {});
-  return { ...EMPTY_PT, ...(r.success ? r.data : {}) } as PtAnswers;
+  const out: Record<string, unknown> = { ...EMPTY_PT };
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out as PtAnswers;
+  const shape = ptSchema.shape as Record<string, z.ZodTypeAny>;
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!(k in shape)) continue;
+    const r = shape[k].safeParse(v);
+    if (r.success) out[k] = r.data;
+  }
+  return out as PtAnswers;
 }
