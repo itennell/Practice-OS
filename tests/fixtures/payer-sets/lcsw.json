@@ -1,0 +1,36 @@
+{
+  "license": "LCSW",
+  "state": "IL",
+  "first_three": [
+    "medicare",
+    "aetna",
+    "bcbsil"
+  ],
+  "payers": [
+    "medicare",
+    "aetna",
+    "bcbsil",
+    "ambetter-il",
+    "cigna-evernorth",
+    "humana",
+    "uhc-optum",
+    "il-medicaid",
+    "aetna-better-health-il",
+    "bcchp-il",
+    "countycare",
+    "meridian-il",
+    "molina-il",
+    "tricare-west"
+  ],
+  "platforms": [
+    "alma",
+    "grow-therapy",
+    "headway",
+    "rula",
+    "sondermind"
+  ],
+  "taxonomy": "1041C0700X",
+  "medicare_specialty": "Clinical Social Worker",
+  "license_only_steps": [],
+  "medicare_steps": 8
+}

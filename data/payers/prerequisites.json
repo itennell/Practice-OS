@@ -1,0 +1,248 @@
+{
+  "prerequisites": [
+    {
+      "id": "npi1",
+      "title": "Get your personal NPI (type 1)",
+      "how": "Apply free online at NPPES; you create a login first. Sole proprietors use their own SSN, not an EIN. You get the number by email.",
+      "portal_url": "https://nppes.cms.hhs.gov",
+      "aeon_can": "none",
+      "applies": "all",
+      "source": {
+        "url": "https://www.cms.gov/medicare/regulations-guidance/administrative-simplification/how-apply",
+        "quote": "Simply log onto the National Plan and Provider Enumeration System (NPPES) and apply on line.",
+        "checked_on": "2026-10-29",
+        "verified": true
+      }
+    },
+    {
+      "id": "npi2",
+      "title": "Get a business NPI (type 2) if you have a PLLC",
+      "how": "Apply in NPPES as an organization. Only needed if your practice is a PLLC or group that bills under its own name.",
+      "portal_url": "https://nppes.cms.hhs.gov",
+      "aeon_can": "none",
+      "applies": "pllc",
+      "source": {
+        "url": "https://www.cms.gov/files/document/npi-fact-sheet.pdf",
+        "quote": "Type 2 NPI for organization providers",
+        "checked_on": "2026-10-29",
+        "verified": false
+      }
+    },
+    {
+      "id": "taxonomy",
+      "title": "Pick your taxonomy code",
+      "how": "NPPES lets you list more than one taxonomy code on your NPI, with one marked primary. LCSW: 1041C0700X (Social Worker, Clinical) for Medicare and commercial payers. LMFT: 106H00000X for both. Psychologist: 103TC0700X (Psychologist, Clinical) for both. LCPC: Medicare tells counselors to select 101YM0800X (Mental Health Counselor), and commercial payers usually expect 101YP2500X (Professional Counselor), so list both. Which one is primary is your call: Aeon suggests 101YM0800X if Medicare is your main payer (please confirm with your Medicare contractor). Give each commercial payer and CAQH the code that payer asks for, and keep NPPES and CAQH matching. Mismatched codes slow approvals.",
+      "portal_url": "https://nppes.cms.hhs.gov",
+      "aeon_can": "none",
+      "applies": "all",
+      "source": {
+        "url": "https://www.cms.gov/medicare/provider-enrollment-and-certification/find-your-taxonomy-code",
+        "quote": "You may select more than one code or code description when applying for an NPI, but you must indicate one of them as the primary code.",
+        "checked_on": "2026-10-30",
+        "verified": true
+      }
+    },
+    {
+      "id": "caqh",
+      "title": "Complete CAQH ProView and keep it attested",
+      "how": "Fill in your profile, upload your license and malpractice certificate, attest, and authorize each payer to view it. Re-attest every 120 days (every 180 days if you practice in Illinois). CAQH also asks you to confirm your data by quarterly email.",
+      "portal_url": "https://proview.caqh.org",
+      "aeon_can": "caqh_prep",
+      "applies": "all",
+      "source": {
+        "url": "https://www.caqh.org/solutions/caqh-proview-faqs",
+        "quote": "they are still required to attest to their data profiles every 120 days (every 180 days for IL providers)",
+        "checked_on": "2026-10-29",
+        "verified": true
+      }
+    },
+    {
+      "id": "malpractice",
+      "title": "Carry malpractice insurance",
+      "how": "Buy professional liability coverage; payers commonly ask for $1M per claim and $3M total. Have the certificate PDF ready.",
+      "portal_url": null,
+      "aeon_can": "none",
+      "applies": "all",
+      "source": {
+        "url": "https://www.caqh.org/resources",
+        "quote": "Payers require current professional liability coverage documents in CAQH",
+        "checked_on": "2026-10-29",
+        "verified": false
+      }
+    },
+    {
+      "id": "ein",
+      "title": "Get an EIN and a W-9",
+      "how": "Apply free on irs.gov (takes minutes) if you have a PLLC or want to avoid using your SSN. Fill a W-9 for payers.",
+      "portal_url": "https://www.irs.gov/businesses/small-businesses-self-employed/apply-for-an-employer-identification-number-ein-online",
+      "aeon_can": "none",
+      "applies": "all",
+      "source": {
+        "url": "https://www.irs.gov/businesses/small-businesses-self-employed/apply-for-an-employer-identification-number-ein-online",
+        "quote": "Apply for an Employer Identification Number (EIN) online",
+        "checked_on": "2026-10-29",
+        "verified": false
+      }
+    },
+    {
+      "id": "il-license",
+      "title": "Confirm your Illinois license is active and independent",
+      "how": "Look yourself up on IDFPR's license lookup. Payers need LCSW, LCPC, LMFT or licensed clinical psychologist, not the supervised-level license.",
+      "portal_url": "https://online-dfpr.micropact.com/lookup/licenselookup.aspx",
+      "aeon_can": "none",
+      "applies": "all",
+      "source": {
+        "url": "https://idfpr.illinois.gov",
+        "quote": "IDFPR license lookup",
+        "checked_on": "2026-10-29",
+        "verified": false
+      }
+    },
+    {
+      "id": "il-impact",
+      "title": "Optional: enroll in Illinois Medicaid IMPACT",
+      "how": "Only needed to bill Illinois Medicaid. Create an account in IMPACT, choose the provider type and specialty that match your license (LCSW, LCPC and LMFT under Behavioral Health Services; psychologists under Psychologist), then contract with the MCOs separately.",
+      "portal_url": "https://impact.illinois.gov",
+      "aeon_can": "none",
+      "applies": "all",
+      "source": {
+        "url": "https://hfs.illinois.gov/medicalproviders/notices/notice.prn230824a.html",
+        "quote": "must enroll as the Provider Type and Specialty corresponding to their licensure",
+        "checked_on": "2026-10-29",
+        "verified": true
+      }
+    }
+  ],
+  "taxonomy": {
+    "LCSW": {
+      "code": "1041C0700X",
+      "label": "Clinical Social Worker",
+      "source": {
+        "url": "https://www.nucc.org/images/stories/CSV/nucc_taxonomy_261.csv",
+        "quote": "1041C0700X,Behavioral Health & Social Service Providers,Social Worker,Clinical",
+        "checked_on": "2026-10-29",
+        "verified": true
+      },
+      "note": "Medicare specialty code 80 (Licensed Clinical Social Worker) maps to this taxonomy."
+    },
+    "LCPC": {
+      "code": "101YP2500X",
+      "label": "Professional Counselor",
+      "source": {
+        "url": "https://www.nucc.org/images/stories/CSV/nucc_taxonomy_261.csv",
+        "quote": "101YP2500X,Behavioral Health & Social Service Providers,Counselor,Professional",
+        "checked_on": "2026-10-29",
+        "verified": true
+      },
+      "note": "Commercial payers and CAQH: 101YP2500X unless the payer asks otherwise (Aeon researched, please confirm with each payer). Medicare: CMS's MFT/MHC FAQ says to select 101YM0800X (Mental Health Counselor) in NPPES. NPPES takes more than one code with one primary, so list both; Aeon suggests 101YM0800X as primary if Medicare is her main payer (please confirm)."
+    },
+    "LMFT": {
+      "code": "106H00000X",
+      "label": "Marriage & Family Therapist",
+      "source": {
+        "url": "https://www.nucc.org/images/stories/CSV/nucc_taxonomy_261.csv",
+        "quote": "106H00000X,Behavioral Health & Social Service Providers,Marriage & Family Therapist",
+        "checked_on": "2026-10-29",
+        "verified": true
+      },
+      "note": "Same code for Medicare (106H00000X) per CMS's MFT/MHC FAQ."
+    },
+    "Psychologist": {
+      "code": "103TC0700X",
+      "label": "Psychologist, Clinical",
+      "source": {
+        "url": "https://www.nucc.org/images/stories/CSV/nucc_taxonomy_261.csv",
+        "quote": "103TC0700X,Behavioral Health & Social Service Providers,Psychologist,Clinical",
+        "checked_on": "2026-10-29",
+        "verified": true
+      },
+      "note": "Medicare specialty code 68 (Clinical Psychologist) maps to this taxonomy."
+    }
+  },
+  "state_licenses": [
+    {
+      "state": "IL",
+      "license": "LPC",
+      "independent_billing": false,
+      "note": "Professional counselor license: practice of professional counseling, not the independent private-practice level. Independent private practice needs the LCPC (225 ILCS 107).",
+      "source": {
+        "url": "https://www.ilga.gov/Legislation/ILCS/Articles?ActID=1324&ChapterID=24",
+        "quote": "\"Licensed professional counselor\" and \"professional counselor\" means a person who holds a license authorizing the practice of professional counseling",
+        "checked_on": "2026-10-29",
+        "verified": true
+      }
+    },
+    {
+      "state": "IL",
+      "license": "LCPC",
+      "independent_billing": true,
+      "note": "Independent private-practice counseling license (225 ILCS 107). Can open a private practice and bill insurance.",
+      "source": {
+        "url": "https://www.ilga.gov/Legislation/ILCS/Articles?ActID=1324&ChapterID=24",
+        "quote": "holds a license authorizing the independent practice of clinical professional counseling in private practice",
+        "checked_on": "2026-10-29",
+        "verified": true
+      }
+    },
+    {
+      "state": "IL",
+      "license": "LSW",
+      "independent_billing": false,
+      "note": "Social work license; clinical social work is allowed only if not done in an independent practice. Independent clinical practice needs the LCSW (225 ILCS 20).",
+      "source": {
+        "url": "https://www.ilga.gov/Legislation/ILCS/Articles?ActID=1295&ChapterID=24",
+        "quote": "Social casework and social group work may also include clinical social work, as long as it is not conducted in an independent practice",
+        "checked_on": "2026-10-29",
+        "verified": true
+      }
+    },
+    {
+      "state": "IL",
+      "license": "LCSW",
+      "independent_billing": true,
+      "note": "Independent practice level; may diagnose, provide psychotherapy and bill insurance (225 ILCS 20).",
+      "source": {
+        "url": "https://www.ilga.gov/Legislation/ILCS/Articles?ActID=1295&ChapterID=24",
+        "quote": "holds a license authorizing the independent practice of clinical social work in Illinois",
+        "checked_on": "2026-10-29",
+        "verified": true
+      }
+    },
+    {
+      "state": "IL",
+      "license": "LAMFT",
+      "independent_billing": false,
+      "note": "Associate license, valid no more than 5 years; must be clinically supervised, no independent practice (225 ILCS 55).",
+      "source": {
+        "url": "https://www.ilga.gov/Legislation/ILCS/Articles?ActID=1308&ChapterID=24",
+        "quote": "An associate licensed marriage and family therapist may not practice independently and must be clinically supervised",
+        "checked_on": "2026-10-29",
+        "verified": true
+      }
+    },
+    {
+      "state": "IL",
+      "license": "LMFT",
+      "independent_billing": true,
+      "note": "Full license (225 ILCS 55); the Act bars only the associate level from independent practice, so the full license is the independent one.",
+      "source": {
+        "url": "https://www.ilga.gov/Legislation/ILCS/Articles?ActID=1308&ChapterID=24",
+        "quote": "may petition the Department for a marriage and family therapist license upon completion of the requirements",
+        "checked_on": "2026-10-29",
+        "verified": false
+      }
+    },
+    {
+      "state": "IL",
+      "license": "Psychologist",
+      "independent_billing": true,
+      "note": "Clinical psychologist license under 225 ILCS 15; the license is required to render clinical psychological services. Independent billing follows from holding the full license.",
+      "source": {
+        "url": "https://www.ilga.gov/Legislation/ILCS/Articles?ActID=1294&ChapterID=24",
+        "quote": "No individual shall, without a valid license as a clinical psychologist issued by the Department, in any manner hold oneself out",
+        "checked_on": "2026-10-29",
+        "verified": true
+      }
+    }
+  ]
+}

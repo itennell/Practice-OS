@@ -70,7 +70,8 @@ function EditableText({ value, label, onSave, multiline = false, disabled }: { v
           setEditing(true);
         }}
         className="min-h-touch w-full rounded-[12px] px-2 py-1 text-left hover:bg-[var(--chip-off-bg)] focus-visible:outline-2 focus-visible:outline-[var(--focus)] disabled:opacity-60"
-        aria-label={`${label}: ${value || "empty"}. Click to change.`}
+        // A caption can run to 2,200 letters, so its button name stays short; the words stay readable on the page.
+        aria-label={multiline ? `${label}, click to change` : `${label}: ${value || "empty"}. Click to change.`}
       >
         <span className={multiline ? "whitespace-pre-wrap text-small" : ""}>{value || <span className="text-[var(--fg-muted)]">Add words</span>}</span>
       </button>

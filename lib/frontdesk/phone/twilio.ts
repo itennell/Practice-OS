@@ -1,5 +1,5 @@
 import { toE164, prettyPhone } from "./numbers";
-import { PhoneError, type CheckResult, type InboundText, type PhoneAdapter, type Voicemail } from "./types";
+import { PhoneError, type Call, type CheckResult, type InboundText, type PhoneAdapter, type Voicemail } from "./types";
 
 // Twilio, on her own Twilio account (Settings › Connections › Practice phone),
 // or Isaiah's developer demo line (FRONT_DESK_DEV_TWILIO=true). Practice-OS
@@ -14,7 +14,7 @@ const API = "https://api.twilio.com/2010-04-01";
 export type TwilioConfig = { accountSid: string; authToken: string; phoneNumber: string; /** Isaiah's demo line from .env. */ developer?: boolean };
 
 type TwilioRecording = { sid: string; call_sid: string; date_created: string; status: string; duration: string };
-type TwilioCall = { sid: string; from: string; to: string };
+type TwilioCall = { sid: string; from: string; to: string; status?: string; duration?: string | null; start_time?: string | null; date_created?: string };
 type TwilioMessage = { sid: string; from: string; to: string; body: string; direction: string; date_sent: string | null; date_created: string };
 
 /** Twilio's date filters take whole days; the exact cut is applied after. */
@@ -68,6 +68,8 @@ export function twilioAdapter(config: TwilioConfig, fetchImpl: typeof fetch = fe
           id: r.sid,
           from: toE164(c.from),
           receivedAt: new Date(r.date_created),
+          callId: r.call_sid,
+          seconds: Number(r.duration) || 0,
           audio: async () => {
             // .wav is mono 16-bit PCM, which muse-voice-transcribe-1.0 accepts as is.
             const res = await fetchImpl(`${base}/Recordings/${r.sid}.wav`, { headers: { Authorization: auth } });
@@ -90,6 +92,30 @@ export function twilioAdapter(config: TwilioConfig, fetchImpl: typeof fetch = fe
         .filter((m) => m.direction === "inbound")
         .map((m) => ({ id: m.sid, from: toE164(m.from) ?? m.from, body: m.body, receivedAt: new Date(m.date_sent ?? m.date_created) }))
         .filter((m) => m.receivedAt >= since)
+        .sort((a, b) => a.receivedAt.getTime() - b.receivedAt.getTime());
+    },
+
+    async recording(id: string) {
+      if (!/^RE[0-9a-f]{32}$/i.test(id)) throw new PhoneError("Not a Twilio recording id", "This voicemail has no recording to play.");
+      // MP3 is small and every browser plays it.
+      const res = await fetchImpl(`${base}/Recordings/${id}.mp3`, { headers: { Authorization: auth }, signal: AbortSignal.timeout(20_000) });
+      if (!res.ok) throw new PhoneError(`Recording download failed (${res.status})`, "Twilio hasn't finished this recording yet. Try again in a minute.", res.status);
+      return { bytes: Buffer.from(await res.arrayBuffer()), mime: "audio/mpeg" };
+    },
+
+    async listCalls(since: Date): Promise<Call[]> {
+      const q = new URLSearchParams({ To: config.phoneNumber, "StartTime>": day(new Date(since.getTime() - 86_400_000)), PageSize: "100" });
+      const out = await call<{ calls: TwilioCall[] }>(`/Calls.json?${q}`);
+      return out.calls
+        .filter((c) => !["queued", "ringing", "in-progress"].includes(c.status ?? ""))
+        .map((c) => ({
+          id: c.sid,
+          from: toE164(c.from),
+          receivedAt: new Date(c.start_time ?? c.date_created ?? 0),
+          seconds: Number(c.duration) || 0,
+          status: c.status ?? "completed",
+        }))
+        .filter((c) => c.receivedAt >= since)
         .sort((a, b) => a.receivedAt.getTime() - b.receivedAt.getTime());
     },
 

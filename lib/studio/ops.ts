@@ -67,7 +67,8 @@ export const CANVAS_ONLY: ReadonlySet<OpName> = new Set(["add_clip", "set_cues"]
 /** What the server has to do besides saving, for an op that needs more than the document. */
 export type Effect = { kind: "picture"; idea: string };
 
-export type ApplyResult = { ok: true; doc: StudioDoc; effects: Effect[] } | { ok: false; why: string };
+/** Things an op did besides what she asked, in her words, for the step summary ("took out the text 'Hi'"). */
+export type ApplyResult = { ok: true; doc: StudioDoc; effects: Effect[]; notes: string[] } | { ok: false; why: string };
 
 class OpError extends Error {}
 const fail = (why: string): never => {
@@ -91,7 +92,7 @@ function move<T>(list: T[], from: number, to: number): T[] {
 const round = (n: number) => Math.round(n * 1000) / 1000;
 const words = (t: string) => t.trim().split(/\s+/).filter(Boolean).length;
 
-function applyOne(doc: StudioDoc, op: Op, effects: Effect[]): StudioDoc {
+function applyOne(doc: StudioDoc, op: Op, effects: Effect[], notes: string[]): StudioDoc {
   switch (op.op) {
     case "move_slide": {
       const i = indexOf(doc.slides, op.slide, "slide");
@@ -151,7 +152,14 @@ function applyOne(doc: StudioDoc, op: Op, effects: Effect[]): StudioDoc {
       if (!doc.clips.length) fail("There's no video yet. Add one first.");
       const c = doc.clips[0];
       if (c.in + op.seconds >= c.out) fail(`The first clip is only ${round(c.out - c.in)} seconds.`);
-      return { ...doc, clips: [{ ...c, in: round(c.in + op.seconds) }, ...doc.clips.slice(1)], overlays: shiftTexts(doc, -op.seconds) };
+      // Everything on the finished timeline moves back with the cut: texts, captions and the cover frame.
+      const overlays = shiftTimed(doc.overlays, -op.seconds);
+      const cues = shiftTimed(doc.captions.cues, -op.seconds);
+      for (const o of doc.overlays) if (!overlays.some((x) => x.id === o.id)) notes.push(`took out the text "${o.text}" that was in the cut part`);
+      const lostCues = doc.captions.cues.length - cues.length;
+      if (lostCues) notes.push(`took out ${lostCues === 1 ? "1 caption" : `${lostCues} captions`} in the cut part`);
+      const cover = doc.cover && "time" in doc.cover ? { time: round(Math.max(0, doc.cover.time - op.seconds)) } : doc.cover;
+      return { ...doc, clips: [{ ...c, in: round(c.in + op.seconds) }, ...doc.clips.slice(1)], overlays, captions: { ...doc.captions, cues }, cover };
     }
     case "cut_end": {
       if (!doc.clips.length) fail("There's no video yet. Add one first.");
@@ -208,9 +216,9 @@ function applyOne(doc: StudioDoc, op: Op, effects: Effect[]): StudioDoc {
   }
 }
 
-/** Texts on the video move with a cut at the start, so they stay on the same moment. */
-function shiftTexts(doc: StudioDoc, by: number) {
-  return doc.overlays
+/** Texts and captions on the video move with a cut at the start, so they stay on the same moment. Ones wholly in the cut go. */
+function shiftTimed<T extends { start: number; end: number }>(list: T[], by: number): T[] {
+  return list
     .map((o) => ({ ...o, start: round(Math.max(0, o.start + by)), end: round(o.end + by) }))
     .filter((o) => o.end > 0 && o.end > o.start);
 }
@@ -220,13 +228,14 @@ export function applyOps(doc: StudioDoc, raw: unknown[], opts: { from?: "chat" |
   if (!raw.length) return { ok: false, why: "Nothing to change." };
   if (raw.length > 20) return { ok: false, why: "That's too many changes at once. Try a few at a time." };
   const effects: Effect[] = [];
+  const notes: string[] = [];
   let next = doc;
   try {
     for (const r of raw) {
       const parsed = OpSchema.safeParse(r);
       if (!parsed.success) return { ok: false, why: "Aeon didn't understand one of those changes." };
       if (opts.from === "chat" && CANVAS_ONLY.has(parsed.data.op)) return { ok: false, why: "That needs a file from your computer; use the buttons on the canvas." };
-      next = applyOne(next, parsed.data, effects);
+      next = applyOne(next, parsed.data, effects, notes);
     }
   } catch (err) {
     if (err instanceof OpError) return { ok: false, why: err.message };
@@ -234,7 +243,7 @@ export function applyOps(doc: StudioDoc, raw: unknown[], opts: { from?: "chat" |
   }
   const problems = shapeProblems(next);
   if (problems.length) return { ok: false, why: problems[0] };
-  return { ok: true, doc: next, effects };
+  return { ok: true, doc: next, effects, notes };
 }
 
 /** One short line on what an op changed, for the history list and Aeon's reply. */

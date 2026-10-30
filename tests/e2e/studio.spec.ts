@@ -112,6 +112,25 @@ test("Approve it, then the big download and copy buttons and how to post it", as
   await page.screenshot({ path: test.info().outputPath("studio-finished.png"), fullPage: true });
 });
 
+test("Editing an approved post asks first; Continue sends it back to her approvals", async ({ page }) => {
+  test.setTimeout(120_000);
+  await makeReel(page);
+  await canvas(page).getByRole("button", { name: "Approve" }).click();
+  await expect(page.getByTestId("finished")).toBeVisible({ timeout: 30_000 });
+  const before = await slideWords(page, 2).getAttribute("aria-label");
+  await say(page, "make slide 2 shorter");
+  await expect(page.getByTestId("reapprove-why")).toHaveText("Editing this will need a new approval. Continue?");
+  // Nothing changed yet.
+  await expect(slideWords(page, 2)).toHaveAttribute("aria-label", before!);
+  await chat(page).getByRole("button", { name: "Continue" }).click();
+  await expect(chat(page).getByText("Slide 2 is shorter.")).toBeVisible();
+  // Back to waiting for her: Approve shows again, the download buttons don't.
+  await expect(canvas(page).getByRole("button", { name: "Approve" })).toBeVisible();
+  await expect(page.getByTestId("finished")).toHaveCount(0);
+  // Only the new reply is announced.
+  await expect(page.getByTestId("studio-heard")).toHaveText("Slide 2 is shorter.");
+});
+
 test("An advice topic gets the plain reason and logistics angles, never an error", async ({ page }) => {
   await page.goto("/media/instagram");
   await say(page, "make a post about depression");

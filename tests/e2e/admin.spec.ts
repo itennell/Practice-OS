@@ -103,7 +103,7 @@ test("Release form panel: blank and revocation PDFs, a filled form downloads, bl
   expect(errors.filter((e) => !e.includes("status of 400"))).toEqual([]);
 });
 
-const PANELS = ["gfe", "superbill", "release", "credentialing", "insurance", "hours"];
+const PANELS = ["forms", "gfe", "superbill", "release", "credentialing", "insurance", "hours"];
 
 for (const path of ["/admin", ...PANELS.map((p) => `/admin?panel=${p}`)]) {
   test(`${path} has no serious accessibility problems`, async ({ page }) => {

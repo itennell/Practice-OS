@@ -44,6 +44,13 @@ export const SCENARIOS: Scenario[] = [
     expectReply: /approv/i,
   },
   {
+    // Client forms library (lib/client-forms): asking in the chat gives the template as a document card.
+    name: "client-form",
+    conversations: [["make me a telehealth consent form"]],
+    expectTools: ["create_document"],
+    expectReply: /telehealth/i,
+  },
+  {
     name: "status",
     conversations: [["Is Practice-OS in dry-run mode right now?"]],
     expectTools: ["status"],
@@ -56,6 +63,15 @@ export const SCENARIOS: Scenario[] = [
     conversations: [["What needs me this week?", "can you pull up the documents here in the chat"]],
     expectTools: ["morning_brief", "find_documents"],
     expectReply: /BCBS|CAQH|card|below/i,
+  },
+  {
+    // Insurance checklist parity: the chat walks the same checklist as Admin › Insurance and
+    // checks off the same step. Cigna starts "not started" for the demo LCPC.
+    name: "walk-cigna",
+    conversations: [["Walk me through getting on Cigna, one step at a time.", "Done, my CAQH profile is complete and attested, and I gave Cigna access."]],
+    expectTools: ["payer_checklist", "check_payer_step"],
+    forbidTools: ["update_payer_application"],
+    expectReply: /next|step|portal/i,
   },
   {
     // The Instagram content coach: ideas first, then a draft of the one she picks, waiting for her OK.
@@ -74,5 +90,19 @@ export const SCENARIOS: Scenario[] = [
     expectTools: [],
     forbidTools: ["forget", "remember"],
     expectReply: /clinical|outside|not something|can't|cannot|don't give/i,
+  },
+  {
+    name: "pt-profile",
+    conversations: [
+      [
+        "Set up my Psychology Today profile",
+        "Yes, that's right",
+        "Mostly anxiety, big life changes, and couples who feel stuck",
+        "We talk about what brought you in and what you hope will change",
+      ],
+    ],
+    expectTools: ["pt_profile_interview"],
+    forbidTools: ["directory_profile"],
+    expectReply: /work/i,
   },
 ];

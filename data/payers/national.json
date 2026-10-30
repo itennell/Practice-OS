@@ -1,0 +1,2073 @@
+[
+  {
+    "id": "aetna",
+    "name": "Aetna (commercial, behavioral health)",
+    "aliases": [
+      "aetna",
+      "aetna commercial"
+    ],
+    "kind": "commercial",
+    "states": [
+      "*"
+    ],
+    "networks": [
+      {
+        "id": "commercial",
+        "name": "Aetna commercial (incl. behavioral health)",
+        "panel": {
+          "status": "unknown",
+          "note": "Aetna does not publish whether the panel is open. It checks need in your area; if the panel is not open you get a denial by letter or email and can ask again later.",
+          "source": {
+            "url": "https://www.aetna.com/health-care-professionals/join-the-aetna-network.html",
+            "quote": "If the panel is not open or we do not intend to pursue a contract, you will be notified by a letter or email",
+            "checked_on": "2026-10-30",
+            "verified": true
+          }
+        }
+      }
+    ],
+    "eligibility": {
+      "LCSW": {
+        "eligible": true,
+        "note": "Aetna's request form is for medical and behavioral health professionals. The page does not list license types by name; no exclusion found.",
+        "source": {
+          "url": "https://www.aetna.com/health-care-professionals/join-the-aetna-network.html",
+          "quote": "including Behavioral Health professionals",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      "LCPC": {
+        "eligible": true,
+        "note": "Aetna's request form is for medical and behavioral health professionals. The page does not list license types by name; no exclusion found.",
+        "source": {
+          "url": "https://www.aetna.com/health-care-professionals/join-the-aetna-network.html",
+          "quote": "including Behavioral Health professionals",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      "LMFT": {
+        "eligible": true,
+        "note": "Aetna's request form is for medical and behavioral health professionals. The page does not list license types by name; no exclusion found.",
+        "source": {
+          "url": "https://www.aetna.com/health-care-professionals/join-the-aetna-network.html",
+          "quote": "including Behavioral Health professionals",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      "Psychologist": {
+        "eligible": true,
+        "note": "Aetna's request form is for medical and behavioral health professionals. The page does not list license types by name; no exclusion found.",
+        "source": {
+          "url": "https://www.aetna.com/health-care-professionals/join-the-aetna-network.html",
+          "quote": "including Behavioral Health professionals",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      }
+    },
+    "requirements": {
+      "caqh": true,
+      "npi": "type1",
+      "ein": "Tax ID on your W-9. Apply as an individual (NPI type 1); a group request under one NPI may be denied",
+      "malpractice": "Not stated on Aetna's page; confirm in your credentialing application",
+      "other": [
+        "Designate Aetna as an authorized health plan in CAQH",
+        "Active Illinois license"
+      ],
+      "source": {
+        "url": "https://www.aetna.com/health-care-professionals/join-the-aetna-network.html",
+        "quote": "Make sure you designate Aetna as an authorized health plan so we can access your application.",
+        "checked_on": "2026-10-30",
+        "verified": true
+      }
+    },
+    "timeline": {
+      "text": "Aetna decides on your request within 60 days; credentialing time after that is not published (third-party guides say 60-120 days).",
+      "source": {
+        "url": "https://www.aetna.com/health-care-professionals/join-the-aetna-network.html",
+        "quote": "we will review your request and make a decision within 60 days.",
+        "checked_on": "2026-10-30",
+        "verified": true
+      }
+    },
+    "fees": {
+      "text": "No application fee stated on the page; not confirmed either way.",
+      "source": {
+        "url": "https://www.aetna.com/health-care-professionals/join-the-aetna-network.html",
+        "quote": "No application fee is mentioned on the page.",
+        "checked_on": "2026-10-30",
+        "verified": false
+      }
+    },
+    "recredential": {
+      "text": "Not published on Aetna's join page; 36 months is a common industry cycle but unconfirmed.",
+      "months": 36,
+      "source": {
+        "url": "https://www.aetna.com/health-care-professionals/join-the-aetna-network.html",
+        "quote": "Not stated on this page.",
+        "checked_on": "2026-10-30",
+        "verified": false
+      }
+    },
+    "steps": [
+      {
+        "id": "caqh-ready",
+        "stage": "credentialing",
+        "title": "Finish and attest your CAQH profile",
+        "how": "Complete every section, upload documents, attest, and authorize Aetna as a health plan.",
+        "portal_url": "https://proview.caqh.org",
+        "aeon_can": "caqh_prep",
+        "submits": false,
+        "source": {
+          "url": "https://www.aetna.com/health-care-professionals/join-the-aetna-network.html",
+          "quote": "Make sure you designate Aetna as an authorized health plan so we can access your application.",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      {
+        "id": "request-form",
+        "stage": "credentialing",
+        "title": "Submit the Aetna request for participation form",
+        "how": "On Aetna's Join the Aetna Network page, choose Medical and behavioral health and fill out the request for participation form. You submit it yourself.",
+        "portal_url": "https://www.aetna.com/health-care-professionals/join-the-aetna-network.html",
+        "aeon_can": "none",
+        "submits": true,
+        "source": {
+          "url": "https://www.aetna.com/health-care-professionals/join-the-aetna-network.html",
+          "quote": "First, you can request participation in the Aetna network by completing our online request for participation form.",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      {
+        "id": "need-review",
+        "stage": "credentialing",
+        "title": "Wait for the network-need decision",
+        "how": "Aetna checks whether it needs providers in your area and answers within 60 days. If the panel is open, a Network Manager contacts you to start credentialing. If not, you get a denial by letter or email and can ask again later.",
+        "portal_url": "https://www.aetna.com/health-care-professionals/join-the-aetna-network.html",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://www.aetna.com/health-care-professionals/join-the-aetna-network.html",
+          "quote": "we’ll evaluate the current need to service our membership in your area",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      {
+        "id": "sign-contract",
+        "stage": "contracting",
+        "title": "Sign and return the contract",
+        "how": "When credentialing is done, Aetna finalizes your contract and sends welcome materials. Read and sign what they send.",
+        "portal_url": "https://www.aetna.com/health-care-professionals/join-the-aetna-network.html",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://www.aetna.com/health-care-professionals/join-the-aetna-network.html",
+          "quote": "When you complete credentialing, your contract will be finalized and you'll receive welcome materials to get up and running.",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      {
+        "id": "fee-schedule",
+        "stage": "contracting",
+        "title": "Check the fee schedule",
+        "how": "Ask the Network Manager for your rates by CPT code before signing.",
+        "portal_url": null,
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://www.aetna.com/health-care-professionals/join-the-aetna-network.html",
+          "quote": "Not stated on the Aetna page beyond welcome materials.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      {
+        "id": "effective-date",
+        "stage": "contracting",
+        "title": "Note your effective date",
+        "how": "Confirm the date in your welcome materials and do not bill in-network before it.",
+        "portal_url": null,
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://www.aetna.com/health-care-professionals/join-the-aetna-network.html",
+          "quote": "Not stated on the Aetna page beyond welcome materials.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      {
+        "id": "retro",
+        "stage": "contracting",
+        "title": "Ask about retro billing",
+        "how": "Ask whether claims can be billed back to the effective date. Not published; get it in writing.",
+        "portal_url": null,
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://www.aetna.com/health-care-professionals/join-the-aetna-network.html",
+          "quote": "Not stated on the Aetna page beyond welcome materials.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      }
+    ],
+    "notes": [
+      {
+        "text": "Aetna does not publish whether the panel is open; it decides by area. Behavioral health uses the same Medical and behavioral health request form.",
+        "source": null
+      },
+      {
+        "text": "CAQH rebranded DataSpring in 2026 per third-party sources; proview.caqh.org may redirect.",
+        "source": null
+      },
+      {
+        "text": "Aetna Illinois Medicare Advantage / Medicaid not covered here.",
+        "source": null
+      },
+      {
+        "text": "Malpractice minimum, recredentialing cadence, fee schedule, effective date and retro billing are not on the page, so they are unverified.",
+        "source": null
+      }
+    ]
+  },
+  {
+    "id": "cigna-evernorth",
+    "name": "Cigna / Evernorth Behavioral Health",
+    "aliases": [
+      "cigna",
+      "evernorth",
+      "cigna behavioral health",
+      "evernorth behavioral health"
+    ],
+    "kind": "commercial",
+    "states": [
+      "*"
+    ],
+    "networks": [
+      {
+        "id": "outpatient",
+        "name": "Cigna behavioral health (Evernorth)",
+        "panel": {
+          "status": "unknown",
+          "note": "The page lists no open or closed notice for Illinois. Only Texas has a limited application window (Feb 1-28, 2026), so Illinois panel status is unknown.",
+          "source": {
+            "url": "https://www.evernorth.com/providers/behavioral/join-the-network",
+            "quote": "Cigna will accept applications for participation in their networks of physicians and other providers from February 1, 2026 through February 28, 2026.",
+            "checked_on": "2026-10-30",
+            "verified": true
+          }
+        }
+      }
+    ],
+    "eligibility": {
+      "LCSW": {
+        "eligible": true,
+        "note": "The page does not list license types by name. It asks for a license to practice independently, without supervision, in your state.",
+        "source": {
+          "url": "https://www.evernorth.com/providers/behavioral/join-the-network",
+          "quote": "A license to practice independently (without supervision) in the state in which you are providing services",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      "LCPC": {
+        "eligible": true,
+        "note": "The page does not list license types by name. It asks for a license to practice independently, without supervision, in your state.",
+        "source": {
+          "url": "https://www.evernorth.com/providers/behavioral/join-the-network",
+          "quote": "A license to practice independently (without supervision) in the state in which you are providing services",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      "LMFT": {
+        "eligible": true,
+        "note": "The page does not list license types by name. It asks for a license to practice independently, without supervision, in your state.",
+        "source": {
+          "url": "https://www.evernorth.com/providers/behavioral/join-the-network",
+          "quote": "A license to practice independently (without supervision) in the state in which you are providing services",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      "Psychologist": {
+        "eligible": true,
+        "note": "The page does not list license types by name. It asks for a license to practice independently, without supervision, in your state.",
+        "source": {
+          "url": "https://www.evernorth.com/providers/behavioral/join-the-network",
+          "quote": "A license to practice independently (without supervision) in the state in which you are providing services",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      }
+    },
+    "requirements": {
+      "caqh": true,
+      "npi": "type1",
+      "ein": "Current W-9 matching the tax ID on the Provider Information Form",
+      "malpractice": "Professional and general liability insurance: $1M/$1M for most providers (prescribers $1M/$3M)",
+      "other": [
+        "Re-attest CAQH every 120 days (180 days for Illinois)",
+        "Authorize Evernorth to see your CAQH profile",
+        "Five years of work history, explain gaps over 6 months",
+        "CV dated within the last 2 years",
+        "Application must be finished in one sitting",
+        "Proof of general liability insurance as well as professional liability"
+      ],
+      "source": {
+        "url": "https://www.evernorth.com/providers/behavioral/join-the-network",
+        "quote": "$1 million/$1 million for all other providers",
+        "checked_on": "2026-10-30",
+        "verified": true
+      }
+    },
+    "timeline": {
+      "text": "Up to 90 calendar days; provisional credentialing possible case by case.",
+      "source": {
+        "url": "https://www.evernorth.com/providers/behavioral/join-the-network",
+        "quote": "The process to join the Evernorth network can take up to 90 calendar days to complete",
+        "checked_on": "2026-10-30",
+        "verified": true
+      }
+    },
+    "fees": {
+      "text": "No fee stated on the page; not confirmed either way.",
+      "source": {
+        "url": "https://www.evernorth.com/providers/behavioral/join-the-network",
+        "quote": "No application fee is mentioned on the page.",
+        "checked_on": "2026-10-30",
+        "verified": false
+      }
+    },
+    "recredential": {
+      "text": "CAQH re-attestation every 180 days in Illinois. How often Evernorth re-credentials you is not stated on its page (36 months is a common industry cycle, unconfirmed).",
+      "months": 36,
+      "source": {
+        "url": "https://www.evernorth.com/providers/behavioral/join-the-network",
+        "quote": "Must re-attest every 120 days, or every 180 days for Illinois providers.",
+        "checked_on": "2026-10-30",
+        "verified": true
+      }
+    },
+    "steps": [
+      {
+        "id": "caqh-ready",
+        "stage": "credentialing",
+        "title": "Finish CAQH and authorize Evernorth",
+        "how": "Complete and attest your CAQH profile, then give Evernorth permission to view it. Write down your CAQH ID. In Illinois you must re-attest every 180 days.",
+        "portal_url": "https://proview.caqh.org",
+        "aeon_can": "caqh_prep",
+        "submits": false,
+        "source": {
+          "url": "https://www.evernorth.com/providers/behavioral/join-the-network",
+          "quote": "Evernorth must be authorized to access your CAQH profile.",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      {
+        "id": "portal",
+        "stage": "credentialing",
+        "title": "Register on the Evernorth Provider Portal",
+        "how": "Create an account on the Evernorth Provider Portal. Your office's portal access manager (you, if you are first) must give you the Contracting permission. Log out and back in, then choose My Practice, then Contracting.",
+        "portal_url": "https://provider.evernorth.com",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://www.evernorth.com/providers/behavioral/join-the-network",
+          "quote": "Select My Practice > Contracting to submit or view applications.",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      {
+        "id": "pif",
+        "stage": "credentialing",
+        "title": "Submit the Provider Information Form",
+        "how": "Fill in the Evernorth Behavioral Health Provider Information Form in one sitting; it cannot be saved and finished later. Have your W-9, CAQH ID and malpractice certificate ready. You submit it yourself.",
+        "portal_url": "https://www.evernorth.com/providers/behavioral/join-the-network",
+        "aeon_can": "none",
+        "submits": true,
+        "source": {
+          "url": "https://www.evernorth.com/providers/behavioral/join-the-network",
+          "quote": "Once you begin the application, it must be completed in a single session.",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      {
+        "id": "wait",
+        "stage": "credentialing",
+        "title": "Watch email for Evernorth replies",
+        "how": "Track the application in the portal. Evernorth notifies you if it needs more information, so answer quickly. It can take up to 90 days.",
+        "portal_url": "https://www.evernorth.com/providers/behavioral/join-the-network",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://www.evernorth.com/providers/behavioral/join-the-network",
+          "quote": "The process to join the Evernorth network can take up to 90 calendar days to complete",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      {
+        "id": "sign-contract",
+        "stage": "contracting",
+        "title": "Sign and return the contract",
+        "how": "Review and sign the agreement Evernorth sends.",
+        "portal_url": "https://www.evernorth.com/providers/behavioral/join-the-network",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://www.evernorth.com/providers/behavioral/join-the-network",
+          "quote": "Not stated on the Evernorth join-the-network page.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      {
+        "id": "fee-schedule",
+        "stage": "contracting",
+        "title": "Check the fee schedule",
+        "how": "Ask for the rate sheet by CPT code before signing.",
+        "portal_url": null,
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://www.evernorth.com/providers/behavioral/join-the-network",
+          "quote": "Not stated on the Evernorth join-the-network page.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      {
+        "id": "effective-date",
+        "stage": "contracting",
+        "title": "Note your effective date",
+        "how": "Write down the effective date in the welcome letter.",
+        "portal_url": null,
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://www.evernorth.com/providers/behavioral/join-the-network",
+          "quote": "Not stated on the Evernorth join-the-network page.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      {
+        "id": "retro",
+        "stage": "contracting",
+        "title": "Ask about retro billing",
+        "how": "Ask whether claims can be billed back to the effective date; not published.",
+        "portal_url": null,
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://www.evernorth.com/providers/behavioral/join-the-network",
+          "quote": "Not stated on the Evernorth join-the-network page.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      }
+    ],
+    "notes": [
+      {
+        "text": "The Evernorth page was read in full on 2026-10-30. Contract signing, rate sheet, effective date and retro billing are not described on it, so those steps are unverified.",
+        "source": null
+      },
+      {
+        "text": "The page lists BehavioralProviderRecruitment@Evernorth.com for questions and 1 (888) 736-7499 for portal help.",
+        "source": null
+      },
+      {
+        "text": "Group/clinic route (4+ clinicians) is separate and not her case as a solo.",
+        "source": null
+      }
+    ]
+  },
+  {
+    "id": "uhc-optum",
+    "name": "UnitedHealthcare / Optum Behavioral Health",
+    "aliases": [
+      "unitedhealthcare",
+      "united healthcare",
+      "uhc",
+      "optum",
+      "united"
+    ],
+    "kind": "commercial",
+    "states": [
+      "*"
+    ],
+    "networks": [
+      {
+        "id": "commercial",
+        "name": "Optum commercial behavioral health",
+        "panel": {
+          "status": "unknown",
+          "note": "Optum's page for individually credentialed clinicians shows no open or closed notice for Illinois, so panel status is unknown. Confirm when you apply.",
+          "source": {
+            "url": "https://public.providerexpress.com/content/ope-provexpr/us/en/our-network/individually-contracted-clinicians.html",
+            "quote": "CAQH Participation is required in the majority of the states to join our network.",
+            "checked_on": "2026-10-30",
+            "verified": true
+          }
+        }
+      }
+    ],
+    "eligibility": {
+      "LCSW": {
+        "eligible": true,
+        "note": "Optum's page does not list license types for individual clinicians. No exclusion found; confirm your license is accepted in Provider Express.",
+        "source": {
+          "url": "https://public.providerexpress.com/content/ope-provexpr/us/en/our-network/individually-contracted-clinicians.html",
+          "quote": "CAQH Participation is required in the majority of the states to join our network.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      "LCPC": {
+        "eligible": true,
+        "note": "Optum's page does not list license types for individual clinicians. No exclusion found; confirm your license is accepted in Provider Express.",
+        "source": {
+          "url": "https://public.providerexpress.com/content/ope-provexpr/us/en/our-network/individually-contracted-clinicians.html",
+          "quote": "CAQH Participation is required in the majority of the states to join our network.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      "LMFT": {
+        "eligible": true,
+        "note": "Optum's page does not list license types for individual clinicians. No exclusion found; confirm your license is accepted in Provider Express.",
+        "source": {
+          "url": "https://public.providerexpress.com/content/ope-provexpr/us/en/our-network/individually-contracted-clinicians.html",
+          "quote": "CAQH Participation is required in the majority of the states to join our network.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      "Psychologist": {
+        "eligible": true,
+        "note": "Optum's page does not list license types for individual clinicians. No exclusion found; confirm your license is accepted in Provider Express.",
+        "source": {
+          "url": "https://public.providerexpress.com/content/ope-provexpr/us/en/our-network/individually-contracted-clinicians.html",
+          "quote": "CAQH Participation is required in the majority of the states to join our network.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      }
+    },
+    "requirements": {
+      "caqh": true,
+      "npi": "type1",
+      "ein": "Signed W-9 with correct Tax ID or EIN",
+      "malpractice": "Current professional liability certificate required; Optum's page gives no dollar minimum for individual clinicians",
+      "other": [
+        "Authorize United Behavioral Health / US Behavioral Health Plan in CAQH",
+        "Your practice locations in CAQH must match your Optum application",
+        "Signed W-9 with the correct Tax ID or EIN",
+        "Register on Provider Express"
+      ],
+      "source": {
+        "url": "https://public.providerexpress.com/content/ope-provexpr/us/en/our-network/individually-contracted-clinicians.html",
+        "quote": "Current Professional Liability Insurance Certificate",
+        "checked_on": "2026-10-30",
+        "verified": true
+      }
+    },
+    "timeline": {
+      "text": "Not published by Optum for individual clinicians (third-party estimates of 60-90 days are unconfirmed). Slow replies to document requests delay it.",
+      "source": {
+        "url": "https://public.providerexpress.com/content/ope-provexpr/us/en/our-network/individually-contracted-clinicians.html",
+        "quote": "Not published on the page.",
+        "checked_on": "2026-10-30",
+        "verified": false
+      }
+    },
+    "fees": {
+      "text": "No fee stated on the page; not confirmed either way.",
+      "source": {
+        "url": "https://public.providerexpress.com/content/ope-provexpr/us/en/our-network/individually-contracted-clinicians.html",
+        "quote": "No fee is mentioned on the page.",
+        "checked_on": "2026-10-30",
+        "verified": false
+      }
+    },
+    "recredential": {
+      "text": "Not stated on Optum's application page; 36 months is a common industry cycle but unconfirmed. Optum publishes separate credentialing plan documents.",
+      "months": 36,
+      "source": {
+        "url": "https://public.providerexpress.com/content/ope-provexpr/us/en/our-network/individually-contracted-clinicians.html",
+        "quote": "Not stated on this page.",
+        "checked_on": "2026-10-30",
+        "verified": false
+      }
+    },
+    "steps": [
+      {
+        "id": "caqh-ready",
+        "stage": "credentialing",
+        "title": "Finish CAQH and authorize Optum",
+        "how": "Complete and attest your CAQH profile. Then sign in to CAQH ProView, open your account settings, and in the Authorization section allow United Behavioral Health / US Behavioral Health Plan to view it.",
+        "portal_url": "https://proview.caqh.org",
+        "aeon_can": "caqh_prep",
+        "submits": false,
+        "source": {
+          "url": "https://public.providerexpress.com/content/ope-provexpr/us/en/our-network/individually-contracted-clinicians.html",
+          "quote": "authorize United Behavioral Health/US Behavioral Health Plan",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      {
+        "id": "register",
+        "stage": "credentialing",
+        "title": "Register on Provider Express",
+        "how": "On Optum's Individually Credentialed Clinicians page, click Continue, then register for or sign in to Provider Express.",
+        "portal_url": "https://public.providerexpress.com/content/ope-provexpr/us/en/our-network/individually-contracted-clinicians.html",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://public.providerexpress.com/content/ope-provexpr/us/en/our-network/individually-contracted-clinicians.html",
+          "quote": "After clicking the Continue button you will be prompted to register or login to Provider Express.",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      {
+        "id": "join",
+        "stage": "credentialing",
+        "title": "Submit Join Our Network application",
+        "how": "After signing in, choose Join Our Network in the menu. Enter your CAQH ID if asked, and attach a signed W-9 and your current liability insurance certificate. You submit it yourself.",
+        "portal_url": "https://public.providerexpress.com/content/ope-provexpr/us/en/our-network/individually-contracted-clinicians.html",
+        "aeon_can": "none",
+        "submits": true,
+        "source": {
+          "url": "https://public.providerexpress.com/content/ope-provexpr/us/en/our-network/individually-contracted-clinicians.html",
+          "quote": "please use the Join Our Network feature in the menu to proceed to the credentialing application.",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      {
+        "id": "status",
+        "stage": "credentialing",
+        "title": "Track status",
+        "how": "Sign in to Provider Express, open My Network Status, then Check Initial Credentialing Status.",
+        "portal_url": "https://public.providerexpress.com/content/ope-provexpr/us/en/our-network/individually-contracted-clinicians.html",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://public.providerexpress.com/content/ope-provexpr/us/en/our-network/individually-contracted-clinicians.html",
+          "quote": "use the Check Initial Credentialing Status under the My Network Status feature in the menu",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      {
+        "id": "sign-contract",
+        "stage": "contracting",
+        "title": "Sign the contract in DocuSign",
+        "how": "Any contract papers still needed arrive by DocuSign. Sign and return them quickly; slow replies delay your application.",
+        "portal_url": "https://public.providerexpress.com/content/ope-provexpr/us/en/our-network/individually-contracted-clinicians.html",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://public.providerexpress.com/content/ope-provexpr/us/en/our-network/individually-contracted-clinicians.html",
+          "quote": "Missing documents are sent out via DocuSign. Sign and return as quickly as possible.",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      {
+        "id": "fee-schedule",
+        "stage": "contracting",
+        "title": "Check the fee schedule",
+        "how": "Review the rates in the agreement for your license type.",
+        "portal_url": null,
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://public.providerexpress.com/content/ope-provexpr/us/en/our-network/individually-contracted-clinicians.html",
+          "quote": "Not stated on the Optum page.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      {
+        "id": "effective-date",
+        "stage": "contracting",
+        "title": "Note your effective date",
+        "how": "Note the effective date in the confirmation.",
+        "portal_url": null,
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://public.providerexpress.com/content/ope-provexpr/us/en/our-network/individually-contracted-clinicians.html",
+          "quote": "Not stated on the Optum page.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      {
+        "id": "retro",
+        "stage": "contracting",
+        "title": "Ask about retro billing",
+        "how": "Ask whether claims can be billed back to the effective date; not published.",
+        "portal_url": null,
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://public.providerexpress.com/content/ope-provexpr/us/en/our-network/individually-contracted-clinicians.html",
+          "quote": "Not stated on the Optum page.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      }
+    ],
+    "notes": [
+      {
+        "text": "Optum's page gave no malpractice minimum, timeline, fee or re-credentialing cadence for individual clinicians. Rate sheet, effective date and retro billing are not described, so those steps are unverified.",
+        "source": null
+      },
+      {
+        "text": "CAQH is rolling out as DataSpring in some materials (third-party); ProView sign-in unchanged.",
+        "source": null
+      },
+      {
+        "text": "Optum Medicare/Medicaid Illinois networks not covered.",
+        "source": null
+      }
+    ]
+  },
+  {
+    "id": "humana",
+    "name": "Humana (Medicare Advantage behavioral health)",
+    "aliases": [
+      "humana medicare advantage"
+    ],
+    "kind": "commercial",
+    "states": [
+      "*"
+    ],
+    "networks": [
+      {
+        "id": "ma-bh",
+        "name": "Humana Medicare Advantage behavioral health",
+        "panel": {
+          "status": "unknown",
+          "note": "Humana does not publish whether its behavioral panel is open. Humana Behavioral Health's own page could not be opened on 2026-10-30 (site refused the connection), so this is unconfirmed.",
+          "source": {
+            "url": "https://www.humanabehavioralhealth.com/providers/join-our-network/",
+            "quote": "All providers must be Medicare eligible to participate.",
+            "checked_on": "2026-10-30",
+            "verified": false
+          }
+        }
+      }
+    ],
+    "eligibility": {
+      "LCSW": {
+        "eligible": true,
+        "note": "Search results say Humana Behavioral Health recruits social workers; must be Medicare eligible. Its own page could not be opened to confirm.",
+        "source": {
+          "url": "https://www.humanabehavioralhealth.com/providers/join-our-network/",
+          "quote": "social workers",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      "LCPC": {
+        "eligible": true,
+        "note": "Search results say licensed professional counselors are recruited; Medicare covers counselors. Its own page could not be opened to confirm.",
+        "source": {
+          "url": "https://www.humanabehavioralhealth.com/providers/join-our-network/",
+          "quote": "licensed professional counselors",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      "LMFT": {
+        "eligible": true,
+        "note": "Search results say marriage and family therapists are recruited; Medicare enrollment needed. Its own page could not be opened to confirm.",
+        "source": {
+          "url": "https://www.humanabehavioralhealth.com/providers/join-our-network/",
+          "quote": "licensed marriage and family therapists",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      "Psychologist": {
+        "eligible": true,
+        "note": "Search results say psychologists are recruited. Its own page could not be opened to confirm.",
+        "source": {
+          "url": "https://www.humanabehavioralhealth.com/providers/join-our-network/",
+          "quote": "psychologists",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      }
+    },
+    "requirements": {
+      "caqh": null,
+      "npi": "type1",
+      "ein": "Tax ID on W-9",
+      "malpractice": "Not confirmed; Humana's behavioral health page could not be opened",
+      "other": [
+        "Medicare enrollment (CMS-855I) first",
+        "Use the Provider Interest Form from Humana Behavioral Health's Join Our Network page",
+        "Search results say CAQH is used for credentialing and Humana must be authorized in CAQH (unconfirmed)"
+      ],
+      "source": {
+        "url": "https://provider.humana.com/working-with-us",
+        "quote": "Credentialing information",
+        "checked_on": "2026-10-30",
+        "verified": false
+      }
+    },
+    "timeline": {
+      "text": "Not confirmed. Search results mention a decision within 120 business days of the interest form, but the official page could not be opened.",
+      "source": {
+        "url": "https://provider.humana.com/working-with-us",
+        "quote": "Credentialing information",
+        "checked_on": "2026-10-30",
+        "verified": false
+      }
+    },
+    "fees": {
+      "text": "Not found.",
+      "source": {
+        "url": "https://provider.humana.com/working-with-us",
+        "quote": "Credentialing information",
+        "checked_on": "2026-10-30",
+        "verified": false
+      }
+    },
+    "recredential": {
+      "text": "Carelon-managed plans recredential every 3 years; Humana's own cycle is not confirmed.",
+      "months": 36,
+      "source": {
+        "url": "https://www.carelonbehavioralhealth.com/providers/join-our-network",
+        "quote": "Re-credentialing is required every three years",
+        "checked_on": "2026-10-30",
+        "verified": false
+      }
+    },
+    "steps": [
+      {
+        "id": "medicare",
+        "stage": "credentialing",
+        "title": "Get enrolled in Medicare first",
+        "how": "Humana Medicare Advantage needs you to be Medicare eligible. Finish your Medicare enrollment before you apply to Humana.",
+        "portal_url": "https://www.cms.gov",
+        "aeon_can": "cms855i",
+        "submits": false,
+        "source": {
+          "url": "https://www.humanabehavioralhealth.com/providers/join-our-network/",
+          "quote": "All providers must be Medicare eligible to participate.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      {
+        "id": "interest",
+        "stage": "credentialing",
+        "title": "Submit the Humana Provider Interest Form",
+        "how": "On Humana's provider site (Working With Us), open Join our behavioral health network and fill out the Provider Interest Form. You send it yourself. Humana decides based on need in your area, so it is not a guarantee.",
+        "portal_url": "https://provider.humana.com/working-with-us",
+        "aeon_can": "none",
+        "submits": true,
+        "source": {
+          "url": "https://provider.humana.com/working-with-us",
+          "quote": "Join our behavioral health network",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      {
+        "id": "credential",
+        "stage": "credentialing",
+        "title": "Complete Humana credentialing",
+        "how": "Answer Humana's document requests quickly. Humana usually uses CAQH, so keep your profile current and authorize Humana (unconfirmed).",
+        "portal_url": "https://provider.humana.com/working-with-us",
+        "aeon_can": "caqh_prep",
+        "submits": false,
+        "source": {
+          "url": "https://provider.humana.com/working-with-us",
+          "quote": "Credentialing information",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      {
+        "id": "sign-contract",
+        "stage": "contracting",
+        "title": "Sign and return the contract",
+        "how": "Review and sign the agreement.",
+        "portal_url": null,
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://provider.humana.com/working-with-us",
+          "quote": "Not stated on the pages that could be opened.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      {
+        "id": "fee-schedule",
+        "stage": "contracting",
+        "title": "Check the fee schedule",
+        "how": "Medicare Advantage rates often track Medicare; confirm percentage.",
+        "portal_url": null,
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://provider.humana.com/working-with-us",
+          "quote": "Not stated on the pages that could be opened.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      {
+        "id": "effective-date",
+        "stage": "contracting",
+        "title": "Note your effective date",
+        "how": "Record it from the welcome letter.",
+        "portal_url": null,
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://provider.humana.com/working-with-us",
+          "quote": "Not stated on the pages that could be opened.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      {
+        "id": "retro",
+        "stage": "contracting",
+        "title": "Ask about retro billing",
+        "how": "Ask whether back billing to the effective date is allowed.",
+        "portal_url": null,
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://provider.humana.com/working-with-us",
+          "quote": "Not stated on the pages that could be opened.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      }
+    ],
+    "notes": [
+      {
+        "text": "Humana Behavioral Health (humanabehavioralhealth.com) refused the connection on 2026-10-30. Only provider.humana.com Working With Us could be read; it lists the behavioral network and credentialing links but no steps.",
+        "source": null
+      },
+      {
+        "text": "Search results (not read on the page) say interest forms go by email, a decision takes up to 120 business days, and contracted Humana BH providers add Medicare Advantage by contract amendment. Check before relying on it.",
+        "source": null
+      },
+      {
+        "text": "Humana commercial exit not confirmed by an official source.",
+        "source": null
+      },
+      {
+        "text": "Carelon manages BH for Humana dual (Medicare-Medicaid) plans in Illinois via Availity; standard MA BH appears Humana-run.",
+        "source": null
+      }
+    ]
+  },
+  {
+    "id": "alma",
+    "name": "Alma",
+    "kind": "platform",
+    "states": [
+      "*"
+    ],
+    "networks": [
+      {
+        "id": "platform-network",
+        "name": "Alma network",
+        "panel": {
+          "status": "open",
+          "note": "Alma takes new members through a form on its provider page. You must get credentialed with at least one of Aetna, Cigna or Optum. Alma lists more partners (Oscar, UnitedHealthcare, Oxford and others by state); which apply in Illinois is not confirmed. No Medicaid listed.",
+          "source": {
+            "url": "https://helloalma.com/faq/",
+            "quote": "get credentialed with at least one of our payer partners — Aetna, Cigna, or Optum.",
+            "checked_on": "2026-10-30",
+            "verified": true
+          }
+        }
+      }
+    ],
+    "eligibility": {
+      "LCSW": {
+        "eligible": true,
+        "note": "Alma accepts fully licensed clinicians only (no limited licenses). Its page does not list license types by name; no Illinois exclusion found.",
+        "source": {
+          "url": "https://helloalma.com/faq/",
+          "quote": "Alma is only available to clinicians who are fully licensed.",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      "LCPC": {
+        "eligible": true,
+        "note": "Alma accepts fully licensed clinicians only (no limited licenses). Its page does not list license types by name; no Illinois exclusion found.",
+        "source": {
+          "url": "https://helloalma.com/faq/",
+          "quote": "Alma is only available to clinicians who are fully licensed.",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      "LMFT": {
+        "eligible": true,
+        "note": "Alma accepts fully licensed clinicians only (no limited licenses). Its page does not list license types by name; no Illinois exclusion found.",
+        "source": {
+          "url": "https://helloalma.com/faq/",
+          "quote": "Alma is only available to clinicians who are fully licensed.",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      "Psychologist": {
+        "eligible": true,
+        "note": "Alma accepts fully licensed clinicians only (no limited licenses). Its page does not list license types by name; no Illinois exclusion found.",
+        "source": {
+          "url": "https://helloalma.com/faq/",
+          "quote": "Alma is only available to clinicians who are fully licensed.",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      }
+    },
+    "requirements": {
+      "caqh": null,
+      "npi": "type1",
+      "ein": "Not needed from you: Alma credentials you under its own Tax ID, even if you are already in-network yourself",
+      "malpractice": "Not stated on Alma's pages; have your certificate ready and ask during onboarding",
+      "other": [
+        "Fully licensed (no limited license)",
+        "Credentialed with at least one of Aetna, Cigna or Optum through Alma"
+      ],
+      "source": {
+        "url": "https://helloalma.com/faq/",
+        "quote": "Members need to be credentialed under Alma’s Tax ID, regardless of their current individual credential status.",
+        "checked_on": "2026-10-30",
+        "verified": true
+      }
+    },
+    "timeline": {
+      "text": "Alma says credentialing takes 45 days or less.",
+      "source": {
+        "url": "https://helloalma.com/for-providers/insurance/",
+        "quote": "Credentialing time 45 days or less",
+        "checked_on": "2026-10-30",
+        "verified": true
+      }
+    },
+    "fees": {
+      "text": "$95/month billed annually ($1,140 a year) on Alma's page. Alma takes no cut of cash-pay sessions.",
+      "source": {
+        "url": "https://helloalma.com/for-providers/insurance/",
+        "quote": "Billed at $1,140 per year.",
+        "checked_on": "2026-10-30",
+        "verified": true
+      }
+    },
+    "recredential": {
+      "text": "Not stated on Alma's pages. Leaving Alma ends in-network status under its Tax ID.",
+      "months": null,
+      "source": {
+        "url": "https://helloalma.com/for-providers/insurance/",
+        "quote": "Not stated on this page.",
+        "checked_on": "2026-10-30",
+        "verified": false
+      }
+    },
+    "steps": [
+      {
+        "id": "alma-signup",
+        "stage": "credentialing",
+        "title": "Start Alma sign-up",
+        "how": "Go to Alma's For Providers page and fill out the form. Alma then sets up a call with a Community Growth Manager to explain membership and onboarding.",
+        "portal_url": "https://helloalma.com/for-providers/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://helloalma.com/faq/",
+          "quote": "Fill out this form and we’ll set up a call with one of our Community Growth Managers",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      {
+        "id": "alma-onboard",
+        "stage": "credentialing",
+        "title": "Finish onboarding",
+        "how": "Finish onboarding with Alma staff. Have your license, NPI and malpractice insurance details ready.",
+        "portal_url": "https://helloalma.com/for-providers/",
+        "aeon_can": "caqh_prep",
+        "submits": false,
+        "source": {
+          "url": "https://helloalma.com/faq/",
+          "quote": "Not stated on the pages that could be read.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      {
+        "id": "alma-submit",
+        "stage": "credentialing",
+        "title": "Approve Alma's payer applications",
+        "how": "Alma applies to Aetna, Cigna or Optum under its own Tax ID for you. You confirm your details and wait; Alma says it takes 45 days or less.",
+        "portal_url": "https://helloalma.com/for-providers/",
+        "aeon_can": "none",
+        "submits": true,
+        "source": {
+          "url": "https://helloalma.com/faq/",
+          "quote": "Members need to be credentialed under Alma’s Tax ID, regardless of their current individual credential status.",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      {
+        "id": "review-agreement",
+        "stage": "contracting",
+        "title": "Sign and return the platform agreement",
+        "how": "Read the contractor agreement the platform sends and sign it. You stay an independent contractor.",
+        "portal_url": "https://helloalma.com/for-providers/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://helloalma.com/faq/",
+          "quote": "Not stated on the pages that could be read.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      {
+        "id": "check-rates",
+        "stage": "contracting",
+        "title": "Check the rate you will be paid",
+        "how": "Look at the per-session rate or fee schedule shown in your dashboard before you accept clients.",
+        "portal_url": "https://helloalma.com/for-providers/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://helloalma.com/faq/",
+          "quote": "Not stated on the pages that could be read.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      {
+        "id": "note-effective",
+        "stage": "contracting",
+        "title": "Write down each payer effective date",
+        "how": "The platform shows an effective date per insurer. Note it, since sessions before it are not covered.",
+        "portal_url": "https://helloalma.com/for-providers/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://helloalma.com/faq/",
+          "quote": "Not stated on the pages that could be read.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      {
+        "id": "ask-retro",
+        "stage": "contracting",
+        "title": "Ask about billing back to the effective date",
+        "how": "Ask support whether sessions since the effective date can be billed after approval. Policy varies by payer.",
+        "portal_url": "https://helloalma.com/for-providers/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://helloalma.com/faq/",
+          "quote": "Not stated on the pages that could be read.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      }
+    ],
+    "notes": [
+      {
+        "text": "You keep your own private practice and cash-pay clients. Even if already in-network with Aetna/Cigna/Optum yourself, you must credential through Alma to see those clients on Alma.",
+        "source": null
+      },
+      {
+        "text": "Alma's FAQ and Insurance Program page were read on 2026-10-30 (timeline, price, payer requirement). Malpractice minimum, recredential cadence, agreement terms and retro billing are not published, so they are unverified.",
+        "source": null
+      },
+      {
+        "text": "Alma lists many insurance partners but no Illinois-specific list was confirmed.",
+        "source": null
+      }
+    ]
+  },
+  {
+    "id": "headway",
+    "name": "Headway",
+    "kind": "platform",
+    "states": [
+      "*"
+    ],
+    "networks": [
+      {
+        "id": "platform-network",
+        "name": "Headway network",
+        "panel": {
+          "status": "open",
+          "note": "Headway credentials you with its insurance partners in your region (commonly Aetna, Cigna, BCBS, Optum affiliates). Illinois payer list unconfirmed.",
+          "source": {
+            "url": "https://help.headway.co/hc/en-us/articles/360058294552-Credentialing-with-Headway",
+            "quote": "Approval can take anywhere from 3 weeks to 4 months, depending on the state and carrier.",
+            "checked_on": "2026-10-30",
+            "verified": false
+          }
+        }
+      }
+    ],
+    "eligibility": {
+      "LCSW": {
+        "eligible": true,
+        "note": "Headway takes independently licensed clinicians. Its help pages could not be opened to confirm each license type in Illinois.",
+        "source": {
+          "url": "https://help.headway.co/hc/en-us/articles/360058294552-Credentialing-with-Headway",
+          "quote": "Approval can take anywhere from 3 weeks to 4 months, depending on the state and carrier.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      "LCPC": {
+        "eligible": true,
+        "note": "Headway takes independently licensed clinicians. Its help pages could not be opened to confirm each license type in Illinois.",
+        "source": {
+          "url": "https://help.headway.co/hc/en-us/articles/360058294552-Credentialing-with-Headway",
+          "quote": "Approval can take anywhere from 3 weeks to 4 months, depending on the state and carrier.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      "LMFT": {
+        "eligible": true,
+        "note": "Headway takes independently licensed clinicians. Its help pages could not be opened to confirm each license type in Illinois.",
+        "source": {
+          "url": "https://help.headway.co/hc/en-us/articles/360058294552-Credentialing-with-Headway",
+          "quote": "Approval can take anywhere from 3 weeks to 4 months, depending on the state and carrier.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      "Psychologist": {
+        "eligible": true,
+        "note": "Headway takes independently licensed clinicians. Its help pages could not be opened to confirm each license type in Illinois.",
+        "source": {
+          "url": "https://help.headway.co/hc/en-us/articles/360058294552-Credentialing-with-Headway",
+          "quote": "Approval can take anywhere from 3 weeks to 4 months, depending on the state and carrier.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      }
+    },
+    "requirements": {
+      "caqh": true,
+      "npi": "type1",
+      "ein": "Not confirmed",
+      "malpractice": "Malpractice insurance required; dollar minimum not confirmed (the help pages could not be opened)",
+      "other": [
+        "Independently licensed provider",
+        "Intake form (about 20-30 minutes) covers license, NPI, malpractice and work history",
+        "Have a CAQH account ready"
+      ],
+      "source": {
+        "url": "https://help.headway.co/hc/en-us/articles/360058294552-Credentialing-with-Headway",
+        "quote": "Before starting, you need a license, malpractice insurance, an NPI, and a CAQH account.",
+        "checked_on": "2026-10-30",
+        "verified": false
+      }
+    },
+    "timeline": {
+      "text": "About 3 weeks to 4 months depending on state and carrier",
+      "source": {
+        "url": "https://help.headway.co/hc/en-us/articles/360058294552-Credentialing-with-Headway",
+        "quote": "Approval can take anywhere from 3 weeks to 4 months, depending on the state and carrier.",
+        "checked_on": "2026-10-30",
+        "verified": false
+      }
+    },
+    "fees": {
+      "text": "Search results say credentialing is free and there is no membership fee. Headway's pages could not be opened to confirm.",
+      "source": {
+        "url": "https://headway.co/for-providers/insurance-credentialing",
+        "quote": "credentialing ... for free",
+        "checked_on": "2026-10-30",
+        "verified": false
+      }
+    },
+    "recredential": {
+      "text": "Every 3 years in Illinois, by filling out Headway's intake form again; the due date depends on the last digit of your SSN and you have about 2 months. Re-attesting CAQH does not count.",
+      "months": 36,
+      "source": {
+        "url": "https://help.headway.co/hc/en-us/articles/34922611276692-Recredentialing-with-Headway",
+        "quote": "Illinois: every 3 years, based on the last digit of your SSN, with 2 months to complete it.",
+        "checked_on": "2026-10-30",
+        "verified": false
+      }
+    },
+    "steps": [
+      {
+        "id": "hw-intake",
+        "stage": "credentialing",
+        "title": "Complete Headway's intake form",
+        "how": "Sign up at headway.co and fill out the intake form (about 20-30 minutes) with your license, NPI, malpractice insurance and work history. Have your CAQH account ready.",
+        "portal_url": "https://headway.co",
+        "aeon_can": "caqh_prep",
+        "submits": false,
+        "source": {
+          "url": "https://help.headway.co/hc/en-us/articles/360058294552-Credentialing-with-Headway",
+          "quote": "Could not open Headway's help pages to confirm this step.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      {
+        "id": "hw-wait",
+        "stage": "credentialing",
+        "title": "Wait for Headway to credential you",
+        "how": "Headway starts credentialing with all partner insurers in your region. Being in-network elsewhere does not skip this.",
+        "portal_url": "https://headway.co",
+        "aeon_can": "none",
+        "submits": true,
+        "source": {
+          "url": "https://help.headway.co/hc/en-us/articles/360058294552-Credentialing-with-Headway",
+          "quote": "Approval can take anywhere from 3 weeks to 4 months, depending on the state and carrier.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      {
+        "id": "review-agreement",
+        "stage": "contracting",
+        "title": "Sign and return the platform agreement",
+        "how": "Read the contractor agreement the platform sends and sign it. You stay an independent contractor.",
+        "portal_url": "https://headway.co",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://help.headway.co/hc/en-us/articles/360058294552-Credentialing-with-Headway",
+          "quote": "Could not open Headway's help pages to confirm this step.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      {
+        "id": "check-rates",
+        "stage": "contracting",
+        "title": "Check the rate you will be paid",
+        "how": "Look at the per-session rate or fee schedule shown in your dashboard before you accept clients.",
+        "portal_url": "https://headway.co",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://help.headway.co/hc/en-us/articles/360058294552-Credentialing-with-Headway",
+          "quote": "Could not open Headway's help pages to confirm this step.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      {
+        "id": "note-effective",
+        "stage": "contracting",
+        "title": "Write down each payer effective date",
+        "how": "The platform shows an effective date per insurer. Note it, since sessions before it are not covered.",
+        "portal_url": "https://headway.co",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://help.headway.co/hc/en-us/articles/360058294552-Credentialing-with-Headway",
+          "quote": "Could not open Headway's help pages to confirm this step.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      {
+        "id": "ask-retro",
+        "stage": "contracting",
+        "title": "Ask about billing back to the effective date",
+        "how": "Ask support whether sessions since the effective date can be billed after approval. Policy varies by payer.",
+        "portal_url": "https://headway.co",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://help.headway.co/hc/en-us/articles/360058294552-Credentialing-with-Headway",
+          "quote": "Could not open Headway's help pages to confirm this step.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      }
+    ],
+    "notes": [
+      {
+        "text": "headway.co and help.headway.co return 403 to every fetch, so nothing could be read on the page itself on 2026-10-30. Everything here is unverified.",
+        "source": null
+      },
+      {
+        "text": "Search-result summaries of the help center say: timeline 3 weeks to 4 months; recredential about every 3 years (Illinois: due date from the last digit of your SSN, about 2 months to complete); intake needs license, malpractice, NPI and CAQH.",
+        "source": null
+      },
+      {
+        "text": "Reported available for independent providers in all 50 states (third-party). Private practice allowed.",
+        "source": null
+      }
+    ]
+  },
+  {
+    "id": "grow-therapy",
+    "name": "Grow Therapy",
+    "aliases": [
+      "grow"
+    ],
+    "kind": "platform",
+    "states": [
+      "*"
+    ],
+    "networks": [
+      {
+        "id": "platform-network",
+        "name": "Grow Therapy network",
+        "panel": {
+          "status": "open",
+          "note": "Illinois listings show LCSWs, LCPCs and licensed clinical psychologists. Grow's page lists a BCBS Illinois timeline of 3 months; other IL payers not confirmed.",
+          "source": {
+            "url": "https://onboarding.growtherapy.com/credentialing-timelines",
+            "quote": "3 months for IL Providers",
+            "checked_on": "2026-10-29",
+            "verified": true
+          }
+        }
+      }
+    ],
+    "eligibility": {
+      "LCSW": {
+        "eligible": true,
+        "note": "Grow's pages don't list license types. Aeon inferred that Grow takes independently licensed Illinois clinicians from its Illinois credentialing timeline and therapist listings.",
+        "source": {
+          "url": "https://onboarding.growtherapy.com/credentialing-timelines",
+          "quote": "3 months for IL Providers",
+          "checked_on": "2026-10-29",
+          "verified": false
+        },
+        "basis": "inferred"
+      },
+      "LCPC": {
+        "eligible": true,
+        "note": "Grow's pages don't list license types. Aeon inferred that Grow takes independently licensed Illinois clinicians from its Illinois credentialing timeline and therapist listings.",
+        "source": {
+          "url": "https://onboarding.growtherapy.com/credentialing-timelines",
+          "quote": "3 months for IL Providers",
+          "checked_on": "2026-10-29",
+          "verified": false
+        },
+        "basis": "inferred"
+      },
+      "LMFT": {
+        "eligible": true,
+        "note": "Grow's pages don't list license types. Aeon inferred that Grow takes independently licensed Illinois clinicians from its Illinois credentialing timeline and therapist listings.",
+        "source": {
+          "url": "https://onboarding.growtherapy.com/credentialing-timelines",
+          "quote": "3 months for IL Providers",
+          "checked_on": "2026-10-29",
+          "verified": false
+        },
+        "basis": "inferred"
+      },
+      "Psychologist": {
+        "eligible": true,
+        "note": "Grow's pages don't list license types. Aeon inferred that Grow takes independently licensed Illinois clinicians from its Illinois credentialing timeline and therapist listings.",
+        "source": {
+          "url": "https://onboarding.growtherapy.com/credentialing-timelines",
+          "quote": "3 months for IL Providers",
+          "checked_on": "2026-10-29",
+          "verified": false
+        },
+        "basis": "inferred"
+      }
+    },
+    "requirements": {
+      "caqh": null,
+      "npi": "type1",
+      "ein": "Not confirmed",
+      "malpractice": "Not confirmed",
+      "other": [
+        "Illinois license",
+        "Type 1 NPI with matching taxonomy code"
+      ],
+      "source": {
+        "url": "https://go.growtherapy.com/hubfs/Credentialing%20Program%20Policies%20and%20Procedures.pdf",
+        "quote": "Type 1 NPI with a taxonomy code matching specialty; recredential within 36 months.",
+        "checked_on": "2026-10-29",
+        "verified": false
+      }
+    },
+    "timeline": {
+      "text": "Grow says average 5-7 days, up to months by payer; BCBS in IL listed at 3 months",
+      "source": {
+        "url": "https://onboarding.growtherapy.com/credentialing-timelines",
+        "quote": "3 months for IL Providers",
+        "checked_on": "2026-10-29",
+        "verified": true
+      }
+    },
+    "fees": {
+      "text": "No monthly fee reported (third-party)",
+      "source": {
+        "url": "https://www.choosingtherapy.com/alma-vs-headway-for-therapists/",
+        "quote": "Grow Therapy has no monthly fee",
+        "checked_on": "2026-10-29",
+        "verified": false
+      }
+    },
+    "recredential": {
+      "text": "Within 36 months of original credentialing",
+      "months": 36,
+      "source": {
+        "url": "https://onboarding.growtherapy.com/credentialing-timelines",
+        "quote": "3 months for IL Providers",
+        "checked_on": "2026-10-29",
+        "verified": true
+      }
+    },
+    "steps": [
+      {
+        "id": "gt-apply",
+        "stage": "credentialing",
+        "title": "Apply on Grow's provider page",
+        "how": "Create your provider profile at growtherapy.com/providers and upload license details.",
+        "portal_url": "https://growtherapy.com/providers/",
+        "aeon_can": "caqh_prep",
+        "submits": false,
+        "source": {
+          "url": "https://go.growtherapy.com/hubfs/Credentialing%20Program%20Policies%20and%20Procedures.pdf",
+          "quote": "Type 1 NPI with a taxonomy code matching specialty; recredential within 36 months.",
+          "checked_on": "2026-10-29",
+          "verified": false
+        }
+      },
+      {
+        "id": "gt-wait",
+        "stage": "credentialing",
+        "title": "Wait for Grow to enroll you with payers",
+        "how": "Grow handles payor enrollment; check your onboarding page for per-payer timelines.",
+        "portal_url": "https://onboarding.growtherapy.com/credentialing-timelines",
+        "aeon_can": "none",
+        "submits": true,
+        "source": {
+          "url": "https://onboarding.growtherapy.com/credentialing-timelines",
+          "quote": "3 months for IL Providers",
+          "checked_on": "2026-10-29",
+          "verified": true
+        }
+      },
+      {
+        "id": "review-agreement",
+        "stage": "contracting",
+        "title": "Sign and return the platform agreement",
+        "how": "Read the contractor agreement the platform sends and sign it. You stay an independent contractor.",
+        "portal_url": "https://growtherapy.com/providers/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://onboarding.growtherapy.com/credentialing-timelines",
+          "quote": "3 months for IL Providers",
+          "checked_on": "2026-10-29",
+          "verified": true
+        }
+      },
+      {
+        "id": "check-rates",
+        "stage": "contracting",
+        "title": "Check the rate you will be paid",
+        "how": "Look at the per-session rate or fee schedule shown in your dashboard before you accept clients.",
+        "portal_url": "https://growtherapy.com/providers/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://onboarding.growtherapy.com/credentialing-timelines",
+          "quote": "3 months for IL Providers",
+          "checked_on": "2026-10-29",
+          "verified": true
+        }
+      },
+      {
+        "id": "note-effective",
+        "stage": "contracting",
+        "title": "Write down each payer effective date",
+        "how": "The platform shows an effective date per insurer. Note it, since sessions before it are not covered.",
+        "portal_url": "https://growtherapy.com/providers/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://onboarding.growtherapy.com/credentialing-timelines",
+          "quote": "3 months for IL Providers",
+          "checked_on": "2026-10-29",
+          "verified": true
+        }
+      },
+      {
+        "id": "ask-retro",
+        "stage": "contracting",
+        "title": "Ask about billing back to the effective date",
+        "how": "Ask support whether sessions since the effective date can be billed after approval. Policy varies by payer.",
+        "portal_url": "https://growtherapy.com/providers/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://onboarding.growtherapy.com/credentialing-timelines",
+          "quote": "3 months for IL Providers",
+          "checked_on": "2026-10-29",
+          "verified": true
+        }
+      }
+    ],
+    "notes": [
+      {
+        "text": "Grow is built for independent practice (credentialing, billing, EHR) per its provider page via search snippet.",
+        "source": null
+      },
+      {
+        "text": "License list not itemised on Grow's pages; Illinois acceptance inferred from IL therapist listings.",
+        "source": null
+      }
+    ]
+  },
+  {
+    "id": "rula",
+    "name": "Rula",
+    "kind": "platform",
+    "states": [
+      "*"
+    ],
+    "networks": [
+      {
+        "id": "platform-network",
+        "name": "Rula network",
+        "panel": {
+          "status": "open",
+          "note": "Rula lists these insurance partners nationally. Which ones apply in Illinois is not confirmed. Rula's Illinois CAQH guide could not be opened.",
+          "source": {
+            "url": "https://www.rula.com/provider-sign-up/",
+            "quote": "We currently partner with Aetna, Cigna, Optum, Kaiser, Anthem, United Healthcare, and Oscar",
+            "checked_on": "2026-10-30",
+            "verified": true
+          }
+        }
+      }
+    ],
+    "eligibility": {
+      "LCSW": {
+        "eligible": true,
+        "note": "Rula lists Licensed Clinical Social Workers. You must be able to provide telehealth.",
+        "source": {
+          "url": "https://www.rula.com/provider-sign-up/",
+          "quote": "Must be licensed as a Licensed Marriage & Family Therapist (LMFT), Licensed Clinical Social Worker (LCSW), Licensed Professional Clinical Counselor (LPCC), or Licensed Psychologist",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      "LCPC": {
+        "eligible": true,
+        "note": "Rula lists Licensed Professional Clinical Counselors (LPCC). Illinois calls this license LCPC; confirm it is accepted. You must be able to provide telehealth.",
+        "source": {
+          "url": "https://www.rula.com/provider-sign-up/",
+          "quote": "Must be licensed as a Licensed Marriage & Family Therapist (LMFT), Licensed Clinical Social Worker (LCSW), Licensed Professional Clinical Counselor (LPCC), or Licensed Psychologist",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      "LMFT": {
+        "eligible": true,
+        "note": "Rula lists Licensed Marriage and Family Therapists. You must be able to provide telehealth.",
+        "source": {
+          "url": "https://www.rula.com/provider-sign-up/",
+          "quote": "Must be licensed as a Licensed Marriage & Family Therapist (LMFT), Licensed Clinical Social Worker (LCSW), Licensed Professional Clinical Counselor (LPCC), or Licensed Psychologist",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      "Psychologist": {
+        "eligible": true,
+        "note": "Rula lists Licensed Psychologists. You must be able to provide telehealth.",
+        "source": {
+          "url": "https://www.rula.com/provider-sign-up/",
+          "quote": "Must be licensed as a Licensed Marriage & Family Therapist (LMFT), Licensed Clinical Social Worker (LCSW), Licensed Professional Clinical Counselor (LPCC), or Licensed Psychologist",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      }
+    },
+    "requirements": {
+      "caqh": true,
+      "npi": "type1",
+      "ein": "Not required; Rula pays you as a contractor",
+      "malpractice": "Malpractice insurance is required; Rula's pages give no dollar minimum",
+      "other": [
+        "Telehealth capable",
+        "NPI, license, resume and three professional references",
+        "Rula helps you fill out CAQH",
+        "Licensed in at least one U.S. state or Washington D.C."
+      ],
+      "source": {
+        "url": "https://www.rula.com/blog/insurance-paneling-therapist-guide/",
+        "quote": "gathering some application information including your NPI number, license, malpractice insurance, resume, and three professional references.",
+        "checked_on": "2026-10-30",
+        "verified": true
+      }
+    },
+    "timeline": {
+      "text": "Rula says most therapists are credentialed and seeing a first client in 3 weeks or less.",
+      "source": {
+        "url": "https://www.rula.com/provider-sign-up/",
+        "quote": "Most therapists are credentialed and see their first client in 3 weeks or less.",
+        "checked_on": "2026-10-30",
+        "verified": true
+      }
+    },
+    "fees": {
+      "text": "Free to join and use, with no minimum hours or caseload. Rula pays you per session (rate depends on license and location).",
+      "source": {
+        "url": "https://www.rula.com/provider-sign-up/",
+        "quote": "Joining and using Rula is completely free, with no minimum hours or caseload requirements.",
+        "checked_on": "2026-10-30",
+        "verified": true
+      }
+    },
+    "recredential": {
+      "text": "Not published on Rula's pages (about every 3 years is a common cycle but unconfirmed).",
+      "months": 36,
+      "source": {
+        "url": "https://www.rula.com/blog/insurance-paneling-therapist-guide/",
+        "quote": "Not stated on this page.",
+        "checked_on": "2026-10-30",
+        "verified": false
+      }
+    },
+    "steps": [
+      {
+        "id": "rula-apply",
+        "stage": "credentialing",
+        "title": "Apply to join Rula",
+        "how": "Go to Rula's provider sign-up page and fill out the get-started form. A Rula Provider Specialist then schedules a call with you.",
+        "portal_url": "https://www.rula.com/provider-sign-up/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://www.rula.com/provider-sign-up/",
+          "quote": "Must be licensed as a Licensed Marriage & Family Therapist (LMFT), Licensed Clinical Social Worker (LCSW), Licensed Professional Clinical Counselor (LPCC), or Licensed Psychologist",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      {
+        "id": "rula-caqh",
+        "stage": "credentialing",
+        "title": "Set up CAQH for Rula",
+        "how": "Rula helps you complete your CAQH application. Make sure your CAQH profile is current, and for Illinois follow Rula's CAQH guide (primary practice state IL, add Rula as an authorized contact).",
+        "portal_url": "https://therapistsupport.rula.com/hc/en-us/articles/22461235956123-CAQH-Profile-Guide-Illinois",
+        "aeon_can": "caqh_prep",
+        "submits": true,
+        "source": {
+          "url": "https://www.rula.com/blog/insurance-paneling-therapist-guide/",
+          "quote": "we’ll help you fill out the Council for Affordable Quality Healthcare (CAQH) application",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      {
+        "id": "review-agreement",
+        "stage": "contracting",
+        "title": "Sign and return the platform agreement",
+        "how": "Read the contractor agreement the platform sends and sign it. You stay an independent contractor.",
+        "portal_url": "https://www.rula.com/provider-sign-up/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://therapistsupport.rula.com/hc/en-us/articles/22461235956123-CAQH-Profile-Guide-Illinois",
+          "quote": "Not stated on the Rula pages that could be read.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      {
+        "id": "check-rates",
+        "stage": "contracting",
+        "title": "Check the rate you will be paid",
+        "how": "Rula pays per session and the rate depends on your license and location. Ask the Provider Specialist for your rate in writing before you accept clients.",
+        "portal_url": "https://www.rula.com/provider-sign-up/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://therapistsupport.rula.com/hc/en-us/articles/22461235956123-CAQH-Profile-Guide-Illinois",
+          "quote": "Not stated on the Rula pages that could be read.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      {
+        "id": "note-effective",
+        "stage": "contracting",
+        "title": "Write down each payer effective date",
+        "how": "The platform shows an effective date per insurer. Note it, since sessions before it are not covered.",
+        "portal_url": "https://www.rula.com/provider-sign-up/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://therapistsupport.rula.com/hc/en-us/articles/22461235956123-CAQH-Profile-Guide-Illinois",
+          "quote": "Not stated on the Rula pages that could be read.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      {
+        "id": "ask-retro",
+        "stage": "contracting",
+        "title": "Ask about billing back to the effective date",
+        "how": "Ask support whether sessions since the effective date can be billed after approval. Policy varies by payer.",
+        "portal_url": "https://www.rula.com/provider-sign-up/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://therapistsupport.rula.com/hc/en-us/articles/22461235956123-CAQH-Profile-Guide-Illinois",
+          "quote": "Not stated on the Rula pages that could be read.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      }
+    ],
+    "notes": [
+      {
+        "text": "Rula's provider sign-up page and credentialing blog were read on 2026-10-30. Rula's Illinois CAQH guide returned 403, so its steps are unverified.",
+        "source": null
+      },
+      {
+        "text": "Rula describes itself as supporting clinicians who start or grow their own private practice.",
+        "source": null
+      },
+      {
+        "text": "Agreement terms, effective dates and retro billing are not published.",
+        "source": null
+      }
+    ]
+  },
+  {
+    "id": "sondermind",
+    "name": "SonderMind",
+    "kind": "platform",
+    "states": [
+      "*"
+    ],
+    "networks": [
+      {
+        "id": "platform-network",
+        "name": "SonderMind network",
+        "panel": {
+          "status": "open",
+          "note": "SonderMind says it credentials you with most major insurers in your state. The specific Illinois insurers are not listed on its page.",
+          "source": {
+            "url": "https://www.sondermind.com/join-sondermind/",
+            "quote": "gets you credentialed with most major insurers in your state, so you can offer in-network care within weeks",
+            "checked_on": "2026-10-30",
+            "verified": true
+          }
+        }
+      }
+    ],
+    "eligibility": {
+      "LCSW": {
+        "eligible": true,
+        "note": "SonderMind takes independently licensed master's or doctorate-level therapists. Its page does not list license types by name; no Illinois exclusion found.",
+        "source": {
+          "url": "https://www.sondermind.com/join-sondermind/",
+          "quote": "Masters or doctorate-level mental health therapist, psychiatrist or psychiatric nurse practitioner",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      "LCPC": {
+        "eligible": true,
+        "note": "SonderMind takes independently licensed master's or doctorate-level therapists. Its page does not list license types by name; no Illinois exclusion found.",
+        "source": {
+          "url": "https://www.sondermind.com/join-sondermind/",
+          "quote": "Masters or doctorate-level mental health therapist, psychiatrist or psychiatric nurse practitioner",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      "LMFT": {
+        "eligible": true,
+        "note": "SonderMind takes independently licensed master's or doctorate-level therapists. Its page does not list license types by name; no Illinois exclusion found.",
+        "source": {
+          "url": "https://www.sondermind.com/join-sondermind/",
+          "quote": "Masters or doctorate-level mental health therapist, psychiatrist or psychiatric nurse practitioner",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      "Psychologist": {
+        "eligible": true,
+        "note": "SonderMind takes independently licensed master's or doctorate-level therapists. Its page does not list license types by name; no Illinois exclusion found.",
+        "source": {
+          "url": "https://www.sondermind.com/join-sondermind/",
+          "quote": "Masters or doctorate-level mental health therapist, psychiatrist or psychiatric nurse practitioner",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      }
+    },
+    "requirements": {
+      "caqh": null,
+      "npi": "type1",
+      "ein": "Not confirmed",
+      "malpractice": "Not stated on SonderMind's page; ask during onboarding",
+      "other": [
+        "Independently licensed",
+        "Master's or doctorate-level therapist"
+      ],
+      "source": {
+        "url": "https://www.sondermind.com/join-sondermind/",
+        "quote": "To become a SonderMind provider, you’ll have to meet the following criteria:",
+        "checked_on": "2026-10-30",
+        "verified": true
+      }
+    },
+    "timeline": {
+      "text": "SonderMind says in-network care within weeks; no exact number is published.",
+      "source": {
+        "url": "https://www.sondermind.com/join-sondermind/",
+        "quote": "so you can offer in-network care within weeks",
+        "checked_on": "2026-10-30",
+        "verified": true
+      }
+    },
+    "fees": {
+      "text": "SonderMind pays you every two weeks for completed sessions and no-shows. No joining fee is stated on its page; a set hourly rate (about $77-105 in an Illinois posting) is third-party.",
+      "source": {
+        "url": "https://www.sondermind.com/join-sondermind/",
+        "quote": "bi-weekly pay for completed sessions and no-shows in each pay period",
+        "checked_on": "2026-10-30",
+        "verified": false
+      }
+    },
+    "recredential": {
+      "text": "Not stated on SonderMind's page.",
+      "months": null,
+      "source": {
+        "url": "https://www.sondermind.com/join-sondermind/",
+        "quote": "Not stated on this page.",
+        "checked_on": "2026-10-30",
+        "verified": false
+      }
+    },
+    "steps": [
+      {
+        "id": "sm-apply",
+        "stage": "credentialing",
+        "title": "Apply on SonderMind",
+        "how": "Go to SonderMind's Join Us page and use Get Started to schedule a call with the team. If it is a good fit you get guided onboarding with a coach.",
+        "portal_url": "https://www.sondermind.com/join-sondermind/",
+        "aeon_can": "none",
+        "submits": true,
+        "source": {
+          "url": "https://www.sondermind.com/join-sondermind/",
+          "quote": "Schedule a call with our team to see if it's a good fit.",
+          "checked_on": "2026-10-30",
+          "verified": true
+        }
+      },
+      {
+        "id": "review-agreement",
+        "stage": "contracting",
+        "title": "Sign and return the platform agreement",
+        "how": "Read the contractor agreement the platform sends and sign it. You stay an independent contractor.",
+        "portal_url": "https://www.sondermind.com/join-sondermind/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://www.sondermind.com/join-sondermind/",
+          "quote": "Not stated on the SonderMind page that could be read.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      {
+        "id": "check-rates",
+        "stage": "contracting",
+        "title": "Check the rate you will be paid",
+        "how": "Look at the per-session rate or fee schedule shown in your dashboard before you accept clients.",
+        "portal_url": "https://www.sondermind.com/join-sondermind/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://www.sondermind.com/join-sondermind/",
+          "quote": "Not stated on the SonderMind page that could be read.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      {
+        "id": "note-effective",
+        "stage": "contracting",
+        "title": "Write down each payer effective date",
+        "how": "The platform shows an effective date per insurer. Note it, since sessions before it are not covered.",
+        "portal_url": "https://www.sondermind.com/join-sondermind/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://www.sondermind.com/join-sondermind/",
+          "quote": "Not stated on the SonderMind page that could be read.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      },
+      {
+        "id": "ask-retro",
+        "stage": "contracting",
+        "title": "Ask about billing back to the effective date",
+        "how": "Ask support whether sessions since the effective date can be billed after approval. Policy varies by payer.",
+        "portal_url": "https://www.sondermind.com/join-sondermind/",
+        "aeon_can": "none",
+        "submits": false,
+        "source": {
+          "url": "https://www.sondermind.com/join-sondermind/",
+          "quote": "Not stated on the SonderMind page that could be read.",
+          "checked_on": "2026-10-30",
+          "verified": false
+        }
+      }
+    ],
+    "notes": [
+      {
+        "text": "SonderMind's Join Us page was read on 2026-10-30. It gives eligibility, pay timing and credentialing speed but no steps, CAQH, malpractice, fees or recredential cadence.",
+        "source": null
+      },
+      {
+        "text": "SonderMind is a contractor model with set pay; private practice status unconfirmed. It does not provide office space.",
+        "source": null
+      }
+    ]
+  }
+]

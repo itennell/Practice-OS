@@ -24,14 +24,30 @@ export async function POST(request: Request) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      const send = (e: MakeEvent | { type: "error"; why: string } | { type: "end" }) => controller.enqueue(encoder.encode(`${JSON.stringify(e)}\n`));
+      // She may close the tab mid-way: Aeon keeps going (the post still reaches her approvals),
+      // but nothing more is written to the closed stream, and close always runs.
+      let open = true;
+      const send = (e: MakeEvent | { type: "error"; why: string } | { type: "end" }) => {
+        if (!open) return;
+        try {
+          controller.enqueue(encoder.encode(`${JSON.stringify(e)}\n`));
+        } catch {
+          open = false;
+        }
+      };
       try {
         await makeProject(BY, parsed.data.request, send, process.env.PLAYWRIGHT_STUDIO_STANDIN === "1" ? standInDeps() : {});
       } catch (err) {
-        send({ type: "error", why: err instanceof Error ? err.message : "Aeon couldn't make that. Try again." });
+        // The details stay in the server log; the browser gets a plain sentence.
+        console.error("studio make failed", err);
+        send({ type: "error", why: "Aeon couldn't make that. Try again." });
       } finally {
         send({ type: "end" });
-        controller.close();
+        try {
+          controller.close();
+        } catch {
+          // Already closed by the browser going away.
+        }
       }
     },
   });

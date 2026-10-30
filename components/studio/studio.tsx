@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import type { ResearchAngle } from "@/lib/instagram/research";
 import type { Angle } from "@/lib/instagram/topic-gate";
 import type { MakeEvent, Project } from "@/lib/studio/store";
-import { Orb, chipClass } from "../ui";
+import { Button, Orb, chipClass } from "../ui";
 import { PromptBar } from "../shared/prompt-bar";
 import { ThoughtLine } from "../shared/thought-line";
 import type { ThoughtStep } from "../shared/thought-line-steps";
@@ -23,7 +23,46 @@ type Entry =
   | { who: "me"; text: string }
   | { who: "aeon"; text: string; tone?: "problem" }
   | { who: "aeon"; research: { summary: string; angles: ResearchAngle[]; picked: number; fixed: boolean } }
-  | { who: "aeon"; redirect: { why: string; angles: Angle[] } };
+  | { who: "aeon"; redirect: { why: string; angles: Angle[] } }
+  /** She approved this already: the change runs only if she says Continue (a fresh approval is queued). */
+  | { who: "aeon"; confirm: { why: string; run: () => Promise<void> } };
+
+/** What a screen reader hears for a new Aeon message. */
+function spoken(e: Entry): string {
+  if (e.who === "me") return "";
+  if ("research" in e) return e.research.summary;
+  if ("redirect" in e) return e.redirect.why;
+  if ("confirm" in e) return e.confirm.why;
+  return e.text;
+}
+
+function Confirm({ why, run, disabled }: { why: string; run: () => Promise<void>; disabled: boolean }) {
+  const [answer, setAnswer] = useState<"" | "yes" | "no">("");
+  return (
+    <>
+      <p data-testid="reapprove-why">{why}</p>
+      {answer ? (
+        <p className="text-small text-[var(--fg-muted)]">{answer === "yes" ? "Going ahead." : "Left as it is."}</p>
+      ) : (
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            variant="accent"
+            disabled={disabled}
+            onClick={() => {
+              setAnswer("yes");
+              void run();
+            }}
+          >
+            Continue
+          </Button>
+          <Button variant="quiet" disabled={disabled} onClick={() => setAnswer("no")}>
+            Not now
+          </Button>
+        </div>
+      )}
+    </>
+  );
+}
 
 export type StudioProfile = { practiceName: string; licenseLine: string; isSample: boolean };
 
@@ -85,6 +124,8 @@ function Bubble({ entry, onPick, disabled }: { entry: Entry; onPick: (text: stri
         </div>
       </>
     );
+  } else if ("confirm" in entry) {
+    body = <Confirm why={entry.confirm.why} run={entry.confirm.run} disabled={disabled} />;
   } else body = <p style={entry.tone === "problem" ? { color: "var(--danger-fg)" } : undefined}>{entry.text}</p>;
   return (
     <li className="flex items-start gap-3">
@@ -97,10 +138,12 @@ function Bubble({ entry, onPick, disabled }: { entry: Entry; onPick: (text: stri
   );
 }
 
-async function post(url: string, body: unknown): Promise<{ ok: boolean; project?: Project; reply?: string; error?: string }> {
+type Answer = { ok: boolean; project?: Project; reply?: string; error?: string; needsReapproval?: boolean };
+
+async function post(url: string, body: unknown): Promise<Answer> {
   try {
     const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-    const data = (await res.json().catch(() => ({}))) as { project?: Project; reply?: string; error?: string };
+    const data = (await res.json().catch(() => ({}))) as Omit<Answer, "ok">;
     return { ok: res.ok, ...data };
   } catch {
     return { ok: false, error: "Couldn't reach Practice-OS. Check that the app is running, then try again." };
@@ -116,7 +159,46 @@ export function Studio({ profile, initial }: { profile: StudioProfile; initial: 
   const [loaded, setLoaded] = useState<{ key: string; bitmap: ImageBitmap | null } | null>(null);
   const [font, setFont] = useState("Inter, sans-serif");
   const listRef = useRef<HTMLOListElement>(null);
-  const say = (e: Entry) => setEntries((x) => [...x, e]);
+  // Only a new Aeon message is announced, not the whole list again.
+  const [heard, setHeard] = useState("");
+  const say = useCallback((e: Entry) => {
+    setEntries((x) => [...x, e]);
+    if (e.who === "aeon") setHeard(spoken(e));
+  }, []);
+
+  /**
+   * Sends a change. When she already approved this post, Aeon asks first; Continue sends the
+   * same change again with reapprove, which puts the post back in her approvals.
+   */
+  const change = useCallback(
+    async (url: string, body: Record<string, unknown>, opts: { fallback: string; done?: (r: Answer) => void }): Promise<boolean> => {
+      const send = async (b: Record<string, unknown>) => {
+        setBusy(true);
+        const r = await post(url, b);
+        setBusy(false);
+        if (r.project) setProject(r.project);
+        return r;
+      };
+      const finish = (r: Answer) => {
+        if (!r.ok) say({ who: "aeon", text: r.error ?? opts.fallback, tone: "problem" });
+        opts.done?.(r);
+        return r.ok;
+      };
+      const r = await send(body);
+      if (!r.needsReapproval) return finish(r);
+      say({
+        who: "aeon",
+        confirm: {
+          why: r.error ?? "Editing this will need a new approval. Continue?",
+          run: async () => {
+            finish(await send({ ...body, reapprove: true }));
+          },
+        },
+      });
+      return false;
+    },
+    [say],
+  );
 
   useEffect(() => {
     document.fonts.ready.then(() => setFont(getComputedStyle(document.body).fontFamily));
@@ -146,25 +228,16 @@ export function Studio({ profile, initial }: { profile: StudioProfile; initial: 
   const apply = useCallback(
     async (ops: unknown[]) => {
       if (!project) return false;
-      setBusy(true);
-      const r = await post(`/api/studio/${project.id}/ops`, { ops, cursor: project.cursor });
-      setBusy(false);
-      if (r.project) setProject(r.project);
-      if (!r.ok) say({ who: "aeon", text: r.error ?? "That change didn't work. Try again.", tone: "problem" });
-      return r.ok;
+      return change(`/api/studio/${project.id}/ops`, { ops, cursor: project.cursor }, { fallback: "That change didn't work. Try again." });
     },
-    [project],
+    [project, change],
   );
   const move = useCallback(
-    async (path: "undo" | "redo" | "step", body: unknown = {}) => {
+    async (path: "undo" | "redo" | "step", body: Record<string, unknown> = {}) => {
       if (!project) return;
-      setBusy(true);
-      const r = await post(`/api/studio/${project.id}/${path}`, body);
-      setBusy(false);
-      if (r.project) setProject(r.project);
-      if (!r.ok) say({ who: "aeon", text: r.error ?? "That didn't work.", tone: "problem" });
+      await change(`/api/studio/${project.id}/${path}`, body, { fallback: "That didn't work." });
     },
-    [project],
+    [project, change],
   );
   const refresh = useCallback(async () => {
     if (!project) return;
@@ -238,11 +311,8 @@ export function Studio({ profile, initial }: { profile: StudioProfile; initial: 
     setBusy(true);
     try {
       if (!project || isNewRequest(t)) await make(t);
-      else {
-        const r = await post(`/api/studio/${project.id}/chat`, { text: t });
-        if (r.project) setProject(r.project);
-        say(r.ok ? { who: "aeon", text: r.reply ?? "Done." } : { who: "aeon", text: r.error ?? "That didn't work. Try again.", tone: "problem" });
-      }
+      else
+        await change(`/api/studio/${project.id}/chat`, { text: t }, { fallback: "That didn't work. Try again.", done: (r) => r.ok && say({ who: "aeon", text: r.reply ?? "Done." }) });
     } finally {
       setBusy(false);
     }
@@ -250,8 +320,12 @@ export function Studio({ profile, initial }: { profile: StudioProfile; initial: 
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(300px,380px)_minmax(0,1fr)]">
+      {/* Only Aeon's newest message is read out; the list itself isn't live, so nothing is read twice. */}
+      <p role="status" aria-live="polite" className="sr-only" data-testid="studio-heard">
+        {heard}
+      </p>
       <section aria-label="Chat with Aeon about your post" className="flex min-h-[420px] flex-col gap-4 lg:sticky lg:top-6 lg:max-h-[calc(100dvh-8rem)]">
-        <ol ref={listRef} aria-live="polite" aria-label="Messages" tabIndex={0} className="flex flex-1 flex-col gap-4 overflow-y-auto rounded-[12px] focus-visible:outline-2 focus-visible:outline-[var(--focus)]">
+        <ol ref={listRef} aria-label="Messages" tabIndex={0} className="flex flex-1 flex-col gap-4 overflow-y-auto rounded-[12px] focus-visible:outline-2 focus-visible:outline-[var(--focus)]">
           <li className="flex items-start gap-3">
             <Orb size={24} className="mt-1" />
             <div className="tile flex min-w-0 flex-1 flex-col gap-1 rounded-[20px] rounded-tl-[6px] px-4 py-3">

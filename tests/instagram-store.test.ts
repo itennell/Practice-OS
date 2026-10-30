@@ -141,19 +141,18 @@ describe.skipIf(!hasDb)("Instagram posts", () => {
     expect(off).toMatchObject({ outcome: "off_topic", angle: { label: "What a first session for grief looks like" } });
   });
 
-  // QA (Isaiah, 2026-10-29): "a post about depression" -> "nothing came up... There was an error".
-  it("a depression post where Muse adds a 988 crisis line is rewritten once, never an empty result", async () => {
-    const { chat } = stubModels({ crisisLineFirst: true });
+  // Review (PR #102): a self-harm hit on Muse's own draft answers with the fixed crisis text, never a reworded message.
+  it("a draft where Muse adds a 988 crisis line is held back with the fixed crisis reply, not rewritten", async () => {
+    const { chat, seen } = stubModels({ crisisLineFirst: true });
+    const before = (await listPosts()).length;
     const one = await requestPost("test", "What a first session for depression looks like", "first_session", { chat, graphic });
-    expect(one.outcome).toBe("rewritten");
-    if (one.outcome !== "rewritten") throw new Error("unreachable");
-    expect(one.post.status).toBe("pending_approval");
+    expect(one).toEqual({ outcome: "blocked", why: CRISIS_REPLY });
+    expect(seen.filter((f) => f === "instagram.write")).toHaveLength(1);
 
     const { chat: chat2 } = stubModels({ crisisLineFirst: true });
     const several = await planSeveral("test", "what therapy for depression costs and how to book", 2, { chat: chat2, graphic });
-    expect(several.outcome).toBe("planned");
-    if (several.outcome !== "planned") throw new Error("unreachable");
-    expect(several.saved.filter((s) => s.status === "pending_approval")).toHaveLength(2);
+    expect(several).toEqual({ outcome: "blocked", why: CRISIS_REPLY });
+    expect((await listPosts()).length).toBe(before);
   });
 
   it("an illness topic gets a plain reason and three logistics angles, with nothing written", async () => {

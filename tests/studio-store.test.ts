@@ -3,12 +3,13 @@
 // Redo, and the safety rules (self-harm, advice topics) on every step.
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { approve } from "../lib/approvals";
 import { closeDb, db } from "../lib/db";
 import { RULE_TEXT, type ChatFn } from "../lib/instagram/critic";
 import type { SearchFn } from "../lib/instagram/research";
 import { practiceFacts } from "../lib/instagram/store";
 import { CRISIS_REPLY } from "../lib/safety";
-import { applyEdit, chatEdit, getProject, goToStep, makeProject, moveCursor, type MakeEvent } from "../lib/studio/store";
+import { applyEdit, chatEdit, getProject, goToStep, KEEP_STEPS, makeProject, moveCursor, REAPPROVE, type MakeEvent } from "../lib/studio/store";
 
 const hasDb = Boolean(process.env.DATABASE_URL);
 
@@ -168,5 +169,154 @@ describe.skipIf(!hasDb)("studio", () => {
     // A clip from chat (data only the browser has) is refused.
     const fromChat = await chatEdit(project!.id, "add my clip", { by: "test", chat: stub({ reply: "Ok.", ops: [{ op: "add_clip", clip: { ...clip, id: "c9" } }] }).chat });
     expect(fromChat.ok).toBe(false);
+  });
+});
+
+// ---- Review fixes (PR #103) ------------------------------------------------------------
+
+const audits = async (action: string, since: Date) =>
+  (await db()<{ n: number }[]>`select count(*)::int as n from practice_os.audit_log where action = ${action} and at >= ${since}`)[0].n;
+
+/** Approves the project's post the way she would (DRY_RUN): the post becomes ready. */
+async function approveIt(projectId: string) {
+  const p = (await getProject(projectId))!;
+  const r = await approve(p.approvalId!, { by: "test" });
+  expect(r.ok).toBe(true);
+  const after = (await getProject(projectId))!;
+  expect(after.postStatus).toBe("ready");
+  return after;
+}
+
+describe.skipIf(!hasDb)("studio review fixes", () => {
+  it("an approved post is never changed silently: Aeon asks, and Continue queues a fresh approval", async () => {
+    const { project } = await makeReel();
+    const id = project!.id;
+    const ready = await approveIt(id);
+    const oldApproval = ready.approvalId!;
+
+    // Canvas, chat, Undo and the version list all ask first and change nothing.
+    const canvas = await applyEdit(id, [{ op: "set_slide_text", slide: 2, text: "Pick any time online" }], { source: "canvas", by: "test", expectCursor: 0 });
+    expect(canvas).toMatchObject({ ok: false, status: 409, why: REAPPROVE, needsReapproval: true });
+    const chat = await chatEdit(id, "make slide 2 shorter", { by: "test", chat: stub().chat });
+    expect(chat).toMatchObject({ ok: false, needsReapproval: true });
+    expect(await goToStep(id, 0)).toMatchObject({ ok: false, needsReapproval: true });
+    const still = (await getProject(id))!;
+    expect(still.doc).toEqual(ready.doc);
+    expect(still.steps).toHaveLength(0);
+    const [post] = await db()<{ status: string; reel: { slides: { text: string }[] } }[]>`select status, reel from practice_os.posts where id = ${ready.postId}`;
+    expect(post.status).toBe("ready");
+
+    // Continue: the change is saved, the post waits for her again, with a new approval.
+    const go = await applyEdit(id, [{ op: "set_slide_text", slide: 2, text: "Pick any time online" }], { source: "canvas", by: "test", expectCursor: 0, reapprove: true, chat: stub().chat });
+    expect(go.ok).toBe(true);
+    if (!go.ok) return;
+    expect(go.project.postStatus).toBe("pending_approval");
+    expect(go.project.approvalStatus).toBe("pending");
+    expect(go.project.approvalId).not.toBe(oldApproval);
+    const [after] = await db()<{ reel: { slides: { text: string }[] } }[]>`select reel from practice_os.posts where id = ${ready.postId}`;
+    expect(after.reel.slides[1].text).toBe("Pick any time online");
+    const [old] = await db()<{ status: string }[]>`select status from practice_os.approvals where id = ${oldApproval}`;
+    expect(old.status).toBe("done");
+    // Now waiting again, a further edit needs no question.
+    expect((await applyEdit(id, [{ op: "set_palette", palette: "warm" }], { source: "canvas", by: "test" })).ok).toBe(true);
+  });
+
+  it("a post that is being posted or already posted never changes, even with Continue", async () => {
+    const { project } = await makeReel();
+    await db()`update practice_os.posts set status = 'published' where id = ${project!.postId}`;
+    const r = await applyEdit(project!.id, [{ op: "set_palette", palette: "warm" }], { source: "canvas", by: "test", reapprove: true });
+    expect(r).toMatchObject({ ok: false, status: 409 });
+    expect(r.ok === false && r.needsReapproval).toBeFalsy();
+    expect((await moveCursor(project!.id, 1, { reapprove: true })).ok).toBe(false);
+  });
+
+  it("a waiting post's approval preview follows the edit", async () => {
+    const { project } = await makeReel();
+    const r = await applyEdit(project!.id, [{ op: "set_caption", text: `New words about booking.\n\n${(await practiceFacts()).licenseLine}` }], { source: "canvas", by: "test", chat: stub().chat });
+    expect(r.ok).toBe(true);
+    const [a] = await db()<{ preview: { body: string } }[]>`select preview from practice_os.approvals where id = ${project!.approvalId}`;
+    expect(a.preview.body).toMatch(/^New words about booking/);
+  });
+
+  it("a video's topic gets the crisis check (fixed reply, alert, audit) and the PHI guard before anything is saved", async () => {
+    const since = new Date();
+    const before = (await db()<{ n: number }[]>`select count(*)::int as n from practice_os.studio_projects`)[0].n;
+    const events: MakeEvent[] = [];
+    expect(await makeProject("test", "edit my own video about wanting to kill myself", (e) => events.push(e))).toBeNull();
+    expect(events).toContainEqual({ type: "stop", why: CRISIS_REPLY });
+    expect(await audits("crisis_reply", since)).toBeGreaterThanOrEqual(1);
+    expect(await audits("crisis_detected", since)).toBeGreaterThanOrEqual(1);
+    const phi: MakeEvent[] = [];
+    expect(await makeProject("test", "edit my own video of my client Kevin Ortiz", (e) => phi.push(e))).toBeNull();
+    expect(phi.some((e) => e.type === "stop")).toBe(true);
+    expect((await db()<{ n: number }[]>`select count(*)::int as n from practice_os.studio_projects`)[0].n).toBe(before);
+  });
+
+  it("Aeon's own reel points get Muse's critic before they're saved", async () => {
+    const base = stub().chat;
+    const chat = (async (feature: string, params: { messages: { content: unknown }[] }) => {
+      if (feature === "instagram.reel")
+        return { choices: [{ message: { content: JSON.stringify({ points: ["Pick a time that works for you on the booking page", "We talk for 15 minutes first, free"], book: "Book a free call. Link in bio." }) } }] };
+      // The critic passes the caption, and flags the slide run.
+      if (feature === "instagram.critic" && String(params.messages.at(-1)?.content).includes("We talk for 15 minutes first, free\nBook a free call"))
+        return { choices: [{ message: { content: JSON.stringify({ breaks: ["advice"] }) } }] };
+      return base(feature, params as never);
+    }) as unknown as ChatFn;
+    const events: MakeEvent[] = [];
+    const project = await makeProject("test", "make a reel about how booking works", (e) => events.push(e), { chat, search, graphic });
+    expect(project).toBeNull();
+    const stop = events.find((e) => e.type === "stop") as Extract<MakeEvent, { type: "stop" }>;
+    expect(stop.why).toMatch(/safety check/);
+  });
+
+  it("a new picture: its idea is checked first, the step is saved first, and an old picture is never reused", async () => {
+    const { project } = await makeReel();
+    const id = project!.id;
+    // Advice in the idea never reaches the image prompt.
+    let drawn = 0;
+    const counting = { ...graphic, background: () => (drawn++, graphic.background()) };
+    const advice = await applyEdit(id, [{ op: "new_picture", idea: "ways to manage your anxiety" }], { source: "canvas", by: "test", graphic: counting, chat: stub().chat });
+    expect(advice).toMatchObject({ ok: false, status: 422 });
+    expect(drawn).toBe(0);
+
+    const one = await applyEdit(id, [{ op: "new_picture", idea: "a sunny office" }], { source: "canvas", by: "test", graphic: counting, chat: stub().chat });
+    expect(one.ok).toBe(true);
+    if (!one.ok) return;
+    const v1 = one.project.doc.picture;
+    expect(v1).toBe(1);
+    await moveCursor(id, -1);
+    const two = await applyEdit(id, [{ op: "new_picture", idea: "a quiet waiting room" }], { source: "canvas", by: "test", graphic: counting, chat: stub().chat });
+    expect(two.ok && two.project.doc.picture).toBeGreaterThan(v1);
+    // The undone picture nothing points at any more is cleaned up.
+    const versions = (await db()<{ version: number }[]>`select version from practice_os.studio_pictures where project_id = ${id} order by version`).map((r) => r.version);
+    expect(versions).toEqual([0, two.ok ? two.project.doc.picture : -1]);
+
+    // A picture that fails its check takes its step back; the old picture stays.
+    const failing = (async (feature: string, params: never) =>
+      feature === "instagram.graphic_check" ? { choices: [{ message: { content: JSON.stringify({ ok: false, problems: ["blurry"] }) } }] } : stub().chat(feature, params)) as unknown as ChatFn;
+    const before = (await getProject(id))!;
+    const bad = await applyEdit(id, [{ op: "new_picture", idea: "a desk" }], { source: "canvas", by: "test", graphic, chat: failing });
+    expect(bad).toMatchObject({ ok: false, status: 502 });
+    const after = (await getProject(id))!;
+    expect(after.cursor).toBe(before.cursor);
+    expect(after.doc).toEqual(before.doc);
+  });
+
+  it("keeps the last 50 steps, folding older ones into how it started", async () => {
+    const { project } = await makeReel();
+    const id = project!.id;
+    const palettes = ["warm", "cool", "bright", "calm"] as const;
+    for (let i = 0; i < KEEP_STEPS + 5; i++) {
+      const r = await applyEdit(id, [{ op: "set_palette", palette: palettes[i % 4] }], { source: "canvas", by: "test" });
+      expect(r.ok).toBe(true);
+    }
+    const p = (await getProject(id))!;
+    expect(p.cursor).toBe(KEEP_STEPS);
+    expect(p.steps).toHaveLength(KEEP_STEPS);
+    expect(p.steps[0].seq).toBe(1);
+    expect(p.doc.palette).toBe(palettes[(KEEP_STEPS + 4) % 4]);
+    // Step 0 is now the state after the 5th change, not how Aeon first made it.
+    const back = await goToStep(id, 0);
+    expect(back.ok && back.project.doc.palette).toBe(palettes[4 % 4]);
   });
 });
