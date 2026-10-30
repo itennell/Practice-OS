@@ -5,29 +5,25 @@ import { PhoneCard } from "@/components/connections/phone-card";
 import { AlertList } from "@/components/front-desk/alert-list";
 import { CalendarCard } from "@/components/front-desk/calendar-card";
 import { CheckNow } from "@/components/front-desk/check-now";
-import { StatusPill, type Status } from "@/components/shared/status-mark";
+import { InboxList } from "@/components/front-desk/inbox";
+import { TestConsole } from "@/components/front-desk/test-console";
 import { ChipLink, GlassCard } from "@/components/ui";
 import { loadApprovalSettings } from "@/lib/approval-settings";
+import { isDryRun } from "@/lib/env";
 import { calendarStatus, phoneStatus } from "@/lib/frontdesk/connect";
+import { alertPhone } from "@/lib/frontdesk/crisis";
 import { prettyPhone } from "@/lib/frontdesk/phone/numbers";
 import { defaultGreeting, loadFrontDeskSetup } from "@/lib/frontdesk/setup";
-import { FILTERS, frontDeskView, type Filter, type InquiryView } from "@/lib/frontdesk/view";
+import { frontDeskInbox, INBOX_FILTERS, maskPhone, lastCheck, type InboxFilter } from "@/lib/frontdesk/inbox";
+import { frontDeskView } from "@/lib/frontdesk/view";
 
 export const metadata = { title: "Front Desk · Practice-OS" };
 
-const FILTER_LABEL: Record<Filter, string> = { all: "All", needs_you: "Needs you", waiting: "Waiting on caller", booked: "Booked" };
-const STATUS: Record<InquiryView["status"], { status: Status; label: string }> = {
-  new: { status: "pending", label: "New" },
-  options_sent: { status: "running", label: "Options sent" },
-  booked: { status: "done", label: "Booked" },
-  needs_clinician: { status: "pending", label: "Needs you" },
-  closed: { status: "declined", label: "Closed" },
-};
-const CHANNEL: Record<InquiryView["channel"], string> = { voicemail: "Voicemail", sms: "Text", web_chat: "Web chat" };
+const FILTER_LABEL: Record<InboxFilter, string> = { all: "All", needs_you: "Needs you", calls: "Calls", voicemails: "Voicemails", texts: "Texts", bookings: "Bookings" };
 
 const when = (iso: string) =>
   new Date(iso).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-const who = (s: string) => (s.startsWith("+1") ? prettyPhone(s) : s);
+const who = (s: string) => (s.startsWith("+") ? maskPhone(s) : s);
 
 export default function FrontDeskPage({ searchParams }: PageProps<"/front-desk">) {
   return (
@@ -42,7 +38,6 @@ export default function FrontDeskPage({ searchParams }: PageProps<"/front-desk">
             </p>
           </div>
         </div>
-        <CheckNow />
       </header>
       <Suspense fallback={<p className="text-[var(--fg-muted)]">Loading Front Desk…</p>}>
         <FrontDesk searchParams={searchParams} />
@@ -54,15 +49,23 @@ export default function FrontDeskPage({ searchParams }: PageProps<"/front-desk">
 async function FrontDesk({ searchParams }: { searchParams: PageProps<"/front-desk">["searchParams"] }) {
   await connection(); // read the database per request, never at build time
   const q = (await searchParams).filter;
-  const filter: Filter = (FILTERS as readonly string[]).includes(String(q)) ? (q as Filter) : "all";
-  const [view, phone, calendar, settings, setup, greeting] = await Promise.all([
-    frontDeskView(filter),
+  const filter: InboxFilter = (INBOX_FILTERS as readonly string[]).includes(String(q)) ? (q as InboxFilter) : "all";
+  const [view, inbox, last, phone, calendar, settings, setup, greeting, ownPhone] = await Promise.all([
+    frontDeskView(),
+    frontDeskInbox(filter),
+    lastCheck(),
     phoneStatus(),
     calendarStatus(),
     loadApprovalSettings(),
     loadFrontDeskSetup(),
     defaultGreeting(),
+    alertPhone(),
   ]);
+  const texting = !phone.connected
+    ? { ok: false, note: "connect your phone below first." }
+    : phone.note
+      ? { ok: false, note: phone.note }
+      : { ok: true, note: "working now." };
   const calcom = calendar.provider === "calcom" && calendar.connected;
   return (
     <>
@@ -73,39 +76,33 @@ async function FrontDesk({ searchParams }: { searchParams: PageProps<"/front-des
         <AlertList initial={view.alerts} />
       </GlassCard>
 
+      <TestConsole
+        line={phone.connected && phone.number ? prettyPhone(phone.number) : null}
+        texting={texting}
+        alertPhone={ownPhone ? `ending ${ownPhone.slice(-4)}` : null}
+        dryRun={isDryRun()}
+        open={filter === "all" && inbox.every((i) => i.isSample)}
+      />
+
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <GlassCard aria-labelledby="callers" className="flex min-w-0 flex-col gap-4 p-6 md:p-8">
-          <h2 id="callers" className="text-section">
-            Calls and texts
-          </h2>
-          <nav aria-label="Filter calls and texts" className="flex flex-wrap gap-2">
-            {FILTERS.map((f) => (
+        <GlassCard aria-labelledby="inbox" className="flex min-w-0 flex-col gap-4 p-6 md:p-8">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex flex-col gap-1">
+              <h2 id="inbox" className="text-section">
+                Inbox
+              </h2>
+              <p className="max-w-[60ch] text-small text-[var(--fg-muted)]">Every call, voicemail, text and booking on your practice line, newest first. Numbers show the last four digits until you ask.</p>
+            </div>
+            <CheckNow last={last} />
+          </div>
+          <nav aria-label="Filter the inbox" className="flex flex-wrap gap-2">
+            {INBOX_FILTERS.map((f) => (
               <ChipLink key={f} href={f === "all" ? "/front-desk" : `/front-desk?filter=${f}`} on={f === filter}>
                 {FILTER_LABEL[f]}
               </ChipLink>
             ))}
           </nav>
-          {view.inquiries.length === 0 ? (
-            <p className="text-[var(--fg-muted)]">No calls or texts here yet.</p>
-          ) : (
-            <ul className="flex flex-col divide-y divide-[var(--hairline)]">
-              {view.inquiries.map((i) => (
-                <li key={i.id} className="flex min-h-14 flex-col gap-1 py-3 sm:flex-row sm:items-center sm:gap-4">
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate font-medium">
-                      {who(i.who)}
-                      {i.crisis && <span className="ml-2 text-small font-semibold text-[var(--danger-fg)]">Urgent</span>}
-                    </span>
-                    <span className="truncate text-small text-[var(--fg-muted)]">
-                      {CHANNEL[i.channel]} · {i.summary ?? i.lastMessage ?? ""}
-                    </span>
-                  </div>
-                  <span className="text-small text-[var(--fg-muted)] sm:w-40">{i.consultAt ? `Consult ${when(i.consultAt)}` : when(i.updatedAt)}</span>
-                  <StatusPill status={STATUS[i.status].status}>{STATUS[i.status].label}</StatusPill>
-                </li>
-              ))}
-            </ul>
-          )}
+          <InboxList items={inbox} />
         </GlassCard>
 
         <GlassCard aria-labelledby="up-next" className="flex flex-col gap-4 p-6">
