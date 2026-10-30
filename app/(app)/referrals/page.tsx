@@ -8,7 +8,7 @@ import { STAGE_LABEL } from "@/lib/referrals/stages";
 import { getProfile } from "@/lib/profile";
 import { evidenceFor } from "@/lib/referrals/evidence/store";
 import { recheckIfDue, recheckDeps } from "@/lib/referrals/sources/recheck";
-import { latestLetters, listSources, practiceFacts, rescoreOldCards } from "@/lib/referrals/store";
+import { latestLetters, listSources, moveDueFollowUps, practiceFacts, rescoreOldCards } from "@/lib/referrals/store";
 import { contactsFor } from "@/lib/referrals/contacts";
 import { tiersWithLog } from "@/lib/referrals/plan";
 import { SCORE_VERSION, type TierResult } from "@/lib/referrals/tier";
@@ -44,6 +44,8 @@ async function Referrals() {
   }
   // Cards last checked over 30 days ago are checked again once a day, after the page is sent (her computer only).
   if (!process.env.VERCEL) {
+    // The board already shows due follow-ups in Follow up; on her computer the move is saved too, with an audit row.
+    after(() => moveDueFollowUps().catch((err) => console.error(`[referrals] follow-ups: ${err instanceof Error ? err.message : String(err)}`)));
     after(() => recheckIfDue(recheckDeps()).catch((err) => console.error(`[referrals] recheck: ${err instanceof Error ? err.message : String(err)}`)));
   }
   const evidence = await evidenceFor(sources);

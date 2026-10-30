@@ -9,7 +9,7 @@
 import type postgres from "postgres";
 import type { Fact } from "../evidence/merge";
 import { formatPhone, normalizeName } from "../evidence/normalize";
-import { extractContacts, extractLinks, type EmailHow, type PageContacts } from "./extract";
+import { extractContacts, extractLinks, extractSelfUrl, type EmailHow, type PageContacts } from "./extract";
 import { politeFetch, type FetchResult } from "./fetch";
 import { robotsCheck, robotsDecision, type RobotsDecision } from "./robots";
 
@@ -26,7 +26,14 @@ const MAX_EXTRA_PAGES = 2;
 const DIRECTORY_EMAILS = 4;
 
 export type Blocked = null | "blocklisted" | "robots" | "no_solicitation" | "unreachable";
-export type DiscoverResult = { facts: Fact[]; pages: string[]; robots: RobotsDecision; blocked: Blocked };
+export type DiscoverResult = {
+  facts: Fact[];
+  pages: string[];
+  robots: RobotsDecision;
+  blocked: Blocked;
+  /** The site's address as its own home page names it (canonical link or og:url, same site), or null. */
+  selfUrl?: string | null;
+};
 export type DiscoverDeps = {
   fetch?: (url: string) => Promise<FetchResult>;
   now?: () => Date;
@@ -78,7 +85,7 @@ function ok(r: FetchResult): boolean {
   return !r.error && r.status >= 200 && r.status < 300;
 }
 
-export async function discoverContacts(website: string, card: { name: string }, deps: DiscoverDeps = {}): Promise<DiscoverResult> {
+export async function discoverContacts(website: string, card: { name: string; isOrg?: boolean }, deps: DiscoverDeps = {}): Promise<DiscoverResult> {
   const now = deps.now ?? (() => new Date());
   const fetchPage = deps.fetch ?? ((url: string) => politeFetch(url, { sql: deps.sql, now: () => now().getTime() }));
   const stop = (blocked: Blocked, robots: RobotsDecision, pages: string[] = []): DiscoverResult => ({ facts: [], pages, robots, blocked });
@@ -111,6 +118,8 @@ export async function discoverContacts(website: string, card: { name: string }, 
   if (!sameSite(homeHost, site.hostname)) return stop("unreachable", homeRobots);
 
   const pages: Page[] = [{ url: home.finalUrl, kind: "home", contacts: extractContacts(home.body, home.finalUrl), robots: homeRobots.reason }];
+  const named = extractSelfUrl(home.body, home.finalUrl);
+  const selfUrl = named && sameSite(new URL(named).hostname, site.hostname) ? named : null;
 
   // Up to two of its own pages that say contact / about / connect / reach, contact first.
   const candidates = new Map<string, PageKind>();
@@ -133,15 +142,15 @@ export async function discoverContacts(website: string, card: { name: string }, 
   }
 
   const read = pages.map((p) => p.url);
-  if (pages.some((p) => p.contacts.noSolicitation)) return stop("no_solicitation", homeRobots, read);
+  if (pages.some((p) => p.contacts.noSolicitation)) return { ...stop("no_solicitation", homeRobots, read), selfUrl };
 
   const checkedAt = now().toISOString();
   const facts: Fact[] = [];
-  const email = bestEmail(pages, site.hostname, card.name);
+  const email = bestEmail(pages, site.hostname, card.name, Boolean(card.isOrg));
   if (email) facts.push(websiteFact("email", email.value, email.page, checkedAt, { how: email.how, unconfirmed: email.unconfirmed, why: email.why }));
   const phone = bestPhone(pages);
   if (phone) facts.push(websiteFact("phone", formatPhone(phone.value), phone.page, checkedAt, {}));
-  return { facts, pages: read, robots: homeRobots, blocked: null };
+  return { facts, pages: read, robots: homeRobots, blocked: null, selfUrl };
 }
 
 type EmailPick = { value: string; how: EmailHow; page: Page; unconfirmed: boolean; why: string | null };
@@ -153,7 +162,7 @@ function tier(how: EmailHow, kind: PageKind): number {
   return kind === "contact" ? 3 : 4;
 }
 
-function bestEmail(pages: Page[], siteHost: string, cardName: string): EmailPick | null {
+function bestEmail(pages: Page[], siteHost: string, cardName: string, isOrg: boolean): EmailPick | null {
   const lasts = normalizeName(cardName).lasts.filter((l) => l.length >= 3);
   const picks: (EmailPick & { rank: number[] })[] = [];
   for (const page of pages) {
@@ -161,12 +170,16 @@ function bestEmail(pages: Page[], siteHost: string, cardName: string): EmailPick
     for (const e of page.contacts.emails) {
       const [local, domain] = e.value.split("@");
       const foreign = !WEBMAIL.has(domain) && !domainFits(domain, siteHost);
+      const named = lasts.some((l) => local.replace(/[^a-z]/g, "").includes(l));
+      // A group page listing two or more clinicians: an address without this person's name may be anyone's.
+      const shared = !isOrg && page.contacts.providerCount >= 2 && !named;
       const why = directory
         ? "the page lists several addresses, so it isn't clear which is theirs"
         : foreign
           ? `the address is at ${domain}, not their website's domain`
-          : null;
-      const named = lasts.some((l) => local.replace(/[^a-z]/g, "").includes(l));
+          : shared
+            ? "the page lists several clinicians and the address doesn't carry their name"
+            : null;
       picks.push({ value: e.value, how: e.how, page, unconfirmed: Boolean(why), why, rank: [why ? 1 : 0, named ? 0 : 1, tier(e.how, page.kind)] });
     }
   }

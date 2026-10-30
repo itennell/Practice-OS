@@ -6,11 +6,18 @@
 // cache is practice_os.referral_fetch_cache; without it, a Map in memory.
 //
 // It refuses anything that isn't a public web address (localhost, private
-// networks, bare IP addresses, .local and .internal names), checks the
-// address the name points to, and follows at most 5 redirects itself,
-// checking each new address the same way, so a website can't send Aeon into
-// her own computer or network.
+// networks, bare IP addresses, .local and .internal names), looks the name up
+// once, refuses it if any address is private, and then connects to exactly
+// that checked address (the Host header and TLS name stay the site's), so a
+// name can't answer "public" to the check and "private" to the connection
+// (DNS rebinding). It follows at most 5 redirects itself, checking and pinning
+// each new address the same way, so a website can't send Aeon into her own
+// computer or network.
 import { lookup as dnsLookup } from "node:dns/promises";
+import http from "node:http";
+import https from "node:https";
+import { BlockList, isIP, type LookupFunction } from "node:net";
+import { Readable } from "node:stream";
 import type postgres from "postgres";
 
 export const USER_AGENT = "Practice-OS/0.1 (+https://github.com/itennell/Practice-OS)";
@@ -20,6 +27,8 @@ const MAX_BODY = 600_000;
 const MAX_REDIRECTS = 5;
 const ROBOTS_TTL = 24 * 60 * 60 * 1000;
 const PAGE_TTL = 7 * 24 * 60 * 60 * 1000;
+/** The database cache keeps at most this many pages; older ones go first. */
+export const CACHE_MAX_ROWS = 2000;
 
 export type FetchResult = {
   url: string;
@@ -33,8 +42,11 @@ export type FetchResult = {
   error?: string;
 };
 
+/** One GET to `url`, connecting only to `address` (already checked as public). */
+export type PinnedFetcher = (url: string, init: { headers: Record<string, string>; signal: AbortSignal }, address: string) => Promise<Response>;
+
 export type PoliteFetchOpts = {
-  fetcher?: typeof fetch;
+  fetcher?: PinnedFetcher;
   /** Milliseconds since 1970, for the cache and the spacing between requests. */
   now?: () => number;
   sql?: postgres.Sql;
@@ -63,22 +75,107 @@ async function defaultLookup(host: string): Promise<string[]> {
   return answers.map((a) => a.address);
 }
 
+/**
+ * A DNS lookup that answers every name with the one address already checked,
+ * and refuses it if it isn't public, so the socket can only go there.
+ */
+export function pinnedLookup(address: string, refuse: (ip: string) => boolean = isPrivateAddress): LookupFunction {
+  const family = isIP(address);
+  return ((_host: string, options: { all?: boolean }, callback: (...args: unknown[]) => void) => {
+    if (!family || refuse(address)) {
+      callback(Object.assign(new Error("refused: not a public web address"), { code: "EREFUSED" }));
+      return;
+    }
+    if (options?.all) callback(null, [{ address, family }]);
+    else callback(null, address, family);
+  }) as unknown as LookupFunction;
+}
+
+/**
+ * GET over node:http(s) to the pinned address. The URL's host name is still
+ * sent as Host and as the TLS server name, so certificates are checked against
+ * the site's name. No compression is asked for, so the body is plain text.
+ */
+export function pinnedRequest(
+  url: string,
+  init: { headers: Record<string, string>; signal: AbortSignal },
+  address: string,
+  refuse: (ip: string) => boolean = isPrivateAddress,
+): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const secure = u.protocol === "https:";
+    const options: https.RequestOptions = {
+      protocol: u.protocol,
+      hostname: u.hostname,
+      port: u.port || (secure ? 443 : 80),
+      path: `${u.pathname}${u.search}`,
+      method: "GET",
+      headers: { ...init.headers, Host: u.host },
+      lookup: pinnedLookup(address, refuse),
+      agent: false,
+      signal: init.signal,
+    };
+    if (secure) options.servername = u.hostname;
+    const req = (secure ? https : http).request(options, (res) => {
+      const status = res.statusCode ?? 0;
+      const headers = new Headers();
+      for (const [k, v] of Object.entries(res.headers)) {
+        if (v === undefined) continue;
+        for (const one of Array.isArray(v) ? v : [v]) headers.append(k, one);
+      }
+      if (status < 200 || status > 599) {
+        res.resume();
+        reject(new Error(`unexpected status ${status}`));
+        return;
+      }
+      if ([204, 205, 304].includes(status)) {
+        res.resume();
+        resolve(new Response(null, { status, headers }));
+        return;
+      }
+      resolve(new Response(Readable.toWeb(res) as ReadableStream<Uint8Array>, { status, headers }));
+    });
+    req.on("error", reject);
+    req.end();
+  });
+}
+
 function isIpLiteral(host: string): boolean {
   return /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(":") || /^\d+$/.test(host) || /^0x/i.test(host);
 }
 
-/** A private, loopback, link-local or otherwise not-public address. */
+// Every range that isn't the public internet: "this network", private (RFC 1918),
+// carrier NAT, loopback, link-local, test nets, benchmarking, multicast and
+// reserved, and for IPv6 loopback, unspecified, unique-local (fc00::/7),
+// link-local, site-local, multicast, documentation and the NAT64 / 6to4 /
+// Teredo forms that can carry an IPv4 address inside.
+const NOT_PUBLIC = new BlockList();
+for (const [net, bits] of [
+  ["0.0.0.0", 8], ["10.0.0.0", 8], ["100.64.0.0", 10], ["127.0.0.0", 8], ["169.254.0.0", 16], ["172.16.0.0", 12],
+  ["192.0.0.0", 24], ["192.0.2.0", 24], ["192.88.99.0", 24], ["192.168.0.0", 16], ["198.18.0.0", 15], ["198.51.100.0", 24],
+  ["203.0.113.0", 24], ["224.0.0.0", 4], ["240.0.0.0", 4],
+] as const) NOT_PUBLIC.addSubnet(net, bits, "ipv4");
+for (const [net, bits] of [
+  ["::", 128], ["::1", 128], ["64:ff9b::", 96], ["64:ff9b:1::", 48], ["100::", 64], ["2001::", 32],
+  ["2001:db8::", 32], ["2002::", 16], ["fc00::", 7], ["fe80::", 10], ["fec0::", 10], ["ff00::", 8],
+] as const) NOT_PUBLIC.addSubnet(net, bits, "ipv6");
+
+/** A private, loopback, link-local or otherwise not-public address (anything that isn't an IP address counts too). */
 export function isPrivateAddress(ip: string): boolean {
-  const v = ip.toLowerCase().replace(/^::ffff:/, "");
-  const m = v.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
-  if (m) {
-    const [a, b] = [Number(m[1]), Number(m[2])];
-    return (
-      a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) ||
-      (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || a >= 224
-    );
+  const v = ip.trim().toLowerCase().replace(/^\[|\]$/g, "").replace(/%.*$/, "");
+  // An IPv4 address written inside IPv6 (::ffff:10.0.0.1) is judged as the IPv4 one.
+  const mapped = v.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+  if (mapped) return isPrivateAddress(mapped[1]);
+  const hex = v.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (hex) {
+    const [hi, lo] = [parseInt(hex[1], 16), parseInt(hex[2], 16)];
+    return isPrivateAddress(`${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`);
   }
-  return v === "::" || v === "::1" || /^f[cd]/.test(v) || /^fe[89ab]/.test(v);
+  const family = isIP(v);
+  if (family === 4) return NOT_PUBLIC.check(v, "ipv4");
+  if (family === 6) return NOT_PUBLIC.check(v, "ipv6");
+  return true;
 }
 
 /** Why a URL may not be fetched, or null when it's a public http(s) web address. */
@@ -131,6 +228,12 @@ async function writeCache(url: string, entry: CacheEntry, sql?: postgres.Sql): P
     values (${url}, ${entry.status}, ${entry.etag}, ${entry.lastModified}, ${entry.body}, ${fetchedAt})
     on conflict (url) do update set status = excluded.status, etag = excluded.etag,
       last_modified = excluded.last_modified, body = excluded.body, fetched_at = excluded.fetched_at`;
+  // Nothing older than a week is ever used, and the table stays small.
+  const cutoff = new Date(entry.fetchedAt - PAGE_TTL);
+  await sql`delete from practice_os.referral_fetch_cache where fetched_at < ${cutoff}`;
+  await sql`
+    delete from practice_os.referral_fetch_cache where url in (
+      select url from practice_os.referral_fetch_cache order by fetched_at desc, url offset ${CACHE_MAX_ROWS})`;
 }
 
 /** Waits until this site's next turn: at least a second after the last request to it. */
@@ -171,7 +274,7 @@ function isWebPage(contentType: string | null): boolean {
 }
 
 export async function politeFetch(url: string, opts: PoliteFetchOpts = {}): Promise<FetchResult> {
-  const fetcher = opts.fetcher ?? fetch;
+  const fetcher: PinnedFetcher = opts.fetcher ?? ((u, init, address) => pinnedRequest(u, init, address));
   const now = opts.now ?? Date.now;
   const sleep = opts.sleep ?? defaultSleep;
   const lookup = opts.lookup ?? defaultLookup;
@@ -200,6 +303,8 @@ export async function politeFetch(url: string, opts: PoliteFetchOpts = {}): Prom
         return fail("the site's address couldn't be found", current);
       }
       if (!addresses.length || addresses.some(isPrivateAddress)) return fail("refused: not a public web address", current);
+      // The connection goes to this checked address only: no second lookup that could answer differently.
+      const pinned = addresses[0];
 
       const headers: Record<string, string> = { "User-Agent": USER_AGENT, Accept: "text/html, text/plain;q=0.9" };
       if (hop === 0 && cached) {
@@ -207,7 +312,7 @@ export async function politeFetch(url: string, opts: PoliteFetchOpts = {}): Prom
         if (cached.lastModified) headers["If-Modified-Since"] = cached.lastModified;
       }
       await waitTurn(host, now, sleep);
-      const res = await fetcher(current, { headers, redirect: "manual", signal: controller.signal });
+      const res = await fetcher(current, { headers, signal: controller.signal }, pinned);
 
       if (res.status === 304 && hop === 0 && cached) {
         await writeCache(url, { ...cached, fetchedAt: now() }, opts.sql).catch(() => {});

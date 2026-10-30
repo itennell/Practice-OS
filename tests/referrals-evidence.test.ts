@@ -1,7 +1,7 @@
 // Referrals v2: matching a provider across sources, merging what each source
 // says, confidence and conflicts. Plain code, no network, no database.
 import { describe, expect, it } from "vitest";
-import { matchCandidate, personNameScore } from "../lib/referrals/evidence/match";
+import { matchCandidate, orgNameScore, personNameScore } from "../lib/referrals/evidence/match";
 import { mergeEvidence, mergeField, valueKey, type Fact } from "../lib/referrals/evidence/merge";
 import { jaroWinkler, normalizeName, normalizeStreet, phoneDigits } from "../lib/referrals/evidence/normalize";
 import { addressLine, nppesFacts } from "../lib/referrals/evidence/store";
@@ -51,11 +51,23 @@ describe("matching on the labeled set", () => {
   });
   it("says how it matched", () => {
     expect(matchCandidate({ npi: "1900000001" }, { npi: "1900000001" })).toEqual({ method: "npi", score: 1 });
-    expect(matchCandidate({ name: "Priya Das", city: "Chicago" }, { name: "DAS, PRIYA", city: "CHICAGO" })?.method).toBe("name_city");
+    expect(matchCandidate({ name: "Avery Samplewood", city: "Chicago" }, { name: "SAMPLEWOOD, AVERY", city: "CHICAGO" })?.method).toBe("name_city");
     expect(matchCandidate({ name: "Maria Rivera", street: "2400 N Lincoln Ave", zip: "60614" }, { name: "Maria Rivera", street: "2400 North Lincoln Avenue", zip: "60614" })?.method).toBe("name_address");
   });
   it("a different last name never matches, however close the first", () => {
     expect(personNameScore("Maria Rivera", "Maria Romero")).toBe(0);
+  });
+  it("with both first names given they must be the same, or a known nickname", () => {
+    expect(personNameScore("Avery Samplewood", "Augustine Samplewood")).toBe(0);
+    expect(personNameScore("Maria Rivera", "Mario Rivera")).toBe(0); // close spelling, different person
+    expect(personNameScore("Robert Szabo", "Bob Szabo")).toBeGreaterThan(0.92);
+    expect(personNameScore("Rivera", "Mario Rivera")).toBeGreaterThan(0); // one side gives only a last name
+  });
+  it("an organization name needs whole words, not a prefix", () => {
+    expect(orgNameScore("Northside Family Medicine", "Northside Family Medicine Associates")).toBe(0.95);
+    expect(orgNameScore("Northside Fam", "Northside Family Medicine")).toBeLessThan(0.92);
+    expect(orgNameScore("Lakeview Pediatrics", "Lakeview Pediatric Dentistry")).toBeLessThan(0.92);
+    expect(orgNameScore("Lakeview Counseling Center", "Lakeview Counseling Centre")).toBeGreaterThanOrEqual(0.92);
   });
 });
 
@@ -115,6 +127,11 @@ describe("card confidence and the Confirmed by line", () => {
     ], { now: NOW });
     expect(ev.confidence).toBe("confirmed");
     expect(ev.confirmedBy).toEqual(["NPI Registry", "Medicare file", "State license: active"]);
+  });
+  it("a name-and-city match (the license list) never lifts a card to confirmed on its own", () => {
+    const ev = mergeEvidence([...nppes(), fact({ field: "license_status", value: "ACTIVE", origin: "state_license", method: "name_city", score: 0.9 })], { now: NOW });
+    expect(ev.confidence).toBe("partly");
+    expect(ev.confirmedBy).toContain("State license: active"); // still shown, just not counted
   });
   it("a license that isn't active, or an NPI gone from the registry, is not confirmed and flagged", () => {
     const lapsed = mergeEvidence([...nppes(), fact({ field: "license_status", value: "NOT RENEWED", origin: "state_license", method: "name_city" })], { now: NOW });

@@ -29,7 +29,7 @@ export const MERGE_SET: LabeledPair[] = [
   { why: "accent and hyphen", a: card({ name: "José Núñez-Ortiz, LCSW" }), b: { name: "Jose Nunez Ortiz", street: "2400 N. Lincoln Ave.", zip: "60614" }, same: true },
   { why: "typo in last name", a: card({ name: "Katherine Oyelaran, DO" }), b: { name: "Katherine Oyelarin", street: "2400 N Lincoln Ave", zip: "60614" }, same: true },
   { why: "typo in first name", a: card({ name: "Jonathan Pell, PsyD" }), b: { name: "Johnathan Pell", street: "2400 N Lincoln", zip: "60614" }, same: true },
-  { why: "city-only list (state license)", a: card({ name: "Priya Das, LCPC" }), b: { name: "DAS, PRIYA", city: "CHICAGO" }, same: true },
+  { why: "city-only list (state license)", a: card({ name: "Avery Samplewood, LCPC" }), b: { name: "SAMPLEWOOD, AVERY", city: "CHICAGO" }, same: true },
   { why: "1 prefix on phone", a: card({ name: "Ana Bell" }), b: { name: "Ana Bell", phone: "+1 312 555 0100" }, same: true },
   { why: "nickname (Tom), street spelled out", a: card({ name: "Tom Hale", street: "1 East Erie Street", zip: "60611" }), b: { name: "Thomas Hale", street: "1 E Erie St", zip: "60611" }, same: true },
   { why: "group, LLC dropped", a: { isOrg: true, name: "Northside Family Medicine LLC", street: "3100 N Clark St", zip: "60657" }, b: { isOrg: true, name: "Northside Family Medicine", street: "3100 North Clark Street", zip: "60657" }, same: true },

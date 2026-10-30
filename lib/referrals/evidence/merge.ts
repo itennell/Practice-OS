@@ -104,6 +104,9 @@ const FAMILY: Record<Origin, string> = {
 
 export const STALE_DAYS = 30;
 
+/** Values that mean "the source has no such record", not a fact about the card. */
+const NO_RECORD = new Set(["not_found", "deactivated"]);
+
 /** Two values of a field are the same when these keys are. */
 export function valueKey(field: Field, value: string): string {
   switch (field) {
@@ -191,7 +194,9 @@ export function mergeEvidence(facts: Fact[], opts: { isOrg?: boolean; now?: Date
   const npi = fields.npi_status?.value;
   const license = fields.license_status?.value;
   const licenseBad = Boolean(license && license.toUpperCase() !== "ACTIVE");
+  const npiGone = npi === "not_found" || npi === "deactivated";
   if (npi === "not_found") flags.push("Not in the NPI Registry any more (it may have been deactivated). Check before you write.");
+  if (npi === "deactivated") flags.push("The NPI Registry shows this NPI as deactivated. Check before you write.");
   if (licenseBad) flags.push(`The state license list shows ${license!.toLowerCase()}. Check before you write.`);
   if (fields.opt_out?.value === "yes") flags.push("Opted out of Medicare, so the Medicare files won't list them. That's common in private pay.");
 
@@ -200,7 +205,7 @@ export function mergeEvidence(facts: Fact[], opts: { isOrg?: boolean; now?: Date
   const add = (label: string) => !confirmedBy.includes(label) && confirmedBy.push(label);
   for (const origin of ORIGINS) {
     if (origin === "clinician") continue;
-    const agreed = facts.some((f) => f.origin === origin && fields[f.field]?.origins.includes(origin) && f.value !== "not_found" && !f.detail?.unconfirmed);
+    const agreed = facts.some((f) => f.origin === origin && fields[f.field]?.origins.includes(origin) && !NO_RECORD.has(f.value) && !f.detail?.unconfirmed);
     if (!agreed) continue;
     if (origin === "state_license" && license) add(`State license: ${license.toLowerCase()}`);
     else if (origin === "cms_dac" || origin === "cms_order_referring") add("Medicare file");
@@ -208,12 +213,23 @@ export function mergeEvidence(facts: Fact[], opts: { isOrg?: boolean; now?: Date
   }
   if (facts.some((f) => f.origin === "clinician")) add("You");
 
+  // Only a match by NPI, or by name and street or phone, counts toward "confirmed": a name in the
+  // same city (the state license list) could be someone else with that name.
   const families = new Set(
-    facts.filter((f) => f.origin !== "clinician" && f.value !== "not_found" && fields[f.field]?.origins.includes(f.origin)).map((f) => FAMILY[f.origin]),
+    facts
+      .filter(
+        (f) =>
+          f.origin !== "clinician" &&
+          !NO_RECORD.has(f.value) &&
+          (f.method === "npi" || f.method === "name_address") &&
+          !f.detail?.unconfirmed &&
+          fields[f.field]?.origins.includes(f.origin),
+      )
+      .map((f) => FAMILY[f.origin]),
   );
   const coreConflict = conflicts.some((c) => c.startsWith("Name") || c.startsWith("Address"));
   let confidence: CardConfidence;
-  if (npi === "not_found" || licenseBad || families.size === 0) confidence = "unconfirmed";
+  if (npiGone || licenseBad || families.size === 0) confidence = "unconfirmed";
   else if (families.size >= 2 && !coreConflict && (npi === "active" || opts.isOrg || !fields.npi_status)) confidence = "confirmed";
   else confidence = "partly";
 

@@ -22,6 +22,33 @@ export type Match = { method: MatchMethod; score: number };
 /** At or above this, two names are the same person (tuned on tests/fixtures/referrals/merge-set.ts). */
 export const NAME_MIN = 0.92;
 
+// Common nicknames, each group one person's name. "Priya" and "Prakash" look
+// alike to a string score, so first names must be the same or in one group.
+const NICKNAMES: string[][] = [
+  ["robert", "rob", "bob", "bobby", "robbie", "bert"], ["william", "will", "bill", "billy", "liam"],
+  ["richard", "rich", "rick", "dick", "ricky"], ["james", "jim", "jimmy", "jamie"], ["john", "jack", "johnny", "jon"],
+  ["joseph", "joe", "joey"], ["michael", "mike", "mikey"], ["thomas", "tom", "tommy"], ["charles", "charlie", "chuck"],
+  ["christopher", "chris"], ["christine", "chris", "christina", "tina"], ["daniel", "dan", "danny"], ["matthew", "matt"],
+  ["anthony", "tony"], ["andrew", "andy", "drew"], ["edward", "ed", "eddie", "ted", "ned"], ["steven", "stephen", "steve"],
+  ["jonathan", "johnathan", "jonathon", "jon"], ["nicholas", "nick"], ["benjamin", "ben"], ["samuel", "sam"], ["samantha", "sam"],
+  ["alexander", "alex", "xander"], ["alexandra", "alex", "sasha"], ["timothy", "tim"], ["patrick", "pat"], ["patricia", "pat", "patty", "trish"],
+  ["elizabeth", "liz", "beth", "betsy", "eliza", "lizzie"], ["margaret", "maggie", "meg", "peggy"], ["katherine", "catherine", "kathryn", "kate", "katie", "kathy", "cathy"],
+  ["jennifer", "jen", "jenny"], ["susan", "sue", "susie"], ["deborah", "debra", "deb", "debbie"], ["rebecca", "becky", "becca"],
+  ["victoria", "vicky", "tori"], ["abigail", "abby"], ["kimberly", "kim"], ["jessica", "jess"], ["gregory", "greg"],
+  ["jeffrey", "jeff"], ["kenneth", "ken", "kenny"], ["ronald", "ron"], ["donald", "don"], ["lawrence", "larry"],
+  ["frederick", "fred"], ["raymond", "ray"], ["douglas", "doug"], ["gerald", "jerry"], ["peter", "pete"],
+];
+const NICK = new Map<string, Set<number>>();
+NICKNAMES.forEach((group, i) => group.forEach((n) => NICK.set(n, (NICK.get(n) ?? new Set()).add(i))));
+
+/** The same first name, or two forms of one (Robert and Bob). */
+export function sameFirstName(a: string, b: string): boolean {
+  if (a === b) return true;
+  const ga = NICK.get(a);
+  const gb = NICK.get(b);
+  return Boolean(ga && gb && [...ga].some((g) => gb.has(g)));
+}
+
 /** 0 to 1: how alike two people's names are. Last name counts more; a different last name is 0. */
 export function personNameScore(a: string | null | undefined, b: string | null | undefined): number {
   const x = normalizeName(a);
@@ -31,9 +58,9 @@ export function personNameScore(a: string | null | undefined, b: string | null |
   if (last < 0.94) return 0;
   // One list may give only the last name.
   if (!x.first || !y.first || x.tokens.length === 1 || y.tokens.length === 1) return last * 0.9;
-  const first = jaroWinkler(x.first, y.first);
-  if (first < 0.85) return 0;
-  return 0.6 * last + 0.4 * first;
+  // Both give a first name: it has to be the same one (or a nickname of it), not just look alike.
+  if (!sameFirstName(x.first, y.first)) return 0;
+  return 0.6 * last + 0.4;
 }
 
 export function orgNameScore(a: string | null | undefined, b: string | null | undefined): number {
@@ -41,8 +68,14 @@ export function orgNameScore(a: string | null | undefined, b: string | null | un
   const y = normalizeOrg(b);
   if (!x || !y) return 0;
   if (x === y) return 1;
-  // "Northside Family Medicine" vs "Northside Family Medicine Associates".
-  if (x.length >= 8 && y.length >= 8 && (x.startsWith(y) || y.startsWith(x))) return 0.95;
+  const xs = x.split(" ");
+  const ys = y.split(" ");
+  const [short, long] = xs.length <= ys.length ? [xs, ys] : [ys, xs];
+  // "Northside Family Medicine" vs "Northside Family Medicine Associates": every word of the
+  // shorter name, whole and in order, starts the longer one ("Northside Fam" is not a match).
+  if (short.length >= 2 && short.every((w, i) => long[i] === w)) return 0.95;
+  // Otherwise the same words, each spelled nearly alike ("Center" / "Centre"), and the whole name close.
+  if (xs.length !== ys.length || !xs.every((w, i) => w === ys[i] || (w.length >= 4 && jaroWinkler(w, ys[i]) >= 0.9))) return Math.min(jaroWinkler(x, y), 0.85);
   return jaroWinkler(x, y);
 }
 

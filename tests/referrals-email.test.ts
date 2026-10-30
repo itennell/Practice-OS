@@ -3,10 +3,10 @@
 // what a page says, and the whole discovery with a fake fetch. No network.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { discoverContacts } from "../lib/referrals/email/discover";
 import { extractContacts, extractLinks, saysNoSolicitation } from "../lib/referrals/email/extract";
-import { politeFetch, resetPoliteFetch, unsafeUrlReason, USER_AGENT, type FetchResult } from "../lib/referrals/email/fetch";
+import { isPrivateAddress, pinnedRequest, politeFetch, resetPoliteFetch, unsafeUrlReason, USER_AGENT, type FetchResult, type PinnedFetcher } from "../lib/referrals/email/fetch";
 import { parseRobots, robotsAllows, robotsCheck, robotsDecision } from "../lib/referrals/email/robots";
 
 const site = (name: string) => readFileSync(join(__dirname, "fixtures/referrals/sites", name), "utf8");
@@ -124,6 +124,37 @@ describe("what a page says", () => {
     const links = extractLinks(site("home.html"), "https://reyescounseling.example/");
     expect(links).toContainEqual({ url: "https://reyescounseling.example/p/42", text: "Contact" });
   });
+
+  it("reads hostile pages in linear time (no regex backtracking over the page)", () => {
+    const hostile = [
+      "a".repeat(300_000), // a long run of address characters with no @
+      `${"a.".repeat(150_000)}@`, // dots and letters, then an @ with no domain
+      `${"x@".repeat(100_000)}`, // many @ in one word
+      "<a ".repeat(100_000), // tags that never close
+      `<a href="x">${"<a href='y'>".repeat(50_000)}`, // links with no </a>
+      "<!--".repeat(100_000), // comments that never close
+      "<script".repeat(80_000), // scripts that never close
+      `<div ${"itemprop ".repeat(60_000)}`, // one huge tag
+      `&${"a".repeat(300_000)}`, // an entity that never ends
+      `${"[at] ".repeat(60_000)}`,
+    ];
+    for (const page of hostile) {
+      const t = Date.now();
+      extractContacts(page, "https://x.example/");
+      extractLinks(page, "https://x.example/");
+      expect(Date.now() - t, page.slice(0, 20)).toBeLessThan(1500);
+    }
+  });
+
+  it("only takes an address whose local part is at most 64 long and starts at a word boundary", () => {
+    expect(extractContacts(`<p>${"b".repeat(65)}@x.example</p>`, "https://x.example/").emails).toEqual([]);
+    expect(extractContacts(`<p>write:hello@x.example, or call</p>`, "https://x.example/").emails).toEqual([{ value: "hello@x.example", how: "text" }]);
+  });
+
+  it("stops at the time budget and keeps what it found", () => {
+    const page = `<a href="mailto:first@x.example">a</a>${"<p>filler words here</p>".repeat(20_000)}`;
+    expect(extractContacts(page, "https://x.example/", { budgetMs: 0 }).emails.map((e) => e.value)).toEqual(["first@x.example"]);
+  });
 });
 
 // A pretend web: url -> answer. Anything not listed is a 404.
@@ -221,10 +252,38 @@ describe("discoverContacts", () => {
 
   it("accepts a webmail address as theirs", async () => {
     const B = "https://riverbend-counseling.example";
+    // Gmail names can't hold an underscore, so this address can't be anyone's.
+    const web = fakeWeb({ [`${B}/`]: `<a href="/contact-us">Say hello</a>`, [`${B}/contact-us`]: `<a href="mailto:sample_not_real@gmail.com">Email</a>` });
+    const r = await discoverContacts(B, { name: "Riley Bend" }, { fetch: web.fetch, now: NOW });
+    expect(r.facts[0]).toMatchObject({ value: "sample_not_real@gmail.com", detail: { label: "on their contact page" } });
+    expect(r.facts[0].detail?.unconfirmed).toBeUndefined();
+  });
+
+  it("an address at a mail host that isn't their site or a known webmail is unconfirmed", async () => {
+    const B = "https://riverbend-counseling.example";
     const web = fakeWeb({ [`${B}/`]: `<a href="/contact-us">Say hello</a>`, [`${B}/contact-us`]: site("gmail.html") });
     const r = await discoverContacts(B, { name: "Riley Bend" }, { fetch: web.fetch, now: NOW });
-    expect(r.facts[0]).toMatchObject({ value: "riverbend.counseling@gmail.com", detail: { label: "on their contact page" } });
-    expect(r.facts[0].detail?.unconfirmed).toBeUndefined();
+    expect(r.facts[0]).toMatchObject({ value: "riverbend.counseling@mail.example", detail: { unconfirmed: true } });
+  });
+
+  it("on a page listing several clinicians, an address without the card's name is unconfirmed", async () => {
+    const team = `<script type="application/ld+json">{"@graph":[{"@type":"Person","name":"[SAMPLE] A"},{"@type":"Person","name":"[SAMPLE] B"}]}</script>`;
+    const web = fakeWeb({ [`${R}/`]: `<a href="/contact">Contact</a>`, [`${R}/contact`]: `${team}<a href="mailto:office@reyescounseling.example">Write</a>` });
+    const r = await discoverContacts(R, DANA, { fetch: web.fetch, now: NOW });
+    expect(r.facts[0]).toMatchObject({ value: "office@reyescounseling.example", detail: { unconfirmed: true } });
+    expect(String(r.facts[0].detail?.label)).toContain("several clinicians");
+    // With their name in it, or for the group's own card, the address is theirs.
+    const named = fakeWeb({ [`${R}/`]: `<a href="/contact">Contact</a>`, [`${R}/contact`]: `${team}<a href="mailto:dreyes@reyescounseling.example">Write</a>` });
+    expect((await discoverContacts(R, DANA, { fetch: named.fetch, now: NOW })).facts[0].detail?.unconfirmed).toBeUndefined();
+    const group = await discoverContacts(R, { name: "Reyes Counseling PLLC", isOrg: true }, { fetch: web.fetch, now: NOW });
+    expect(group.facts[0].detail?.unconfirmed).toBeUndefined();
+  });
+
+  it("reports the address the home page names for itself, only on the same site", async () => {
+    const web = fakeWeb({ [`${R}/`]: `<link rel="canonical" href="https://www.reyescounseling.example/home">` });
+    expect((await discoverContacts(R, DANA, { fetch: web.fetch, now: NOW })).selfUrl).toBe("https://www.reyescounseling.example/");
+    const elsewhere = fakeWeb({ [`${R}/`]: `<meta property="og:url" content="https://directory.example/p/1">` });
+    expect((await discoverContacts(R, DANA, { fetch: elsewhere.fetch, now: NOW })).selfUrl).toBeNull();
   });
 
   it("prefers an address with the card's last name, and a confirmed one over an unconfirmed one", async () => {
@@ -362,11 +421,92 @@ describe("politeFetch", () => {
     expect(waits).toEqual([1000, 2000]);
   });
 
+  it("looks the name up once per hop and connects to that checked address (no DNS rebinding)", async () => {
+    let lookups = 0;
+    // A name that answers public to the check and private to any second lookup.
+    const rebinding = async () => (++lookups === 1 ? ["93.184.216.34"] : ["127.0.0.1"]);
+    const pinned: string[] = [];
+    const fetcher = (async (_url: string, _init: unknown, address: string) => {
+      pinned.push(address);
+      return html("ok");
+    }) as PinnedFetcher;
+    const r = await politeFetch("https://rebind.example/", { fetcher, lookup: rebinding, sleep: noSleep });
+    expect(r).toMatchObject({ status: 200, body: "ok" });
+    expect(lookups).toBe(1);
+    expect(pinned).toEqual(["93.184.216.34"]);
+    // Each redirect is looked up and checked again: a hop to a name now pointing inside is refused.
+    resetPoliteFetch();
+    lookups = 0;
+    const hop = (async () => new Response(null, { status: 302, headers: { location: "https://other.example/" } })) as PinnedFetcher;
+    expect((await politeFetch("https://rebind.example/", { fetcher: hop, lookup: rebinding, sleep: noSleep })).error).toMatch(/^refused/);
+    expect(lookups).toBe(2);
+  });
+
+  it("refuses an answer list with any private address, IPv6 and IPv4-in-IPv6 included", async () => {
+    for (const bad of [["93.184.216.34", "10.0.0.1"], ["::1"], ["::ffff:127.0.0.1"], ["::ffff:7f00:1"], ["fd12::1"], ["fe80::1"], ["169.254.169.254"], ["not-an-ip"]]) {
+      const { fetcher, calls } = fakeFetch(() => html("x"));
+      const r = await politeFetch("https://mixed.example/", { fetcher, lookup: async () => bad, sleep: noSleep });
+      expect(r.error, bad.join(",")).toMatch(/^refused/);
+      expect(calls).toHaveLength(0);
+    }
+    expect(isPrivateAddress("2606:4700::1")).toBe(false);
+    expect(isPrivateAddress("8.8.8.8")).toBe(false);
+  });
+
+  it("the pinned connection goes to the checked address with the site's Host header, and refuses a private one", async () => {
+    const { createServer } = await import("node:http");
+    const seen: string[] = [];
+    const server = createServer((req, res) => {
+      seen.push(req.headers.host ?? "");
+      res.writeHead(200, { "content-type": "text/html" });
+      res.end("<p>pinned</p>");
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const port = (server.address() as { port: number }).port;
+    try {
+      const signal = new AbortController().signal;
+      // Allowed here only because the test passes its own check; the real one refuses 127.0.0.1.
+      const res = await pinnedRequest(`http://practice.example:${port}/x`, { headers: {}, signal }, "127.0.0.1", () => false);
+      expect(await res.text()).toBe("<p>pinned</p>");
+      expect(seen).toEqual([`practice.example:${port}`]);
+      await expect(pinnedRequest(`http://practice.example:${port}/x`, { headers: {}, signal }, "127.0.0.1")).rejects.toThrow(/refused/);
+      expect(seen).toHaveLength(1);
+    } finally {
+      server.close();
+    }
+  });
+
   it("reports a site that doesn't answer as status 0 with plain words", async () => {
     const fetcher = (async () => {
       throw new Error("ECONNREFUSED");
     }) as typeof fetch;
     const r = await politeFetch("https://down.example/", { fetcher, lookup: publicDns, sleep: noSleep });
     expect(r).toMatchObject({ status: 0, error: expect.stringContaining("couldn't be reached") });
+  });
+});
+
+describe.skipIf(!process.env.DATABASE_URL)("the page cache in the database", async () => {
+  const { closeDb, db } = await import("../lib/db");
+  const { CACHE_MAX_ROWS } = await import("../lib/referrals/email/fetch");
+  afterAll(async () => {
+    await db()`delete from practice_os.referral_fetch_cache where url like 'https://prune-%'`;
+    await closeDb();
+  });
+
+  it("drops rows older than a week and keeps at most CACHE_MAX_ROWS on each write", async () => {
+    resetPoliteFetch();
+    const t = Date.parse("2026-10-29T12:00:00Z");
+    const old = new Date(t - 8 * 86_400_000);
+    await db()`insert into practice_os.referral_fetch_cache (url, status, body, fetched_at) values ('https://prune-old.example/', 200, 'x', ${old})`;
+    const urls = Array.from({ length: CACHE_MAX_ROWS + 5 }, (_, i) => `https://prune-many.example/${i}`);
+    await db()`
+      insert into practice_os.referral_fetch_cache (url, status, body, fetched_at)
+      select u, 200, 'x', ${new Date(t - 3600_000)}::timestamptz from unnest(${urls}::text[]) as u`;
+    const { fetcher } = fakeFetch(() => html("<p>new</p>"));
+    await politeFetch("https://prune-new.example/", { fetcher, lookup: publicDns, sleep: noSleep, now: () => t, sql: db() });
+    const [{ n }] = await db()`select count(*)::int as n from practice_os.referral_fetch_cache`;
+    expect(n).toBeLessThanOrEqual(CACHE_MAX_ROWS);
+    expect(await db()`select 1 from practice_os.referral_fetch_cache where url = 'https://prune-old.example/'`).toHaveLength(0);
+    expect(await db()`select 1 from practice_os.referral_fetch_cache where url = 'https://prune-new.example/'`).toHaveLength(1);
   });
 });
