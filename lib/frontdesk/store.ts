@@ -2,14 +2,14 @@ import { audit } from "../audit";
 import { db } from "../db";
 import { isDryRun } from "../env";
 import { deps } from "./deps";
-import { PhoneError, type PhoneAdapter } from "./phone/types";
+import { PhoneError, type MessageVendor, type PhoneAdapter } from "./phone/types";
 import type { Practice } from "./templates";
 
 // Database helpers for the Front Desk tables (migrations 001 and 016).
 
 export type InquiryRow = {
   id: string;
-  channel: "voicemail" | "sms" | "web_chat";
+  channel: "voicemail" | "sms" | "web_chat" | "call";
   contact_name: string | null;
   contact_phone: string | null;
   summary: string | null;
@@ -82,16 +82,32 @@ export async function hasMessage(vendor: string, providerId: string): Promise<bo
 export async function addMessage(m: {
   inquiryId: string;
   direction: "inbound" | "outbound";
-  channel: "voicemail" | "sms";
+  channel: "voicemail" | "sms" | "call";
   body: string;
-  vendor: string;
+  vendor: MessageVendor;
   providerId: string | null;
+  /** What the inbox shows beside it (migration 037): call length, recording id, safety result. */
+  meta?: Record<string, unknown>;
+  isSample?: boolean;
 }): Promise<boolean> {
   const rows = await db()`
-    insert into practice_os.messages (inquiry_id, direction, channel, body, vendor, provider_sid)
-    values (${m.inquiryId}, ${m.direction}, ${m.channel}, ${m.body}, ${m.vendor}, ${m.providerId})
+    insert into practice_os.messages (inquiry_id, direction, channel, body, vendor, provider_sid, meta, is_sample)
+    values (${m.inquiryId}, ${m.direction}, ${m.channel}, ${m.body}, ${m.vendor}, ${m.providerId}, ${db().json((m.meta ?? {}) as never)}, ${m.isSample ?? false})
     on conflict (vendor, provider_sid) do nothing returning id`;
   return rows.length > 0;
+}
+
+/** Adds to a message's inbox details (the safety result once the checks have run). */
+export async function addMessageMeta(vendor: MessageVendor, providerId: string, meta: Record<string, unknown>): Promise<void> {
+  await db()`
+    update practice_os.messages set meta = meta || ${db().json(meta as never)}
+    where vendor = ${vendor} and provider_sid = ${providerId}`;
+}
+
+async function isSampleInquiry(id: string | null): Promise<boolean> {
+  if (!id) return false;
+  const [row] = await db()`select is_sample from practice_os.inquiries where id = ${id}`;
+  return Boolean(row?.is_sample);
 }
 
 export async function isOptedOut(phone: string): Promise<boolean> {
@@ -145,16 +161,19 @@ export async function sendText(input: {
   if (!input.force && (await isOptedOut(input.to))) {
     throw new PhoneError("Number opted out", "This caller texted STOP, so Front Desk can't text them.");
   }
-  const dryRun = isDryRun();
+  // A [Sample] conversation or the stand-in phone never reaches a real phone,
+  // DRY_RUN or not: it is logged like a dry run.
+  const sample = input.phone?.vendor === "sample" || (await isSampleInquiry(input.inquiryId));
+  const dryRun = isDryRun() || sample;
   let id: string | null = null;
   if (!dryRun) {
     const phone = input.phone ?? (await deps().phone());
     if (!phone) throw new PhoneError("No phone connected", "Connect your phone company on the Front Desk page.");
     id = (await phone.sendText(input.to, input.body)).id;
   }
-  const vendor = input.phone?.vendor ?? (await deps().phone().catch(() => null))?.vendor ?? "twilio";
+  const vendor = sample ? "sample" : (input.phone?.vendor ?? (await deps().phone().catch(() => null))?.vendor ?? "twilio");
   if (input.inquiryId) {
-    await addMessage({ inquiryId: input.inquiryId, direction: "outbound", channel: "sms", body: input.body, vendor, providerId: id });
+    await addMessage({ inquiryId: input.inquiryId, direction: "outbound", channel: "sms", body: input.body, vendor, providerId: id, meta: { dryRun }, isSample: sample });
   }
   await audit({
     actor: input.actor,
@@ -162,7 +181,7 @@ export async function sendText(input: {
     approvalId: input.approvalId ?? null,
     subjectType: "inquiry",
     subjectId: input.inquiryId,
-    details: { dryRun, chars: input.body.length, provider_id: id },
+    details: { dryRun, sample, chars: input.body.length, provider_id: id },
   });
   return { sent: !dryRun, dryRun, id };
 }

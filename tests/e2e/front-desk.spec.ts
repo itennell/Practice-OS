@@ -33,11 +33,11 @@ test("Front Desk shows sample callers, filters, Up next and both Connect cards",
   await expect(page.getByText("[Sample] Jordan Example asked whether you offer couples sessions.")).toBeVisible();
   await expect(page.getByText("[Sample] Sam Example").first()).toBeVisible();
   await expect(page.getByRole("heading", { name: "Up next" })).toBeVisible();
-  await expect(page.getByText(/FD-1001/)).toBeVisible();
+  await expect(page.getByRole("region", { name: "Up next" }).getByText(/FD-1001/)).toBeVisible();
 
-  await page.getByRole("link", { name: "Booked" }).click();
-  await expect(page).toHaveURL(/filter=booked/);
-  await expect(page.getByRole("link", { name: "Booked" })).toHaveAttribute("aria-current", "page");
+  await page.getByRole("link", { name: "Bookings" }).click();
+  await expect(page).toHaveURL(/filter=bookings/);
+  await expect(page.getByRole("link", { name: "Bookings" })).toHaveAttribute("aria-current", "page");
   await expect(page.getByText("[Sample] Riley Example")).toHaveCount(0);
 
   const phone = page.getByRole("region", { name: "Practice phone" });
