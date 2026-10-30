@@ -1,4 +1,5 @@
 import { db } from "../db";
+import { blankContacts } from "./redact";
 
 // What the Front Desk page shows. Logistics words only, never a caller's mood.
 
@@ -58,7 +59,8 @@ export async function frontDeskView(filter: Filter = "all") {
         isSample: r.is_sample,
       }),
     ),
-    alerts: alerts.map((r): AlertView => ({ id: r.id, kind: r.kind, message: r.message, createdAt: new Date(r.created_at).toISOString(), inquiryId: r.inquiry_id, isSample: r.is_sample })),
+    // Older rows may hold a full number: blank it again on the way out.
+    alerts: alerts.map((r): AlertView => ({ id: r.id, kind: r.kind, message: blankContacts(r.message).text, createdAt: new Date(r.created_at).toISOString(), inquiryId: r.inquiry_id, isSample: r.is_sample })),
     consults: consults.map((r): ConsultView => ({ id: r.id, reference: r.reference, who: r.who, startsAt: new Date(r.starts_at).toISOString(), status: r.status, isSample: r.is_sample })),
   };
 }

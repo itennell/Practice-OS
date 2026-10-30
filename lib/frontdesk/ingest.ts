@@ -8,15 +8,18 @@ import { loadApprovalSettings } from "../approval-settings";
 import { audit } from "../audit";
 import { db } from "../db";
 import { transcribe, transcriptText } from "../meta";
-import { checkCrisis } from "../safety";
+import { checkIdentity, type PhiKind } from "../aeon/identity-filter";
+import { checkCrisis, type CrisisResult } from "../safety";
+import type { CalendarAdapter } from "./calendar/types";
 import { handleCrisis } from "./crisis";
 import { deps } from "./deps";
-import { extractVoicemail, type Extracted } from "./extract";
+import { readIntent, type Extracted } from "./extract";
 import { offerTimes, passToClinician } from "./offers";
 import { prettyPhone } from "./phone/numbers";
-import type { InboundText, PhoneAdapter, Voicemail } from "./phone/types";
+import type { Call, InboundText, MessageVendor, PhoneAdapter, Voicemail } from "./phone/types";
+import { maskPhone } from "./redact";
 import { parseReply } from "./reply";
-import { activeBookingFor, addAlert, addMessage, hasMessage, inquiryForPhone, openOfferFor, practice, sendText } from "./store";
+import { activeBookingFor, addAlert, addMessage, addMessageMeta, hasMessage, inquiryForPhone, openOfferFor, practice, sendText } from "./store";
 import { helpText, noBookingText, pickHelpText, startText, stopText } from "./templates";
 
 // One voicemail or one text, start to finish. Order is fixed (AGENTS.md):
@@ -48,11 +51,29 @@ export async function voicemailTranscript(v: Voicemail): Promise<{ text: string 
   return fallback ? { text: fallback, source: "provider" } : { text: null, source: null };
 }
 
+/**
+ * What the inbox shows as the safety result: the crisis check's category and
+ * which kinds of private detail the plain-code check sees (a caller's name or
+ * number is expected). Front Desk keeps the words for her; the flag tells her
+ * they never go into Aeon's memory.
+ */
+export function safetyResult(text: string, crisis: CrisisResult): { crisis: string | null; private: PhiKind[] } {
+  const found: PhiKind[] = [];
+  for (const kind of ["client_name", "contact", "birth_date", "identifier", "diagnosis", "address"] as const) {
+    if (!checkIdentity(text, { names: [], contacts: [] }, [kind]).ok) found.push(kind);
+  }
+  return { crisis: crisis.crisis ? crisis.category : null, private: found };
+}
+
+async function saveSafety(vendor: MessageVendor, providerId: string, text: string, crisis: CrisisResult) {
+  await addMessageMeta(vendor, providerId, { safety: safetyResult(text, crisis) });
+}
+
 async function rules() {
   return (await loadApprovalSettings()).frontDesk;
 }
 
-async function actOnIntent(inquiryId: string, phone: string | null, intent: Extracted["intent"], note: string) {
+async function actOnIntent(inquiryId: string, phone: string | null, intent: Extracted["intent"], note: string, calendar?: CalendarAdapter) {
   const now = deps().now();
   if ((intent === "reschedule" || intent === "cancel") && phone) {
     const booking = await activeBookingFor(phone, now);
@@ -68,38 +89,55 @@ async function actOnIntent(inquiryId: string, phone: string | null, intent: Extr
     }
   }
   if (intent === "question" || intent === "other") return passToClinician(inquiryId, note);
-  return offerTimes(inquiryId, { purpose: "book" });
+  return offerTimes(inquiryId, { purpose: "book", calendar });
 }
 
-export async function processVoicemail(v: Voicemail, phone: PhoneAdapter): Promise<"skipped" | "crisis" | "done"> {
+export async function processVoicemail(
+  v: Voicemail,
+  phone: PhoneAdapter,
+  /** "Simulate a voicemail": the calendar to read times from when hers isn't connected. */
+  opts: { calendar?: CalendarAdapter } = {},
+): Promise<"skipped" | "crisis" | "done"> {
   if (await hasMessage(phone.vendor, v.id)) return "skipped";
   const { text, source } = await voicemailTranscript(v);
+  const sample = phone.vendor === "sample";
   const [inquiry] = await db()<{ id: string }[]>`
-    insert into practice_os.inquiries (channel, contact_phone, status) values ('voicemail', ${v.from}, 'new') returning id`;
-  await addMessage({ inquiryId: inquiry.id, direction: "inbound", channel: "voicemail", body: text ?? NO_TRANSCRIPT, vendor: phone.vendor, providerId: v.id });
+    insert into practice_os.inquiries (channel, contact_phone, status, is_sample) values ('voicemail', ${v.from}, 'new', ${sample}) returning id`;
+  await addMessage({
+    inquiryId: inquiry.id,
+    direction: "inbound",
+    channel: "voicemail",
+    body: text ?? NO_TRANSCRIPT,
+    vendor: phone.vendor,
+    providerId: v.id,
+    meta: { call_id: v.callId ?? null, seconds: v.seconds ?? null, transcript: source },
+    isSample: sample,
+  });
   await audit({ actor: "system", action: "voicemail_received", subjectType: "inquiry", subjectId: inquiry.id, details: { vendor: phone.vendor, transcript: source } });
 
   if (!text) {
-    await addAlert("question", `New voicemail from ${v.from ? prettyPhone(v.from) : "a hidden number"}. Front Desk couldn't read it; listen in your phone app.`, inquiry.id);
+    await addAlert("question", `New voicemail from ${v.from ? maskPhone(v.from) : "a hidden number"}. Front Desk couldn't read it; listen in your phone app.`, inquiry.id);
     await db()`update practice_os.inquiries set status = 'needs_clinician' where id = ${inquiry.id}`;
     return "done";
   }
 
   const crisis = checkCrisis(text); // before any model, always
+  await saveSafety(phone.vendor, v.id, text, crisis);
   if (crisis.crisis) {
     await handleCrisis({ inquiryId: inquiry.id, channel: "voicemail", from: v.from, category: crisis.category, phone });
     return "crisis";
   }
 
-  const x = await extractVoicemail(text, v.from);
+  const x = await readIntent(text, v.from);
   await db()`
     update practice_os.inquiries
     set contact_name = ${x.name}, contact_phone = ${x.callbackNumber}, summary = ${x.summary}
     where id = ${inquiry.id}`;
   const who = x.name ?? (x.callbackNumber ? prettyPhone(x.callbackNumber) : "A caller");
-  await withOrigin({ rule: "front_desk", rules: await rules() }, () =>
-    actOnIntent(inquiry.id, x.callbackNumber, x.intent, `${who} left a voicemail: ${x.summary}`),
-  );
+  const act = () => actOnIntent(inquiry.id, x.callbackNumber, x.intent, `${who} left a voicemail: ${x.summary}`, opts.calendar);
+  // A [Sample] always waits for her tap, so the test shows the approval step.
+  if (sample) await act();
+  else await withOrigin({ rule: "front_desk", rules: await rules() }, act);
   return "done";
 }
 
@@ -110,6 +148,7 @@ export async function processText(t: InboundText, phone: PhoneAdapter): Promise<
   if (!added) return "skipped";
 
   const crisis = checkCrisis(t.body); // before anything else, always
+  await saveSafety(phone.vendor, t.id, t.body, crisis);
   if (crisis.crisis) {
     await handleCrisis({ inquiryId: inquiry.id, channel: "sms", from: t.from, category: crisis.category, phone });
     return "crisis";
@@ -172,7 +211,7 @@ export async function processText(t: InboundText, phone: PhoneAdapter): Promise<
       default: {
         // A free-form text ("I'd like to set up a consult"): Muse reads the intent;
         // plain code still decides. Anything that isn't a booking request goes to her.
-        const x = await extractVoicemail(t.body, t.from);
+        const x = await readIntent(t.body, t.from);
         if (x.name && !inquiry.contact_name) await db()`update practice_os.inquiries set contact_name = ${x.name} where id = ${inquiry.id}`;
         if (x.intent === "book") return offerTimes(inquiry.id, { purpose: "book" });
         if (x.intent === "reschedule" || x.intent === "cancel") return actOnIntent(inquiry.id, t.from, x.intent, `${who} texted: "${t.body.slice(0, 200)}"`);
@@ -181,4 +220,26 @@ export async function processText(t: InboundText, phone: PhoneAdapter): Promise<
     }
   });
   return "done";
+}
+
+/**
+ * One call to the practice line, for the inbox. A call starts nothing on its
+ * own: its voicemail (if one was left) does. It joins the caller's open
+ * conversation, or starts a closed one so it never shows as waiting on her.
+ */
+export async function processCall(c: Call, phone: PhoneAdapter): Promise<"skipped" | "done"> {
+  if (await hasMessage(phone.vendor, c.id)) return "skipped";
+  const [open] = c.from
+    ? await db()<{ id: string }[]>`
+        select id from practice_os.inquiries
+        where contact_phone = ${c.from} and status <> 'closed' and updated_at > now() - interval '30 days' and not is_sample
+        order by updated_at desc limit 1`
+    : [];
+  const inquiryId =
+    open?.id ??
+    (await db()<{ id: string }[]>`
+      insert into practice_os.inquiries (channel, contact_phone, status) values ('call', ${c.from}, 'closed') returning id`)[0].id;
+  const body = c.seconds > 0 ? "Called the practice line" : "Missed call";
+  const added = await addMessage({ inquiryId, direction: "inbound", channel: "call", body, vendor: phone.vendor, providerId: c.id, meta: { seconds: c.seconds, status: c.status } });
+  return added ? "done" : "skipped";
 }

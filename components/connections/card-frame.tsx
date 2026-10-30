@@ -28,21 +28,26 @@ export function ConnectionCardFrame({
 }) {
   const headingId = `connection-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
   return (
-    <GlassCard aria-labelledby={headingId} className="flex flex-col gap-4 p-6 md:p-7">
-      <div className="flex flex-wrap items-start gap-4">
+    // @container: the card lays itself out by its own width, not the window's. On Front Desk
+    // it sits in a two-column grid, so a wide window can still mean a narrow card.
+    <GlassCard aria-labelledby={headingId} className="@container flex flex-col gap-4 p-6 md:p-7">
+      <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-4 gap-y-3 @4xl:grid-cols-[auto_minmax(0,1fr)_auto]">
         <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-2xl border border-border bg-[var(--chip-off-bg)] text-[var(--fg)]">
           {icon}
         </span>
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <h2 id={headingId} className="text-section font-semibold">
+        <div className="flex min-w-0 flex-col gap-1">
+          <h2 id={headingId} className="text-section font-semibold [overflow-wrap:anywhere]">
             {title}
           </h2>
           <p className="max-w-[60ch] text-[var(--fg-muted)]">{description}</p>
         </div>
-        {/* On phones the status gets its own line so the description keeps its width. */}
-        <div className="basis-full sm:basis-auto">
+        {/* A narrow card puts the status on its own row under the title, so the text keeps its
+            width. Only a wide card sets it beside the title, capped so a long label wraps. */}
+        <div className="col-start-2 flex min-w-0 @4xl:col-start-3 @4xl:max-w-[16rem] @4xl:justify-end">
           {connected ? (
-            <StatusPill status="done">{accountLabel ? `Connected · ${accountLabel}` : "Connected"}</StatusPill>
+            <StatusPill status="done" className="h-auto min-h-7 max-w-full shrink py-1 [overflow-wrap:anywhere]">
+              {accountLabel ? `Connected · ${accountLabel}` : "Connected"}
+            </StatusPill>
           ) : (
             <span className="text-small text-[var(--fg-muted)]">{statusText}</span>
           )}
