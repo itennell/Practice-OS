@@ -250,7 +250,7 @@ export function Studio({ profile, initial, videoEditor }: { profile: StudioProfi
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(300px,380px)_minmax(0,1fr)]">
       <section aria-label="Chat with Aeon about your post" className="flex min-h-[420px] flex-col gap-4 lg:sticky lg:top-6 lg:max-h-[calc(100dvh-8rem)]">
-        <ol ref={listRef} aria-live="polite" className="flex flex-1 flex-col gap-4 overflow-y-auto">
+        <ol ref={listRef} aria-live="polite" aria-label="Messages" tabIndex={0} className="flex flex-1 flex-col gap-4 overflow-y-auto rounded-[12px] focus-visible:outline-2 focus-visible:outline-[var(--focus)]">
           <li className="flex items-start gap-3">
             <Orb size={24} className="mt-1" />
             <div className="tile flex min-w-0 flex-1 flex-col gap-1 rounded-[20px] rounded-tl-[6px] px-4 py-3">
