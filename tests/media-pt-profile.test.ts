@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 vi.mock("../lib/audit", () => ({ audit: vi.fn(async () => {}) }));
 vi.mock("../lib/aeon/guard", () => ({
-  guard: vi.fn(async (t: string) => (/\bmy client (maria|john)\b/i.test(t) ? { ok: false, kind: "phi" } : { ok: true, text: t })),
+  guard: vi.fn(async (t: string) => (/\bmy client (maria|john)\b|\bGottman\b/i.test(t) ? { ok: false, kind: "phi" } : { ok: true, text: t })),
   REFUSAL: { phi: "Please leave out anything about a client." },
 }));
 const alertCrisis = vi.hoisted(() => vi.fn(async () => ({ alerted: true })));
@@ -97,6 +97,10 @@ describe("PT interview answers", () => {
     expect(alertCrisis).toHaveBeenCalled();
   });
 
+  it("doesn't mistake a method named after a person for a client's name", async () => {
+    expect((await validateStep("extraCredentials", "Gottman Level 1 training, 2022", DANA)).pt.extraCredentials).toBe("Gottman Level 1 training, 2022");
+  });
+
   it("refuses client details", async () => {
     await expect(validateStep("focus", "Helping my client Maria with her divorce", DANA)).rejects.toThrow("client");
   });
@@ -125,6 +129,11 @@ describe("PT profile view and export", () => {
     expect(v.treatment.note.text).toContain("Gottman Method");
     expect(v.statement.snippet.length).toBeLessThanOrEqual(HOOK_CHARS + 1);
     expect(v.source).toBe("live");
+  });
+
+  it("quotes her regular session fee, not the intake fee", () => {
+    const f = { ...FILLED, fees: [{ label: "First session (intake)", cents: 20000 }, { label: "Therapy, 38-52 minutes", cents: 15000 }] };
+    expect(buildProfileView(f, null).glance.feeLine).toMatch(/^\$150 per session/);
   });
 
   it("never shows a license number or a made-up endorsement", () => {

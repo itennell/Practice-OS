@@ -14,26 +14,9 @@ import { lintText } from "./lint";
 import { assemble, cardPreview, finish, type DraftField, type ProfileDraft } from "./profile";
 import { EMPTY_PT, ptSchema, type PtAnswers } from "./pt-answers";
 import { HOOK_CHARS, PT_LISTS, type PtListId, type PtTextId } from "./schema";
+import { MAKE_IT_YOURS, SECTIONS, SECTION_TITLE, WELCOME, type SectionId } from "./pt-sections";
 
-export const WELCOME = "Welcome. Let's set up your Psychology Today profile.";
-export const MAKE_IT_YOURS = "Read it and make it yours";
-
-export const SECTIONS = [
-  { id: "header", title: "Name and title" },
-  { id: "statement", title: "Personal statement" },
-  { id: "photos", title: "Photos" },
-  { id: "consult", title: "Free consultation" },
-  { id: "glance", title: "My Practice at a Glance" },
-  { id: "finances", title: "Finances" },
-  { id: "qualifications", title: "Qualifications" },
-  { id: "specialties", title: "Specialties and Expertise" },
-  { id: "endorsements", title: "Endorsements" },
-  { id: "clientFocus", title: "Client Focus" },
-  { id: "treatment", title: "Treatment Approach" },
-  { id: "location", title: "Location" },
-] as const;
-export type SectionId = (typeof SECTIONS)[number]["id"];
-export const SECTION_TITLE = Object.fromEntries(SECTIONS.map((s) => [s.id, s.title])) as Record<SectionId, string>;
+export { MAKE_IT_YOURS, SECTIONS, SECTION_TITLE, WELCOME, type SectionId } from "./pt-sections";
 
 type MediaKey = keyof MediaAnswers;
 type PtKey = Exclude<keyof PtAnswers, "seen" | "skipped">;
@@ -122,6 +105,31 @@ export const STEPS: Step[] = [
 
 export const STEP = new Map(STEPS.map((s) => [s.id, s]));
 
+/** Short names for the questions she skipped. */
+const SHORT: Record<string, string> = {
+  focus: "What people come to you for",
+  firstSession: "First session",
+  approach: "How you work",
+  why: "Why you do this work",
+  freeConsultMinutes: "Free consult",
+  availability: "Taking new clients",
+  sessionFormat: "In person or online",
+  paymentMethods: "Payment methods",
+  slidingScale: "Sliding scale",
+  yearsInPractice: "Years in practice",
+  education: "Education",
+  extraCredentials: "Other credentials",
+  topSpecialties: "Top 3 specialties",
+  expertise: "Expertise",
+  ages: "Ages",
+  participants: "Participants",
+  communities: "Communities",
+  faith: "Faith",
+  languages: "Languages",
+  therapyTypes: "Types of therapy",
+  nearby: "Nearby areas",
+};
+
 // ---- prefill --------------------------------------------------------------------------
 
 const AGE_FROM_WHO: Record<string, string> = { children: "Children (6 to 10)", teens: "Teen", adults: "Adults", "older adults": "Elders (65+)" };
@@ -192,6 +200,8 @@ export type InterviewStep = {
   value: unknown;
   lines: string[];
   number: number;
+  /** The question before this one, for Back. */
+  prev: string | null;
 };
 
 export type InterviewState = {
@@ -199,8 +209,8 @@ export type InterviewState = {
   total: number;
   answered: number;
   step: InterviewStep | null;
-  /** Steps she put off, for "Still to set up". */
-  skipped: string[];
+  /** Steps she put off, to come back to. */
+  skipped: { id: string; label: string }[];
   done: boolean;
 };
 
@@ -217,6 +227,7 @@ function present(step: Step, f: MediaFacts): InterviewStep {
     value: valueOf(step, f),
     lines: confirmLines(step, f),
     number: STEPS.indexOf(step) + 1,
+    prev: previousStep(step.id),
   };
 }
 
@@ -230,7 +241,7 @@ export function interviewState(f: MediaFacts, at?: string): InterviewState {
     total: STEPS.length,
     answered: STEPS.filter((s) => seen.has(s.id)).length,
     step: next ? present(next, f) : null,
-    skipped: f.pt.skipped.filter((id) => STEP.has(id)),
+    skipped: f.pt.skipped.filter((id) => STEP.has(id)).map((id) => ({ id, label: SHORT[id] ?? SECTION_TITLE[STEP.get(id)!.section] })),
     done: !next,
   };
 }
@@ -242,8 +253,15 @@ export function previousStep(id: string): string | null {
 
 export type StepPatch = { media: Partial<MediaAnswers>; pt: Partial<PtAnswers> };
 
+// Therapy methods named after people (Gottman, Adlerian, Jungian...) read as a
+// person's name to the client-detail guard, so those words are masked for that check.
+const METHOD_WORDS = new Set(
+  PT_LISTS.therapyTypes.options.flatMap((o) => o.match(/\b[A-Z][a-z]{2,}\b/g) ?? []).filter((w) => !/^(Therapy|Method|Focused|Based|Brief|Family|Systems|Behavioral|Cognitive)$/.test(w)),
+);
+const maskMethods = (t: string) => t.replace(/\b[A-Z][a-z]{2,}\b/g, (w) => (METHOD_WORDS.has(w) ? "method" : w));
+
 async function checkTyped(value: string, f: MediaFacts): Promise<void> {
-  await checkAnswerText(value);
+  await checkAnswerText(maskMethods(value));
   const blocked = lintText(value, f).filter((x) => x.severity === "block");
   if (blocked.length) throw new AnswerRefused(blocked.map((x) => x.message).join(" "));
 }
@@ -367,6 +385,8 @@ export type ProfileView = {
   /** Labels she typed that aren't one of Psychology Today's boxes (she types them under "Other"). */
   ownLabels: string[];
   sections: { id: SectionId; title: string; copy: string }[];
+  /** Every section in order, for "Copy all, in order". */
+  exportText: string;
 };
 
 const lines = (...xs: (string | false | null | undefined)[]) => xs.filter(Boolean).join("\n");
@@ -388,7 +408,7 @@ export function buildProfileView(f: MediaFacts, draft: ProfileDraft | null): Pro
   const statement = { boxes: [box("statement_help"), box("statement_approach"), box("statement_about")], snippet: d.cardPreview || cardPreview(box("statement_help").text), snippetChars: HOOK_CHARS };
   const primary = f.address ? `${f.address.street}, ${f.address.city}, ${f.address.state} ${f.address.zip}` : place(f);
   const online = f.telehealth || formats.includes("Online") ? `Online in ${stateName(f)}` : null;
-  const view: Omit<ProfileView, "sections" | "ownLabels"> = {
+  const view: Omit<ProfileView, "sections" | "ownLabels" | "exportText"> = {
     sample: f.isSample,
     source: draft ? "draft" : "live",
     header: { name: f.name, credential: f.credential, title: titleWords(f), place: place(f), formats, phone: f.phone, email: f.email, website: f.website },
@@ -419,14 +439,15 @@ export function buildProfileView(f: MediaFacts, draft: ProfileDraft | null): Pro
   };
   const known = new Set(Object.values(PT_LISTS).flatMap((l) => l.options));
   const ownLabels = [...pt.topSpecialties, ...pt.expertise, ...pt.therapyTypes, ...pt.communities, ...pt.faith, ...pt.paymentMethods].filter((x) => !known.has(x));
-  return { ...view, ownLabels: [...new Set(ownLabels)], sections: sectionCopies(view) };
+  const sections = sectionCopies(view);
+  return { ...view, ownLabels: [...new Set(ownLabels)], sections, exportText: exportAll({ header: view.header, sample: view.sample, sections }) };
 }
 
 const yesNo = (b: boolean | null) => (b === null ? "" : b ? "Yes" : "No");
 const tick = (label: string, xs: string[]) => (xs.length ? `${label}: ${xs.join(", ")}` : "");
 
 /** The words of each section as she pastes or ticks them, in profile order. */
-function sectionCopies(v: Omit<ProfileView, "sections" | "ownLabels">): ProfileView["sections"] {
+function sectionCopies(v: Omit<ProfileView, "sections" | "ownLabels" | "exportText">): ProfileView["sections"] {
   const copy: Record<SectionId, string> = {
     header: lines(`${v.header.name}, ${v.header.credential}`, v.header.title, v.header.place),
     statement: v.statement.boxes.map((b) => b.text).filter(Boolean).join("\n\n"),
@@ -457,7 +478,7 @@ function sectionCopies(v: Omit<ProfileView, "sections" | "ownLabels">): ProfileV
 }
 
 /** Every section in profile order, ready to paste into a note before she fills in the editor. */
-export function exportAll(v: ProfileView): string {
+export function exportAll(v: Pick<ProfileView, "header" | "sample" | "sections">): string {
   const head = `Psychology Today profile for ${v.header.name}, ${v.header.credential}${v.sample ? " (fictional demo practice)" : ""}\n${MAKE_IT_YOURS} before you paste it.`;
   return [head, ...v.sections.map((s) => `${s.title.toUpperCase()}\n${s.copy}`)].join("\n\n");
 }

@@ -1,6 +1,6 @@
 import { connection } from "next/server";
 import { Suspense } from "react";
-import { MediaTabs } from "@/components/media/media-tabs";
+import { MediaTabs, MediaWidth } from "@/components/media/media-tabs";
 import { instagramDeclined } from "@/lib/instagram/onboarding";
 
 // Media (the Instagram helper grown up): where she lists herself, her website,
@@ -8,12 +8,12 @@ import { instagramDeclined } from "@/lib/instagram/onboarding";
 // Media is for everyone; if she said Instagram isn't for her, its tab is left out.
 export default function MediaLayout({ children }: LayoutProps<"/media">) {
   return (
-    <div className="mx-auto flex w-full max-w-[860px] flex-col gap-6">
+    <MediaWidth>
       <Suspense fallback={<MediaTabs hideInstagram={false} />}>
         <Tabs />
       </Suspense>
       {children}
-    </div>
+    </MediaWidth>
   );
 }
 

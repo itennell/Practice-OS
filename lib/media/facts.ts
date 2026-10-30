@@ -167,9 +167,10 @@ export async function loadMediaFacts(): Promise<MediaFacts> {
 
 export const money = (cents: number) => `$${(cents / 100).toFixed(cents % 100 ? 2 : 0)}`;
 
-/** The plain session fee to quote: the first fee line (her most common session). */
+/** The plain session fee to quote: her first regular session fee (an intake or first-session fee is skipped). */
 export function mainFee(f: MediaFacts): string | null {
-  return f.fees[0] ? money(f.fees[0].cents) : null;
+  const fee = f.fees.find((x) => !/\b(intake|first session|initial|evaluation|assessment)\b/i.test(x.label)) ?? f.fees[0];
+  return fee ? money(fee.cents) : null;
 }
 
 export function place(f: MediaFacts): string {
