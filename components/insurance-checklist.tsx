@@ -2,7 +2,7 @@
 
 import { ExternalLink, MessageCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { formatDate } from "./deadline-card";
 import { SpringCheck } from "./shared/spring-check";
 import { StatusPill, type Status } from "./shared/status-mark";
@@ -31,13 +31,16 @@ export type ChecklistPayer = {
   name: string;
   kind: string;
   note: string;
+  /** "Please confirm" (eligibility inferred) or "Check eligibility" (ask the payer first); null when the source says so. */
+  eligibilityTag: "Please confirm" | "Check eligibility" | null;
+  eligibilitySource: Source;
   isDefault: boolean;
   status: string;
   statusLabel: string;
-  networks: { name: string; status: string; note: string }[];
+  networks: { name: string; status: string; note: string; source: Source }[];
   facts: { label: string; text: string; source: Source }[];
   steps: Step[];
-  notes: string[];
+  notes: { text: string; source: Source | null }[];
 };
 export type ChecklistData = {
   license: string;
@@ -48,6 +51,8 @@ export type ChecklistData = {
   payers: ChecklistPayer[];
   platforms: ChecklistPayer[];
   notEligible: { name: string; reason: string }[];
+  /** A payer that fits her has no row yet: the page asks for the prelist write once. */
+  needsPrelist: boolean;
 };
 
 const MARK: Record<string, Status> = {
@@ -68,6 +73,11 @@ async function check(scope: string, step_id: string, done: boolean): Promise<str
   if (res.ok) return null;
   const b = (await res.json().catch(() => ({}))) as { error?: string };
   return b.error ?? "Couldn't save. Try again.";
+}
+
+/** Next to a fact whose quote wasn't read on its source page. */
+function Confirm() {
+  return <span className="font-medium text-[var(--fg)]"> · Please confirm</span>;
 }
 
 function SourceLine({ source }: { source: Source }) {
@@ -152,18 +162,34 @@ function PayerCard({ p }: { p: ChecklistPayer }) {
           <StatusPill status={MARK[p.status] ?? "pending"}>{p.statusLabel}</StatusPill>
         </summary>
         <div className="flex flex-col gap-4 px-4 pb-4">
-          <p className="max-w-[65ch] text-small">{p.note}</p>
+          <div className="flex flex-col gap-0.5">
+            <p className="max-w-[65ch] text-small">
+              {p.eligibilityTag && <strong>{p.eligibilityTag}: </strong>}
+              {p.note}
+            </p>
+            {p.eligibilityTag && (
+              <p className="text-small text-[var(--fg-muted)]">
+                {p.eligibilityTag === "Check eligibility"
+                  ? "Ask the payer whether it takes your license before you start."
+                  : "Aeon read this from what the payer's page says; it doesn't name your license."}{" "}
+                <a href={p.eligibilitySource.url} target="_blank" rel="noreferrer" className={link}>
+                  Source
+                </a>
+              </p>
+            )}
+          </div>
           <ul className="flex flex-col gap-1 text-small">
             {p.networks.map((n) => (
               <li key={n.name}>
                 <strong>{n.name}</strong>: panel {PANEL_WORDS[n.status]?.toLowerCase() ?? "not confirmed"}
                 {n.note && <span className="text-[var(--fg-muted)]"> · {n.note}</span>}
+                {!n.source.verified && <Confirm />}
               </li>
             ))}
             {p.facts.map((f) => (
               <li key={f.label}>
                 <strong>{f.label}</strong>: {f.text}
-                {!f.source.verified && <span className="text-[var(--fg-muted)]"> (please confirm)</span>}
+                {!f.source.verified && <Confirm />}
               </li>
             ))}
           </ul>
@@ -180,7 +206,19 @@ function PayerCard({ p }: { p: ChecklistPayer }) {
           {p.notes.length > 0 && (
             <ul className="flex list-disc flex-col gap-1 pl-5 text-small text-[var(--fg-muted)]">
               {p.notes.map((n) => (
-                <li key={n}>{n}</li>
+                <li key={n.text}>
+                  {n.text}
+                  {n.source?.verified ? (
+                    <>
+                      {" "}
+                      <a href={n.source.url} target="_blank" rel="noreferrer" className={link}>
+                        Source
+                      </a>
+                    </>
+                  ) : (
+                    <Confirm />
+                  )}
+                </li>
               ))}
             </ul>
           )}
@@ -208,6 +246,20 @@ function Section({ id, title, line, children }: { id: string; title: string; lin
 }
 
 export function InsuranceChecklist({ data }: { data: ChecklistData }) {
+  const router = useRouter();
+  // Reading this page never writes. When a payer that fits her has no row yet, ask once for the prelist (a write behind canDecide).
+  useEffect(() => {
+    if (!data.needsPrelist) return;
+    let live = true;
+    fetch("/api/payers/prelist", { method: "POST" })
+      .then((r) => {
+        if (r.ok && live) router.refresh();
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [data.needsPrelist, router]);
   if (data.blocked) {
     return (
       <p role="note" className="max-w-[65ch]">

@@ -2,6 +2,10 @@
   {
     "id": "aetna",
     "name": "Aetna (commercial, behavioral health)",
+    "aliases": [
+      "aetna",
+      "aetna commercial"
+    ],
     "kind": "commercial",
     "states": [
       "*"
@@ -216,15 +220,33 @@
       }
     ],
     "notes": [
-      "Aetna does not publish whether the panel is open; it decides by area. Behavioral health uses the same Medical and behavioral health request form.",
-      "CAQH rebranded DataSpring in 2026 per third-party sources; proview.caqh.org may redirect.",
-      "Aetna Illinois Medicare Advantage / Medicaid not covered here.",
-      "Malpractice minimum, recredentialing cadence, fee schedule, effective date and retro billing are not on the page, so they are unverified."
+      {
+        "text": "Aetna does not publish whether the panel is open; it decides by area. Behavioral health uses the same Medical and behavioral health request form.",
+        "source": null
+      },
+      {
+        "text": "CAQH rebranded DataSpring in 2026 per third-party sources; proview.caqh.org may redirect.",
+        "source": null
+      },
+      {
+        "text": "Aetna Illinois Medicare Advantage / Medicaid not covered here.",
+        "source": null
+      },
+      {
+        "text": "Malpractice minimum, recredentialing cadence, fee schedule, effective date and retro billing are not on the page, so they are unverified.",
+        "source": null
+      }
     ]
   },
   {
     "id": "cigna-evernorth",
     "name": "Cigna / Evernorth Behavioral Health",
+    "aliases": [
+      "cigna",
+      "evernorth",
+      "cigna behavioral health",
+      "evernorth behavioral health"
+    ],
     "kind": "commercial",
     "states": [
       "*"
@@ -458,14 +480,30 @@
       }
     ],
     "notes": [
-      "The Evernorth page was read in full on 2026-10-30. Contract signing, rate sheet, effective date and retro billing are not described on it, so those steps are unverified.",
-      "The page lists BehavioralProviderRecruitment@Evernorth.com for questions and 1 (888) 736-7499 for portal help.",
-      "Group/clinic route (4+ clinicians) is separate and not her case as a solo."
+      {
+        "text": "The Evernorth page was read in full on 2026-10-30. Contract signing, rate sheet, effective date and retro billing are not described on it, so those steps are unverified.",
+        "source": null
+      },
+      {
+        "text": "The page lists BehavioralProviderRecruitment@Evernorth.com for questions and 1 (888) 736-7499 for portal help.",
+        "source": null
+      },
+      {
+        "text": "Group/clinic route (4+ clinicians) is separate and not her case as a solo.",
+        "source": null
+      }
     ]
   },
   {
     "id": "uhc-optum",
     "name": "UnitedHealthcare / Optum Behavioral Health",
+    "aliases": [
+      "unitedhealthcare",
+      "united healthcare",
+      "uhc",
+      "optum",
+      "united"
+    ],
     "kind": "commercial",
     "states": [
       "*"
@@ -697,14 +735,26 @@
       }
     ],
     "notes": [
-      "Optum's page gave no malpractice minimum, timeline, fee or re-credentialing cadence for individual clinicians. Rate sheet, effective date and retro billing are not described, so those steps are unverified.",
-      "CAQH is rolling out as DataSpring in some materials (third-party); ProView sign-in unchanged.",
-      "Optum Medicare/Medicaid Illinois networks not covered."
+      {
+        "text": "Optum's page gave no malpractice minimum, timeline, fee or re-credentialing cadence for individual clinicians. Rate sheet, effective date and retro billing are not described, so those steps are unverified.",
+        "source": null
+      },
+      {
+        "text": "CAQH is rolling out as DataSpring in some materials (third-party); ProView sign-in unchanged.",
+        "source": null
+      },
+      {
+        "text": "Optum Medicare/Medicaid Illinois networks not covered.",
+        "source": null
+      }
     ]
   },
   {
     "id": "humana",
     "name": "Humana (Medicare Advantage behavioral health)",
+    "aliases": [
+      "humana medicare advantage"
+    ],
     "kind": "commercial",
     "states": [
       "*"
@@ -920,10 +970,22 @@
       }
     ],
     "notes": [
-      "Humana Behavioral Health (humanabehavioralhealth.com) refused the connection on 2026-10-30. Only provider.humana.com Working With Us could be read; it lists the behavioral network and credentialing links but no steps.",
-      "Search results (not read on the page) say interest forms go by email, a decision takes up to 120 business days, and contracted Humana BH providers add Medicare Advantage by contract amendment. Check before relying on it.",
-      "Humana commercial exit not confirmed by an official source.",
-      "Carelon manages BH for Humana dual (Medicare-Medicaid) plans in Illinois via Availity; standard MA BH appears Humana-run."
+      {
+        "text": "Humana Behavioral Health (humanabehavioralhealth.com) refused the connection on 2026-10-30. Only provider.humana.com Working With Us could be read; it lists the behavioral network and credentialing links but no steps.",
+        "source": null
+      },
+      {
+        "text": "Search results (not read on the page) say interest forms go by email, a decision takes up to 120 business days, and contracted Humana BH providers add Medicare Advantage by contract amendment. Check before relying on it.",
+        "source": null
+      },
+      {
+        "text": "Humana commercial exit not confirmed by an official source.",
+        "source": null
+      },
+      {
+        "text": "Carelon manages BH for Humana dual (Medicare-Medicaid) plans in Illinois via Availity; standard MA BH appears Humana-run.",
+        "source": null
+      }
     ]
   },
   {
@@ -1143,9 +1205,18 @@
       }
     ],
     "notes": [
-      "You keep your own private practice and cash-pay clients. Even if already in-network with Aetna/Cigna/Optum yourself, you must credential through Alma to see those clients on Alma.",
-      "Alma's FAQ and Insurance Program page were read on 2026-10-30 (timeline, price, payer requirement). Malpractice minimum, recredential cadence, agreement terms and retro billing are not published, so they are unverified.",
-      "Alma lists many insurance partners but no Illinois-specific list was confirmed."
+      {
+        "text": "You keep your own private practice and cash-pay clients. Even if already in-network with Aetna/Cigna/Optum yourself, you must credential through Alma to see those clients on Alma.",
+        "source": null
+      },
+      {
+        "text": "Alma's FAQ and Insurance Program page were read on 2026-10-30 (timeline, price, payer requirement). Malpractice minimum, recredential cadence, agreement terms and retro billing are not published, so they are unverified.",
+        "source": null
+      },
+      {
+        "text": "Alma lists many insurance partners but no Illinois-specific list was confirmed.",
+        "source": null
+      }
     ]
   },
   {
@@ -1351,14 +1422,26 @@
       }
     ],
     "notes": [
-      "headway.co and help.headway.co return 403 to every fetch, so nothing could be read on the page itself on 2026-10-30. Everything here is unverified.",
-      "Search-result summaries of the help center say: timeline 3 weeks to 4 months; recredential about every 3 years (Illinois: due date from the last digit of your SSN, about 2 months to complete); intake needs license, malpractice, NPI and CAQH.",
-      "Reported available for independent providers in all 50 states (third-party). Private practice allowed."
+      {
+        "text": "headway.co and help.headway.co return 403 to every fetch, so nothing could be read on the page itself on 2026-10-30. Everything here is unverified.",
+        "source": null
+      },
+      {
+        "text": "Search-result summaries of the help center say: timeline 3 weeks to 4 months; recredential about every 3 years (Illinois: due date from the last digit of your SSN, about 2 months to complete); intake needs license, malpractice, NPI and CAQH.",
+        "source": null
+      },
+      {
+        "text": "Reported available for independent providers in all 50 states (third-party). Private practice allowed.",
+        "source": null
+      }
     ]
   },
   {
     "id": "grow-therapy",
     "name": "Grow Therapy",
+    "aliases": [
+      "grow"
+    ],
     "kind": "platform",
     "states": [
       "*"
@@ -1382,43 +1465,47 @@
     "eligibility": {
       "LCSW": {
         "eligible": true,
-        "note": "Accepted if independently licensed in Illinois",
+        "note": "Grow's pages don't list license types. Aeon inferred that Grow takes independently licensed Illinois clinicians from its Illinois credentialing timeline and therapist listings.",
         "source": {
           "url": "https://onboarding.growtherapy.com/credentialing-timelines",
           "quote": "3 months for IL Providers",
           "checked_on": "2026-10-29",
-          "verified": true
-        }
+          "verified": false
+        },
+        "basis": "inferred"
       },
       "LCPC": {
         "eligible": true,
-        "note": "Accepted if independently licensed in Illinois",
+        "note": "Grow's pages don't list license types. Aeon inferred that Grow takes independently licensed Illinois clinicians from its Illinois credentialing timeline and therapist listings.",
         "source": {
           "url": "https://onboarding.growtherapy.com/credentialing-timelines",
           "quote": "3 months for IL Providers",
           "checked_on": "2026-10-29",
-          "verified": true
-        }
+          "verified": false
+        },
+        "basis": "inferred"
       },
       "LMFT": {
         "eligible": true,
-        "note": "Accepted if independently licensed in Illinois",
+        "note": "Grow's pages don't list license types. Aeon inferred that Grow takes independently licensed Illinois clinicians from its Illinois credentialing timeline and therapist listings.",
         "source": {
           "url": "https://onboarding.growtherapy.com/credentialing-timelines",
           "quote": "3 months for IL Providers",
           "checked_on": "2026-10-29",
-          "verified": true
-        }
+          "verified": false
+        },
+        "basis": "inferred"
       },
       "Psychologist": {
         "eligible": true,
-        "note": "Accepted if independently licensed in Illinois",
+        "note": "Grow's pages don't list license types. Aeon inferred that Grow takes independently licensed Illinois clinicians from its Illinois credentialing timeline and therapist listings.",
         "source": {
           "url": "https://onboarding.growtherapy.com/credentialing-timelines",
           "quote": "3 months for IL Providers",
           "checked_on": "2026-10-29",
-          "verified": true
-        }
+          "verified": false
+        },
+        "basis": "inferred"
       }
     },
     "requirements": {
@@ -1558,8 +1645,14 @@
       }
     ],
     "notes": [
-      "Grow is built for independent practice (credentialing, billing, EHR) per its provider page via search snippet.",
-      "License list not itemised on Grow's pages; Illinois acceptance inferred from IL therapist listings."
+      {
+        "text": "Grow is built for independent practice (credentialing, billing, EHR) per its provider page via search snippet.",
+        "source": null
+      },
+      {
+        "text": "License list not itemised on Grow's pages; Illinois acceptance inferred from IL therapist listings.",
+        "source": null
+      }
     ]
   },
   {
@@ -1766,9 +1859,18 @@
       }
     ],
     "notes": [
-      "Rula's provider sign-up page and credentialing blog were read on 2026-10-30. Rula's Illinois CAQH guide returned 403, so its steps are unverified.",
-      "Rula describes itself as supporting clinicians who start or grow their own private practice.",
-      "Agreement terms, effective dates and retro billing are not published."
+      {
+        "text": "Rula's provider sign-up page and credentialing blog were read on 2026-10-30. Rula's Illinois CAQH guide returned 403, so its steps are unverified.",
+        "source": null
+      },
+      {
+        "text": "Rula describes itself as supporting clinicians who start or grow their own private practice.",
+        "source": null
+      },
+      {
+        "text": "Agreement terms, effective dates and retro billing are not published.",
+        "source": null
+      }
     ]
   },
   {
@@ -1958,8 +2060,14 @@
       }
     ],
     "notes": [
-      "SonderMind's Join Us page was read on 2026-10-30. It gives eligibility, pay timing and credentialing speed but no steps, CAQH, malpractice, fees or recredential cadence.",
-      "SonderMind is a contractor model with set pay; private practice status unconfirmed. It does not provide office space."
+      {
+        "text": "SonderMind's Join Us page was read on 2026-10-30. It gives eligibility, pay timing and credentialing speed but no steps, CAQH, malpractice, fees or recredential cadence.",
+        "source": null
+      },
+      {
+        "text": "SonderMind is a contractor model with set pay; private practice status unconfirmed. It does not provide office space.",
+        "source": null
+      }
     ]
   }
 ]

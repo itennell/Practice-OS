@@ -1,5 +1,5 @@
 import { CREDENTIALS, type Credential } from "../compliance/types";
-import { allPayers, stateLicenses, statesWithData, type Payer } from "./catalog";
+import { allPayers, stateLicenses, statesWithData, type EligibilityBasis, type Payer, type Source } from "./catalog";
 
 // Which payers fit her: plain code over the catalog, keyed on her license and
 // state. Medicare, Aetna and Blue Cross come first whenever she qualifies.
@@ -9,7 +9,19 @@ export const DEFAULT_PAYERS = ["medicare", "aetna", "bcbsil"] as const;
 
 const KIND_ORDER: Record<Payer["kind"], number> = { medicare: 0, commercial: 1, medicaid: 2, mco: 3, military: 4, platform: 5 };
 
-export type PayerFit = { payer: Payer; note: string; isDefault: boolean };
+export type PayerFit = {
+  payer: Payer;
+  note: string;
+  isDefault: boolean;
+  /** How sure "she can join" is; see ELIGIBILITY_BASIS. */
+  basis: EligibilityBasis;
+  source: Source;
+};
+
+/** The word she sees next to "you can join": nothing when the source says so, else "Please confirm" or "Check eligibility". Pure. */
+export function eligibilityTag(f: Pick<PayerFit, "basis">): "Please confirm" | "Check eligibility" | null {
+  return f.basis === "check" ? "Check eligibility" : f.basis === "inferred" ? "Please confirm" : null;
+}
 export type PayerSet = {
   license: string;
   state: string;
@@ -50,7 +62,8 @@ export function payersFor(input: { license: string; state: string }): PayerSet {
   const notEligible: PayerSet["notEligible"] = [];
   for (const payer of allPayers().filter((p) => inState(p, state))) {
     const e = payer.eligibility[license];
-    if (e.eligible) fits.push({ payer, note: e.note, isDefault: (DEFAULT_PAYERS as readonly string[]).includes(payer.id) });
+    const basis: EligibilityBasis = e.basis ?? (e.source.verified ? "stated" : "inferred");
+    if (e.eligible) fits.push({ payer, note: e.note, isDefault: (DEFAULT_PAYERS as readonly string[]).includes(payer.id), basis, source: e.source });
     else notEligible.push({ payer, reason: e.note });
   }
   const rank = (f: PayerFit) => {

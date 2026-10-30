@@ -4,6 +4,7 @@ import { audit } from "../audit";
 import { addDays, addMonths, daysBetween, toDate, type ISODate } from "../compliance/dates";
 import { practiceToday } from "../compliance/store";
 import { db } from "../db";
+import { catalogIdFor } from "./catalog";
 
 // Her insurance (payer) applications (migration 009). Aeon prepares forms and
 // tracks dates; she applies, signs and submits. Follow-ups and recredential
@@ -101,7 +102,8 @@ export function withDefaults(a: z.infer<typeof applicationSchema>, today: ISODat
     stage: a.stage ?? "credentialing",
     status,
     applied_on,
-    follow_up_on: waiting ? follow_up_on : null,
+    // A date she (or an unchecked submit step) passes in is kept; only the default is limited to waiting statuses.
+    follow_up_on: waiting ? follow_up_on : (a.follow_up_on ?? null),
     approved_on,
     effective_on: a.effective_on ?? null,
     recredential_on,
@@ -117,7 +119,16 @@ export async function listPayerApplications(sql: postgres.Sql = db()): Promise<P
 
 /** Adds a payer, or updates one by id. Audited (payer and status, never notes). */
 export async function savePayerApplication(input: unknown, by: string, sql: postgres.Sql = db()): Promise<PayerApplication> {
-  const a = applicationSchema.parse(input);
+  let a = applicationSchema.parse(input);
+  // Saved by name ("Aetna", "BCBSIL"): link it to the catalog payer on an exact name or alias match,
+  // and update that payer's row if it already has one, so the checklist never lists it twice.
+  const catalogId = a.catalog_id ?? catalogIdFor(a.payer, a.form);
+  if (catalogId && !a.catalog_id) {
+    const [held] = await sql<{ id: string }[]>`select id from practice_os.payer_applications where catalog_id = ${catalogId}`;
+    if (!held) a = { ...a, catalog_id: catalogId };
+    else if (!a.id) a = { ...a, id: held.id, catalog_id: catalogId };
+    else if (held.id === a.id) a = { ...a, catalog_id: catalogId };
+  }
   const v = withDefaults(a, await practiceToday(sql));
   const [row] = a.id
     ? await sql`

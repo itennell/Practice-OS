@@ -19,12 +19,26 @@ export const sourceSchema = z
     checked_on: isoDate,
     verified: z.boolean(),
   })
-  .strict();
+  .strict()
+  .refine((s) => !s.verified || s.quote.length > 0, { message: "A verified source needs the quote that was read on the page." });
 export type Source = z.infer<typeof sourceSchema>;
 
 const sourced = <T extends z.ZodRawShape>(shape: T) => z.object({ ...shape, source: sourceSchema }).strict();
 
-const eligibilitySchema = sourced({ eligible: z.boolean(), note: z.string().trim().max(600) });
+/**
+ * How sure the eligibility call is. "stated": the source names her license (or
+ * every license like it). "inferred": the page names no license types, so Aeon
+ * read eligibility from what it does say. "check": the page leaves real doubt;
+ * she should ask the payer before she starts. Left out: stated when the source
+ * is verified, inferred when it isn't.
+ */
+export const ELIGIBILITY_BASIS = ["stated", "inferred", "check"] as const;
+export type EligibilityBasis = (typeof ELIGIBILITY_BASIS)[number];
+const eligibilitySchema = sourced({ eligible: z.boolean(), note: z.string().trim().max(600), basis: z.enum(ELIGIBILITY_BASIS).optional() });
+
+/** A note about a payer. source is null when the note is Aeon's own research summary with no one page behind it. */
+export const noteSchema = z.object({ text: z.string().trim().min(3).max(600), source: sourceSchema.nullable() }).strict();
+export type PayerNote = z.infer<typeof noteSchema>;
 
 export const PAYER_KINDS = ["medicare", "medicaid", "mco", "commercial", "military", "platform"] as const;
 export const STAGES = ["credentialing", "contracting"] as const;
@@ -51,6 +65,8 @@ export const payerSchema = z
   .object({
     id: z.string().regex(/^[a-z0-9-]+$/),
     name: z.string().trim().min(2).max(120),
+    /** Other names she might use ("Blue Cross", "UHC"). Matched exactly, never loosely. */
+    aliases: z.array(z.string().trim().min(2).max(80)).optional(),
     kind: z.enum(PAYER_KINDS),
     /** Two-letter states it credentials in, or "*" for every state. */
     states: z.array(z.string().regex(/^([A-Z]{2}|\*)$/)).min(1),
@@ -77,7 +93,7 @@ export const payerSchema = z
     fees: sourced({ text: z.string().trim().max(300) }),
     recredential: sourced({ text: z.string().trim().max(300), months: z.number().int().positive().nullable() }),
     steps: z.array(stepSchema).min(2),
-    notes: z.array(z.string().trim().max(600)),
+    notes: z.array(noteSchema),
   })
   .strict()
   .superRefine((p, ctx) => {
@@ -148,3 +164,35 @@ export function stepsFor(p: Payer, license: Credential): PayerStep[] {
 }
 
 export const payerById = (id: string): Payer | undefined => load().payers.find((p) => p.id === id);
+
+/** Lowercase words only: "Blue Cross & Blue Shield (BCBSIL)" -> "blue cross blue shield bcbsil". */
+export const normalizeName = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+/** Every name a payer answers to, normalized: its id, its name, the name without its (parenthetical), and its aliases. */
+export function namesOf(p: Payer): string[] {
+  const out = new Set<string>();
+  for (const n of [p.id, p.name, p.name.replace(/\s*\([^)]*\)\s*/g, " "), ...(p.aliases ?? [])]) {
+    const k = normalizeName(n);
+    if (k) out.add(k);
+  }
+  return [...out];
+}
+
+/** The catalog id for a payer name she typed, only on an exact name or alias match that points at one payer. */
+export function catalogIdFor(name: string, form?: string | null): string | null {
+  if (form === "cms855i") return "medicare";
+  const q = normalizeName(name);
+  if (!q) return null;
+  const hits = load().payers.filter((p) => namesOf(p).includes(q));
+  return hits.length === 1 ? hits[0]!.id : null;
+}
+
+/** What she sees next to any fact whose quote wasn't read on its source page. */
+export const PLEASE_CONFIRM = "Please confirm";
+
+/** One fact with its verified flag and source, the same shape for the Insurance tab and the chat. Pure. */
+export function factView(text: string, source: Source | null) {
+  const verified = Boolean(source?.verified);
+  return { text, verified, source: source?.url ?? null, checked_on: source?.checked_on ?? null, ...(verified ? {} : { say: PLEASE_CONFIRM }) };
+}
+export type FactView = ReturnType<typeof factView>;

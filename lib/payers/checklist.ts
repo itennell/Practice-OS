@@ -4,7 +4,7 @@ import type { ISODate } from "../compliance/dates";
 import { practiceToday } from "../compliance/store";
 import { db } from "../db";
 import type { Credential } from "../compliance/types";
-import { payerById, prerequisites, stepsFor, type Payer, type PayerStep, type Prerequisite } from "./catalog";
+import { allPayers, namesOf, normalizeName, payerById, prerequisites, stepsFor, type Payer, type PayerStep, type Prerequisite } from "./catalog";
 import { isCredential, payersFor, type PayerFit, type PayerSet } from "./eligibility";
 import { STATUS_LABEL, WAITING, listPayerApplications, savePayerApplication, type PayerApplication, type PayerStatus } from "./store";
 
@@ -14,6 +14,17 @@ import { STATUS_LABEL, WAITING, listPayerApplications, savePayerApplication, typ
 // other. Checking steps moves the payer's status; Aeon never submits anything.
 
 export const PREREQ_SCOPE = "prerequisites";
+
+/** Where she ticks the step that says she sent an application. */
+export const INSURANCE_PAGE = "/admin?panel=insurance";
+
+/** Thrown when anyone but the clinician's own click tries to check (or uncheck) the step where she submits. */
+export class SubmitStepIsHers extends Error {
+  constructor(payer: string) {
+    super(`Only you can mark your ${payer} application as sent. Tick that step yourself on the Insurance page (${INSURANCE_PAGE}).`);
+    this.name = "SubmitStepIsHers";
+  }
+}
 
 export type StepState = PayerStep & { done_on: ISODate | null };
 export type PrereqState = Prerequisite & { done_on: ISODate | null };
@@ -65,15 +76,41 @@ async function herLicense(sql: postgres.Sql): Promise<{ license: string; state: 
   return { license: row?.credential ?? "", state: row?.state ?? "IL" };
 }
 
-const sameName = (a: PayerApplication, p: Payer) =>
-  [p.id, p.name].map((n) => n.toLowerCase()).includes(a.payer.trim().toLowerCase()) || (p.id === "medicare" && a.form === "cms855i");
+/** A row she made by name ("Aetna", "BCBSIL") is this catalog payer: exact name or alias only. */
+const sameName = (a: PayerApplication, p: Payer) => namesOf(p).includes(normalizeName(a.payer)) || (p.id === "medicare" && a.form === "cms855i");
+
+/** Her application row for a catalog payer, or one she made by name for it. Pure. */
+const rowFor = (apps: PayerApplication[], p: Payer) => apps.find((a) => a.catalog_id === p.id) ?? apps.find((a) => !a.catalog_id && sameName(a, p));
+
+/** What a payer she hasn't started shows before it has a row: "not started". Pure, never saved. */
+function notStarted(p: Payer): PayerApplication {
+  return {
+    id: "",
+    payer: p.name,
+    form: null,
+    catalog_id: p.id,
+    network: p.networks[0]!.name,
+    stage: "credentialing",
+    status: "not_started",
+    applied_on: null,
+    follow_up_on: null,
+    approved_on: null,
+    effective_on: null,
+    recredential_on: null,
+    reference: null,
+    notes: null,
+    is_sample: false,
+  };
+}
 
 /**
- * Makes sure every payer that fits her has a row, "not started" until she
- * begins. Rows she made by name (e.g. "Aetna") are linked to the catalog
- * instead of doubled. Idempotent. Returns all her applications.
+ * WRITE PATH. Makes sure every payer that fits her has a row, "not started"
+ * until she begins. Rows she made by name (e.g. "Aetna") are linked to the
+ * catalog instead of doubled. Idempotent. Runs only from a write: checking a
+ * step, or the Insurance page's prelist call (POST /api/payers/prelist, behind
+ * canDecide). Never from a read or a view-only render.
  */
-export async function ensurePayerList(set: PayerSet, sql: postgres.Sql = db()): Promise<PayerApplication[]> {
+export async function ensurePayerList(set: Pick<PayerSet, "payers" | "platforms">, sql: postgres.Sql = db()): Promise<PayerApplication[]> {
   let apps = await listPayerApplications(sql);
   let changed = false;
   for (const fit of [...set.payers, ...set.platforms]) {
@@ -99,35 +136,93 @@ function item(fit: PayerFit, license: Credential, app: PayerApplication, done: D
   return { fit, app, steps, next: steps.find((s) => !s.done_on) ?? null, status, statusLabel: STATUS_LABEL[status] };
 }
 
-/** Everything the Insurance tab and the chat show, for her license and state. */
+/**
+ * READ PATH. Everything the Insurance tab and the chat show, for her license and
+ * state. Only reads: a payer she hasn't started shows as "not started" without
+ * a row (ensurePayerList adds the rows, from a write path).
+ */
 export async function loadChecklist(sql: postgres.Sql = db()): Promise<Checklist> {
   const { license, state } = await herLicense(sql);
   const set = payersFor({ license, state });
-  const [apps, done, today] = await Promise.all([ensurePayerList(set, sql), loadDone(sql), practiceToday(sql)]);
-  const byId = new Map(apps.filter((a) => a.catalog_id).map((a) => [a.catalog_id!, a]));
+  const [apps, done, today] = await Promise.all([listPayerApplications(sql), loadDone(sql), practiceToday(sql)]);
+  const used = new Set<string>();
   const items = (fits: PayerFit[]) =>
-    isCredential(license) ? fits.flatMap((f) => (byId.has(f.payer.id) ? [item(f, license, byId.get(f.payer.id)!, done, today)] : [])) : [];
-  const fitIds = new Set([...set.payers, ...set.platforms].map((f) => f.payer.id));
+    isCredential(license)
+      ? fits.map((f) => {
+          const row = rowFor(apps, f.payer);
+          if (row) used.add(row.id);
+          return item(f, license, row ?? notStarted(f.payer), done, today);
+        })
+      : [];
+  const payers = items(set.payers);
+  const platforms = items(set.platforms);
   return {
     license,
     state,
     set,
     prerequisites: prerequisites().map((p) => ({ ...p, done_on: done.get(key(PREREQ_SCOPE, p.id)) ?? null })),
-    payers: items(set.payers),
-    platforms: items(set.platforms),
-    other: apps.filter((a) => !a.catalog_id || !fitIds.has(a.catalog_id)),
+    payers,
+    platforms,
+    other: apps.filter((a) => !used.has(a.id)),
   };
 }
 
-/** Finds a payer in her list by id or name, loosely ("aetna", "Blue Cross", "BCBS"). */
-export function findPayer(list: Checklist, query: string): PayerItem | undefined {
-  const q = query.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-  const all = [...list.payers, ...list.platforms];
-  const alias = (p: Payer) => [p.id, p.name, ...(p.id.startsWith("bcbs") ? ["blue cross", "bcbs", "blue cross blue shield"] : [])];
-  return (
-    all.find((i) => alias(i.fit.payer).some((a) => a.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() === q)) ??
-    all.find((i) => alias(i.fit.payer).some((a) => a.toLowerCase().replace(/[^a-z0-9]+/g, " ").includes(q) || q.includes(a.toLowerCase())))
-  );
+/** WRITE PATH: prelists every payer for her license and state. Returns how many rows it added or linked. */
+export async function prelistPayers(sql: postgres.Sql = db()): Promise<number> {
+  const set = payersFor(await herLicense(sql));
+  const before = await listPayerApplications(sql);
+  const linked = (apps: PayerApplication[]) => apps.filter((a) => a.catalog_id).length;
+  return linked(await ensurePayerList(set, sql)) - linked(before);
+}
+
+/** True when a payer that fits her has no row yet, so the Insurance page asks for the prelist write. */
+export const needsPrelist = (c: Checklist): boolean => [...c.payers, ...c.platforms].some((i) => !i.app.id || !i.app.catalog_id);
+
+export type PayerMatch =
+  | { kind: "found"; item: PayerItem }
+  /** Her words could mean more than one payer: ask her which. */
+  | { kind: "ambiguous"; choices: string[] }
+  /** The payer is in the catalog but doesn't fit her license and state. */
+  | { kind: "not_hers"; name: string }
+  /** Nothing matched; choices are her payers whose names contain her words, to pick from. */
+  | { kind: "none"; choices: string[] };
+
+/** Whether `name` appears in `q` as whole words. */
+const within = (q: string, name: string) => ` ${q} `.includes(` ${name} `);
+
+/**
+ * Finds a payer from her words, never loosely. An exact id, name or alias wins.
+ * Otherwise every catalog name her words contain counts, and a name inside a
+ * longer one ("aetna" in "aetna better health") gives way to the longer one;
+ * if more than one payer is left she picks from a list. A partial name
+ * ("blue") never resolves: it returns the payers she might mean.
+ */
+export function matchPayer(list: Pick<Checklist, "payers" | "platforms">, query: string): PayerMatch {
+  const q = normalizeName(query);
+  const mine = [...list.payers, ...list.platforms];
+  const resolve = (p: Payer): PayerMatch => {
+    const it = mine.find((i) => i.fit.payer.id === p.id);
+    return it ? { kind: "found", item: it } : { kind: "not_hers", name: p.name };
+  };
+  if (!q) return { kind: "none", choices: [] };
+  const catalog = allPayers();
+  const exact = catalog.filter((p) => namesOf(p).includes(q));
+  if (exact.length === 1) return resolve(exact[0]!);
+  if (exact.length > 1) return { kind: "ambiguous", choices: exact.map((p) => p.name) };
+
+  const hits = catalog.flatMap((p) => namesOf(p).filter((n) => within(q, n)).map((n) => ({ p, n })));
+  const kept = hits.filter((h) => !hits.some((o) => o.p.id !== h.p.id && o.n.length > h.n.length && within(o.n, h.n)));
+  const ids = [...new Set(kept.map((h) => h.p.id))];
+  if (ids.length === 1) return resolve(catalog.find((p) => p.id === ids[0])!);
+  if (ids.length > 1) return { kind: "ambiguous", choices: ids.map((id) => catalog.find((p) => p.id === id)!.name) };
+
+  return { kind: "none", choices: mine.filter((i) => namesOf(i.fit.payer).some((n) => within(n, q))).map((i) => i.fit.payer.name) };
+}
+
+/** The payer her words name, only when they name exactly one of hers. */
+export function findPayer(list: Pick<Checklist, "payers" | "platforms">, query: string): PayerItem | undefined {
+  const m = matchPayer(list, query);
+  return m.kind === "found" ? m.item : undefined;
 }
 
 /**
@@ -144,6 +239,8 @@ export async function setStep(
   const payer = isPrereq ? undefined : payerById(input.scope);
   const valid = isPrereq ? prerequisites().some((p) => p.id === input.step_id) : payer?.steps.some((s) => s.id === input.step_id);
   if (!valid) throw new Error("That step isn't on this checklist.");
+  // The step where she sends the application marks it Applied: only her own click on the Insurance page does that.
+  if (payer?.steps.find((s) => s.id === input.step_id)?.submits && actor !== "clinician") throw new SubmitStepIsHers(payer.name);
   const today = await practiceToday(sql);
   if (input.done) {
     await sql`
@@ -171,7 +268,7 @@ export async function setStep(
   const contracting = steps.some((s) => s.stage === "contracting" && done.has(s.id));
   const stage = contracting ? "contracting" : "credentialing";
   if (status !== app.status || stage !== app.stage) {
-    const unsubmitted = status === "preparing" && WAITING.includes(app.status);
+    // Unchecking the submit step moves the status back but keeps her applied and follow-up dates.
     await savePayerApplication(
       {
         id: app.id,
@@ -181,8 +278,8 @@ export async function setStep(
         network: app.network,
         stage,
         status,
-        applied_on: unsubmitted ? null : app.applied_on,
-        follow_up_on: unsubmitted ? null : app.follow_up_on,
+        applied_on: app.applied_on,
+        follow_up_on: app.follow_up_on,
         approved_on: app.approved_on,
         effective_on: app.effective_on,
         recredential_on: app.recredential_on,

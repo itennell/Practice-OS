@@ -2,6 +2,13 @@
   {
     "id": "medicare",
     "name": "Medicare Part B (J6, National Government Services)",
+    "aliases": [
+      "medicare",
+      "medicare part b",
+      "original medicare",
+      "pecos",
+      "cms 855i"
+    ],
     "kind": "medicare",
     "states": [
       "IL"
@@ -117,7 +124,7 @@
         "id": "medicare-npi",
         "stage": "credentialing",
         "title": "Confirm your NPI and PECOS login",
-        "how": "Make sure your individual NPI is active and uses the right taxonomy code: LCSW 1041C0700X, LCPC 101YM0800X (Medicare counselor code), LMFT 106H00000X, psychologist 103TC0700X. Then create or sign in to your Identity and Access (I&A) account, which lets you use PECOS.",
+        "how": "Make sure your individual NPI is active and uses the right taxonomy code: LCSW 1041C0700X, LCPC 101YM0800X (the Medicare counselor code; NPPES lets you keep 101YP2500X on your NPI too for commercial payers, with one code marked primary), LMFT 106H00000X, psychologist 103TC0700X. Then create or sign in to your Identity and Access (I&A) account, which lets you use PECOS.",
         "portal_url": "https://nppes.cms.hhs.gov/",
         "aeon_can": "none",
         "submits": false,
@@ -266,19 +273,49 @@
       }
     ],
     "notes": [
-      "Illinois Part B MAC is J6, National Government Services (verified on cms.gov). The old WPS assumption is outdated: WPS handed Part B to NGS on 2021-01-01.",
-      "Contracting steps for Medicare are really: accept assignment or not (participating vs non-participating), review the Medicare Physician Fee Schedule, note effective date. No separate contract.",
-      "Medicare pays MFT/MHC at 75% of the clinical psychologist rate (secondary sources, unverified).",
-      "CMS-855R reassignment is possibly folded into 855I/PECOS (commercial source only); confirm.",
-      "NGS site now sits under a Wellpoint Federal address; enrollment details there were not readable this run.",
-      "Retroactive billing: up to 30 days before the effective date if circumstances precluded enrolling first (42 CFR 424.521(a)(1)(i), read on law.cornell.edu). Effective date is the filing date of an application later approved (424.520(d)).",
-      "Paper CMS-855I has no MFT/MHC line: pick Undefined Non-Physician Practitioner in section 2H and write MFT or MHC (CMS MFT/MHC FAQ, read). PECOS lists the specialties.",
-      "Illinois LCPC qualifies as MHC (CMS FAQ lists clinical professional counselor); it must meet the 2 years/3,000 hours rule. CMS taxonomy: MFT 106H00000X, MHC 101YM0800X (FAQ, read). Specialty codes: psychologist 68, licensed clinical social worker 80 (CMS crosswalk, read); MFT/MHC codes not found on a CMS page."
+      {
+        "text": "Illinois Part B MAC is J6, National Government Services (verified on cms.gov). The old WPS assumption is outdated: WPS handed Part B to NGS on 2021-01-01.",
+        "source": null
+      },
+      {
+        "text": "Contracting steps for Medicare are really: accept assignment or not (participating vs non-participating), review the Medicare Physician Fee Schedule, note effective date. No separate contract.",
+        "source": null
+      },
+      {
+        "text": "Medicare pays MFT/MHC at 75% of the clinical psychologist rate (secondary sources, unverified).",
+        "source": null
+      },
+      {
+        "text": "CMS-855R reassignment is possibly folded into 855I/PECOS (commercial source only); confirm.",
+        "source": null
+      },
+      {
+        "text": "NGS site now sits under a Wellpoint Federal address; enrollment details there were not readable this run.",
+        "source": null
+      },
+      {
+        "text": "Retroactive billing: up to 30 days before the effective date if circumstances precluded enrolling first (42 CFR 424.521(a)(1)(i), read on law.cornell.edu). Effective date is the filing date of an application later approved (424.520(d)).",
+        "source": null
+      },
+      {
+        "text": "Paper CMS-855I has no MFT/MHC line: pick Undefined Non-Physician Practitioner in section 2H and write MFT or MHC (CMS MFT/MHC FAQ, read). PECOS lists the specialties.",
+        "source": null
+      },
+      {
+        "text": "Illinois LCPC qualifies as MHC (CMS FAQ lists clinical professional counselor); it must meet the 2 years/3,000 hours rule. CMS taxonomy: MFT 106H00000X, MHC 101YM0800X (FAQ, read). Specialty codes: psychologist 68, licensed clinical social worker 80 (CMS crosswalk, read); MFT/MHC codes not found on a CMS page.",
+        "source": null
+      }
     ]
   },
   {
     "id": "il-medicaid",
     "name": "Illinois Medicaid (HFS IMPACT)",
+    "aliases": [
+      "illinois medicaid",
+      "medicaid",
+      "impact",
+      "hfs impact"
+    ],
     "kind": "medicaid",
     "states": [
       "IL"
@@ -494,15 +531,31 @@
       }
     ],
     "notes": [
-      "Provider-type numbers (086/087/088) come from MCO billing guides (Meridian, CountyCare), not an IMPACT table; confirm the dropdown in IMPACT.",
-      "HFS notice table was garbled; it lists Behavioral Health Services for LCPC/LMFT/LCSW and Psychologist > Licensed Clinical Psychologist for LCP.",
-      "Fee-for-service Medicaid has no separate contract; the MCO steps are listed per plan.",
-      "Most Illinois Medicaid members are in a HealthChoice MCO, so the MCO entries matter more than FFS."
+      {
+        "text": "Provider-type numbers (086/087/088) come from MCO billing guides (Meridian, CountyCare), not an IMPACT table; confirm the dropdown in IMPACT.",
+        "source": null
+      },
+      {
+        "text": "HFS notice table was garbled; it lists Behavioral Health Services for LCPC/LMFT/LCSW and Psychologist > Licensed Clinical Psychologist for LCP.",
+        "source": null
+      },
+      {
+        "text": "Fee-for-service Medicaid has no separate contract; the MCO steps are listed per plan.",
+        "source": null
+      },
+      {
+        "text": "Most Illinois Medicaid members are in a HealthChoice MCO, so the MCO entries matter more than FFS.",
+        "source": null
+      }
     ]
   },
   {
     "id": "aetna-better-health-il",
     "name": "Aetna Better Health of Illinois",
+    "aliases": [
+      "aetna better health",
+      "aetna medicaid"
+    ],
     "kind": "mco",
     "states": [
       "IL"
@@ -718,12 +771,21 @@
       }
     ],
     "notes": [
-      "Plan list from HFS Managed Care Program Map dated 2026-01-01 (verified). Plan-specific credentialing details not read; step text is generic."
+      {
+        "text": "Plan list from HFS Managed Care Program Map dated 2026-01-01 (verified). Plan-specific credentialing details not read; step text is generic.",
+        "source": null
+      }
     ]
   },
   {
     "id": "bcchp-il",
     "name": "Blue Cross Community Health Plans (Illinois)",
+    "aliases": [
+      "bcchp",
+      "blue cross community health plans",
+      "blue cross community",
+      "blue cross medicaid"
+    ],
     "kind": "mco",
     "states": [
       "IL"
@@ -939,12 +1001,19 @@
       }
     ],
     "notes": [
-      "Plan list from HFS Managed Care Program Map dated 2026-01-01 (verified). Plan-specific credentialing details not read; step text is generic."
+      {
+        "text": "Plan list from HFS Managed Care Program Map dated 2026-01-01 (verified). Plan-specific credentialing details not read; step text is generic.",
+        "source": null
+      }
     ]
   },
   {
     "id": "countycare",
     "name": "CountyCare Health Plan (Cook County only)",
+    "aliases": [
+      "countycare",
+      "county care"
+    ],
     "kind": "mco",
     "states": [
       "IL"
@@ -1160,13 +1229,22 @@
       }
     ],
     "notes": [
-      "Plan list from HFS Managed Care Program Map dated 2026-01-01 (verified). Plan-specific credentialing details not read; step text is generic.",
-      "Cook County only; members live in Cook County."
+      {
+        "text": "Plan list from HFS Managed Care Program Map dated 2026-01-01 (verified). Plan-specific credentialing details not read; step text is generic.",
+        "source": null
+      },
+      {
+        "text": "Cook County only; members live in Cook County.",
+        "source": null
+      }
     ]
   },
   {
     "id": "meridian-il",
     "name": "Meridian (Illinois Medicaid)",
+    "aliases": [
+      "meridian"
+    ],
     "kind": "mco",
     "states": [
       "IL"
@@ -1382,13 +1460,23 @@
       }
     ],
     "notes": [
-      "Plan list from HFS Managed Care Program Map dated 2026-01-01 (verified). Plan-specific credentialing details not read; step text is generic.",
-      "No portal link on HFS provider contacts page for Meridian; look up the Meridian Illinois provider site."
+      {
+        "text": "Plan list from HFS Managed Care Program Map dated 2026-01-01 (verified). Plan-specific credentialing details not read; step text is generic.",
+        "source": null
+      },
+      {
+        "text": "No portal link on HFS provider contacts page for Meridian; look up the Meridian Illinois provider site.",
+        "source": null
+      }
     ]
   },
   {
     "id": "molina-il",
     "name": "Molina Healthcare of Illinois",
+    "aliases": [
+      "molina",
+      "molina healthcare"
+    ],
     "kind": "mco",
     "states": [
       "IL"
@@ -1604,13 +1692,24 @@
       }
     ],
     "notes": [
-      "Plan list from HFS Managed Care Program Map dated 2026-01-01 (verified). Plan-specific credentialing details not read; step text is generic.",
-      "HFS also lists YouthCare (former youth in care only); not included."
+      {
+        "text": "Plan list from HFS Managed Care Program Map dated 2026-01-01 (verified). Plan-specific credentialing details not read; step text is generic.",
+        "source": null
+      },
+      {
+        "text": "HFS also lists YouthCare (former youth in care only); not included.",
+        "source": null
+      }
     ]
   },
   {
     "id": "tricare-west",
     "name": "TRICARE West Region (TriWest Healthcare Alliance)",
+    "aliases": [
+      "tricare",
+      "triwest",
+      "tricare west"
+    ],
     "kind": "military",
     "states": [
       "IL"
@@ -1828,16 +1927,38 @@
       }
     ],
     "notes": [
-      "Illinois moved from East (Humana Military) to West (TriWest) on 2025-01-01. tricare.mil lists Illinois in the West Region (verified).",
-      "Contact: 888-874-9378; TRICAREProviderInquiries@triwest.com.",
-      "Reimbursement mostly CHAMPUS Maximum Allowable Charge (CMAC) rates.",
-      "Check whether you even need the network: authorized providers can bill TRICARE as non-network.",
-      "TRICARE counselor rules above are from the 32 CFR 199.6 text on law.cornell.edu (read); the TRICARE Policy Manual may be newer, so TriWest should confirm for your case."
+      {
+        "text": "Illinois moved from East (Humana Military) to West (TriWest) on 2025-01-01. tricare.mil lists Illinois in the West Region (verified).",
+        "source": null
+      },
+      {
+        "text": "Contact: 888-874-9378; TRICAREProviderInquiries@triwest.com.",
+        "source": null
+      },
+      {
+        "text": "Reimbursement mostly CHAMPUS Maximum Allowable Charge (CMAC) rates.",
+        "source": null
+      },
+      {
+        "text": "Check whether you even need the network: authorized providers can bill TRICARE as non-network.",
+        "source": null
+      },
+      {
+        "text": "TRICARE counselor rules above are from the 32 CFR 199.6 text on law.cornell.edu (read); the TRICARE Policy Manual may be newer, so TriWest should confirm for your case.",
+        "source": null
+      }
     ]
   },
   {
     "id": "bcbsil",
     "name": "Blue Cross and Blue Shield of Illinois (BCBSIL)",
+    "aliases": [
+      "blue cross",
+      "bcbs",
+      "bcbsil",
+      "blue cross blue shield",
+      "blue cross blue shield of illinois"
+    ],
     "kind": "commercial",
     "states": [
       "IL"
@@ -1909,7 +2030,8 @@
           "quote": "No license types are listed on the join page.",
           "checked_on": "2026-10-30",
           "verified": false
-        }
+        },
+        "basis": "check"
       },
       "LCPC": {
         "eligible": true,
@@ -1919,7 +2041,8 @@
           "quote": "No license types are listed on the join page.",
           "checked_on": "2026-10-30",
           "verified": false
-        }
+        },
+        "basis": "check"
       },
       "LMFT": {
         "eligible": true,
@@ -1929,7 +2052,8 @@
           "quote": "No license types are listed on the join page.",
           "checked_on": "2026-10-30",
           "verified": false
-        }
+        },
+        "basis": "check"
       },
       "Psychologist": {
         "eligible": true,
@@ -1939,7 +2063,8 @@
           "quote": "No license types are listed on the join page.",
           "checked_on": "2026-10-30",
           "verified": false
-        }
+        },
+        "basis": "check"
       }
     },
     "requirements": {
@@ -2112,14 +2237,26 @@
       }
     ],
     "notes": [
-      "Behavioral health: BCBSIL runs BH utilization management itself for commercial non-HMO members (Behavioral Health Program page); no separate BH network vendor application found. Official path is the BCBSIL Provider Onboarding Form plus CAQH (not Availity).",
-      "The join page was read on 2026-10-30. It gives no malpractice minimum, application fee, total timeline, license types, fee schedule or retro-billing policy, so those are unverified.",
-      "HMO networks are reached through a medical group or IPA."
+      {
+        "text": "Behavioral health: BCBSIL runs BH utilization management itself for commercial non-HMO members (Behavioral Health Program page); no separate BH network vendor application found. Official path is the BCBSIL Provider Onboarding Form plus CAQH (not Availity).",
+        "source": null
+      },
+      {
+        "text": "The join page was read on 2026-10-30. It gives no malpractice minimum, application fee, total timeline, license types, fee schedule or retro-billing policy, so those are unverified.",
+        "source": null
+      },
+      {
+        "text": "HMO networks are reached through a medical group or IPA.",
+        "source": null
+      }
     ]
   },
   {
     "id": "ambetter-il",
     "name": "Ambetter of Illinois (Centene)",
+    "aliases": [
+      "ambetter"
+    ],
     "kind": "commercial",
     "states": [
       "IL"
@@ -2149,7 +2286,8 @@
           "quote": "Select your provider type.",
           "checked_on": "2026-10-30",
           "verified": false
-        }
+        },
+        "basis": "check"
       },
       "LCPC": {
         "eligible": true,
@@ -2159,7 +2297,8 @@
           "quote": "Select your provider type.",
           "checked_on": "2026-10-30",
           "verified": false
-        }
+        },
+        "basis": "check"
       },
       "LMFT": {
         "eligible": true,
@@ -2169,7 +2308,8 @@
           "quote": "Select your provider type.",
           "checked_on": "2026-10-30",
           "verified": false
-        }
+        },
+        "basis": "check"
       },
       "Psychologist": {
         "eligible": true,
@@ -2179,7 +2319,8 @@
           "quote": "Select your provider type.",
           "checked_on": "2026-10-30",
           "verified": false
-        }
+        },
+        "basis": "check"
       }
     },
     "requirements": {
@@ -2320,9 +2461,18 @@
       }
     ],
     "notes": [
-      "The Ambetter join form was read on 2026-10-30. Its specialty list has no social worker, counselor, MFT or psychologist option, so ask the Contracting Department how therapists join.",
-      "No separate Envolve behavioral health application found for Ambetter Illinois. The form also offers Meridian, Wellcare products.",
-      "Malpractice, CAQH requirement, fee schedule, effective date and recredential cadence are not on the page: unverified."
+      {
+        "text": "The Ambetter join form was read on 2026-10-30. Its specialty list has no social worker, counselor, MFT or psychologist option, so ask the Contracting Department how therapists join.",
+        "source": null
+      },
+      {
+        "text": "No separate Envolve behavioral health application found for Ambetter Illinois. The form also offers Meridian, Wellcare products.",
+        "source": null
+      },
+      {
+        "text": "Malpractice, CAQH requirement, fee schedule, effective date and recredential cadence are not on the page: unverified.",
+        "source": null
+      }
     ]
   }
 ]

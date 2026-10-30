@@ -5,7 +5,8 @@ import { PayerTracker } from "@/components/payer-tracker";
 import { ButtonLink, GlassCard } from "@/components/ui";
 import { practiceToday } from "@/lib/compliance/store";
 import { loadCredentialingProfile } from "@/lib/credentialing/store";
-import { loadChecklist, type Checklist, type PayerItem } from "@/lib/payers/checklist";
+import { loadChecklist, needsPrelist, type Checklist, type PayerItem } from "@/lib/payers/checklist";
+import { eligibilityTag } from "@/lib/payers/eligibility";
 import { CMS855I_VERSION, LEFT_FOR_YOU, MFT_MHC_FAQ, cms855iEntries, specialtyFor } from "@/lib/payers/cms855i";
 import { payerDates } from "@/lib/payers/store";
 
@@ -22,10 +23,12 @@ function payerView(i: PayerItem): ChecklistPayer {
     name: p.name,
     kind: p.kind,
     note: i.fit.note,
+    eligibilityTag: eligibilityTag(i.fit),
+    eligibilitySource: i.fit.source,
     isDefault: i.fit.isDefault,
     status: i.status,
     statusLabel: i.statusLabel,
-    networks: p.networks.map((n) => ({ name: n.name, status: n.panel.status, note: n.panel.note })),
+    networks: p.networks.map((n) => ({ name: n.name, status: n.panel.status, note: n.panel.note, source: n.panel.source })),
     facts: [
       { label: "How long", text: p.timeline.text, source: p.timeline.source },
       { label: "Fees", text: p.fees.text, source: p.fees.source },
@@ -47,6 +50,8 @@ export function checklistView(c: Checklist): ChecklistData {
     payers: c.payers.map(payerView),
     platforms: c.platforms.map(payerView),
     notEligible: c.set.notEligible.map((n) => ({ name: n.payer.name, reason: n.reason })),
+    // The prelist is a write: only on her own computer, never on the view-only Vercel copy (its POST needs canDecide too).
+    needsPrelist: needsPrelist(c) && !process.env.VERCEL,
   };
 }
 

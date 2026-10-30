@@ -31,14 +31,14 @@
     {
       "id": "taxonomy",
       "title": "Pick your taxonomy code",
-      "how": "Use the NUCC code for your license, and enter the same code in NPPES and CAQH. LCSW: 1041C0700X (Social Worker, Clinical). LCPC: 101YP2500X (Professional Counselor) for most payers, but Medicare's own FAQ names 101YM0800X (Mental Health Counselor) for counselors. LMFT: 106H00000X. Psychologist: 103TC0700X (Psychologist, Clinical). Mismatched codes slow approvals.",
-      "portal_url": "https://www.nucc.org",
+      "how": "NPPES lets you list more than one taxonomy code on your NPI, with one marked primary. LCSW: 1041C0700X (Social Worker, Clinical) for Medicare and commercial payers. LMFT: 106H00000X for both. Psychologist: 103TC0700X (Psychologist, Clinical) for both. LCPC: Medicare tells counselors to select 101YM0800X (Mental Health Counselor), and commercial payers usually expect 101YP2500X (Professional Counselor), so list both. Which one is primary is your call: Aeon suggests 101YM0800X if Medicare is your main payer (please confirm with your Medicare contractor). Give each commercial payer and CAQH the code that payer asks for, and keep NPPES and CAQH matching. Mismatched codes slow approvals.",
+      "portal_url": "https://nppes.cms.hhs.gov",
       "aeon_can": "none",
       "applies": "all",
       "source": {
-        "url": "https://www.nucc.org/index.php/code-sets-mainmenu-41/provider-taxonomy-mainmenu-40/csv-mainmenu-57",
-        "quote": "NUCC Health Care Provider Taxonomy code set Version 26.1",
-        "checked_on": "2026-10-29",
+        "url": "https://www.cms.gov/medicare/provider-enrollment-and-certification/find-your-taxonomy-code",
+        "quote": "You may select more than one code or code description when applying for an NPI, but you must indicate one of them as the primary code.",
+        "checked_on": "2026-10-30",
         "verified": true
       }
     },
@@ -134,7 +134,7 @@
         "checked_on": "2026-10-29",
         "verified": true
       },
-      "note": "Medicare enrolls counselors under 101YM0800X (Mental Health Counselor), per CMS's own MFT/MHC FAQ. Use 101YP2500X for commercial payers unless they say otherwise."
+      "note": "Commercial payers and CAQH: 101YP2500X unless the payer asks otherwise (Aeon researched, please confirm with each payer). Medicare: CMS's MFT/MHC FAQ says to select 101YM0800X (Mental Health Counselor) in NPPES. NPPES takes more than one code with one primary, so list both; Aeon suggests 101YM0800X as primary if Medicare is her main payer (please confirm)."
     },
     "LMFT": {
       "code": "106H00000X",
