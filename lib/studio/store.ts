@@ -129,17 +129,6 @@ export function topicOf(request: string): string {
   return t.length >= 3 ? t : request.trim();
 }
 
-const LOGISTICS_ANGLES: Angle[] = [
-  { label: "What your first session looks like", pillar: "first_session" },
-  { label: "What sessions cost, and superbills", pillar: "fees_superbills" },
-  { label: "How to book a first call", pillar: "how_to_book" },
-];
-
-/** Logistics angles for a redirected topic: the nearest one first, then the plain ones. */
-export function redirectAngles(first: Angle): Angle[] {
-  return [first, ...LOGISTICS_ANGLES.filter((a) => a.label !== first.label && a.pillar !== first.pillar)].slice(0, 3);
-}
-
 const STEP = {
   check: "Checking the topic",
   posts: "Looking at what therapists post",
@@ -190,7 +179,7 @@ export async function makeProject(by: string, request: string, emit: (e: MakeEve
     return null;
   }
   if (r.outcome === "off_topic") {
-    emit({ type: "redirect", why: r.why, angles: redirectAngles(r.angle) });
+    emit({ type: "redirect", why: r.why, angles: r.angles });
     return null;
   }
   const research = r.research;
@@ -217,7 +206,7 @@ export async function makeProject(by: string, request: string, emit: (e: MakeEve
     return null;
   }
   if (out.outcome === "off_topic") {
-    emit({ type: "redirect", why: out.why, angles: redirectAngles(out.angle) });
+    emit({ type: "redirect", why: out.why, angles: out.angles });
     return null;
   }
   step("picture", "done");

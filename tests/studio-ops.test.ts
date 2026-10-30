@@ -125,3 +125,11 @@ describe("studio ops", () => {
     expect(d.slides[1].text.length).toBeLessThan(reel().slides[1].text.length);
   });
 });
+
+describe("chat: new or change", async () => {
+  const { isNewRequest } = await import("../components/studio/studio");
+  it("tells a new request from an edit", () => {
+    for (const t of ["make a reel about how booking works", "Make a carousel about what a first session is like", "can you make me a new post about fees", "Edit my own video", "make another reel on superbills"]) expect(isNewRequest(t), t).toBe(true);
+    for (const t of ["make slide 2 shorter", "make it warmer", "make the post square", "swap the picture", "cut the first 3 seconds", "make the reel 12 seconds"]) expect(isNewRequest(t), t).toBe(false);
+  });
+});

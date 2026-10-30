@@ -33,9 +33,12 @@ const STARTERS = [
   { icon: Video, text: "Edit my own video" },
 ];
 
-/** Her words start something new, rather than change what's open. */
+/** Her words start something new ("make a reel about…", "edit my own video"), rather than change what's open ("make slide 2 shorter"). */
 export function isNewRequest(text: string): boolean {
-  return /^\s*(please\s+)?(can you\s+|could you\s+)?(make|create|write|draft|plan|start|build|give me|edit my( own)? video|upload)\b/i.test(text) && /\b(post|reel|carousel|video|slides?)\b/i.test(text);
+  return (
+    /^\s*(please\s+)?((can|could) you\s+)?(make|create|write|draft|plan|start|build|give me)\s+(me\s+)?(an?|one|another|some|a new|new)\s+(\w+\s+)?(post|reel|carousel|video)s?\b/i.test(text) ||
+    /\b(edit|upload|add) my( own)? (video|footage|clip)\b/i.test(text)
+  );
 }
 
 function Bubble({ entry, onPick, disabled }: { entry: Entry; onPick: (text: string) => void; disabled: boolean }) {

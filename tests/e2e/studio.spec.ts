@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 
 // The chat-first studio on Media > Instagram, with the studio stand-ins
 // (PLAYWRIGHT_STUDIO_STANDIN=1: fixed model answers, a plain background, the
@@ -96,11 +96,21 @@ test("Approve it, then the big download and copy buttons and how to post it", as
   await expect(finished.getByRole("button", { name: "Download video" })).toBeVisible();
   await expect(finished.getByRole("heading", { name: "How to post it" })).toBeVisible();
   await axe(page);
+  // The reel is made in her browser: a real H.264 MP4 at 1080x1920, as long as its slides.
+  const seconds = Number((await canvas(page).getByText(/Reel · [\d.]+ s/).first().textContent())?.match(/([\d.]+) s/)?.[1]);
+  const [file] = await Promise.all([page.waitForEvent("download", { timeout: 90_000 }), finished.getByRole("button", { name: "Download video" }).click()]);
+  expect(file.suggestedFilename()).toMatch(/\.mp4$/);
+  const probe = JSON.parse(
+    execFileSync("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name,width,height:format=duration", "-of", "json", (await file.path())!], { encoding: "utf8" }),
+  );
+  expect(probe.streams[0]).toMatchObject({ codec_name: "h264", width: 1080, height: 1920 });
+  expect(Math.abs(Number(probe.format.duration) - seconds)).toBeLessThan(0.5);
+  await page.screenshot({ path: test.info().outputPath("studio-finished.png"), fullPage: true });
 });
 
 test("An advice topic gets the plain reason and logistics angles, never an error", async ({ page }) => {
   await page.goto("/media/instagram");
-  await say(page, "make a post about how to cope with depression");
+  await say(page, "make a post about depression");
   await expect(page.getByTestId("redirect-why")).toContainText("Posts stay on how your practice works");
   const angles = page.getByTestId("redirect-angles").getByRole("button");
   await expect(angles.first()).toHaveText(/depression/);
