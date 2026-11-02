@@ -12,6 +12,17 @@
  */
 export const FRONT_DESK_ENABLED = false;
 
+/**
+ * Urgent crisis alerts texted to her own cell. Off with Front Desk (Isaiah, 2026-11-02: no phone
+ * work for now). While false there is no phone card, alert-number setting or onboarding question;
+ * when the chat's crisis check fires, Aeon still shows the fixed 988/911 message and puts an
+ * urgent item at the top of Admin, but texts no one. Set to true to bring the texted alert back.
+ */
+export const PHONE_ALERTS_ENABLED = false;
+
+/** Any phone line at all: Front Desk's practice line or the urgent-alert line. */
+export const PHONE_ENABLED = FRONT_DESK_ENABLED || PHONE_ALERTS_ENABLED;
+
 /** Aeon tools that belong to Front Desk (lib/aeon/tools.ts, mcp/server.ts). */
 export const FRONT_DESK_TOOLS: readonly string[] = ["front_desk_status", "front_desk_check_now", "offer_consult_times"];
 

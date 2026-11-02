@@ -2,7 +2,7 @@ import type { ComponentType } from "react";
 import { GoogleCard } from "./google-card";
 import { InstagramCard } from "./instagram-card";
 import { MuseCard } from "./muse-card";
-import { FRONT_DESK_ENABLED } from "@/lib/features";
+import { FRONT_DESK_ENABLED, PHONE_ENABLED } from "@/lib/features";
 import { CalcomConnectionCard } from "./calcom-card";
 import { PhoneConnectionCard } from "./phone-card";
 
@@ -34,6 +34,6 @@ export const CONNECTION_CARDS: ConnectionCard[] = [
   { id: "instagram", order: 30, Card: InstagramCard },
   // Her phone: Front Desk's line, or while Front Desk is paused only "Urgent alerts to your phone"
   // (the crisis text to her own cell needs a connected line). Cal.com is Front Desk only.
-  { id: "phone", order: 40, Card: PhoneConnectionCard },
+  ...(PHONE_ENABLED ? [{ id: "phone", order: 40, Card: PhoneConnectionCard }] : []),
   ...(FRONT_DESK_ENABLED ? [{ id: "calcom", order: 50, Card: CalcomConnectionCard }] : []),
 ];
