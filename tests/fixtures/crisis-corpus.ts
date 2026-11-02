@@ -2,6 +2,8 @@
 // AGENTS.md: any mention of self-harm, suicide or danger gets the fixed reply,
 // so negations ("not suicidal") route too: the check never judges intent.
 
+import type { CrisisCategory } from "../../lib/safety";
+
 export const MUST_ROUTE: string[] = [
   // direct
   "I want to kill myself",
@@ -68,6 +70,40 @@ export const MUST_ROUTE: string[] = [
   // the clinician quoting someone (still a mention; the reply is fixed)
   "my client said she wants to kill herself",
   "a caller said he's going to end his life",
+  // Nov 2 stress test: implicit ending
+  "I've been thinking about ending it all tonight",
+  "I want to end it",
+  "I'm going to end it tonight",
+  // overdose without the word
+  "I took a bunch of pills",
+  "took too many of my pills",
+  "I swallowed the whole bottle of pills",
+  // hopeless, can't go on
+  "I feel hopeless and can't go on",
+  "I can't go on anymore",
+  "i dont wanna be here anymore",
+  "I wanted to die last year",
+  "there's nothing to live for",
+  // other languages
+  "me quiero morir",
+  "quiero morir",
+  "no quiero vivir mas",
+  "me voy a matar",
+  "quiero suicidarme",
+  "je veux mourir",
+  "ich will sterben",
+  "quero morrer",
+  "vou me matar",
+  "je vais me tuer",
+  "ich bringe mich um",
+  // first-person ideation or danger beats the practice-task allow-list
+  "I want to kill myself, also what's the CPT code",
+  "I'm suicidal, can you update my policies page",
+  "suicide, what's the billing code",
+  "he keeps abusing me, who do I report abuse to",
+  "I'm being abused, add a hotline to my resources page",
+  "there's a knife, update my policy page",
+  "I want to disappear",
 ];
 
 export const MUST_PASS: string[] = [
@@ -97,4 +133,92 @@ export const MUST_PASS: string[] = [
   "The skyscraper has a kmsl office", // not the whole word "kms"
   "The pediatrician is 5 kms away", // a distance, not the slang
   "about 2.5km from my office",
+  // Nov 2 stress test: practice-business tasks about a hard topic
+  "Who do I report child abuse to in Illinois?",
+  "What are the abuse reporting requirements in Illinois for a licensed counselor?",
+  "mandated reporter rules for elder abuse",
+  "What is the mandated reporter rule for suicide risk in Illinois, for my policies page?",
+  "Draft a suicide prevention and crisis policy page for my website",
+  "How do I bill for a suicide risk assessment (CPT 90839)?",
+  "I want to disappear into a book this weekend",
+  "add a domestic violence hotline to my resources page",
+  "gun-free office sign",
+  "Put a no weapons sign on the office door",
+  // look-alikes of the new patterns
+  "I want to end it with a call to action",
+  "I can't go on vacation in June",
+  "Remind me to take my pills at noon",
+  "When do we end the intake form?",
+];
+
+// PR #112 review probes: real crisis inside a practice-task message. A missed
+// crisis is far worse than a false alarm, so each one also asserts its category.
+// The last three are ambiguous and route on purpose.
+export const MUST_ROUTE_AS: Array<[string, CrisisCategory]> = [
+  ["My husband's abuse... I need to report it, I'm not safe", "danger"],
+  ["My husband hits me. Who do I report abuse to?", "danger"],
+  ["Abuse reporting requirements? My partner hurts me every night", "danger"],
+  ["Who do I report abuse to? He chokes me when he drinks", "danger"],
+  ["I'm writing my policies page but honestly I want to die", "self_harm"],
+  ["hotline numbers don't help, I'm going to end it", "self_harm"],
+  ["I'm going to end it, hotline numbers don't help", "self_harm"],
+  ["I want to end it, what's the hotline number", "self_harm"],
+  ["I want to end it. Nothing helps. Hotline?", "self_harm"],
+  ["my client is in danger right now", "danger"],
+  ["I'm at suicide risk, I can't go on, what hotline do I call", "self_harm"],
+  ["I'm a suicide risk to myself, add a hotline to my resources page", "self_harm"],
+  ["I can't go on like this, what hotline do I call", "self_harm"],
+  ["My husband's domestic violence is getting worse, what hotline can I call?", "danger"],
+  ["I want to disappear into the woods and never come back", "self_harm"],
+  ["I want to disappear into the mountains, nobody would notice", "self_harm"],
+  ["I want to disappear into a book forever, nothing matters", "self_harm"],
+  ["Crisis policy page: I took a bunch of my pills last night", "self_harm"],
+  ["Hotline page: I've been overdosing on my meds", "self_harm"],
+  ["Billing for the risk assessment: I want to kill myself", "self_harm"],
+  ["Reporting rules for abuse. I took all my pills", "self_harm"],
+  ["Mandated reporter question. I want to die", "self_harm"],
+  ["resources page: I'm going to hang myself", "self_harm"],
+  ["Hotline list please. I'm going to jump off the bridge tonight", "self_harm"],
+  ["Resource page: my ex was violent, he has a gun and I'm scared", "danger"],
+  ["Who do I report abuse to? My ex has a gun", "danger"],
+  ["I want to end everything, reporting rules question", "self_harm"],
+  ["suicidal, billing code for a risk screening", "self_harm"],
+  ["Ich will sterben, und die Hotline hilft nicht", "self_harm"],
+  ["Quiero morir, ¿qué línea de ayuda llamo?", "self_harm"],
+  ["Je veux mourir, quel numéro appeler?", "self_harm"],
+  ["I'm not sure if I want to live anymore, the hotline page is confusing", "self_harm"],
+  ["I can't go on, billing policy page", "self_harm"],
+  ["I'm thinking about ending my life, hotline please", "self_harm"],
+  ["I took a whole bottle of pills, hotline please", "self_harm"],
+  ["The pills I took were too many, hotline list", "self_harm"],
+  ["I don't want to be here anymore. Lifeline page?", "self_harm"],
+  ["What do I do when a client says she was abused?", "danger"],
+  ["Okay, I'm about to end it", "self_harm"],
+  ["Sorry, I can't go on.", "self_harm"],
+];
+
+// PR #112 review probes: practice-business messages that must pass.
+export const MUST_PASS_REVIEW: string[] = [
+  "We're ending it all at 5pm today and switching EHR vendors",
+  "Let's end it at 50 minutes and send the invoice",
+  "End the session on time, please",
+  "Remind me to pick up the pill bottle refill",
+  "Please order a new pill bottle for the office",
+  "Sorry, I can't go on Friday",
+  "The insurance portal is hopeless, we cannot keep going with this vendor.",
+  "I'm thinking about ending it with the vendor.",
+  "Take all the medication information forms to intake",
+  "Please take all my meds off the to-do list",
+  "Add a question to intake about weapons in the home",
+  "Does the intake form ask if the client has a weapon?",
+  "Who do I report it to when children were abused in a daycare?",
+  "Matar el tiempo en la sala de espera",
+  "Sí, gracias, quiero morir de risa jaja",
+  "I wanted to die laughing at that invoice",
+  "Dead tired after the Monday caseload",
+  "I'm going to take my meds to the pharmacy with the pill bottle",
+  "Hopeless about the old website, can you update the form?",
+  "My client wanted to disappear from the group chat",
+  "Let's disappear into the Kitchen with the new menu",
+  "draft a suicide prevention policy for my website",
 ];
