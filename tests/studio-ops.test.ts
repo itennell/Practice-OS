@@ -113,6 +113,132 @@ describe("studio ops", () => {
     expect(plain.ok && plain.notes).toEqual([]);
   });
 
+  // Review (PR #109): trim, split, move, remove and cut_end move captions and
+  // texts with their footage; whatever is cut away is reported, not kept stale.
+  function captioned(): StudioDoc {
+    return {
+      ...video(),
+      overlays: [{ id: "o1", text: "Welcome", start: 4, end: 6, position: "bottom" as const }],
+      captions: { on: true, cues: [{ start: 0, end: 2, text: "hello" }, { start: 11, end: 13, text: "second clip words" }] },
+    };
+  }
+
+  it("trim moves captions and texts with the footage it keeps", () => {
+    const d = ok(applyOps(captioned(), [{ op: "trim_clip", clip: 1, out: 8 }]));
+    expect(d.clips[0]).toMatchObject({ in: 0, out: 8 });
+    expect(d.overlays).toMatchObject([{ start: 4, end: 6 }]);
+    expect(d.captions.cues).toEqual([
+      { start: 0, end: 2, text: "hello" },
+      { start: 9, end: 11, text: "second clip words" },
+    ]);
+    const cut = ok(applyOps(captioned(), [{ op: "trim_clip", clip: 1, in: 5 }]));
+    expect(cut.clips[0]).toMatchObject({ in: 5, out: 10 });
+    // "Welcome" was 4-6; 5-6 of its footage is left, so it's clipped, not dropped.
+    expect(cut.overlays).toMatchObject([{ text: "Welcome", start: 0, end: 1 }]);
+    expect(cut.captions.cues).toEqual([{ start: 6, end: 8, text: "second clip words" }]);
+    const r = applyOps(captioned(), [{ op: "trim_clip", clip: 1, in: 5 }]);
+    expect(r.ok && r.notes).toEqual(['shortened the text "Welcome" to the part still in the video', "took out 1 caption that isn't in the video any more"]);
+    // Trimmed wholly away: dropped.
+    const gone = applyOps(captioned(), [{ op: "trim_clip", clip: 1, in: 7 }]);
+    expect(gone.ok && gone.doc.overlays).toEqual([]);
+  });
+
+  // Review (PR #109, second pass): an end exactly on a clip join stays in the
+  // earlier clip, and items are clipped to their surviving footage.
+  function joined(): StudioDoc {
+    return {
+      ...emptyDoc("video", "two clips"),
+      clips: [
+        { id: "A", source: "opfs:a", name: "Clip 1", duration: 2, in: 0, out: 2 },
+        { id: "B", source: "opfs:b", name: "Clip 2", duration: 2, in: 0, out: 2 },
+      ],
+      overlays: [{ id: "o1", text: "Across", start: 1, end: 3, position: "bottom" }],
+      captions: { on: true, cues: [{ start: 0, end: 2, text: "in A" }, { start: 2, end: 4, text: "in B" }] },
+    };
+  }
+
+  it("a caption ending on a clip join moves with its clip", () => {
+    const r = applyOps(joined(), [{ op: "move_clip", clip: "B", to: 1 }]);
+    if (!r.ok) throw new Error(r.why);
+    expect(r.doc.clips.map((c) => c.id)).toEqual(["B", "A"]);
+    expect(r.doc.captions.cues).toEqual([
+      { start: 2, end: 4, text: "in A" },
+      { start: 0, end: 2, text: "in B" },
+    ]);
+    // The text across the join keeps its longer unbroken half (ties go to the earlier one).
+    expect(r.doc.overlays).toHaveLength(1);
+    expect(r.doc.overlays[0].end - r.doc.overlays[0].start).toBe(1);
+  });
+
+  it("remove clips a spanning text to what's left and drops only what's wholly gone", () => {
+    const r = applyOps(joined(), [{ op: "remove_clip", clip: "A" }]);
+    if (!r.ok) throw new Error(r.why);
+    expect(r.doc.overlays).toMatchObject([{ text: "Across", start: 0, end: 1 }]);
+    expect(r.doc.captions.cues).toEqual([{ start: 0, end: 2, text: "in B" }]);
+    expect(r.notes).toEqual(['shortened the text "Across" to the part still in the video', "took out 1 caption that isn't in the video any more"]);
+  });
+
+  it("trim and cut_end clip a caption at a join instead of dropping it", () => {
+    const t = ok(applyOps(joined(), [{ op: "trim_clip", clip: "A", in: 1 }]));
+    expect(t.captions.cues).toEqual([{ start: 0, end: 1, text: "in A" }, { start: 1, end: 3, text: "in B" }]);
+    expect(t.overlays).toMatchObject([{ start: 0, end: 2 }]);
+    const c = ok(applyOps(joined(), [{ op: "cut_end", seconds: 1.5 }]));
+    expect(c.captions.cues).toEqual([{ start: 0, end: 2, text: "in A" }, { start: 2, end: 2.5, text: "in B" }]);
+    expect(c.overlays).toMatchObject([{ start: 1, end: 2.5 }]);
+  });
+
+  it("the cover frame follows its footage and stays inside the video", () => {
+    const moved = ok(applyOps({ ...joined(), cover: { time: 1 } }, [{ op: "move_clip", clip: "B", to: 1 }]));
+    expect(moved.cover).toEqual({ time: 3 });
+    const removed = ok(applyOps({ ...joined(), cover: { time: 3.5 } }, [{ op: "cut_end", seconds: 1 }]));
+    expect(removed.cover).toEqual({ time: 3 });
+    const gone = ok(applyOps({ ...joined(), cover: { time: 1 } }, [{ op: "remove_clip", clip: "A" }]));
+    expect(gone.cover).toEqual({ time: 1 });
+    const end = ok(applyOps({ ...joined(), cover: { time: 4 } }, [{ op: "remove_clip", clip: "B" }]));
+    expect(end.cover).toEqual({ time: 2 });
+  });
+
+  it("split keeps captions and texts exactly where they are", () => {
+    const d = ok(applyOps(captioned(), [{ op: "split_clip", clip: 2, at: 2 }]));
+    expect(d.clips.map((c) => [c.in, c.out])).toEqual([[0, 10], [1, 3], [3, 6]]);
+    expect(d.overlays).toMatchObject([{ start: 4, end: 6 }]);
+    expect(d.captions.cues).toEqual(captioned().captions.cues);
+    const r = applyOps(captioned(), [{ op: "split_clip", clip: 2, at: 2 }]);
+    expect(r.ok && r.notes).toEqual([]);
+  });
+
+  it("move_clip carries captions and texts with their clip", () => {
+    const d = ok(applyOps(captioned(), [{ op: "move_clip", clip: "c2", to: 1 }]));
+    expect(d.clips.map((c) => c.id)).toEqual(["c2", "c1"]);
+    expect(d.overlays).toMatchObject([{ start: 9, end: 11 }]);
+    expect(d.captions.cues).toEqual([
+      { start: 5, end: 7, text: "hello" },
+      { start: 1, end: 3, text: "second clip words" },
+    ]);
+  });
+
+  it("remove_clip drops what was on the removed clip and shifts the rest", () => {
+    const r = applyOps(captioned(), [{ op: "remove_clip", clip: 1 }]);
+    if (!r.ok) throw new Error(r.why);
+    expect(r.doc.clips.map((c) => c.id)).toEqual(["c2"]);
+    expect(r.doc.overlays).toEqual([]);
+    expect(r.doc.captions.cues).toEqual([{ start: 1, end: 3, text: "second clip words" }]);
+    expect(r.notes).toEqual(['took out the text "Welcome" that isn\'t in the video any more', "took out 1 caption that isn't in the video any more"]);
+  });
+
+  it("cut_end drops captions past the new ending and keeps the rest", () => {
+    const d = {
+      ...captioned(),
+      captions: { on: true, cues: [{ start: 0, end: 2, text: "hello" }, { start: 12, end: 14.5, text: "goodbye" }, { start: 14, end: 15, text: "bye" }] },
+    };
+    const r = applyOps(d, [{ op: "cut_end", seconds: 2 }]);
+    if (!r.ok) throw new Error(r.why);
+    expect(r.doc.clips.at(-1)).toMatchObject({ out: 4 });
+    expect(r.doc.captions.cues).toEqual([{ start: 0, end: 2, text: "hello" }, { start: 12, end: 13, text: "goodbye" }]);
+    expect(r.doc.overlays).toMatchObject([{ start: 4, end: 6 }]);
+    expect(r.notes).toEqual(["took out 1 caption that isn't in the video any more", "shortened 1 caption to the part still in the video"]);
+  });
+
   it("adds text at the start, captions on, a cover frame", () => {
     const d = ok(applyOps(video(), [{ op: "add_text", text: "How booking works", start: 0, end: 3 }, { op: "set_captions", on: true }, { op: "set_cover", time: 2 }]));
     expect(d.overlays.at(-1)).toMatchObject({ text: "How booking works", start: 0, end: 3, position: "bottom" });

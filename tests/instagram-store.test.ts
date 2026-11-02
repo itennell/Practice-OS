@@ -320,7 +320,7 @@ describe.skipIf(!hasDb)("after 'Not for me'", () => {
     expect((await loadInstagramPrefs()).setup).toBeNull();
 
     await instagramQuestions.save({ goals: ["fill_spots"], topics: ["how_to_book"], posts_per_week: "1", never_show: ["face"], style: { pick: "warm", example: "Book a call." } });
-    const pending = (await listApprovals()).filter((a) => a.kind === "instagram_post").length;
+    const pending = (await listApprovals()).filter((a) => a.kind === "instagram_post" && a.status === "pending").length;
     expect(pending).toBeGreaterThan(0); // Dana's sample posts wait for her
     const before = (await loadMenuData()).counts.approvals;
 

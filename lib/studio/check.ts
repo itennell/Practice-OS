@@ -57,12 +57,48 @@ export function changedWords(before: StudioDoc | null, next: StudioDoc): string[
   return docWords(next).filter((w) => !old.has(w));
 }
 
-/** The slide and on-video words in the order she sees them, as one run of text. */
+/** The slide, on-video and caption words in the order she sees them, as one run of text. */
 export function joinedText(doc: StudioDoc): string {
-  return [doc.title, ...doc.slides.map((s) => s.text), ...[...doc.overlays].sort((a, b) => a.start - b.start).map((o) => o.text)]
+  return [
+    doc.title,
+    ...doc.slides.map((s) => s.text),
+    ...[...doc.overlays].sort((a, b) => a.start - b.start).map((o) => o.text),
+    ...[...doc.captions.cues].sort((a, b) => a.start - b.start).map((c) => c.text),
+  ]
     .map((t) => t.trim())
     .filter(Boolean)
     .join("\n");
+}
+
+/** The captions as one transcript in time order, so words split across two pieces are read together. */
+export function captionRun(doc: StudioDoc): string {
+  return [...doc.captions.cues]
+    .sort((a, b) => a.start - b.start)
+    .map((c) => c.text.trim())
+    .filter(Boolean)
+    .join(" ");
+}
+
+const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+
+/**
+ * New caption pieces that break a plain-code rule (the topic gate, her never-show
+ * list, an invented fee) are left out one by one and named by where they sit,
+ * like a piece the client-detail guard refused, instead of failing the whole
+ * batch. A self-harm piece is not left out: checkStep stops on it.
+ */
+export function screenCues(before: StudioDoc, next: StudioDoc, limits: Limits): { doc: StudioDoc; skipped: string[] } {
+  const old = new Set(before.captions.cues.map((c) => `${c.start}|${c.end}|${c.text}`));
+  const skipped: string[] = [];
+  const cues = next.captions.cues.filter((c) => {
+    if (old.has(`${c.start}|${c.end}|${c.text}`)) return true;
+    const problems = textProblems(c.text, limits);
+    if (!problems.length || problems.includes(RULE_TEXT.self_harm) || checkCrisis(c.text).crisis) return true;
+    skipped.push(`left out the caption at ${clock(c.start)}: ${problems[0]}`);
+    return false;
+  });
+  if (!skipped.length) return { doc: next, skipped };
+  return { doc: { ...next, captions: { ...next.captions, cues } }, skipped };
 }
 
 export type DocCheck = { ok: true } | { ok: false; hardStop: boolean; why: string; problems: string[] };
@@ -92,8 +128,12 @@ export async function checkStep(before: StudioDoc | null, next: StudioDoc, limit
   const joined = joinedText(next);
   const joinedChanged = !before || joinedText(before) !== joined;
   const captionChanged = before?.caption !== next.caption;
-  if (!changed.length && !joinedChanged && !captionChanged) return { ok: true };
-  if ([...changed, joined].some((w) => checkCrisis(w).crisis)) return fail([RULE_TEXT.self_harm]);
+  // The captions' whole run as one transcript: a crisis phrase split across two
+  // caption pieces reads safe in each piece alone.
+  const transcript = captionRun(next);
+  const transcriptChanged = !before || captionRun(before) !== transcript;
+  if (!changed.length && !joinedChanged && !captionChanged && !transcriptChanged) return { ok: true };
+  if ([...changed, joined].some((w) => checkCrisis(w).crisis) || (transcriptChanged && !!transcript && checkCrisis(transcript).crisis)) return fail([RULE_TEXT.self_harm]);
   const problems: string[] = [];
   for (const w of changed) {
     if (w === next.caption) continue;

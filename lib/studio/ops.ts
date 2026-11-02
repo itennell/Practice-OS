@@ -19,8 +19,10 @@ import {
   newId,
   shapeProblems,
   videoSeconds,
+  type Clip,
   type StudioDoc,
 } from "./doc";
+import { segments } from "./timeline";
 
 const ref = z.union([z.number().int().min(1).max(50), z.string().min(1).max(40)]);
 const text = (max: number) => z.string().trim().min(1).max(max);
@@ -146,7 +148,8 @@ function applyOne(doc: StudioDoc, op: Op, effects: Effect[], notes: string[]): S
       const i = indexOf(doc.clips, op.clip, "clip");
       const c = doc.clips[i];
       const next = { ...c, in: round(op.in ?? c.in), out: round(Math.min(op.out ?? c.out, c.duration)) };
-      return { ...doc, clips: doc.clips.map((x, k) => (k === i ? next : x)) };
+      const clips = doc.clips.map((x, k) => (k === i ? next : x));
+      return followClips(doc, clips, notes);
     }
     case "cut_start": {
       if (!doc.clips.length) fail("There's no video yet. Add one first.");
@@ -165,7 +168,7 @@ function applyOne(doc: StudioDoc, op: Op, effects: Effect[], notes: string[]): S
       if (!doc.clips.length) fail("There's no video yet. Add one first.");
       const c = doc.clips.at(-1)!;
       if (c.out - op.seconds <= c.in) fail(`The last clip is only ${round(c.out - c.in)} seconds.`);
-      return { ...doc, clips: [...doc.clips.slice(0, -1), { ...c, out: round(c.out - op.seconds) }] };
+      return followClips(doc, [...doc.clips.slice(0, -1), { ...c, out: round(c.out - op.seconds) }], notes);
     }
     case "split_clip": {
       const i = indexOf(doc.clips, op.clip, "clip");
@@ -173,16 +176,16 @@ function applyOne(doc: StudioDoc, op: Op, effects: Effect[], notes: string[]): S
       const cut = round(c.in + op.at);
       if (cut <= c.in || cut >= c.out) fail(`Clip ${i + 1} is ${round(c.out - c.in)} seconds; split it somewhere inside that.`);
       const second = { ...c, id: newId("c", allIds(doc)), in: cut };
-      return { ...doc, clips: [...doc.clips.slice(0, i), { ...c, out: cut }, second, ...doc.clips.slice(i + 1)] };
+      return followClips(doc, [...doc.clips.slice(0, i), { ...c, out: cut }, second, ...doc.clips.slice(i + 1)], notes);
     }
     case "move_clip": {
       const i = indexOf(doc.clips, op.clip, "clip");
       if (op.to > doc.clips.length) fail(`There are only ${doc.clips.length} clips.`);
-      return { ...doc, clips: move(doc.clips, i, op.to - 1) };
+      return followClips(doc, move(doc.clips, i, op.to - 1), notes);
     }
     case "remove_clip": {
       const i = indexOf(doc.clips, op.clip, "clip");
-      return { ...doc, clips: doc.clips.filter((_, k) => k !== i) };
+      return followClips(doc, doc.clips.filter((_, k) => k !== i), notes);
     }
     case "add_clip": {
       if (doc.kind !== "video") fail("Clips go in a video.");
@@ -221,6 +224,95 @@ function shiftTimed<T extends { start: number; end: number }>(list: T[], by: num
   return list
     .map((o) => ({ ...o, start: round(Math.max(0, o.start + by)), end: round(o.end + by) }))
     .filter((o) => o.end > 0 && o.end > o.start);
+}
+
+type Piece = { id: string; source: string; from: number; to: number };
+type Span = { start: number; end: number };
+const EPS = 1e-3;
+
+/**
+ * The footage under a span of the finished video, before the clips change: one
+ * piece per clip it covers. Zero-length overlaps are skipped, so a span that
+ * ends exactly on a join stays in the earlier clip.
+ */
+function sourcePieces(before: Clip[], start: number, end: number): Piece[] {
+  const out: Piece[] = [];
+  for (const s of segments(before)) {
+    const lo = Math.max(start, s.start);
+    const hi = Math.min(end, s.end);
+    if (hi - lo > EPS) out.push({ id: s.clip.id, source: s.clip.source, from: s.clip.in + (lo - s.start), to: s.clip.in + (hi - s.start) });
+  }
+  return out;
+}
+
+/** Where that footage sits on the finished video after the clips change, as unbroken spans in order. Empty when none of it is left. */
+function timelineSpans(after: Clip[], pieces: Piece[], beforeIds: Set<string>): Span[] {
+  const spans: Span[] = [];
+  for (const s of segments(after)) {
+    const c = s.clip;
+    // The same clip, or a new clip cut from the same file (the second half of a split).
+    for (const p of pieces) {
+      if (p.id !== c.id && (beforeIds.has(c.id) || p.source !== c.source)) continue;
+      const lo = Math.max(p.from, c.in);
+      const hi = Math.min(p.to, c.out);
+      if (hi - lo > EPS) spans.push({ start: s.start + (lo - c.in), end: s.start + (hi - c.in) });
+    }
+  }
+  spans.sort((a, b) => a.start - b.start);
+  const merged: Span[] = [];
+  for (const x of spans) {
+    const last = merged.at(-1);
+    if (last && x.start <= last.end + EPS) last.end = Math.max(last.end, x.end);
+    else merged.push({ ...x });
+  }
+  return merged;
+}
+
+/**
+ * Moves timed items through a clip change so they stay on the same footage. An
+ * item whose footage is partly cut away is clipped to what's left (the longest
+ * unbroken stretch, when its footage ends up in two places); only an item with
+ * none of its footage left is dropped.
+ */
+function remapTimed<T extends { start: number; end: number }>(list: T[], before: Clip[], after: Clip[]): { kept: T[]; lost: T[]; shortened: T[] } {
+  const beforeIds = new Set(before.map((c) => c.id));
+  const kept: T[] = [];
+  const lost: T[] = [];
+  const shortened: T[] = [];
+  for (const item of list) {
+    const spans = timelineSpans(after, sourcePieces(before, item.start, item.end), beforeIds);
+    const best = spans.reduce<Span | null>((a, b) => (!a || b.end - b.start > a.end - a.start + EPS ? b : a), null);
+    const next = best && { ...item, start: round(best.start), end: round(best.end) };
+    if (!next || next.end <= next.start) {
+      lost.push(item);
+      continue;
+    }
+    if (next.end - next.start < item.end - item.start - EPS) shortened.push(next);
+    kept.push(next);
+  }
+  return { kept, lost, shortened };
+}
+
+/** The cover frame follows its footage like a text does; if that footage is gone it keeps its moment, clamped inside the new video. */
+function remapCover(doc: StudioDoc, after: Clip[]): StudioDoc["cover"] {
+  if (!doc.cover || !("time" in doc.cover)) return doc.cover;
+  const t = doc.cover.time;
+  const total = segments(after).reduce((m, s) => Math.max(m, s.end), 0);
+  const spans = timelineSpans(after, sourcePieces(doc.clips, t, t + 2 * EPS).slice(0, 1), new Set(doc.clips.map((c) => c.id)));
+  const at = spans.length ? spans[0].start : t;
+  return { time: round(Math.max(0, Math.min(at, total))) };
+}
+
+/** New clip order after a trim, split, move, remove or end cut: texts, captions and the cover frame follow their footage. */
+function followClips(doc: StudioDoc, clips: Clip[], notes: string[]): StudioDoc {
+  const overlays = remapTimed(doc.overlays, doc.clips, clips);
+  const cues = remapTimed(doc.captions.cues, doc.clips, clips);
+  const n = (k: number) => (k === 1 ? "1 caption" : `${k} captions`);
+  for (const o of overlays.lost) notes.push(`took out the text "${o.text}" that isn't in the video any more`);
+  for (const o of overlays.shortened) notes.push(`shortened the text "${o.text}" to the part still in the video`);
+  if (cues.lost.length) notes.push(`took out ${n(cues.lost.length)} that ${cues.lost.length === 1 ? "isn't" : "aren't"} in the video any more`);
+  if (cues.shortened.length) notes.push(`shortened ${n(cues.shortened.length)} to the part still in the video`);
+  return { ...doc, clips, overlays: overlays.kept, captions: { ...doc.captions, cues: cues.kept }, cover: remapCover(doc, clips) };
 }
 
 /** Validates and applies a list of ops, all or nothing. The input document is never changed. */

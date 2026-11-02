@@ -170,6 +170,18 @@ describe.skipIf(!hasDb)("studio", () => {
     const fromChat = await chatEdit(project!.id, "add my clip", { by: "test", chat: stub({ reply: "Ok.", ops: [{ op: "add_clip", clip: { ...clip, id: "c9" } }] }).chat });
     expect(fromChat.ok).toBe(false);
   });
+
+  it("words typed onto the canvas get the client-detail guard", async () => {
+    const project = await makeProject("test", "edit my own video", () => {});
+    const id = project!.id;
+    await applyEdit(id, [{ op: "add_clip", clip: { id: "c1", source: "opfs:abc", name: "", duration: 8, in: 0, out: 8 } }], { source: "canvas", by: "test" });
+    const bad = await applyEdit(id, [{ op: "add_text", text: "Call (555) 123-4567", start: 0, end: 3 }], { source: "canvas", by: "test", chat: stub().chat });
+    expect(bad).toMatchObject({ ok: false, status: 422 });
+    expect(bad.ok === false && bad.why).toMatch(/phone number/);
+    expect((await getProject(id))!.doc.overlays).toEqual([]);
+    const good = await applyEdit(id, [{ op: "add_text", text: "Free 15-minute call", start: 0, end: 3 }], { source: "canvas", by: "test", chat: stub().chat });
+    expect(good.ok).toBe(true);
+  });
 });
 
 // ---- Review fixes (PR #103) ------------------------------------------------------------
@@ -318,5 +330,74 @@ describe.skipIf(!hasDb)("studio review fixes", () => {
     // Step 0 is now the state after the 5th change, not how Aeon first made it.
     const back = await goToStep(id, 0);
     expect(back.ok && back.project.doc.palette).toBe(palettes[4 % 4]);
+  });
+});
+
+// ---- Review fixes (PR #109, second pass) -----------------------------------------------
+
+describe.skipIf(!hasDb)("studio canvas guard order", () => {
+  /** The usual stub chain wrapped in a spy: records every model call the edit makes. */
+  function spy() {
+    const calls: string[] = [];
+    const inner = stub().chat;
+    const chat = (async (feature: string, params: never) => {
+      calls.push(feature);
+      return inner(feature, params);
+    }) as unknown as ChatFn;
+    return { chat, calls };
+  }
+
+  async function video() {
+    const project = await makeProject("test", "edit my own video", () => {});
+    const id = project!.id;
+    await applyEdit(id, [{ op: "add_clip", clip: { id: "c1", source: "opfs:abc", name: "", duration: 8, in: 0, out: 8 } }], { source: "canvas", by: "test" });
+    return id;
+  }
+
+  it("a client detail typed on the canvas is refused before Muse's critic sees it", async () => {
+    const id = await video();
+    const s = spy();
+    const bad = await applyEdit(id, [{ op: "add_text", text: "Call (555) 123-4567", start: 0, end: 3 }], { source: "canvas", by: "test", chat: s.chat });
+    expect(bad).toMatchObject({ ok: false, status: 422 });
+    expect(s.calls).toEqual([]);
+    // A clean edit does reach the critic, so the spy sits on the real call path.
+    const good = await applyEdit(id, [{ op: "add_text", text: "Free 15-minute call", start: 0, end: 3 }], { source: "canvas", by: "test", chat: s.chat });
+    expect(good.ok).toBe(true);
+    expect(s.calls).toContain("instagram.critic");
+  });
+
+  it("a phone number split across two caption pieces is refused on the joined run, before Muse", async () => {
+    const id = await video();
+    const s = spy();
+    const cues = [
+      { start: 0, end: 2, text: "Call (555) 123" },
+      { start: 2, end: 4, text: "4567 to book" },
+    ];
+    const r = await applyEdit(id, [{ op: "set_cues", cues }], { source: "canvas", by: "test", chat: s.chat });
+    expect(r).toMatchObject({ ok: false, status: 422 });
+    expect(r.ok === false && r.why).toMatch(/phone number/);
+    expect(s.calls).toEqual([]);
+    expect((await getProject(id))!.doc.captions.cues).toEqual([]);
+  });
+
+  it("lists every clip file a kept step still uses, so her browser keeps only those", async () => {
+    const id = await video();
+    const removed = await applyEdit(id, [{ op: "remove_clip", clip: 1 }], { source: "canvas", by: "test" });
+    if (!removed.ok) throw new Error(removed.why);
+    expect(removed.project.doc.clips).toEqual([]);
+    // Undo can bring the clip back, so its file is still on the keep list.
+    expect(removed.project.clipKeys).toContain("opfs:abc");
+  });
+
+  it("an advice caption piece is left out and named; the rest are saved", async () => {
+    const id = await video();
+    const cues = [
+      { start: 0, end: 2, text: "Booking takes two steps" },
+      { start: 4, end: 6, text: "Tips to cope with anxiety at work" },
+    ];
+    const r = await applyEdit(id, [{ op: "set_cues", cues }], { source: "canvas", by: "test", chat: stub().chat });
+    if (!r.ok) throw new Error(r.why);
+    expect(r.project.doc.captions.cues.map((c) => c.text)).toEqual(["Booking takes two steps"]);
+    expect(r.reply).toMatch(/left out the caption at 0:04/);
   });
 });
