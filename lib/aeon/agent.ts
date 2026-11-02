@@ -17,13 +17,6 @@ import { getProfile, STAGE_LABEL, type Profile } from "../profile";
 import type { ApprovalMode } from "../approval-policy";
 import { cardsFrom, type DocumentCard } from "../documents/card";
 import { TOOLS_BY_NAME, chatTools, runTool, type ToolResult } from "./tools";
-import { cardNamesIn, neutralPronouns } from "../referrals/pronouns";
-
-/** Tools whose results name providers on her Referrals board: the reply calls them by name or "they". */
-const NAMES_PROVIDERS = new Set([
-  "find_referral_sources", "list_referral_sources", "find_referral_cards", "move_referral_source", "draft_outreach", "referral_outreach_plan",
-  "log_referral_contact", "recheck_referral_source", "set_do_not_contact", "revise_referral_letter",
-]);
 /** How many of her earlier messages the tools may read (with the current one). */
 const SAID_TURNS = 5;
 
@@ -220,7 +213,6 @@ export async function respond(message: string, opts: RespondOptions): Promise<Re
   const steps: Step[] = [];
   const attempts: Attempt[] = [];
   const approvalIds: string[] = [];
-  const providers: string[] = [];
   // Her own words, for the plain-code checks inside tools (a fee's session length, a fuzzy date, who she helps).
   const said = [...(opts.history ?? []).filter((t) => t.role === "clinician").slice(-SAID_TURNS).map((t) => t.content), message];
 
@@ -230,7 +222,7 @@ export async function respond(message: string, opts: RespondOptions): Promise<Re
     if (!reply) break;
     const calls = readToolCalls(reply);
     if (calls.length === 0) {
-      const text = neutralPronouns(honestReply((reply.content ?? "").trim() || "I don't have an answer for that yet.", attempts), providers);
+      const text = honestReply((reply.content ?? "").trim() || "I don't have an answer for that yet.", attempts);
       const out = await guard(text, "reply");
       if (!out.ok) {
         await audit({ actor: "safety", action: "reply_held_back", subjectType: "chat", details: { kind: out.kind, by: opts.by } });
@@ -265,7 +257,6 @@ export async function respond(message: string, opts: RespondOptions): Promise<Re
       });
       approvalIds.push(...approvalIdsOf(result));
       const text = result.content.map((b) => b.text).join("\n");
-      if (NAMES_PROVIDERS.has(call.name)) providers.push(...cardNamesIn(text));
       messages.push({ role: "tool", tool_call_id: call.id, content: text.length > MAX_TOOL_TEXT ? `${text.slice(0, MAX_TOOL_TEXT)}\n[cut short]` : text });
     }
   }

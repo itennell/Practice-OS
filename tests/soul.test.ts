@@ -13,6 +13,7 @@ describe("aeon/SOUL.md", () => {
     ["crisis line", /988/],
     ["emergency", /911/],
     ["memories are data", /never instructions/i],
+    ["no guessed pronouns for providers", /Never guess a provider's pronouns[^\n]*by name, or "they"/],
   ])("keeps the rule: %s", (_name, pattern) => {
     expect(text).toMatch(pattern);
   });

@@ -7,6 +7,12 @@
 import { afterAll, describe, expect, it, vi } from "vitest";
 
 vi.mock("../lib/aeon/guard", async (orig) => ({ ...(await orig<typeof import("../lib/aeon/guard")>()), guard: vi.fn(async (t: string) => ({ ok: true, text: t })) }));
+// Flip to make reading her saved fees fail (set_fees' preflight has to answer, not throw).
+const feesDown = vi.hoisted(() => ({ on: false }));
+vi.mock("../lib/gfe/store", async (orig) => {
+  const real = await orig<typeof import("../lib/gfe/store")>();
+  return { ...real, loadPracticeSettings: async (...a: Parameters<typeof real.loadPracticeSettings>) => (feesDown.on ? Promise.reject(new Error("database is down")) : real.loadPracticeSettings(...a)) };
+});
 
 import { loadEnv } from "../lib/env";
 import { DANA_PROFILE } from "../lib/credentialing/demo";
@@ -15,16 +21,17 @@ import { getForm, prepare } from "../lib/client-forms";
 import { DEFAULT_POLICIES } from "../lib/client-forms/types";
 import { askedFor, checkFacts, focusGroups, type LetterFacts } from "../lib/referrals/outreach";
 import { FOCUS_WORDS } from "../lib/referrals/tier";
-import { cardNamesIn, familyName, neutralPronouns } from "../lib/referrals/pronouns";
 import { choiceOf, resolveExact, whatItSays } from "../lib/aeon/tools-referrals";
-import { businessDaysSaid, lengthsNamed, sessionLengthQuestion, toPolicies } from "../lib/aeon/tools-settings";
+import { businessDaysSaid, feeLines, lengthsNamed, replySentence, resolveFees, sessionLengthQuestion, toPolicies } from "../lib/aeon/tools-settings";
+import { applyFees } from "../lib/aeon/tools-settings";
+import { replyFields } from "../lib/client-forms/types";
 import type { ReferralSource } from "../lib/referrals/store";
 
 loadEnv();
 const hasDb = Boolean(process.env.DATABASE_URL);
 
 const { closeDb, db } = await import("../lib/db");
-const { blanksToAsk, callKey, fuzzyDateCheck, runTool } = await import("../lib/aeon/tools");
+const { blanksToAsk, callKey, contactDay, contactSentence, dayFromWords, runTool } = await import("../lib/aeon/tools");
 const { suppress } = await import("../lib/referrals/contacts");
 const { outreachPlan } = await import("../lib/referrals/plan");
 const { writeLetter } = await import("../lib/referrals/outreach");
@@ -85,8 +92,37 @@ describe("what she asked a letter to say (plain code)", () => {
     const asked = askedFor("mention Cigna", FACTS, null);
     expect(asked.find((a) => /Cigna/.test(a.what))).toMatchObject({ allowed: false, why: expect.stringMatching(/isn't in network/) });
   });
-  it("'drop the sliding scale' drops it", () => {
-    expect(askedFor("drop the sliding scale", FACTS, OLD_LETTER).some((a) => a.what === "sliding scale")).toBe(false);
+  it("'drop the sliding scale' drops it, and says so in left_out", () => {
+    expect(askedFor("drop the sliding scale", FACTS, OLD_LETTER).filter((a) => a.what === "sliding scale")).toEqual([
+      { what: "sliding scale", allowed: false, why: "she asked to take it out" },
+    ]);
+  });
+  it("splits her request into clauses: 'mention Aetna but not BCBS, and add my sliding scale'", () => {
+    const asked = askedFor("mention Aetna but not BCBS, and add my sliding scale", FACTS, null);
+    expect(asked.map((a) => [a.what, a.allowed])).toEqual([
+      ["Aetna (commercial, behavioral health)", true],
+      ["sliding scale", true],
+      ["Blue Cross and Blue Shield of Illinois (BCBSIL)", false],
+      ["who she helps (new and expecting parents)", true],
+    ]);
+    expect(asked.find((a) => a.what.startsWith("Blue Cross"))!.why).toBe("she asked to take it out");
+  });
+  it("a negated sentence never counts as saying it", () => {
+    const asked = askedFor("mention Aetna and my sliding scale and my years", FACTS, null);
+    const says = (what: string, letter: string) => asked.find((a) => a.what === what)!.says!(letter);
+    expect(says("Aetna (commercial, behavioral health)", "I'm in network with Aetna.")).toBe(true);
+    expect(says("Aetna (commercial, behavioral health)", "I'm not in network with Aetna.")).toBe(false);
+    expect(says("sliding scale", "I offer a sliding scale.")).toBe(true);
+    expect(says("sliding scale", "I don't offer a sliding scale.")).toBe(false);
+    expect(says("sliding scale", "I no longer have a sliding scale.")).toBe(false);
+    expect(says("6 years in practice", "I have practiced 6 years.")).toBe(true);
+    expect(says("6 years in practice", "It isn't 6 years yet.")).toBe(false);
+  });
+  it("years: '5-year-old', 'year-long' and '1-year follow-up' aren't years in practice", () => {
+    expect(checkFacts("I see parents of 5-year-olds and a 2-year-old.", FACTS)).toEqual({ ok: true });
+    expect(checkFacts("Our 3-year-long group and the 1-year follow-up visit.", FACTS)).toEqual({ ok: true });
+    expect(checkFacts("Parents of children 4 years old.", FACTS)).toEqual({ ok: true });
+    expect(checkFacts("I have 5 years in practice.", FACTS)).toEqual({ ok: false, reason: "She has practiced 6 years; don't say any other number of years." });
   });
   it("names a pending plan only as pending; 5 years (or 5-year) never passes for 6", () => {
     expect(checkFacts("I'm in network with Aetna and BCBS.", FACTS)).toMatchObject({ ok: false, reason: expect.stringMatching(/pending/) });
@@ -104,42 +140,51 @@ describe("what she asked a letter to say (plain code)", () => {
 
 // ---- 4. letters name who she helps ---------------------------------------------------------------
 describe("who she helps reaches the letter", () => {
-  it("'new moms' in the chat becomes the group 'new and expecting parents'", () => {
-    expect(focusGroups("find OBs near me for new moms", [])).toEqual(["perinatal"]);
+  it("comes from her profile and her own 'I work with / I help / I see' words, never search words", () => {
+    expect(focusGroups("find OBs near me for new moms", [])).toEqual([]);
+    expect(focusGroups("I work with new moms.", [])).toEqual(["perinatal"]);
+    expect(focusGroups("I help couples and I see teens.", ["adults"])).toEqual(["adults", "teens", "couples"]);
+    expect(focusGroups("I don't see new moms.", ["perinatal", "adults"])).toEqual(["adults"]);
+    expect(focusGroups("I see adults, but I don't work with teens.", ["teens"])).toEqual(["adults"]);
     expect(FOCUS_WORDS.perinatal).toBe("new and expecting parents");
-    const asked = askedFor(null, FACTS, null);
-    const who = asked.find((a) => a.what.startsWith("who she helps"))!;
+    const who = askedFor(null, FACTS, null).find((a) => a.what.startsWith("who she helps"))!;
     expect(who.says!("I work with new and expecting parents.")).toBe(true);
+    expect(who.says!("I don't work with new and expecting parents.")).toBe(false);
     expect(who.says!("I work with adults.")).toBe(false);
   });
 });
 
-// ---- 6. fuzzy dates ------------------------------------------------------------------------------
-describe("fuzzy dates are confirmed, never silent", () => {
-  it("'yesterday-ish' comes back with the date it reads as; an exact day or a confirmed one goes on", async () => {
-    const r = await fuzzyDateCheck({ happened_on: "2026-11-01", date_words: "yesterday-ish" }, {});
-    expect(body(r!)).toMatchObject({ logged: false, needs_confirmation: expect.stringMatching(/Sunday, November 1, 2026 \(2026-11-01\)/) });
-    const fromHerWords = await fuzzyDateCheck({ happened_on: "2026-11-01" }, { said: ["I called Dr. Rivera yesterday-ish"] });
-    expect(fromHerWords).not.toBeNull();
-    expect(await fuzzyDateCheck({ happened_on: "2026-11-01", date_words: "yesterday" }, {})).toBeNull();
-    expect(await fuzzyDateCheck({ happened_on: "2026-11-01", date_words: "yesterday-ish", date_confirmed: true }, {})).toBeNull();
+// ---- 6. dates from her words --------------------------------------------------------------------
+describe("the day a contact is logged for comes from her words", () => {
+  const TODAY = "2026-11-02"; // a Monday
+  it("reads today, yesterday, a weekday and last <weekday> in plain code", () => {
+    expect(dayFromWords("I called them today", TODAY)).toEqual({ day: "2026-11-02", ambiguous: false });
+    expect(dayFromWords("I called them yesterday", TODAY)).toEqual({ day: "2026-11-01", ambiguous: false });
+    expect(dayFromWords("we met on Thursday", TODAY)).toEqual({ day: "2026-10-29", ambiguous: false });
+    expect(dayFromWords("we met on Monday", TODAY)).toEqual({ day: "2026-11-02", ambiguous: false });
+    expect(dayFromWords("I emailed last Monday", TODAY)).toEqual({ day: "2026-10-26", ambiguous: true });
+    expect(dayFromWords("no day here", TODAY)).toBeNull();
   });
-});
-
-// ---- 7. they / name ------------------------------------------------------------------------------
-describe("providers are 'they' in the reply", () => {
-  it("he/his/him and she/her after a provider's name become they/their/them", () => {
-    const names = cardNamesIn(JSON.stringify({ cards: [{ name: "[Sample] Ann Johnson, MD" }] }));
-    expect(familyName(names[0])).toBe("Johnson");
-    const out = neutralPronouns(
-      "Dr. Johnson is a good fit. He'll see new parents, he sees kids too and his office is close. Call him or email her office.\nYou have 3 follow-ups; she said hi.",
-      names,
+  it("logs the day her words name, and asks 'I read that as ...' when fuzzy, ambiguous or different", () => {
+    expect(contactDay({}, ["I called Dr. Rivera yesterday."], TODAY)).toEqual({ day: "2026-11-01" });
+    expect(contactDay({ happened_on: "2026-11-01" }, ["I called Dr. Rivera yesterday."], TODAY)).toEqual({ day: "2026-11-01" });
+    const fuzzy = contactDay({ happened_on: "2026-11-01" }, ["I called Dr. Rivera yesterday-ish"], TODAY);
+    expect("ask" in fuzzy && body(fuzzy.ask)).toEqual({
+      logged: false,
+      needs_confirmation:
+        'I read that as Sunday, November 1, 2026 (2026-11-01). Her words ("yesterday-ish") aren\'t an exact day. Nothing is logged until she confirms that date (date_confirmed: true) or gives another.',
+    });
+    const last = contactDay({}, ["I emailed them last Monday"], TODAY);
+    expect("ask" in last && body(last.ask).needs_confirmation).toBe(
+      'I read that as Monday, October 26, 2026 (2026-10-26). "last Monday" could mean this week or the week before. Nothing is logged until she confirms that date (date_confirmed: true) or gives another.',
     );
-    expect(out).toBe(
-      "Dr. Johnson is a good fit. They'll see new parents, they see kids too and their office is close. Call them or email their office.\nYou have 3 follow-ups; she said hi.",
-    );
-    expect(neutralPronouns("He is in network.", names)).toBe("He is in network.");
-    expect(neutralPronouns("Dr. Johnson? She is in network and he has an opening.", names)).toBe("Dr. Johnson? They are in network and they have an opening.");
+    const wrong = contactDay({ happened_on: "2026-10-30" }, ["I called them yesterday"], TODAY);
+    expect("ask" in wrong && body(wrong.ask).needs_confirmation).toMatch(/^I read that as Sunday, November 1, 2026 \(2026-11-01\)\. The date passed \(2026-10-30\)/);
+    expect(contactDay({ happened_on: "2026-10-30", date_confirmed: true }, ["yesterday-ish"], TODAY)).toEqual({ day: "2026-10-30" });
+  });
+  it("reads only the sentence with the contact: 'smallish' elsewhere doesn't make it fuzzy", () => {
+    expect(contactSentence("It's a smallish office. I called them yesterday.")).toBe("I called them yesterday.");
+    expect(contactDay({}, ["It's a smallish office. I called them yesterday."], TODAY)).toEqual({ day: "2026-11-01" });
   });
 });
 
@@ -166,8 +211,29 @@ describe("a session fee goes to the length her words name, never the model's pic
     expect(sessionLengthQuestion(FEES, [{ code: "90837", dollars: 160 }], "45-minute sessions are $130")).toMatchObject({ ask_which: expect.any(Array) });
     expect(sessionLengthQuestion(FEES, [{ service: "intake", dollars: 150 }], "intake is $150")).toBeNull();
   });
-  it("with one session code saved, 'sessions' means that one", () => {
-    expect(sessionLengthQuestion([FEES[0], FEES[2]], [{ service: "follow_up", dollars: 130 }], "sessions are $130")).toBeNull();
+  it("with one session code saved, 'sessions' means that one, but a different named length asks", () => {
+    expect(resolveFees([FEES[0], FEES[2]], [{ service: "follow_up", dollars: 130 }], "sessions are $130")).toEqual({ changes: [{ code: "90837", dollars: 130 }] });
+    expect(resolveFees([FEES[0], FEES[2]], [{ service: "follow_up", dollars: 130 }], "45-minute sessions are $130")).toEqual({
+      ask: { ask_which: [{ code: "90837", label: "Therapy, 53 minutes or longer", now: "$175.00" }], why: "Her words name 90834, not 90837." },
+    });
+    expect(resolveFees([FEES[0], FEES[2]], [{ code: "90837", dollars: 130 }], "45-minute sessions are $130")).toMatchObject({ ask: { why: "Her words name 90834, not 90837." } });
+  });
+  it("ties each amount to its own length: '45-min $130 and 60-min $160'", () => {
+    const words = "45-min $130 and 60-min $160";
+    expect(resolveFees(FEES, [{ code: "90834", dollars: 130 }, { code: "90837", dollars: 160 }], words)).toEqual({
+      changes: [{ code: "90834", dollars: 130 }, { code: "90837", dollars: 160 }],
+    });
+    expect(resolveFees(FEES, [{ code: "90834", dollars: 160 }, { code: "90837", dollars: 130 }], words)).toMatchObject({ ask: { why: "She tied $130 to 90834, not $160." } });
+    expect(resolveFees(FEES, [{ service: "follow_up", dollars: 160 }], words)).toEqual({ changes: [{ code: "90837", dollars: 160 }] });
+  });
+  it("without her words (MCP or an approved re-run) a session fee needs its code", () => {
+    expect(resolveFees(FEES, [{ service: "follow_up", dollars: 130 }], undefined)).toMatchObject({ ask: { why: "Without her own words, a session fee needs its CPT code (90832, 90834 or 90837)." } });
+    expect(resolveFees(FEES, [{ code: "90834", dollars: 130 }], undefined)).toEqual({ changes: [{ code: "90834", dollars: 130 }] });
+  });
+  it("her approval shows the resolved code, label and old -> new fee", () => {
+    const r = resolveFees(FEES, [{ service: "follow_up", dollars: 130 }], "my 45 minute sessions are $130");
+    expect(r).toEqual({ changes: [{ code: "90834", dollars: 130 }] });
+    expect(feeLines(applyFees(FEES, (r as { changes: never[] }).changes).changed)).toBe("90834 Therapy, 38-52 minutes: $150.00 -> $130.00");
   });
 });
 
@@ -189,6 +255,20 @@ describe("reply time in business days stays business days", () => {
       expect(p.text, id).not.toMatch(/48 hours/);
       expect(p.check.missing, id).toEqual([]);
     }
+  });
+  it("reads business days only from the reply-time sentence; the editor sends one unit and clears the other", () => {
+    expect(replySentence("I'm closed 2 business days at Thanksgiving. I reply to messages within 1 business day.")).toBe("I reply to messages within 1 business day.");
+    expect(businessDaysSaid(replySentence("I'm closed 2 business days at Thanksgiving. Cancel 24 hours ahead."))).toBeNull();
+    expect(replyFields("hours", "48")).toEqual({ reply_within_hours: 48, reply_within_business_days: null });
+    expect(replyFields("business_days", "2")).toEqual({ reply_within_hours: null, reply_within_business_days: 2 });
+    expect(replyFields("hours", "")).toEqual({ reply_within_hours: null, reply_within_business_days: null });
+  });
+  it("set_practice_policies compares days whenever days are given", async () => {
+    const r = await runTool("set_practice_policies", { reply_within_business_days: 3 }, { by: BY, said: ["Reply within 2 business days"] });
+    expect(r.isError).toBe(true);
+    expect(JSON.parse(r.content[0].text).error).toBe("She said 2 business days. Call again with reply_within_business_days: 2 and no reply_within_hours. Nothing was saved.");
+    const closed = await runTool("set_practice_policies", { cancel_hours: 24 }, { by: BY, said: ["I'm closed 2 business days at Thanksgiving. Cancel 24 hours ahead."], viewOnly: true });
+    expect(closed.content[0].text).not.toMatch(/business day/);
   });
   it("set_practice_policies refuses hours when her words say business days", async () => {
     const r = await runTool("set_practice_policies", { reply_within_hours: 48 }, { by: BY, said: ["Reply within 2 business days"] });
@@ -353,6 +433,39 @@ describe.skipIf(!hasDb)("settings against the database", () => {
     expect(b.already_waiting).toBe(true);
     const [n] = await db()<{ n: number }[]>`select count(*)::int as n from practice_os.approvals where created_by = ${BY} and kind = 'aeon_action' and status = 'pending' and payload ->> 'tool' = 'set_fees'`;
     expect(n.n).toBe(1);
+  });
+
+  it("the queued approval shows and runs the resolved code, label and old -> new fee", async () => {
+    const r = body(await runTool("set_fees", { changes: [{ service: "follow_up", dollars: 125 }] }, { by: BY, mode: "manual", said: ["my 45 minute sessions are $125"] }));
+    const [row] = await db()<{ preview: { body: string }; payload: { args: unknown } }[]>`select preview, payload from practice_os.approvals where id = ${r.approval_id as string}`;
+    expect(row.payload.args).toEqual({ changes: [{ code: "90834", dollars: 125 }] });
+    expect(row.preview.body).toBe("Updated your fees. Aeon will run this once you approve it.\n90834 Therapy, 38-52 minutes: $150.00 -> $125.00");
+  });
+
+  it("only a pending approval counts as the same one; log_referral_contact is never deduped", async () => {
+    const args = { changes: [{ code: "90837", dollars: 190 }] };
+    const ctx = { by: BY, mode: "manual" as const, said: ["90837 is $190"] };
+    const a = body(await runTool("set_fees", args, ctx));
+    await db()`update practice_os.approvals set status = 'running', decided_at = now(), decided_by = 'test' where id = ${a.approval_id as string}`;
+    const b = body(await runTool("set_fees", args, ctx));
+    expect(b.approval_id).not.toBe(a.approval_id);
+    const id = await makeCard("[Sample] Rue Twicecalled, MD");
+    const logArgs = { source: id, kind: "called", happened_on: "2026-11-01", date_confirmed: true };
+    const one = body(await runTool("log_referral_contact", logArgs, { by: BY, mode: "manual" }));
+    const two = body(await runTool("log_referral_contact", logArgs, { by: BY, mode: "manual" }));
+    expect(one.waiting_for_her).toBe(true);
+    expect(two.approval_id).not.toBe(one.approval_id);
+  });
+
+  it("set_fees answers plainly when her saved fees can't be read", async () => {
+    feesDown.on = true;
+    try {
+      const r = await runTool("set_fees", { changes: [{ code: "90834", dollars: 130 }] }, { by: BY, mode: "manual", said: ["45-minute sessions are $130"] });
+      expect(r.isError).toBe(true);
+      expect(JSON.parse(r.content[0].text)).toEqual({ ok: false, saved: false, error: "Couldn't read her saved fees, so nothing was changed. database is down" });
+    } finally {
+      feesDown.on = false;
+    }
   });
 
   it("a privacy notice without its date asks for that date in the chat, saves it, then the blank is gone", async () => {

@@ -93,6 +93,15 @@ export const policiesSchema = z
   .strict();
 export type Policies = z.infer<typeof policiesSchema>;
 
+export type ReplyUnit = "hours" | "business_days";
+
+/** The two reply-time fields from the editor's box and unit: one is set, the other is always cleared; an empty box clears both. */
+export function replyFields(unit: ReplyUnit, value: string): { reply_within_hours: number | null; reply_within_business_days: number | null } {
+  const n = Math.round(Number(value));
+  if (!value || !(n >= 1)) return { reply_within_hours: null, reply_within_business_days: null };
+  return unit === "hours" ? { reply_within_hours: Math.min(168, n), reply_within_business_days: null } : { reply_within_hours: null, reply_within_business_days: Math.min(10, n) };
+}
+
 /** Marks a gap she has to fill. A form that still prints one can't be downloaded. */
 export const FILL_IN = "[fill in";
 export const fillIn = (what: string) => `${FILL_IN}: ${what}]`;

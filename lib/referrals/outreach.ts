@@ -72,12 +72,34 @@ export type LetterFacts = {
   her_log: { what: string; on: string; note: string | null }[];
 };
 
+// "I work with new moms", "I help couples", "I see teens": her own statements, never search words.
+const HELPS = /\bI(?:'m| am)?\s+(?:also\s+|mostly\s+|mainly\s+|only\s+)?(?:work(?:ing)? with|help(?:ing)?|see(?:ing)?|specializ(?:e|ing) in|focus(?:ing)? on|treat(?:ing)?)\b/i;
+const NOT_HELPS = /\bI(?:'m| am)?\s+(?:don'?t|do not|no longer|never|won'?t|will not|am not|'m not|stopped)\s+(?:work(?:ing)? with|help(?:ing)?|see(?:ing)?|specializ(?:e|ing) in|focus(?:ing)? on|treat(?:ing)?|taking)\b/i;
+
+/** The groups of people her own words say she helps (`yes`) and says she doesn't (`no`). */
+export function focusStated(words: string | null | undefined): { yes: Focus[]; no: Focus[] } {
+  const yes = new Set<Focus>();
+  const no = new Set<Focus>();
+  for (const clause of (words ?? "").split(/(?<=[.!?;])\s+|\n+|,\s*but\s+|\s+but\s+/i)) {
+    const neg = NOT_HELPS.exec(clause);
+    if (neg) {
+      for (const f of focusFrom(clause.slice(neg.index + neg[0].length))) no.add(f);
+      continue;
+    }
+    const pos = HELPS.exec(clause);
+    if (pos) for (const f of focusFrom(clause.slice(pos.index + pos[0].length))) yes.add(f);
+  }
+  return { yes: [...yes], no: [...no] };
+}
+
 /**
- * Who she helps, as groups of people: what she said in this chat ("new moms") first,
- * then her "Who you help" answer. Only the groups plain code knows reach the letter.
+ * Who she helps, as groups of people: her "Who you help" answer plus what she says in
+ * this chat in her own words ("I work with new moms"); "I don't see new moms" takes
+ * that group out. Search words never count. Only groups plain code knows reach the letter.
  */
 export function focusGroups(said: string | null | undefined, profileFocus: Focus[]): Focus[] {
-  return [...new Set([...focusFrom(said), ...profileFocus])];
+  const { yes, no } = focusStated(said);
+  return [...new Set([...profileFocus, ...yes])].filter((f) => !no.includes(f));
 }
 
 export async function letterFacts(
@@ -106,6 +128,7 @@ export async function letterFacts(
     sliding_scale: media?.slidingScale ?? null,
     who_she_helps: focus.map((f) => FOCUS_WORDS[f]),
     focus,
+    // Her own saved answer (Media › "How many years have you been in practice?"): the only source of years.
     years_in_practice: media?.answers.yearsInPractice ?? null,
     // Each note is checked again with the chat's full privacy check; one that fails never reaches Muse.
     her_log: await Promise.all(
@@ -121,10 +144,15 @@ const NUMBER_WORDS: Record<string, number> = {
   one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
   thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20, thirty: 30,
 };
-const YEARS = /\b(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty)\+?(?:\s+|-)(?:plus\s+)?years?\b|\b(?:a|over a|more than a)\s+decades?\b|\bdecades\b|\bsince\s+(?:19|20)\d\d\b/gi;
+const YEARS = /\b(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty)\+?(?:\s+|-)(?:plus\s+)?years?\b(?!-[A-Za-z]|\s+olds?\b|\s+follow-?ups?\b)|\b(?:a|over a|more than a)\s+decades?\b|\bdecades\b|\bsince\s+(?:19|20)\d\d\b/gi;
 /** A sentence that says an application is still waiting: the only way a plan she applied to may be named. */
 const PENDING_WORDS = /\b(?:pending|applied|application|in process|waiting to hear)\b/i;
-const sentences = (t: string) => t.split(/(?<=[.!?;])\s+|\n+/);
+/** Sentences, not cut at "Dr." or "St.". */
+const sentences = (t: string) => t.split(/(?<=[!?;]|(?<!\b(?:Dr|Mr|Ms|Mrs|Mx|St|Ave|Jr|Sr|Inc|vs))\.)\s+|\n+/);
+/** A sentence that says the opposite: "I'm not in network with Aetna" never counts as saying it. */
+const NEGATED = /\b(?:not|isn'?t|aren'?t|don'?t|doesn'?t|no longer|never)\b/i;
+/** Some sentence of the letter says it, plainly (no negation in that sentence). */
+const saysPlainly = (letter: string, test: (sentence: string) => boolean) => sentences(letter).some((x) => test(x) && !NEGATED.test(x));
 
 // Insurers a letter might name: every payer in the catalog (data/payers), by its
 // name and aliases. A one-word alias counts only when written as a name ("Aetna",
@@ -203,7 +231,9 @@ export type Asked = {
 const SLIDING = /\bsliding[- ]scale\b/i;
 const PRIVATE_PAY = /\bprivate(?:ly)?[- ]pay\w*|\bpay\w* (?:privately|themselves|out of pocket)|\bself[- ]pay\w*|\bout[- ]of[- ]pocket\b|\bsuperbills?\b/i;
 const YEARS_ASKED = /\byears?\b|\bexperience\b/i;
-const DROP = /\b(?:remove|drop|take out|cut|delete|don'?t (?:mention|say|include)|no longer|without|leave out|stop mentioning)\b/i;
+const DROP = /\b(?:remove|drop|take out|cut|delete|don'?t (?:mention|say|include)|no longer|without|leave out|stop mentioning|not)\b/i;
+/** Her request in clauses: "mention Aetna but not BCBS, and add my sliding scale" -> three. */
+const clauses = (t: string) => t.split(/\s*(?:[,;.!?\n]|\band\b|\bbut\b)\s*/i).filter(Boolean);
 
 function namesTerm(text: string, m: InsurerMatcher): boolean {
   return m.terms.some((t) => new RegExp(`(?<![A-Za-z])${escapeRe(t)}(?![A-Za-z])`, "i").test(text));
@@ -219,14 +249,14 @@ export function yearsSaid(text: string): number[] {
 /** One insurer as an item: in network, application pending, or not allowed. */
 function insurerItem(m: InsurerMatcher, facts: Pick<LetterFacts, "in_network" | "applied_pending">): Asked {
   const has = (list: string[]) => m.terms.some((t) => list.join(" | ").toLowerCase().includes(t.toLowerCase()));
-  if (has(facts.in_network)) return { what: m.name, allowed: true, hint: `say she is in network with ${m.name}`, says: (l) => insurersNamed(l, [m]).length > 0 };
+  if (has(facts.in_network)) return { what: m.name, allowed: true, hint: `say she is in network with ${m.name}`, says: (l) => saysPlainly(l, (x) => insurersNamed(x, [m]).length > 0) };
   if (has(facts.applied_pending)) {
     const others = facts.in_network.length ? `in network with ${facts.in_network.join(" and ")}; ` : "";
     return {
       what: `${m.name} (application pending)`,
       allowed: true,
       hint: `say her ${m.name} application is pending, e.g. "${others}${m.name} application pending"`,
-      says: (l) => sentences(l).some((x) => insurersNamed(x, [m]).length > 0 && PENDING_WORDS.test(x)),
+      says: (l) => saysPlainly(l, (x) => insurersNamed(x, [m]).length > 0 && PENDING_WORDS.test(x)),
     };
   }
   return { what: m.name, allowed: false, why: `she isn't in network with ${m.name} and hasn't applied, so the letter can't name them` };
@@ -243,28 +273,30 @@ export function askedFor(instruction: string | null | undefined, facts: LetterFa
   const add = (a: Asked) => {
     if (!out.some((x) => x.what === a.what)) out.push(a);
   };
-  const dropping = (test: (sentence: string) => boolean) => sentences(said).some((x) => DROP.test(x) && test(x));
+  const parts = clauses(said);
+  const dropping = (test: (clause: string) => boolean) => parts.some((x) => DROP.test(x) && test(x));
+  const adding = (test: (clause: string) => boolean) => parts.some((x) => !DROP.test(x) && test(x));
   const matchers = insurerMatchers();
-  for (const m of matchers.filter((m) => namesTerm(said, m))) if (!dropping((x) => namesTerm(x, m))) add(insurerItem(m, facts));
-  if (SLIDING.test(said) && !dropping((x) => SLIDING.test(x))) {
+  for (const m of matchers) if (adding((x) => namesTerm(x, m)) && !dropping((x) => namesTerm(x, m))) add(insurerItem(m, facts));
+  if (adding((x) => SLIDING.test(x)) && !dropping((x) => SLIDING.test(x))) {
     add(
       facts.sliding_scale === true
-        ? { what: "sliding scale", allowed: true, hint: "say she offers a sliding scale (no amounts)", says: (l) => SLIDING.test(l) }
+        ? { what: "sliding scale", allowed: true, hint: "say she offers a sliding scale (no amounts)", says: (l) => saysPlainly(l, (x) => SLIDING.test(x)) }
         : { what: "sliding scale", allowed: false, why: "her records don't say she offers a sliding scale" },
     );
   }
-  if (PRIVATE_PAY.test(said) && !dropping((x) => PRIVATE_PAY.test(x))) {
+  if (adding((x) => PRIVATE_PAY.test(x)) && !dropping((x) => PRIVATE_PAY.test(x))) {
     add(
       facts.private_pay
-        ? { what: "private pay", allowed: true, hint: "say she also sees clients who pay privately (no amounts)", says: (l) => PRIVATE_PAY.test(l) }
+        ? { what: "private pay", allowed: true, hint: "say she also sees clients who pay privately (no amounts)", says: (l) => saysPlainly(l, (x) => PRIVATE_PAY.test(x)) }
         : { what: "private pay", allowed: false, why: "she hasn't listed fees for clients who pay themselves" },
     );
   }
   const n = facts.years_in_practice;
-  if (YEARS_ASKED.test(said) && !dropping((x) => YEARS_ASKED.test(x))) {
+  if (adding((x) => YEARS_ASKED.test(x)) && !dropping((x) => YEARS_ASKED.test(x))) {
     add(
       n !== null
-        ? { what: `${n} years in practice`, allowed: true, hint: `say she has practiced ${n} years (exactly ${n})`, says: (l) => yearsSaid(l).includes(n) }
+        ? { what: `${n} years in practice`, allowed: true, hint: `say she has practiced ${n} years (exactly ${n})`, says: (l) => saysPlainly(l, (x) => yearsSaid(x).includes(n)) }
         : { what: "years in practice", allowed: false, why: "her profile doesn't say how many years she has practiced" },
     );
   }
@@ -272,25 +304,30 @@ export function askedFor(instruction: string | null | undefined, facts: LetterFa
     for (const m of insurersNamed(previous, matchers)) {
       if (dropping((x) => namesTerm(x, m))) continue;
       const a = insurerItem(m, facts);
-      if (a.allowed) add(a);
+      add(a.allowed ? a : { ...a, why: `the old letter named ${m.name}, but ${a.why}` });
     }
     if (SLIDING.test(previous) && facts.sliding_scale === true && !dropping((x) => SLIDING.test(x))) {
-      add({ what: "sliding scale", allowed: true, hint: "keep that she offers a sliding scale", says: (l) => SLIDING.test(l) });
+      add({ what: "sliding scale", allowed: true, hint: "keep that she offers a sliding scale", says: (l) => saysPlainly(l, (x) => SLIDING.test(x)) });
     }
     if (PRIVATE_PAY.test(previous) && facts.private_pay && !dropping((x) => PRIVATE_PAY.test(x))) {
-      add({ what: "private pay", allowed: true, hint: "keep that she sees clients who pay privately", says: (l) => PRIVATE_PAY.test(l) });
+      add({ what: "private pay", allowed: true, hint: "keep that she sees clients who pay privately", says: (l) => saysPlainly(l, (x) => PRIVATE_PAY.test(x)) });
     }
     if (n !== null && yearsSaid(previous).includes(n) && !dropping((x) => YEARS_ASKED.test(x))) {
-      add({ what: `${n} years in practice`, allowed: true, hint: `keep "${n} years" exactly`, says: (l) => yearsSaid(l).includes(n) });
+      add({ what: `${n} years in practice`, allowed: true, hint: `keep "${n} years" exactly`, says: (l) => saysPlainly(l, (x) => yearsSaid(x).includes(n)) });
     }
   }
+  // What she asked to take out is reported as left out, so the reply says it plainly.
+  for (const m of matchers) if (dropping((x) => namesTerm(x, m))) add({ what: m.name, allowed: false, why: "she asked to take it out" });
+  if (dropping((x) => SLIDING.test(x))) add({ what: "sliding scale", allowed: false, why: "she asked to take it out" });
+  if (dropping((x) => PRIVATE_PAY.test(x))) add({ what: "private pay", allowed: false, why: "she asked to take it out" });
+  if (dropping((x) => YEARS_ASKED.test(x))) add({ what: "years in practice", allowed: false, why: "she asked to take it out" });
   // Who she helps: every letter names the group (never a client).
   if (facts.focus.length) {
     add({
       what: `who she helps (${facts.who_she_helps.join(", ")})`,
       allowed: true,
       hint: `say who she helps: ${facts.who_she_helps.join(", ")} (groups of people, never a client)`,
-      says: (l) => focusFrom(l).some((f) => facts.focus.includes(f)),
+      says: (l) => saysPlainly(l, (x) => focusFrom(x).some((f) => facts.focus.includes(f))),
     });
   }
   return out;

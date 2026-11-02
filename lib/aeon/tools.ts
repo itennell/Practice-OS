@@ -117,6 +117,8 @@ export type AeonTool = {
    * session length). Null lets the call go on. Skipped when she already approved the call.
    */
   preflight?: (input: never, ctx: ToolContext) => Promise<ToolResult | null>;
+  /** What her approval shows and runs, when it differs from the raw call (set_fees resolves "sessions" to its code). */
+  forApproval?: (input: never, ctx: ToolContext) => Promise<{ args: unknown; shows: string } | null>;
 };
 
 const text = (value: unknown): ToolResult => ({ content: [{ type: "text", text: JSON.stringify(value, null, 2) }] });
@@ -261,21 +263,69 @@ export const longDay = (iso: string) =>
 export const FUZZY_DATE =
   /\b[a-z]+-ish\b|\bor so\b|\bthe other day\b|\b(?:a few|a couple(?: of)?|several) days ago\b|\bsome ?time\b|\b(?:earlier|sometime) this week\b|\blast week\b|\b(?:around|about|roughly|maybe|probably) (?:yesterday|today|last|monday|tuesday|wednesday|thursday|friday|saturday|sunday|the \d)/i;
 
-/** A fuzzy date never becomes a day silently: the parsed date comes back for her to confirm. */
+const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+const addDaysIso = (iso: string, n: number) => new Date(Date.parse(`${iso}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+/** The words that say she did something with a referral source: the date check reads only that sentence. */
+const CONTACT_EVENT = /\b(?:call(?:ed)?|phoned|email(?:ed)?|e-mailed|met|meet|sent|mailed|dropped off|spoke|talked|left (?:a )?(?:message|voicemail)|replied|heard back|wrote|texted|visited|referred|faxed)\b/i;
+
+/** The sentence of her message that tells the contact ("I called Dr. Rivera yesterday-ish"), or null. */
+export function contactSentence(message: string): string | null {
+  return message.split(/(?<=[!?;]|(?<!\b(?:Dr|Mr|Ms|Mrs|Mx|St|Ave|Jr|Sr|Inc|vs))\.)\s+|\n+/).find((x) => CONTACT_EVENT.test(x)) ?? null;
+}
+
+/**
+ * Plain code reads the day from her words: today, yesterday, the day before yesterday, "on
+ * Tuesday" (the most recent one) and "last Tuesday" (the same day, but ambiguous: it waits for
+ * her OK). Null when the words name no day.
+ */
+export function dayFromWords(words: string, today: string): { day: string; ambiguous: boolean } | null {
+  if (/\bday before yesterday\b/i.test(words)) return { day: addDaysIso(today, -2), ambiguous: false };
+  if (/\byesterday\b/i.test(words)) return { day: addDaysIso(today, -1), ambiguous: false };
+  if (/\btoday\b|\bthis morning\b|\bthis afternoon\b|\bearlier today\b/i.test(words)) return { day: today, ambiguous: false };
+  const m = /\b(last\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/i.exec(words);
+  if (!m) return null;
+  const now = new Date(`${today}T12:00:00Z`).getUTCDay();
+  const want = WEEKDAYS.indexOf(m[2].toLowerCase());
+  const back = (now - want + 7) % 7 || (m[1] ? 7 : 0);
+  return { day: addDaysIso(today, -back), ambiguous: Boolean(m[1]) };
+}
+
+/**
+ * The day a contact is logged for, from her own words, never the model's guess. A fuzzy or
+ * ambiguous day, or a day that isn't the one her words name, comes back to ask:
+ * "I read that as ...". `day` is the day to log when it's clear.
+ */
+export function contactDay(
+  input: { happened_on?: string; date_words?: string; date_confirmed?: boolean },
+  said: string[] | undefined,
+  today: string,
+): { ask: ToolResult } | { day: string | undefined } {
+  if (input.date_confirmed) return { day: input.happened_on };
+  const sentence = said?.length ? contactSentence(said.at(-1)!) : null;
+  const words = sentence ?? input.date_words ?? "";
+  const parsed = dayFromWords(words, today) ?? (input.date_words ? dayFromWords(input.date_words, today) : null);
+  const fuzzy = FUZZY_DATE.test(words) || (!sentence && FUZZY_DATE.test(input.date_words ?? ""));
+  const day = parsed?.day ?? input.happened_on ?? today;
+  const ask = (why: string) => ({
+    ask: text({
+      logged: false,
+      needs_confirmation: `I read that as ${longDay(day)} (${day}). ${why} Nothing is logged until she confirms that date (date_confirmed: true) or gives another.`,
+    }),
+  });
+  if (fuzzy) return ask(`Her words ("${(words.match(FUZZY_DATE)?.[0] ?? input.date_words ?? "").trim()}") aren't an exact day.`);
+  if (parsed?.ambiguous) return ask(`"${words.match(/last\s+\w+day/i)?.[0] ?? "last week's day"}" could mean this week or the week before.`);
+  if (parsed && input.happened_on && input.happened_on !== parsed.day) return ask(`The date passed (${input.happened_on}) isn't the day her words name.`);
+  return { day: parsed?.day ?? input.happened_on };
+}
+
+/** contactDay with the practice's today. */
 export async function fuzzyDateCheck(
   input: { happened_on?: string; date_words?: string; date_confirmed?: boolean },
   ctx: Pick<ToolContext, "said">,
+  today?: string,
 ): Promise<ToolResult | null> {
-  if (input.date_confirmed) return null;
-  const words = input.date_words ?? "";
-  const latest = ctx.said?.at(-1) ?? "";
-  const phrase = words.match(FUZZY_DATE)?.[0] ?? latest.match(FUZZY_DATE)?.[0];
-  if (!phrase) return null;
-  const day = input.happened_on ?? (await practiceToday());
-  return text({
-    logged: false,
-    needs_confirmation: `She said "${words || phrase}", which isn't an exact day; it reads as ${longDay(day)} (${day}). Nothing is logged until she confirms that date (date_confirmed: true) or gives another.`,
-  });
+  const r = contactDay(input, ctx.said, today ?? (await practiceToday()));
+  return "ask" in r ? r.ask : null;
 }
 
 /** The card a log entry is for: by id or by name; no match or several answer at once. */
@@ -1157,7 +1207,7 @@ export const TOOLS: AeonTool[] = [
       "(the card's I sent it button, or log_referral_contact with sent_letter). Uses her real phone, email, in-network plans and " +
       "her log notes for this card. If a letter to them is already waiting, it is rewritten in place; to change a waiting letter " +
       "('make it shorter') use revise_referral_letter. Tell her what `included` and `left_out` say, never more. 'Letters for my top 3': pass top: 3 (never ids you picked), and the letters go to the " +
-      "first 3 of referral_outreach_plan's ranked list. The letter names who she helps (groups of people, from her profile and this chat's search). " +
+      "first 3 of referral_outreach_plan's ranked list. The letter names who she helps (groups of people, from her profile and what she says in this chat). " +
       "Takes about 10 seconds a letter.",
     input: {
       id: z.string().uuid().optional().describe("The referral source's id, from find_referral_sources or list_referral_sources."),
@@ -1168,15 +1218,14 @@ export const TOOLS: AeonTool[] = [
         .optional()
         .describe("With top: only these kinds of provider, when she named them (as for referral_outreach_plan)."),
       note: z.string().trim().max(500).optional().describe("Anything she wants the letter to mention, in her words."),
-      focus: z.string().trim().max(200).optional().describe("Who she said she helps in this chat, in her words ('new moms'). Groups of people only, never a client."),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: false },
     label: "Drafted an introduction letter",
     changesData: false,
-    run: async ({ id, top, specialties, note, focus }, ctx) => {
+    run: async ({ id, top, specialties, note }, ctx) => {
       if (Boolean(id) === Boolean(top)) return { content: [{ type: "text", text: "Pass either id (one card) or top (the first N of this week's plan)." }], isError: true };
-      // Who she helps: what she said in the tool call, then her own words in this chat (plain code keeps only groups of people).
-      const stated = [focus, ...(ctx.said ?? [])].filter(Boolean).join("\n");
+      // Who she helps: her profile, plus her own "I work with / I help / I see" statements in this chat (never search words).
+      const stated = (ctx.said ?? []).join("\n");
       const opts = { by: ctx.by, note, focus: stated || null, ...(ctx.chat ? { chat: ctx.chat as unknown as Parameters<typeof draftOutreach>[1]["chat"] } : {}) };
       if (top) {
         // "My top 3" is the plan's ranked order, never a pick of the model's.
@@ -1282,12 +1331,14 @@ export const TOOLS: AeonTool[] = [
       const found = logCard(source, await listSources());
       if (found.result) return found.result;
       const card = found.card!;
+      let day = happened_on;
       if (!ctx.approved) {
-        const fuzzy = await fuzzyDateCheck({ happened_on, date_words, date_confirmed }, ctx);
-        if (fuzzy) return fuzzy;
+        const read = contactDay({ happened_on, date_words, date_confirmed }, ctx.said, await practiceToday());
+        if ("ask" in read) return read.ask;
+        day = read.day;
       }
       try {
-        const r = await logContact(card.id, { kind, happenedOn: happened_on, note, followUpOn: follow_up_on, by: "aeon" });
+        const r = await logContact(card.id, { kind, happenedOn: day, note, followUpOn: follow_up_on, by: "aeon" });
         return text({
           logged: true,
           name: card.name,
@@ -1820,18 +1871,18 @@ export function callKey(tool: string, args: unknown): string {
 }
 
 /** One aeon_action approval per identical call: a second ask for the same change returns the one already waiting. */
-async function queueCallOnce(tool: AeonTool, args: unknown, ctx: ToolContext, body: string) {
+/** Tools whose same call can rightly happen twice (she called the same office twice): never deduped. */
+const REPEATABLE = new Set(["log_referral_contact"]);
+
+async function queueCallOnce(tool: AeonTool, input: unknown, ctx: ToolContext, body: string) {
+  // A tool may show what will really change (set_fees: the code, its label, old and new fee) and queue exactly that.
+  const shown = tool.forApproval ? await tool.forApproval(input as never, ctx) : null;
+  const args = shown?.args ?? input;
+  const said = shown?.shows ? `${body}\n${shown.shows}` : body;
   const call_key = callKey(tool.name, args);
-  return queueApprovalOnce(
-    {
-      kind: "aeon_action",
-      title: tool.title,
-      preview: { body, tool: tool.name, args },
-      payload: { tool: tool.name, args, call_key },
-      createdBy: ctx.by,
-    },
-    { payloadField: "call_key", value: call_key },
-  );
+  const approval = { kind: "aeon_action" as const, title: tool.title, preview: { body: said, tool: tool.name, args }, payload: { tool: tool.name, args, call_key }, createdBy: ctx.by };
+  if (REPEATABLE.has(tool.name)) return { id: await queueApproval(approval), created: true };
+  return queueApprovalOnce(approval, { payloadField: "call_key", value: call_key }, ["pending"]);
 }
 
 /** The one way to call a tool, from MCP or the chat. */
