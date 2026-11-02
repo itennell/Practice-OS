@@ -2,6 +2,7 @@ import { connection } from "next/server";
 import { z } from "zod";
 import { BY, refuse } from "@/lib/studio/http";
 import { standInDeps } from "@/lib/studio/standin";
+import { regenerateProject } from "@/lib/studio/regenerate";
 import { listProjects, makeProject, type MakeEvent } from "@/lib/studio/store";
 
 export async function GET() {
@@ -9,7 +10,8 @@ export async function GET() {
   return Response.json({ projects: await listProjects() });
 }
 
-const body = z.object({ request: z.string().trim().min(3).max(600) }).strict();
+// regenerate: a project's id, made again from her current facts (the "Facts changed" flag); its request is ignored.
+const body = z.object({ request: z.string().trim().min(3).max(600), regenerate: z.string().uuid().optional() }).strict();
 
 // Make something new from what she typed. The answer streams one JSON event per
 // line (lib/studio/store.ts MakeEvent) so the canvas fills in as Aeon works:
@@ -36,7 +38,9 @@ export async function POST(request: Request) {
         }
       };
       try {
-        await makeProject(BY, parsed.data.request, send, process.env.PLAYWRIGHT_STUDIO_STANDIN === "1" ? standInDeps() : {});
+        const deps = process.env.PLAYWRIGHT_STUDIO_STANDIN === "1" ? standInDeps() : {};
+        if (parsed.data.regenerate) await regenerateProject(BY, parsed.data.regenerate, send, deps);
+        else await makeProject(BY, parsed.data.request, send, deps);
       } catch (err) {
         // The details stay in the server log; the browser gets a plain sentence.
         console.error("studio make failed", err);

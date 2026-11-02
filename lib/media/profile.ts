@@ -77,6 +77,35 @@ const TITLE_WORDS: Record<string, string> = {
   Psychologist: "Licensed Clinical Psychologist",
 };
 
+/** Her own "who I help" answer; a [Sample] seed line is never hers, so it never reaches a box. */
+export function ownWho(f: { whoIHelp: string }): string {
+  return /\[sample\]/i.test(f.whoIHelp) ? "" : f.whoIHelp;
+}
+
+const JOINERS = new Set(["a", "an", "the", "in", "of", "and", "or", "to", "for", "with", "through", "going", "who", "are", "is"]);
+
+/**
+ * Two-word phrases from the demo's [Sample] seed text ("work stress", "life transitions")
+ * that a box may not use unless her own answers say them: a "warmer" rewrite once swapped
+ * her focus for the seed's words.
+ */
+export function seedPhrases(text: string, f: MediaFacts): string[] {
+  if (!/\[sample\]/i.test(f.whoIHelp)) return [];
+  const words = f.whoIHelp.replace(/\[sample\]/gi, "").toLowerCase().match(/[a-z][a-z'-]*/g) ?? [];
+  const hers = [f.answers.focus, f.answers.approach, f.answers.firstSession, f.answers.why, f.pt.topSpecialties.join(" ")].join(" ").toLowerCase();
+  const t = text.toLowerCase();
+  const out: string[] = [];
+  for (let i = 0; i + 1 < words.length; i++) {
+    if (JOINERS.has(words[i]) || JOINERS.has(words[i + 1])) continue;
+    const pair = `${words[i]} ${words[i + 1]}`;
+    if (t.includes(pair) && !hers.includes(pair)) out.push(pair);
+  }
+  return [...new Set(out)];
+}
+
+/** Any line about languages: with no languages answer, a box says nothing about them (not even "I don't speak other languages"). */
+const LANGUAGE_MENTION = /\b(?:languages?|bilingual|speak(?:s|ing)?|english|spanish|fluent)\b/i;
+
 function who(f: MediaFacts): string {
   const groups = f.whoIHelp
     .split(";")
@@ -151,7 +180,7 @@ function prompt(f: MediaFacts, retry?: string, tone?: string): string {
     "Use ONLY these facts. If a fact isn't here, leave it out. Never invent years, schools, insurers, prices, offers or approaches.",
     `- Fees: ${fees}.`,
     `- In network with: ${f.inNetwork.length ? `${f.inNetwork.join(", ")} (never say private pay or that she doesn't take insurance)` : "none (say a superbill is available on request for out-of-network benefits)"}. Superbills are on request: never say how often.`,
-    `- Sees: ${f.whoIHelp || "not given"}. In person in ${place(f)}${f.telehealth ? `, and online in ${stateName(f)}` : ""}.`,
+    `- Sees: ${ownWho(f) || "not given"}. In person in ${place(f)}${f.telehealth ? `, and online in ${stateName(f)}` : ""}.`,
     `- Free consult: ${a.freeConsultMinutes ? `${a.freeConsultMinutes} minutes` : "none: do not offer one"}. Years in practice: ${a.yearsInPractice ?? "not given: do not mention"}.`,
     `- Languages besides English: ${a.languages || "not given: never mention languages at all (not even English)"}.`,
     `- Education: ${f.education.join("; ") || "not given: never name a school or degree"}.`,
@@ -216,16 +245,30 @@ export function assemble(f: MediaFacts, muse: Partial<Record<PtTextId, string>> 
       const c = checkField(id, split.text, f, "aeon");
       c.findings.push(...split.notes.map((n) => ({ rule: "placeholder" as const, severity: "warn" as const, message: `Aeon's note, kept out of the box: ${n}` })));
       const casual = CASUAL.test(c.text);
-      if (c.text && !blocks(c.findings) && !casual) return c;
-      museFailed.push(`${id}: ${!c.text ? "too long" : casual ? "casual words copied from her answers" : c.findings.filter((x) => x.severity === "block").map((x) => x.rule).join(", ")}`);
+      const seed = seedPhrases(c.text, f);
+      const langs = !f.answers.languages && LANGUAGE_MENTION.test(c.text);
+      if (c.text && !blocks(c.findings) && !casual && !seed.length && !langs) return c;
+      museFailed.push(
+        `${id}: ${
+          !c.text
+            ? "too long"
+            : casual
+              ? "casual words copied from her answers"
+              : seed.length
+                ? `used words that aren't hers (${seed.join(", ")})`
+                : langs
+                  ? "mentioned languages, which she didn't give"
+                  : c.findings.filter((x) => x.severity === "block").map((x) => x.rule).join(", ")
+        }`,
+      );
     }
     return checkField(id, tpl[id], f, "template");
   });
-  // Every topic she gave stays in: what people come to her for, and how she works.
-  const all = () => fields.map((x) => x.text).join(" ");
+  // Every topic she gave stays in its own box: what people come to her for in statement_help
+  // (the search card), how she works in statement_approach. Another box naming it doesn't count.
   for (const [id, answer] of [["statement_help", f.answers.focus], ["statement_approach", f.answers.approach]] as const) {
     const i = fields.findIndex((x) => x.id === id);
-    const lost = droppedTerms(all(), answer);
+    const lost = droppedTerms(fields[i].text, answer);
     if (lost.length && fields[i].from === "aeon") {
       museFailed.push(`${id}: dropped her answers (${lost.join(", ")})`);
       fields = fields.map((x, j) => (j === i ? checkField(id, tpl[id], f, "template") : x));
@@ -245,7 +288,7 @@ export function picks(f: MediaFacts): Pick[] {
   add("fees", "Fees", f.fees.map((x) => `${x.label}: ${money(x.cents)}`).join("; "));
   add("insurance", "Insurance", f.inNetwork.length ? f.inNetwork.join(", ") : "Out of Network");
   add("free_consult", "Free consultation", f.answers.freeConsultMinutes ? `On (${f.answers.freeConsultMinutes} minutes)` : "Off");
-  add("client_focus", "Client focus: ages and participants", f.whoIHelp);
+  add("client_focus", "Client focus: ages and participants", ownWho(f));
   if (f.answers.languages) add("client_focus", "Client focus: I also speak", f.answers.languages);
   add("location", "Location", f.address ? `${f.address.street}, ${f.address.city}, ${f.address.state} ${f.address.zip}` : place(f));
   add("contact", "Phone and email", [f.phone, f.email].filter(Boolean).join(" · "));

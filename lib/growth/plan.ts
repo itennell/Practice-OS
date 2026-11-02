@@ -250,3 +250,24 @@ export const SAMPLE_INPUT: PlanInput = {
   target_weekly_sessions: 25,
   target_monthly_income_cents: 1_200_000,
 };
+
+/**
+ * The plan said in plain sentences, for the chat reply: what she needs, which panel to
+ * drop first, the 12-week goal, and what's still missing. A plan built on [Sample]
+ * numbers says so first; one still waiting on her numbers says which ones.
+ */
+export function planInWords(p: PrivatePayPlan): string {
+  const out: string[] = [];
+  if (p.sample) out.push("[Sample] These are sample numbers for the fictional demo practice, not yours.");
+  if (p.privateFeeCents) out.push(`Your private-pay fee is ${usd(p.privateFeeCents)} a session.`);
+  for (const x of p.panels) {
+    if (x.rateCents === null) continue;
+    out.push(
+      `${x.sample ? "[Sample] " : ""}${x.payer} pays ${usd(x.rateCents)} a session for ${x.weeklySessions} session${x.weeklySessions === 1 ? "" : "s"} a week${x.monthlyCents !== null ? `, about ${usd(x.monthlyCents)} a month` : ""}${x.clientsToReplace !== null ? `; ${x.clientsToReplace} private-pay client${x.clientsToReplace === 1 ? "" : "s"} would replace it` : ""}.`,
+    );
+  }
+  if (p.dropFirst) out.push(`Drop ${p.dropFirst.payer} first: ${p.dropFirst.why}`);
+  if (p.goalClients !== null) out.push(`The 12-week goal is ${p.goalClients} new private-pay client${p.goalClients === 1 ? "" : "s"}.`);
+  if (p.asks.length) out.push(`To finish the plan I need ${p.asks.length === 1 ? "one more number" : `${p.asks.length} more numbers`}. ${p.asks[0]}`);
+  return out.join(" ");
+}

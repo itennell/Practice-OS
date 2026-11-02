@@ -12,6 +12,7 @@ const MESSAGES = {
 
 export function decisionResponse(result: ApproveResult) {
   if (result.ok) return Response.json({ approval: result.approval });
+  if (result.reason === "facts_changed") return Response.json({ error: result.why, approval: result.approval ?? null }, { status: 409 });
   const { status, error } = MESSAGES[result.reason];
   return Response.json({ error, approval: result.approval ?? null }, { status });
 }

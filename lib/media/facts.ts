@@ -10,7 +10,7 @@ import { alertCrisis, checkCrisis, CRISIS_REPLY } from "../safety";
 import { guard, REFUSAL } from "../aeon/guard";
 import { loadCredentialingProfile } from "../credentialing/store";
 import { loadPracticeSettings } from "../gfe/store";
-import { listPayerApplications } from "../payers/store";
+import { listPayerApplications, WAITING } from "../payers/store";
 import { loadPolicies } from "../client-forms/store";
 import { parsePt, type PtAnswers } from "./pt-answers";
 
@@ -176,7 +176,9 @@ export async function loadMediaFacts(): Promise<MediaFacts> {
     email: cred?.identity.email ?? "",
     telehealth: Boolean(loc?.telehealth),
     fees: settings.fees.map((f) => ({ label: f.label, cents: f.cents })),
-    insurers: payers.filter((x) => x.status !== "denied" && x.status !== "withdrawn").map((x) => x.payer),
+    // Approved, or applied and waiting (applied, pending, follow_up). A plan she hasn't applied to
+    // yet (not_started, preparing) never reaches public copy, not even as "applying".
+    insurers: payers.filter((x) => x.status === "approved" || WAITING.includes(x.status)).map((x) => x.payer),
     inNetwork: payers.filter((x) => x.status === "approved").map((x) => x.payer),
     whoIHelp: typeof a.who_i_help === "string" ? a.who_i_help : "",
     website: typeof marketing.website_url === "string" ? marketing.website_url : null,

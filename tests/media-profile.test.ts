@@ -127,6 +127,51 @@ describe("profile drafts", () => {
     expect(g.text.length).toBeLessThanOrEqual(750);
     expect(g.text).not.toMatch(/\$\d/);
   });
+
+  describe("a 'warmer' rewrite", () => {
+    // The demo's seed "who I help" line is [Sample] text; her own focus is tech workers.
+    const f = {
+      ...DANA,
+      whoIHelp: "[Sample] Adults in Chicago going through work stress and life transitions",
+      answers: { ...DANA.answers, focus: "Anxiety and burnout in tech workers", languages: "" },
+    };
+    const warm = (help: string) => ({ ...templateFields(f), statement_help: help });
+
+    it("never uses the seed's words: the box falls back to her own", () => {
+      const { fields, museFailed } = assemble(f, warm("Feeling the weight of work stress and life transitions? I'm Dana Reyes, LCPC, in Lincoln Park, and I'd love to talk."));
+      const help = fields.find((x) => x.id === "statement_help")!;
+      expect(help.from).toBe("template");
+      expect(help.text).toMatch(/tech workers/);
+      expect(help.text).not.toMatch(/work stress|life transitions/);
+      expect(museFailed.join(" ")).toMatch(/work stress/);
+    });
+
+    it("keeps her focus words in the search-card box, even if another box names them", () => {
+      const muse = { ...warm("Feeling anxious and worn out? I'm Dana Reyes, LCPC, in Lincoln Park, and I'd love to talk."), note_top_specialties: "People come to me for anxiety and burnout in tech workers." };
+      const help = assemble(f, muse).fields.find((x) => x.id === "statement_help")!;
+      expect(help.text).toMatch(/tech workers/);
+    });
+
+    it("keeps a warm box that keeps her words", () => {
+      const help = assemble(f, warm("Anxiety or burnout from tech work? Many tech workers come to me. I'm Dana Reyes, LCPC, in Lincoln Park.")).fields.find((x) => x.id === "statement_help")!;
+      expect(help.from).toBe("aeon");
+    });
+
+    it("never says she speaks no other languages when she gave none", () => {
+      const muse = { ...templateFields(f), statement_about: "I'm Dana Reyes, LCPC. I do not speak other languages. I run Reyes Counseling PLLC in Lincoln Park." };
+      const about = assemble(f, muse).fields.find((x) => x.id === "statement_about")!;
+      expect(about.text).not.toMatch(/speak|languages/i);
+      expect(Object.values(templateFields(f)).join(" ")).not.toMatch(/speak|languages/i);
+    });
+
+    it("the prompt leaves the seed line out", async () => {
+      const chat = chatReturning(templateFields(f));
+      await draftProfile(f, { chat, tone: "warmer" });
+      const sent = JSON.stringify((chat as unknown as { mock: { calls: unknown[][] } }).mock.calls[0]);
+      expect(sent).not.toMatch(/work stress/);
+      expect(sent).toMatch(/tech workers/);
+    });
+  });
 });
 
 describe("website", async () => {

@@ -11,7 +11,7 @@
 // batch, its number and the parts, so "draft the second one" finds idea 2 of her
 // latest list even though chat history keeps only text.
 import { audit } from "../audit";
-import { insuranceLine } from "../media/truth";
+import { factSheet, insuranceLine, repairCopy, type TruthFacts } from "../media/truth";
 import { chat as metaChat } from "../meta";
 import { db } from "../db";
 import { codeCritic, type ChatFn } from "./critic";
@@ -68,7 +68,7 @@ export function fixedIdeas(f: Pick<PracticeFacts, "clinicianName" | "credential"
     first_session: {
       topic: "first_session",
       hook: "Wondering what your first session looks like?",
-      points: [`How long it lasts: ${FILL("length")}.`, "We go over a few forms and what you're looking for.", "You can ask any questions about how it works."],
+      points: [`How long it lasts: ${FILL("length")}.`, "I go over a few forms with you and ask what you're looking for.", "You can ask any questions about how it works."],
       cta: book,
     },
     fees_superbills: {
@@ -91,7 +91,7 @@ export function fixedIdeas(f: Pick<PracticeFacts, "clinicianName" | "credential"
     },
     office_telehealth: {
       topic: "office_telehealth",
-      hook: "Where we meet.",
+      hook: "Where sessions happen.",
       points: [`The office: ${where}.`, `Video sessions: ${FILL("whether you offer them, and where")}.`],
       cta: book,
     },
@@ -132,6 +132,7 @@ function prompt(f: PracticeFacts, prefs: InstagramPrefs, topics: PillarId[], cou
   return [
     `Suggest ${count} Instagram post ideas for this week for ${f.practiceName}, the private practice of ${f.clinicianName}, ${f.credential}, in ${[f.neighborhood, f.city].filter(Boolean).join(", ")}. This is a fictional demo practice.`,
     "Each idea: a hook (the opening line), 2 or 3 short points, a call to action such as how to book, and a suggested picture.",
+    ...(f.truth ? ["Practice facts. These are the only facts that exist; an idea may use them but never add or change one:", ...factSheet({ ...f.truth, fees: f.fees })] : []),
     "Practice logistics ONLY. Never: mental health advice, coping tips, symptoms, therapy techniques, any client story (real or made up), testimonials or reviews, promises of results, prices, or anything about suicide, self-harm or crisis.",
     `Use only these topics, spreading the ideas across them: ${topics.map((t) => `"${t}" (${PILLAR_BY_ID.get(t)!.label}: ${PILLAR_BY_ID.get(t)!.brief})`).join("; ")}.`,
     never,
@@ -144,21 +145,24 @@ function prompt(f: PracticeFacts, prefs: InstagramPrefs, topics: PillarId[], cou
 type Checked = { kept: Idea[]; dropped: number; blocked: boolean };
 
 /** Plain code decides: her topics only, the post rules, and her never-show list. */
-export function checkIdeas(raw: unknown[], opts: { topics: PillarId[]; neverShow: string[]; firstName?: string; feesCents: number[] }): Checked {
+export function checkIdeas(raw: unknown[], opts: { topics: PillarId[]; neverShow: string[]; firstName?: string; feesCents: number[]; truth?: TruthFacts }): Checked {
   const kept: Idea[] = [];
   let dropped = 0;
   for (const r of raw) {
     const x = (r ?? {}) as Record<string, unknown>;
     const points = Array.isArray(x.points) ? x.points.filter((p): p is string => typeof p === "string" && p.trim().length > 0).map((p) => p.trim().slice(0, 160)) : [];
+    // The same safe repairs as a post ("we" -> "I" for her solo practice, a superbill schedule she never set).
+    const fix = (t: string) => (opts.truth ? repairCopy(t, opts.truth) : t);
     const idea = {
       topic: x.topic as PillarId,
-      hook: typeof x.hook === "string" ? x.hook.trim().slice(0, 120) : "",
-      points: points.slice(0, 3),
-      cta: typeof x.call_to_action === "string" ? x.call_to_action.trim().slice(0, 120) : "",
+      hook: typeof x.hook === "string" ? fix(x.hook.trim()).slice(0, 120) : "",
+      points: points.slice(0, 3).map(fix),
+      cta: typeof x.call_to_action === "string" ? fix(x.call_to_action.trim()).slice(0, 120) : "",
       picture: typeof x.picture === "string" ? x.picture.trim().slice(0, 200) : "",
     };
     const words = [idea.hook, ...idea.points, idea.cta, idea.picture].join("\n");
-    const critic = codeCritic(words, { licenseLine: "", feesCents: opts.feesCents });
+    // Her saved facts too (the same check as a post): "We are private pay" is dropped when a plan approved her.
+    const critic = codeCritic(words, { licenseLine: "", feesCents: opts.feesCents, truth: opts.truth });
     if (critic.hardStop) return { kept: [], dropped: raw.length, blocked: true };
     const broken = critic.findings.some((f) => f.rule !== "license_line");
     if (!opts.topics.includes(idea.topic) || !idea.hook || idea.points.length < 2 || !idea.cta || broken) {
@@ -191,7 +195,13 @@ export async function writeIdeas(
 ): Promise<{ ideas: Idea[]; dropped: number; blocked: boolean; source: "muse" | "fixed" }> {
   // A chat passed in (tests, a replayed conversation) counts as a key.
   const hasKey = opts.hasKey ?? (Boolean(opts.chat) || Boolean(process.env.MODEL_API_KEY));
-  const check = { topics: opts.topics, neverShow: prefs.neverShow, firstName: f.clinicianName.split(" ")[0], feesCents: f.fees.map((x) => x.cents) };
+  const check = {
+    topics: opts.topics,
+    neverShow: prefs.neverShow,
+    firstName: f.clinicianName.split(" ")[0],
+    feesCents: f.fees.map((x) => x.cents),
+    ...(f.truth ? { truth: { ...f.truth, fees: f.fees } } : {}),
+  };
   if (!hasKey) return { ideas: fill([], opts.topics, opts.count, f), dropped: 0, blocked: false, source: "fixed" };
   try {
     const res = await (opts.chat ?? metaChat)("instagram.ideas", {

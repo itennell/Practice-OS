@@ -100,7 +100,9 @@ export function codeCritic(text: string, ctx: CriticContext): CriticResult {
   if (!text.includes(ctx.licenseLine)) findings.push({ rule: "license_line", by: "code", message: RULE_TEXT.license_line });
   // The one shared fee, insurer and claim check (lib/media/truth.ts), the same as profiles and the website.
   const facts = ctx.truth ? factProblems(clean, { ...ctx.truth, fees: ctx.feesCents.map((cents) => ({ label: "", cents })) }) : priceProblems(clean, ctx.feesCents);
-  if (facts.some((p) => p.kind === "fee")) findings.push({ rule: "invented_fee", by: "code", message: RULE_TEXT.invented_fee });
+  // Says exactly which price, so a blocked post or slide names the fact that failed.
+  const fees = facts.filter((p) => p.kind === "fee");
+  if (fees.length) findings.push({ rule: "invented_fee", by: "code", message: `${RULE_TEXT.invented_fee} It ${fees.map((p) => p.message).join(", and ")}.` });
   for (const p of facts) if (p.kind !== "fee") findings.push({ rule: "wrong_fact", by: "code", message: `${RULE_TEXT.wrong_fact} It ${p.message}.` });
   for (const p of captionProblems(text)) findings.push({ rule: "caption_limits", by: "code", message: p });
   return finish(findings);

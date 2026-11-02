@@ -76,6 +76,21 @@ describe.skipIf(!hasDb)("Grow drafts, approvals and exports", () => {
     expect(r.asks.join(" ")).toMatch(/What does BCBSIL pay you/);
   });
 
+  it("from chat words: 'BCBS pays $95, 10 sessions a week' is used on her BCBSIL panel, and the result is never a failure", async () => {
+    const { outcomeOf } = await import("../lib/aeon/agent");
+    for (const args of [{}, { panels: [{ payer: "BCBS", rate_dollars: 95, weekly_sessions: 10 }] }, { panels: [{ payer: "Blue Cross", rate_dollars: "$95", weekly_sessions: "10" }] }]) {
+      const res = await runTool("private_pay_plan", args, ctx);
+      expect(outcomeOf(res), JSON.stringify(args)).toEqual({ state: "ok" });
+      const r = json(res);
+      expect(r.saved).toBeUndefined();
+      expect(r.in_plain_words).toMatch(/^\[Sample\] /);
+    }
+    const r = json(await runTool("private_pay_plan", { panels: [{ payer: "BCBS", rate_dollars: 95, weekly_sessions: 10 }] }, ctx));
+    expect(r.panels.find((p: { payer: string }) => p.payer === "BCBSIL")).toMatchObject({ sessions_a_week: 10, pays_per_session: "$95" });
+    expect(r.panels.some((p: { payer: string }) => p.payer === "BCBS")).toBe(false);
+    expect(r.in_plain_words).toMatch(/BCBSIL pays \$95 a session for 10 sessions a week/);
+  });
+
   it("numbers that don't fit come back as a plain error, never a thrown ZodError", async () => {
     const r = await runTool("private_pay_plan", { panels: [{ payer: "X", rate_dollars: 999.999, weekly_sessions: 59.999 }], private_fee_dollars: 999.995 }, ctx);
     expect(r.isError ?? false).toBe(false);

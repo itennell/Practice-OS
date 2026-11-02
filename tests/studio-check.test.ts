@@ -32,10 +32,13 @@ function critic(breaks: string[] = []) {
   return { chat, read };
 }
 
+/** The invented-fee finding names the price, so a refused slide says which fact failed. */
+const fee = (price: string) => `${RULE_TEXT.invented_fee} It states the fee ${price}, which isn't on your fee list.`;
+
 describe("studio check", () => {
   it("a price on a slide must be one of her real fees", () => {
     expect(textProblems("Sessions are $150", limits)).toEqual([]);
-    expect(textProblems("Sessions are $99", limits)).toContain(RULE_TEXT.invented_fee);
+    expect(textProblems("Sessions are $99", limits)).toContain(fee("$99"));
     // The license line belongs to the caption, never a slide.
     expect(textProblems("Book a free call", limits)).toEqual([]);
   });
@@ -44,11 +47,11 @@ describe("studio check", () => {
     const { chat } = critic();
     const before = reel();
     const slide = await checkStep(before, reel(["Pick a time online", "Sessions are $99"]), limits, { chat });
-    expect(slide).toMatchObject({ ok: false, why: RULE_TEXT.invented_fee });
+    expect(slide).toMatchObject({ ok: false, why: fee("$99") });
     const overlay = await checkStep(before, { ...before, overlays: [{ id: "o1", text: "Only $20 a visit", start: 0, end: 2, position: "bottom" }] }, limits, { chat });
-    expect(overlay).toMatchObject({ ok: false, why: RULE_TEXT.invented_fee });
+    expect(overlay).toMatchObject({ ok: false, why: fee("$20") });
     const cue = await checkStep(before, { ...before, captions: { on: true, cues: [{ start: 0, end: 2, text: "it costs $45" }] } }, limits, { chat });
-    expect(cue).toMatchObject({ ok: false, why: RULE_TEXT.invented_fee });
+    expect(cue).toMatchObject({ ok: false, why: fee("$45") });
     expect(await checkStep(before, reel(["Pick a time online", "Sessions are $150"]), limits, { chat })).toEqual({ ok: true });
   });
 

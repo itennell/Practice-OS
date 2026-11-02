@@ -36,7 +36,7 @@ import * as payerChecklist from "../payers/checklist";
 import { PLEASE_CONFIRM, factView, type Source } from "../payers/catalog";
 import { eligibilityTag } from "../payers/eligibility";
 import * as instagram from "../instagram/store";
-import { looksLikeEdit, revisePost } from "../instagram/revise";
+import { looksLikeEdit, looksLikeEditSignal, revisePost, waitingPost } from "../instagram/revise";
 import * as coach from "../instagram/coach";
 import type { ChatFn } from "../instagram/critic";
 import { ACCOUNT_STEPS } from "../instagram/onboarding";
@@ -78,6 +78,27 @@ export type ToolContext = {
   said?: string[];
 };
 
+const squash = (s: string) => s.toLowerCase().replace(/[\s.,;:!?'"’‘“”()-]+/g, " ").trim();
+
+/**
+ * Why a Psychology Today answer can't be saved from chat, or null: every typed word (a string,
+ * a pick-many label that isn't on the list, a number) must appear in her latest message,
+ * case and spacing aside. A listed choice or a yes/no is fine as the model passes it.
+ */
+export function notInHerWords(answer: unknown, options: { value: string | number; label: string }[], latest: string | undefined): string | null {
+  if (answer === undefined || answer === null || typeof answer === "boolean") return null;
+  const listed = new Set(options.flatMap((o) => [squash(String(o.value)), squash(o.label)]));
+  const typed = (Array.isArray(answer) ? answer : [answer]).map((a) => String(a)).filter((a) => !listed.has(squash(a)));
+  if (!typed.length) return null;
+  const hers = ` ${squash(latest ?? "")} `;
+  const missing = typed.filter((a) => !squash(a) || !hers.includes(` ${squash(a)} `));
+  if (!missing.length) return null;
+  return "I can only save an answer in your own words. Please type it here exactly as it should read, or fill it in on the Media page.";
+}
+
+/** The Psychology Today steps whose answers she types: their words must be hers (notInHerWords). */
+export const TYPED_STEPS = new Set(["text", "number", "multi"]);
+
 /** aeon_action is queued only by runTool itself in Manual mode, never by an agent. */
 const QUEUEABLE_KINDS = APPROVAL_KINDS.filter((k) => k !== "aeon_action" && (FRONT_DESK_ENABLED || !FRONT_DESK_APPROVAL_KINDS.includes(k))) as [Exclude<ApprovalKind, "aeon_action">, ...Exclude<ApprovalKind, "aeon_action">[]];
 
@@ -87,7 +108,7 @@ const QUEUEABLE_KINDS = APPROVAL_KINDS.filter((k) => k !== "aeon_action" && (FRO
  * Nor do the Media writers: their drafts stay on her computer until she pastes them.
  * They still count as changes, so the view-only demo copy refuses them (no writes, no Muse).
  */
-const ALWAYS_RUNS = new Set(["remember", "forget", "post_ideas", "weekly_plan", "draft_post", "plan_instagram_week", "draft_instagram_post", "directory_profile", "pt_profile_interview", "website_help", ...MEDIA_ALWAYS_RUNS, ...GROWTH_ALWAYS_RUNS]);
+const ALWAYS_RUNS = new Set(["remember", "forget", "post_ideas", "weekly_plan", "draft_post", "plan_instagram_week", "draft_instagram_post", "directory_profile", "website_help", ...MEDIA_ALWAYS_RUNS, ...GROWTH_ALWAYS_RUNS]);
 
 export type ToolResult = {
   content: { type: "text"; text: string }[];
@@ -1429,6 +1450,7 @@ export const TOOLS: AeonTool[] = [
       "Writes one Instagram post she asked for, in her words, then checks it and makes its picture; it waits for her approval. " +
       "Posts cover practice logistics only. If she asks about a client, a review or anything clinical, nothing is written: tell her why and offer the logistics angle it returns (offer_instead); " +
       "suicide or self-harm topics are refused. Pass her request as she said it. " +
+      "A short statement of a new topic ('Drop-in hours on Fridays', 'parking near the office') is a request for a new post: call this right away with her words; don't ask questions first. " +
       "To change a post she already has waiting ('make it shorter', 'change it to Wednesday'), use revise_instagram_post instead; for a reel or carousel, use make_studio_post.",
     input: {
       request: z.string().trim().min(3).max(600),
@@ -1439,7 +1461,8 @@ export const TOOLS: AeonTool[] = [
     changesData: true,
     run: async ({ request, pillar }, ctx) => {
       // An edit sent here by mistake changes the waiting post instead of queueing a second one.
-      if (looksLikeEdit(request)) {
+      // With a post waiting, "fewer words" or "Wednesday instead" is an edit of it, not a new post.
+      if (looksLikeEdit(request) || (looksLikeEditSignal(request) && (await waitingPost()))) {
         const rev = await revisePost(ctx.by, request, { chat: ctx.chat });
         if (rev.outcome === "revised") return text({ written: true, revised_existing: true, headline: rev.headline, approval_id: rev.approvalId, see: "/media/instagram" });
         if (rev.outcome !== "none") return text({ written: false, revised_existing: false, why: rev.why });
@@ -1791,7 +1814,7 @@ export const TOOLS: AeonTool[] = [
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: false },
     label: "Worked on your Psychology Today profile",
     changesData: true,
-    run: async (input: { step?: string; answer?: string | string[] | number | boolean; skip?: boolean; back?: boolean }) => {
+    run: async (input: { step?: string; answer?: string | string[] | number | boolean; skip?: boolean; back?: boolean }, ctx: ToolContext) => {
       const facts = await import("../media/facts");
       const pt = await import("../media/pt-profile");
       let f = await facts.loadMediaFacts();
@@ -1804,6 +1827,16 @@ export const TOOLS: AeonTool[] = [
         if (wrong) {
           const s = pt.interviewState(f);
           return text({ refused: wrong, progress: `${s.answered} of ${s.total} answered`, ...(s.step ? { question: { step: s.step.id, ask: s.step.ask } } : { done: true }) });
+        }
+        // Her answers become the truth her profile is checked against, so the model can't write
+        // one for her: typed words must be in her latest message (the Media page is the other way in).
+        // Only typed answers are checked: a confirm or info step (the model may pass true or "true")
+        // and a one-choice pick (a listed value) carry no words of hers to copy.
+        const q = pt.interviewState(f, step).step;
+        const notHers = !input.skip && q && TYPED_STEPS.has(q.kind) ? notInHerWords(input.answer, q.options, ctx.said?.at(-1)) : null;
+        if (notHers) {
+          const s = pt.interviewState(f, step);
+          return text({ refused: notHers, progress: `${s.answered} of ${s.total} answered`, question: { step, ask: q!.ask } });
         }
         try {
           f = await pt.saveStep(f, step, input.skip ? { skip: true } : { value: typeof input.answer === "boolean" ? null : input.answer });

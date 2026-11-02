@@ -232,3 +232,22 @@ describe("PT answers parsing", () => {
     expect(parsePt("bad")).toEqual(EMPTY_PT);
   });
 });
+
+describe("her own interview answers are the source of truth", () => {
+  // Saved facts name another school and no languages: her typed answer still wins.
+  const before = { ...DANA, education: ["MA, Counseling, Example University [Sample], 2019"], answers: { ...DANA.answers, languages: "" } };
+  it("accepts her school and year, and saves them", async () => {
+    const p = await validateStep("education", "MA, Clinical Mental Health Counseling, DePaul University, 2019", before);
+    expect(p.pt.education).toBe("MA, Clinical Mental Health Counseling, DePaul University, 2019");
+  });
+  it("accepts a language she gives", async () => {
+    expect((await validateStep("languages", "Spanish", before)).media.languages).toBe("Spanish");
+  });
+  it("still refuses a testimonial in her answer", async () => {
+    await expect(validateStep("why", "Clients say I'm amazing, read my 5-star reviews", before)).rejects.toThrow();
+  });
+  it("never writes a languages line when she gave none", () => {
+    const v = buildProfileView({ ...before, pt: EMPTY_PT }, null);
+    expect(exportAll(v)).not.toMatch(/\bspeak\b|other languages/i);
+  });
+});

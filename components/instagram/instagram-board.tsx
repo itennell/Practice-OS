@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 import type { Research, ResearchAngle } from "@/lib/instagram/research";
 import type { PostView } from "@/lib/instagram/store";
 import { Slider } from "../shared/slider";
+import { FactsChanged } from "../studio/facts-changed";
 import { TextField } from "../shared/settings-controls";
 import { StatusPill } from "../shared/status-mark";
 import { ThoughtLine } from "../shared/thought-line";
@@ -164,7 +165,20 @@ function Retry({ post, onDone, draft = false }: { post: PostView; onDone: () => 
   );
 }
 
-function PostCard({ post, profile, onChange }: { post: PostView; profile: PreviewProfile; onChange: () => void }) {
+
+function PostCard({
+  post,
+  profile,
+  onChange,
+  onRegenerate,
+  busy,
+}: {
+  post: PostView;
+  profile: PreviewProfile;
+  onChange: () => void;
+  onRegenerate: (post: PostView) => void;
+  busy: boolean;
+}) {
   const state = postState(post);
   const s = STATE[state];
   const headingId = `post-${post.id}`;
@@ -177,6 +191,7 @@ function PostCard({ post, profile, onChange }: { post: PostView; profile: Previe
         </h3>
         <StatusPill status={s.status}>{s.label}</StatusPill>
       </div>
+      <FactsChanged problems={post.factsChanged ?? []} busy={busy} onRegenerate={() => onRegenerate(post)} />
       {post.status === "blocked" ? (
         <div className="flex flex-col gap-2 rounded-[20px] border border-[var(--hairline)] bg-[var(--glass-strong)] p-4">
           <p className="label-caps text-[var(--fg-muted)]">{PILLAR_LABEL[post.pillar]}</p>
@@ -347,6 +362,24 @@ export function InstagramBoard({ initialPosts, profile }: { initialPosts: PostVi
     }
   }
 
+  /** Regenerate on a "Facts changed" flag: written again from her current facts; the old post and its approval are retired. */
+  async function regenerate(postId: string) {
+    setMessage(null);
+    setOffer(null);
+    setWorking("write");
+    try {
+      const res = await fetch(`/api/instagram/posts/${postId}/regenerate`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) setMessage({ tone: "problem", text: data.error ?? "Something went wrong. Try again." });
+      else setMessage(say("write", data).message);
+    } catch {
+      setMessage({ tone: "problem", text: "Couldn't reach Practice-OS. Check that the app is running, then try again." });
+    } finally {
+      setWorking(null);
+      refresh();
+    }
+  }
+
   async function run(kind: "write" | "plan", request = ask, pillar: string | null = null, pick?: { id: string; angle: number }) {
     setMessage(null);
     setOffer(null);
@@ -493,7 +526,14 @@ export function InstagramBoard({ initialPosts, profile }: { initialPosts: PostVi
         ) : (
           <ul className="grid grid-cols-1 gap-6 md:grid-cols-2">
             {initialPosts.map((p) => (
-              <PostCard key={p.id} post={p} profile={profile} onChange={refresh} />
+              <PostCard
+                key={p.id}
+                post={p}
+                profile={profile}
+                onChange={refresh}
+                busy={working !== null}
+                onRegenerate={(old) => void regenerate(old.id)}
+              />
             ))}
           </ul>
         )}

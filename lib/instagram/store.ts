@@ -6,6 +6,7 @@ import { audit } from "../audit";
 import { db } from "../db";
 import { loadMediaFacts } from "../media/facts";
 import { truthOf } from "../media/truth";
+import { currentTruth, factsChanged } from "../studio/stale";
 import { alertCrisis, checkCrisis, CRISIS_REPLY } from "../safety";
 import type { ChatFn, CriticResult } from "./critic";
 import { designPost, type GraphicDeps } from "./graphic";
@@ -115,6 +116,8 @@ export type PostView = {
   hasImage: boolean;
   weekOf: string | null;
   createdAt: string;
+  /** What her saved details now contradict in its words (lib/studio/stale.ts); empty for blocked or posted ones. */
+  factsChanged: string[];
 };
 
 export async function listPosts(opts: { week?: string; limit?: number } = {}): Promise<PostView[]> {
@@ -128,9 +131,10 @@ export async function listPosts(opts: { week?: string; limit?: number } = {}): P
     select p.id, p.topic, p.headline, p.caption, p.alt_text, p.status, p.blocked_reason, p.failed_reason, p.approval_id,
            a.status as approval_status, p.ig_permalink, p.image_jpeg is not null as has_image, p.week_of, p.created_at
       from practice_os.posts p left join practice_os.approvals a on a.id = p.approval_id
-     where p.status <> 'idea' and ${opts.week ? db()`p.week_of = ${opts.week}` : db()`true`}
+     where p.status <> 'idea' and not coalesce(p.critic ? 'superseded_by', false) and ${opts.week ? db()`p.week_of = ${opts.week}` : db()`true`}
      order by p.created_at desc
      limit ${opts.limit ?? 50}`;
+  const truth = rows.length ? await currentTruth() : null;
   return rows.map((r) => ({
     id: r.id,
     pillar: r.topic,
@@ -146,6 +150,7 @@ export async function listPosts(opts: { week?: string; limit?: number } = {}): P
     hasImage: r.has_image,
     weekOf: r.week_of ? new Date(r.week_of).toISOString().slice(0, 10) : null,
     createdAt: new Date(r.created_at).toISOString(),
+    factsChanged: r.status === "blocked" || r.status === "published" ? [] : factsChanged([r.headline ?? "", r.caption], truth),
   }));
 }
 

@@ -16,6 +16,7 @@ import { PromptBar } from "../shared/prompt-bar";
 import { ThoughtLine } from "../shared/thought-line";
 import type { ThoughtStep } from "../shared/thought-line-steps";
 import { Canvas, type CanvasActions } from "./canvas";
+import { FactsChanged, studioFlag } from "./facts-changed";
 import type { DrawAssets } from "./slide-draw";
 import { VideoEditor } from "./video-editor";
 
@@ -79,6 +80,12 @@ export function isNewRequest(text: string): boolean {
     /^\s*(please\s+)?((can|could) you\s+)?(make|create|write|draft|plan|start|build|give me)\s+(me\s+)?(an?|one|another|some|a new|new)\s+(\w+\s+)?(post|reel|carousel|video)s?\b/i.test(text) ||
     /\b(edit|upload|add) my( own)? (video|footage|clip)\b/i.test(text)
   );
+}
+
+/** Regenerate on a "Facts changed" flag: the same kind on the same topic, made again from her current facts. */
+export function regenerateRequest(doc: Pick<Project["doc"], "kind" | "topic" | "title">): string {
+  const about = (doc.topic || doc.title || "my practice").replace(/^\s*(?:make|create|write)\s+(?:me\s+)?(?:an?|one|another|a new)\s+(?:post|reel|carousel)s?\s+(?:about|on)\s+/i, "");
+  return `Make a new ${doc.kind === "video" ? "post" : doc.kind} about ${about}`.slice(0, 600);
 }
 
 function Bubble({ entry, onPick, disabled }: { entry: Entry; onPick: (text: string) => void; disabled: boolean }) {
@@ -247,7 +254,7 @@ export function Studio({ profile, initial }: { profile: StudioProfile; initial: 
   const act: CanvasActions = useMemo(() => ({ apply, undo: () => move("undo"), redo: () => move("redo"), goTo: (seq) => move("step", { seq }), refresh }), [apply, move, refresh]);
 
   /** Something new: the answer streams one event per line, and the canvas fills in. */
-  async function make(text: string) {
+  async function make(text: string, regenerate?: string) {
     // The canvas clears for the new one; if nothing new is made (a redirect, a stop), the old one comes back.
     const before = project;
     let made = false;
@@ -264,7 +271,7 @@ export function Studio({ profile, initial }: { profile: StudioProfile; initial: 
         return list;
       });
     try {
-      const res = await fetch("/api/studio", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ request: text }) });
+      const res = await fetch("/api/studio", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ request: text, ...(regenerate ? { regenerate } : {}) }) });
       if (!res.ok || !res.body) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
         say({ who: "aeon", text: data.error ?? "Aeon couldn't start that. Try again.", tone: "problem" });
@@ -301,6 +308,19 @@ export function Studio({ profile, initial }: { profile: StudioProfile; initial: 
       if (!made) setProject(before);
       setSteps(null);
       setWords(null);
+    }
+  }
+
+  /** Regenerate on a "Facts changed" flag: the server makes it again from her current facts and retires the old post. */
+  async function regenerate(p: Project) {
+    if (busy) return;
+    const text = regenerateRequest(p.doc);
+    say({ who: "me", text });
+    setBusy(true);
+    try {
+      await make(text, p.id);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -355,6 +375,15 @@ export function Studio({ profile, initial }: { profile: StudioProfile; initial: 
       </section>
 
       <div className="min-w-0">
+        {project && studioFlag(project.doc.kind, project.factsChanged).show && (
+          <div className="mb-4">
+            <FactsChanged
+              problems={project.factsChanged}
+              busy={busy}
+              onRegenerate={studioFlag(project.doc.kind, project.factsChanged).regenerate ? () => void regenerate(project) : undefined}
+            />
+          </div>
+        )}
         {project ? (
           <Canvas project={project} assets={assets} busy={busy} act={act} videoEditor={project.doc.kind === "video" ? <VideoEditor doc={project.doc} busy={busy} apply={apply} projectId={project.id} keepKeys={project.clipKeys} /> : undefined} />
         ) : (

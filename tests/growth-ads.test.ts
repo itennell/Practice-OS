@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 import { checkGoogleDraft, checkMetaDraft, draftGoogleAds, draftMetaAds, googleAdsEditorCsv, metaAdsSpec, type GrowthSettings } from "../lib/growth/ads";
 import { checkKeyword, checkTargeting, checkText, LIMITS, MIN_CAP_CENTS, MIN_CAP_MESSAGE } from "../lib/growth/policy";
-import { csvField, GOOGLE_BUDGET_NOTE } from "../lib/growth/ads";
+import { article, csvField, feeLine, GOOGLE_BUDGET_NOTE, priceRange, sessionLength } from "../lib/growth/ads";
 import { DANA } from "./media-fixtures";
 
 const S: GrowthSettings = { siteUrl: "https://www.example.com", bookingUrl: null, monthlyCapCents: 30000, radiusMiles: 5 };
@@ -74,7 +74,7 @@ describe("Google Search draft", () => {
     expect(d.ad.descriptions.length).toBeGreaterThanOrEqual(2);
     for (const x of d.ad.descriptions) expect([...x].length).toBeLessThanOrEqual(90);
     expect(d.ad.headlines).toContain("Free 15-Minute Consult");
-    expect(d.ad.headlines).toContain("Private Pay $150 a Session");
+    expect(d.ad.headlines).toContain("[Sample] Sessions $150");
   });
 
   it("targets keywords and a radius only, with a hard cap and paused status", () => {
@@ -169,5 +169,53 @@ describe("Meta draft", () => {
     expect(spec.campaign.status).toBe("PAUSED");
     expect(spec.how_to_use.join(" ")).toMatch(/Don't install the Meta Pixel/);
     expect(spec.note).toMatch(/\[Sample\]/);
+  });
+});
+
+describe("fee wording in ads (her real session fees, sample-labelled)", () => {
+  const FEES = [
+    { label: "First session (intake)", cents: 20000 },
+    { label: "Therapy, 38-52 minutes", cents: 15000 },
+    { label: "Therapy, 53 minutes or longer", cents: 17500 },
+  ];
+  const real = { ...DANA, isSample: false, fees: FEES };
+
+  it("lists every session fee with its length, never one ambiguous price", () => {
+    expect(feeLine(real)).toBe("$150 (45 min) / $175 (53+ min)");
+    expect(feeLine({ ...real, isSample: true })).toBe("[Sample] $150 (45 min) / $175 (53+ min)");
+    expect(priceRange(real)).toBe("$150–$200");
+    expect(sessionLength("90834 Psychotherapy, 45 min")).toBe("45 min");
+    expect(["LCPC", "LCSW", "LMFT", "PhD", "PsyD", "counselor"].map(article)).toEqual(["an", "an", "an", "a", "a", "a"]);
+  });
+
+  it("puts both prices in a Google headline and the Meta fee ad", () => {
+    const g = draftGoogleAds(real, S);
+    expect(g.check.ok).toBe(true);
+    // Dana is in network with BCBSIL, so "Private Pay $150 / $175" (private pay only) is never offered.
+    expect(g.ad.headlines).toContain("Sessions $150 / $175");
+    expect(g.ad.headlines.some((h) => /^Private Pay \$/.test(h))).toBe(false);
+    expect(g.ad.descriptions.join(" ")).toContain("$150 (45 min) / $175 (53+ min)");
+    const m = draftMetaAds(real, S);
+    expect(m.check.ok).toBe(true);
+    expect(m.ads.map((a) => a.primaryText).join(" ")).toContain("Private pay or Blue Cross Blue Shield of Illinois. Sessions are $150 (45 min) / $175 (53+ min).");
+    // Out of network everywhere, "Private Pay $150 / $175" is true and kept.
+    const out = { ...real, inNetwork: [], insurers: [] };
+    expect(draftGoogleAds(out, S).ad.headlines).toContain("Private Pay $150 / $175");
+    expect(draftMetaAds(out, S).ads.map((a) => a.primaryText).join(" ")).toContain("Private-pay sessions are $150 (45 min) / $175 (53+ min).");
+  });
+
+  it("the ad check runs the shared fact check: 'Private pay only' while in network is blocked", () => {
+    const blocked = (t: string) => checkText(t, "headline", null, real).some((x) => x.rule === "wrong_fact" && x.severity === "block");
+    expect(blocked("Private pay only")).toBe(true);
+    expect(blocked("Private pay only, Aetna included.")).toBe(true);
+    expect(blocked("Private pay or Blue Cross Blue Shield of Illinois.")).toBe(false);
+    expect(blocked("Book a free discovery call.")).toBe(false); // Dana offers a free 15-minute consult
+    expect(blocked("Superbills every session.")).toBe(true);
+  });
+
+  it("never exports a [Sample] fee without the label", () => {
+    const g = draftGoogleAds({ ...DANA, fees: FEES }, S);
+    const m = draftMetaAds({ ...DANA, fees: FEES }, S);
+    for (const t of [...g.ad.headlines, ...g.ad.descriptions, ...m.ads.map((a) => a.primaryText)]) if (/\$\d/.test(t)) expect(t).toMatch(/\[Sample\][^$]*\$\d/);
   });
 });

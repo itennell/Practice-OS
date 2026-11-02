@@ -19,8 +19,9 @@ import { criticContext } from "../instagram/write";
 import { alertCrisis, checkCrisis, CRISIS_REPLY } from "../safety";
 import { captionRun, checkStep, pictureIdeaProblems, screenCues, type Limits } from "./check";
 import { docWords, emptyDoc, LIMITS, parseDoc, type Kind, type StudioDoc } from "./doc";
-import { proposeEdit } from "./edit";
+import { proposeEdit, SHORT_CAPTION, shortenCaption, wantsWholeShorter } from "./edit";
 import { syncFacts } from "./facts-sync";
+import { currentTruth, docTexts, factsChanged } from "./stale";
 import { applyOps, describeOp, OpSchema } from "./ops";
 
 export type Step = { seq: number; source: "chat" | "canvas" | "aeon"; summary: string; at: string };
@@ -38,6 +39,8 @@ export type Project = {
   updatedAt: string;
   /** Video projects: every clip file key any project's history still uses (referencedClipKeys). */
   clipKeys: string[];
+  /** What her saved details now contradict in its words (lib/studio/stale.ts): shown as "Facts changed" with Regenerate. */
+  factsChanged: string[];
 };
 
 type Row = { id: string; post_id: string | null; doc: unknown; cursor: number; is_sample: boolean; updated_at: Date; post_status: string | null; approval_id: string | null; approval_status: string | null };
@@ -66,6 +69,7 @@ export async function getProject(id: string): Promise<Project | null> {
     isSample: row.is_sample,
     updatedAt: new Date(row.updated_at).toISOString(),
     clipKeys: doc.kind === "video" ? await referencedClipKeys() : [],
+    factsChanged: factsChanged(docTexts(doc), await currentTruth()),
   };
 }
 
@@ -579,6 +583,16 @@ export async function chatEdit(id: string, said: string, opts: { by: string; rea
     proposal = await proposeEdit(said, project.doc, { chat: opts.chat });
   } catch {
     return { ok: false, status: 502, why: "Aeon didn't answer just now. Try again in a minute.", project };
+  }
+  // A whole-post "make it shorter" shortens the caption too, not only the slides
+  // (a 537-character caption stayed as it was): plain code does it when Muse didn't.
+  if (wantsWholeShorter(said) && project.doc.kind !== "video" && !proposal.ops.some((o) => (o as { op?: unknown }).op === "set_caption")) {
+    const { licenseLine } = await practiceFacts();
+    const body = licenseLine && project.doc.caption.trim().endsWith(licenseLine) ? project.doc.caption.trim().slice(0, -licenseLine.length).trim() : project.doc.caption.trim();
+    const short = body.length > SHORT_CAPTION ? shortenCaption(project.doc.caption, licenseLine) : null;
+    if (short) {
+      proposal = { reply: proposal.ops.length ? `${proposal.reply} The caption is shorter too.` : "The caption is shorter.", ops: [...proposal.ops, { op: "set_caption", text: short }] };
+    }
   }
   if (!proposal.ops.length) return { ok: true, project, reply: proposal.reply };
   return applyEdit(id, proposal.ops, { ...opts, source: "chat", said, reply: proposal.reply, expectCursor: project.cursor });
