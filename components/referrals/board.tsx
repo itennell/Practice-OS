@@ -26,7 +26,7 @@ const MOVE_OPTIONS = STAGES.map((s) => ({ value: s, label: STAGE_LABEL[s] }));
 
 const HINT: Record<Stage, string> = {
   found: "From the map. Draft an email to start.",
-  contacted: "Letter approved. Send it, then follow up in a week.",
+  contacted: "Letter sent. Follow up in a week.",
   follow_up: "Time for a friendly check-in.",
   connected: "You've talked. Keep in touch.",
   not_a_fit: "Set aside.",
@@ -40,9 +40,22 @@ function dateLabel(iso: string): string {
  * The drafted email on the card: subject and letter, a Copy button, and plain
  * steps. Aeon never sends; she pastes it into her own email.
  */
-function LetterBox({ letter, name, demo }: { letter: LetterState; name: string; demo: boolean }) {
+function LetterBox({
+  letter,
+  cardId,
+  name,
+  demo,
+  onSent,
+}: {
+  letter: LetterState;
+  cardId: string;
+  name: string;
+  demo: boolean;
+  onSent: (view: CardView) => void;
+}) {
   const [copied, setCopied] = useState(false);
   const [open, setOpen] = useState(false);
+  const [marking, setMarking] = useState(false);
   const boxId = `letter-${letter.approvalId}`;
   if (!letter.letter) {
     return letter.status === "pending" ? (
@@ -52,8 +65,28 @@ function LetterBox({ letter, name, demo }: { letter: LetterState; name: string; 
     ) : null;
   }
   const text = `Subject: ${letter.subject ?? ""}\n\n${letter.letter}`;
-  // She approves the letter first; only then can she copy it to send.
+  // She approves the letter first; only then can she copy it to send. It is
+  // "Letter ready" until she says she sent it; only then does the card move to Contacted.
   const approved = letter.status === "done";
+  const sent = approved && Boolean(letter.sent);
+
+  async function markSent() {
+    setMarking(true);
+    try {
+      const res = await fetch(`/api/referrals/${cardId}/contacts`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ kind: "sent_letter" }),
+      });
+      const data = (await res.json().catch(() => ({}))) as CardView & { error?: string };
+      if (!res.ok || !data.card) throw new Error(data.error ?? "Couldn't save that. Try again.");
+      onSent(data);
+    } catch (err) {
+      notify.error(err instanceof Error ? err.message : "Couldn't save that. Try again.");
+    } finally {
+      setMarking(false);
+    }
+  }
 
   async function copy() {
     try {
@@ -77,13 +110,13 @@ function LetterBox({ letter, name, demo }: { letter: LetterState; name: string; 
   return (
     <div className="flex flex-col gap-2 rounded-[16px] border border-[var(--line)] p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-small font-semibold">{approved ? "Email to send yourself" : "Email draft"}</p>
+        <p className="text-small font-semibold">{sent ? "Email you sent" : approved ? "Email to send yourself" : "Email draft"}</p>
         {(letter.status === "pending" || letter.status === "running") && (
           <Link href="/approvals" className="text-small text-[var(--link)] underline underline-offset-2">
             <StatusPill status="pending">Waiting in Approvals</StatusPill>
           </Link>
         )}
-        {approved && <StatusPill status="done">Approved</StatusPill>}
+        {sent ? <StatusPill status="done">Sent</StatusPill> : approved && <StatusPill status="pending">Letter ready</StatusPill>}
         {letter.status === "failed" && (
           <Link href="/approvals" className="text-small font-medium text-[var(--danger-fg)] underline underline-offset-2">
             Didn&rsquo;t go through. See why
@@ -117,15 +150,21 @@ function LetterBox({ letter, name, demo }: { letter: LetterState; name: string; 
             {copied ? "Copied" : "Copy"}
           </Button>
         )}
+        {approved && !sent && (
+          <Button variant="quiet" onClick={markSent} disabled={marking} aria-label={`I sent the email to ${name}`}>
+            {marking ? "Saving…" : "I sent it"}
+          </Button>
+        )}
         <Button variant="quiet" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-controls={open ? `${boxId}-text` : undefined}>
           {open ? "Show less" : "Read it all"}
         </Button>
       </div>
-      {approved ? (
+      {sent ? null : approved ? (
         <ol className="list-decimal pl-5 text-small text-[var(--fg-muted)]">
           <li>Press Copy.</li>
           <li>Open your email and start a new message to {name}.</li>
           <li>Paste, check it, and send it yourself. Aeon never sends.</li>
+          <li>Press I sent it. The card moves to Contacted with a follow-up a week out.</li>
         </ol>
       ) : (
         letter.status !== "failed" && (
@@ -171,7 +210,9 @@ function Card({
   onDraft: () => void;
 }) {
   const headingId = `ref-${card.id}`;
-  const canDraft = (card.stage === "found" || card.stage === "follow_up") && letter?.status !== "pending";
+  // No second draft while one waits for approval or an approved one is ready to send.
+  const letterReady = letter?.status === "done" && !letter.sent;
+  const canDraft = (card.stage === "found" || card.stage === "follow_up") && letter?.status !== "pending" && !letterReady;
   const meta = [
     card.specialty ?? card.taxonomy,
     card.distance_miles === null ? null : card.distance_miles < 0.1 ? "in your ZIP" : `${card.distance_miles} mi`,
@@ -215,7 +256,15 @@ function Card({
       )}
       <EvidenceBox card={card} evidence={evidence} onUpdate={onUpdate} />
       <ContactLog card={card} contacts={contacts} onUpdate={onLogged} />
-      {letter && <LetterBox letter={letter} name={card.name} demo={demo} />}
+      {letter && (
+        <LetterBox
+          letter={letter}
+          cardId={card.id}
+          name={card.name}
+          demo={demo}
+          onSent={(view) => onLogged(view, `Marked the email to ${card.name} as sent. It's in Contacted now, with a follow-up a week out.`)}
+        />
+      )}
       <SettingSelect
         compact
         label="Move to"
@@ -331,6 +380,10 @@ export function ReferralBoard({
 
   function logged(view: CardView, said: string) {
     setCards((all) => all.map((c) => (c.id === view.card.id ? view.card : c)));
+    // She just logged "sent the letter": the approved letter on the card went out.
+    if (view.contacts[0]?.kind === "sent_letter") {
+      setLetters((all) => (all[view.card.id]?.status === "done" ? { ...all, [view.card.id]: { ...all[view.card.id], sent: true } } : all));
+    }
     setContacts((all) => ({ ...all, [view.card.id]: view.contacts }));
     setTierById((all) => ({ ...all, [view.card.id]: view.tier }));
     setAnnounce(said);

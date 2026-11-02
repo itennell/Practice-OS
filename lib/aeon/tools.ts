@@ -45,12 +45,14 @@ import { CONTACT_KINDS, CONTACT_LABEL, logContact, REFERRED_NOTE } from "../refe
 import { evidenceFor, setTypedEmail } from "../referrals/evidence/store";
 import { cardsNamed, outreachPlan } from "../referrals/plan";
 import { RecheckTooSoon, recheckDeps, recheckSource, recheckSummary } from "../referrals/sources/recheck";
-import { findReferralSources, getSource, interleave, listSources, moveSource, STAGE_LABEL, STAGES } from "../referrals/store";
+import { findReferralSources, getSource, interleave, listSources, moveSource, practiceFacts, STAGE_LABEL, STAGES } from "../referrals/store";
 import * as documents from "../documents";
 import { DOCUMENT_KINDS, forModel, type DocumentCard } from "../documents/card";
 import { guard, WITHHELD } from "./guard";
 import { fileTools } from "./tools-files";
 import { forget, MEMORY_KINDS, MemoryRefused, recentChanges, remember } from "./memory";
+import { ABOUT_NAMES, REFERRAL_TOOLS } from "./tools-referrals";
+import { outOfStateWarning } from "../referrals/states";
 import { RULES_TOOLS } from "./tools-rules";
 import { SETTINGS_TOOLS } from "./tools-settings";
 import { MEDIA_ALWAYS_RUNS, MEDIA_TOOLS } from "./tools-media";
@@ -351,6 +353,8 @@ export const TOOLS: AeonTool[] = [
       referral_follow_ups: z
         .array(z.object({ id: z.string(), name: z.string(), on: z.string(), days_left: z.number(), stage: z.string(), last: z.string().nullable() }))
         .optional(),
+      // Approved referral letters not marked sent after 2 days.
+      referral_letters_ready: z.array(z.object({ id: z.string(), name: z.string(), approved_on: z.string(), days: z.number() })).optional(),
       is_sample: z.boolean(),
       summary: z.string(),
     },
@@ -988,11 +992,15 @@ export const TOOLS: AeonTool[] = [
         phone: p.phone,
         npi: p.npi,
       }));
+      const away = outOfStateWarning(zips, (await practiceFacts()).state);
       return text({
         searched_zips: zips,
+        ...(askedZip ? {} : { searched_around: `her saved ZIP ${zip}; say so` }),
+        ...(away ? { warning: away } : {}),
         matched,
         on_board: `${found.length} best matches are on the Referrals board under Found (/referrals).`,
         best_matches: top,
+        about_names: ABOUT_NAMES,
       });
     },
   }),
@@ -1002,7 +1010,8 @@ export const TOOLS: AeonTool[] = [
     title: "List the Referrals board",
     description:
       "Lists the cards on her Referrals board, best fit first, with each one's id, column (found, contacted, follow_up, " +
-      "connected, not_a_fit), specialty, miles, fit score and follow-up date. Read-only.",
+      "connected, not_a_fit), specialty, miles, fit score and follow-up date. It shows only the top cards: to find a particular " +
+      "provider, or a kind of provider, use find_referral_cards, which searches the whole board. Read-only.",
     input: {
       stage: z.enum(STAGES).optional().describe("Only this column."),
       limit: z.number().int().min(1).max(50).optional().describe("How many. Default 20."),
@@ -1015,6 +1024,8 @@ export const TOOLS: AeonTool[] = [
       const rows = all.filter((s) => !stage || s.stage === stage).slice(0, limit ?? 20);
       return text({
         total_on_board: all.length,
+        ...(all.length > rows.length ? { not_listed: `${all.length - rows.length} more; use find_referral_cards to look for someone by name.` } : {}),
+        about_names: ABOUT_NAMES,
         cards: rows.map((s) => ({
           id: s.id,
           name: s.name,
@@ -1051,8 +1062,10 @@ export const TOOLS: AeonTool[] = [
       "Writes a short professional introduction letter from the clinician to one referral source on her board (by its id): " +
       "who she sees and an offer of a 15-minute call. Never offers fees, gifts or anything of value. The letter waits in her " +
       "approvals and on the Referrals board card, where she copies it into her own email and sends it herself (Aeon never sends). " +
-      "When she approves it, the card moves to " +
-      "Contacted and a follow-up is set a week out. Takes about 10 seconds.",
+      "Approving makes it ready to copy; the card moves to Contacted, with a follow-up a week out, only when she marks it sent " +
+      "(the card's I sent it button, or log_referral_contact with sent_letter). Uses her real phone, email, in-network plans and " +
+      "her log notes for this card. If a letter to them is already waiting, it is rewritten in place; to change a waiting letter " +
+      "('make it shorter') use revise_referral_letter. Takes about 10 seconds.",
     input: {
       id: z.string().uuid().describe("The referral source's id, from find_referral_sources or list_referral_sources."),
       note: z.string().trim().max(500).optional().describe("Anything she wants the letter to mention, in her words."),
@@ -1061,11 +1074,19 @@ export const TOOLS: AeonTool[] = [
     label: "Drafted an introduction letter",
     changesData: false,
     run: async ({ id, note }, ctx) => {
-      const { approvalId, subject, letter, source } = await draftOutreach(id, { by: ctx.by, note });
+      const { approvalId, subject, letter, source, revised } = await draftOutreach(id, { by: ctx.by, note });
       const [row] = await db()<{ status: string }[]>`select status from practice_os.approvals where id = ${approvalId}`;
       return {
         content: [
-          { type: "text", text: row?.status === "pending" ? "queued for clinician approval" : `ran on its own under her mode: ${row?.status}` },
+          {
+            type: "text",
+            text:
+              row?.status === "pending"
+                ? revised
+                  ? "the letter already waiting was rewritten in place; still waiting for her approval"
+                  : "queued for clinician approval"
+                : `ran on its own under her mode: ${row?.status} (ready to copy; not sent)`,
+          },
           { type: "text", text: JSON.stringify({ approval_id: approvalId, to: source.name, subject, letter }, null, 2) },
         ],
         structuredContent: { status: row?.status ?? "pending", approval_id: approvalId },
@@ -1080,13 +1101,21 @@ export const TOOLS: AeonTool[] = [
     description:
       "Answers 'who should I reach out to this week?': referral follow-ups due in the next 7 days first, then up to 3 new people " +
       "from the top of her Referrals board with why and the next step. People she reached out to in the last 30 days wait, and " +
-      "anyone on her do-not-contact list is never suggested. Never suggest offering anything in return for a referral. Read-only.",
-    input: {},
+      "anyone on her do-not-contact list is never suggested. New people who see who she helps come first. When she names kinds of " +
+      "provider, or just searched for some, pass them as specialties (left out, her chat search from the last two hours counts). " +
+      "Never suggest offering anything in return for a referral. Read-only.",
+    input: {
+      specialties: z
+        .array(z.enum(SPECIALTIES.map((s) => s.id) as [SpecialtyId, ...SpecialtyId[]]))
+        .min(1)
+        .optional()
+        .describe("Only these kinds of provider, when she asked about them."),
+    },
     annotations: { readOnlyHint: true, openWorldHint: false },
     label: "Planned this week's referral outreach",
     changesData: false,
-    run: async () => {
-      const plan = await outreachPlan();
+    run: async ({ specialties }) => {
+      const plan = await outreachPlan(undefined, undefined, { specialties });
       return { content: [{ type: "text", text: plan.summary }, { type: "text", text: JSON.stringify(plan, null, 2) }] };
     },
   }),
@@ -1099,7 +1128,9 @@ export const TOOLS: AeonTool[] = [
       "referred (they referred someone to her). Name the card as she said it ('Dr. Rivera', 'Lakeview Pediatrics') or pass its id. " +
       "Reaching out moves the card to Contacted and sets a follow-up a week out unless she gives a date; a reply, meeting or referral " +
       "moves it to Connected and raises its tier. For 'referred', record NOTHING about who was referred: no name, initials, age or reason; " +
-      "Aeon never tells the referrer someone became a client without that person's written consent. If more than one card fits, ask which.",
+      "Aeon never tells the referrer someone became a client without that person's written consent. If more than one card fits, ask which. " +
+      "If she says they aren't interested or not to contact them again, use set_do_not_contact (a note alone changes nothing). " +
+      "If she says she sent the letter, log sent_letter.",
     input: {
       source: z.string().trim().min(2).max(160).describe("The card's name as she said it, or its id."),
       kind: z.enum(CONTACT_KINDS),
@@ -1180,6 +1211,9 @@ export const TOOLS: AeonTool[] = [
       return text({ saved: true, email: ev.fields.email?.value ?? null });
     },
   }),
+
+  // Find any card, do-not-contact, and change a waiting letter (lib/aeon/tools-referrals.ts).
+  ...REFERRAL_TOOLS,
 
   // ---- Instagram (Instagram session) ---------------------------------------------------------
   tool({

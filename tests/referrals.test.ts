@@ -107,7 +107,7 @@ describe("letter rules (no fees, gifts or anything of value)", () => {
   it.each([
     ["$50 for every new client", "a dollar amount"],
     ["Happy to cover lunch for your staff.", "a gift"],
-    ["We can talk about my fees.", "money or payment"],
+    ["Happy to pay you a referral fee.", "money or payment"],
     ["Thank you in exchange for referrals.", "something in return"],
   ])("refuses %s", (extra, why) => {
     const check = checkLetter(`${ok} ${extra}`);
