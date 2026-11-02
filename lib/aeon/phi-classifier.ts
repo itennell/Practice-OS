@@ -155,6 +155,28 @@ const AUDIENCE_WORDS = new Set(
   "Couples Couple Families Family Teens Teen Teenagers Children Kids Adults Adult Groups Group Parents Individuals Clients Veterans Students Seniors"
     .split(" "),
 );
+// Titles and credentials on their own ("Dr" split off "Dr. Zimmerman"), and the
+// words of official documents, programs and agencies ("Physician Fee Schedule",
+// "Child Abuse Hotline"). The model sometimes reads these as a person; a hit
+// made only of them (and AUDIENCE_WORDS) isn't one. A real name keeps at least
+// one word outside the list ("Jenny Key", "Grace Park").
+const NOT_NAME_WORDS = new Set(
+  (
+    "Dr Doctor Mr Mrs Ms Mx Miss Prof Professor Rev Hon Sir Madam MD DO PhD PsyD EdD LCSW LICSW LCPC LPC LPCC LMHC LMFT MFT NP PMHNP APRN RN " +
+    "Fee Fees Schedule Schedules Lookup Act Acts Code Codes Rule Rules Regulation Regulations Statute Statutes Manual Guide Guidance Handbook " +
+    "Report Reports Reporting Reporter Reporters Hotline Helpline Lifeline Notice Policy Policies Agreement Statement Bulletin Register Registry " +
+    "Directory Program Programs Benefit Benefits Plan Plans Coverage Claim Claims Billing Payment Payments Assessment Screening Physician Physicians " +
+    "Provider Providers Abuse Abused Neglect Neglected Protective Mandated Office Board Commission Division Bureau Agency Administration Committee Council " +
+    "Federal National Crisis Suicide Prevention Emergency Child Children"
+  ).split(" "),
+);
+
+/** False for a hit made only of titles, credentials, document or audience words. */
+export function isNameLike(name: string): boolean {
+  const words = name.split(/[\s.,'’-]+/).filter(Boolean);
+  return words.some((w) => !NOT_NAME_WORDS.has(w) && !AUDIENCE_WORDS.has(w));
+}
+
 // A second read costs one more model call, so each 1500-character slice gets at
 // most this many. Past the cap it does not fail closed: the first read still
 // covers every word, and the second read is an extra net for names with odd
@@ -163,11 +185,16 @@ const AUDIENCE_WORDS = new Set(
 // closed there would withhold official sources.
 const MAX_SECOND_READS = 24;
 
-export async function findNames(text: string): Promise<string[]> {
+export async function findNames(text: string, opts: { secondReads?: boolean } = {}): Promise<string[]> {
   const ner = await loadNameFinder();
   const names: string[] = [];
-  const located = (name: string, slice: string) =>
-    new RegExp(`(?<![\\p{L}\\p{N}])${escape(name)}${WORD_TAIL}`, "u").exec(slice)?.[0];
+  // As written: the model drops the dot in "M. Zimmerman", and a possessive
+  // ("Gary Bucher's") is the name, so the 's is left off.
+  const located = (name: string, slice: string) => {
+    const words = name.split(/\s+/).map(escape).join("\\.?\\s+");
+    const hit = new RegExp(`(?<![\\p{L}\\p{N}])${words}${WORD_TAIL}`, "u").exec(slice)?.[0];
+    return hit?.replace(/['’]s?$/u, "");
+  };
   const people = async (input: string) =>
     mergeEntities(await ner(input)).filter((e) => e.label === "PER" && e.score >= MIN_SCORE && e.text.length >= 2);
 
@@ -195,7 +222,7 @@ export async function findNames(text: string): Promise<string[]> {
         }
       }
       const name = found ?? text;
-      if (!AUDIENCE_WORDS.has(name)) names.push(name);
+      if (isNameLike(name)) names.push(name);
     }
 
     // Runs come from the slice as written, so a comma still separates "Fri, Nov 6".
@@ -206,9 +233,9 @@ export async function findNames(text: string): Promise<string[]> {
       if (names.some((n) => run.includes(n) || n.includes(run))) continue;
       runs.add(run);
     }
-    for (const run of [...runs].slice(0, MAX_SECOND_READS)) {
+    for (const run of [...runs].slice(0, opts.secondReads === false ? 0 : MAX_SECOND_READS)) {
       for (const e of await people(`I spoke with ${run} yesterday.`)) {
-        if (run.includes(e.text)) names.push(located(e.text, slice) ?? e.text);
+        if (run.includes(e.text) && isNameLike(e.text)) names.push(located(e.text, slice) ?? e.text);
       }
     }
   }

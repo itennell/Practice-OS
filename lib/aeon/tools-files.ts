@@ -119,17 +119,18 @@ export function fileTools(): AeonTool[] {
       const { screenText } = await import("../uploads/file");
       const screened = await screenText(raw, ctx.by);
       if (!screened.ok) return fail(screened.text);
+      // Stricter than the upload's tool-result check: the text goes to the model whole, so every
+      // kind the chat refuses in her own messages (birth date, diagnosis, contact, address...) withholds it.
+      // Checked first so she hears the real reason; an ID number gets the tax/ID line below.
+      const allow = await practiceAllowlist();
+      const phi = checkIdentity(normalizeForCheck(raw), { names: allow.names.map(normalizeForCheck), contacts: allow.contacts.map(normalizeForCheck) });
+      if (!phi.ok && phi.kind !== "identifier") {
+        await audit({ actor: "safety", action: "document_text_withheld", subjectType: "document", subjectId: doc.id, details: { reason: phi.kind, by: ctx.by } });
+        return fail(withheldText(phi.kind));
+      }
       if (screened.private_ || screened.text === null) {
         await audit({ actor: "safety", action: "document_text_withheld", subjectType: "document", subjectId: doc.id, details: { reason: "id_number", by: ctx.by } });
         return fail("This file has a tax or ID number in it, so its text stays on her computer and isn't sent to Muse. She can open it on the Files page and read it there.");
-      }
-      // Stricter than the upload's tool-result check: the text goes to the model whole, so every
-      // kind the chat refuses in her own messages (birth date, diagnosis, contact, address...) withholds it.
-      const allow = await practiceAllowlist();
-      const phi = checkIdentity(normalizeForCheck(raw), { names: allow.names.map(normalizeForCheck), contacts: allow.contacts.map(normalizeForCheck) });
-      if (!phi.ok) {
-        await audit({ actor: "safety", action: "document_text_withheld", subjectType: "document", subjectId: doc.id, details: { reason: phi.kind, by: ctx.by } });
-        return fail(withheldText(phi.kind));
       }
 
       const { uploadedCard } = await import("../documents");
