@@ -44,7 +44,7 @@ describe.skipIf(FRONT_DESK_ENABLED)("Front Desk is off", () => {
   });
 
   it("drops Front Desk from the menu; the phone card stays only as urgent alerts, Cal.com goes", () => {
-    expect(PRACTICE.map((l) => l.label)).toEqual(["Admin", "Approvals", "Referrals", "Media"]);
+    expect(PRACTICE.map((l) => l.label)).toEqual(["Admin", "Files", "Approvals", "Referrals", "Media"]);
     expect(PRACTICE.some((l) => l.href === "/front-desk")).toBe(false);
     const ids = CONNECTION_CARDS.map((c) => c.id);
     expect(ids).toContain("phone"); // "Urgent alerts to your phone": the crisis text needs a line

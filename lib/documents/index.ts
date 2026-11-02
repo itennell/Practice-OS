@@ -18,6 +18,7 @@ import type { ReleaseFields } from "../release/fields";
 import { getSuperbill, listSuperbills, summarize, type SuperbillRow } from "../superbill/store";
 import { DOC_KIND_LABEL } from "../uploads/classify";
 import { listStoredDocuments, getStoredDocument, type StoredDocument } from "../uploads/store";
+import { db } from "../db";
 import { DOCUMENT_KINDS, KIND_LABEL, type DocumentCard, type DocumentKind } from "./card";
 
 // The document index: every kind of paperwork Admin holds or can make, read from its
@@ -119,7 +120,7 @@ export function releaseDraftCard(draftId: string, fields: ReleaseFields, isSampl
   });
 }
 
-function releaseTemplateCards(isSample: boolean): DocumentCard[] {
+export function releaseTemplateCards(isSample: boolean): DocumentCard[] {
   return [
     card({
       id: "release_form:blank",
@@ -297,10 +298,83 @@ export function uploadedCard(d: Pick<StoredDocument, "id" | "kind" | "title" | "
   });
 }
 
+/** An introduction letter Aeon drafted for a referral source (an approvals row, kind referral_letter). */
+export type LetterRow = { id: string; title: string; subject: string | null; status: string; is_sample: boolean; created_at: Date };
+
+const LETTER_STATUS: Record<string, string> = { pending: "Waiting for you", running: "Approved", done: "Approved", failed: "Failed", rejected: "Declined" };
+
+export function referralLetterCard(l: LetterRow): DocumentCard {
+  const made = new Date(l.created_at).toISOString().slice(0, 10);
+  return card({
+    id: `referral_letter:${l.id}`,
+    kind: "referral_letter",
+    title: l.title.slice(0, 160),
+    subtitle: [l.subject, `Drafted ${niceDate(made)}`].filter(Boolean).join(" · ").slice(0, 240),
+    status: LETTER_STATUS[l.status] ?? "Draft",
+    topics: words(l.title, l.subject, "referral letter introduction outreach intro"),
+    // A letter waiting for her opens in Approvals; once approved she copies it from the Referrals board.
+    open: l.status === "pending" ? "/approvals" : "/referrals",
+    needs_her: l.status === "pending" ? "Read it and approve it in Approvals." : l.status === "done" ? "Copy it from the Referrals board and send it from your own email." : null,
+    is_sample: l.is_sample,
+  });
+}
+
+/** The latest introduction letters, newest first. Read straight from approvals; the provider is a referral source, never a client. */
+export async function listReferralLetters(limit = 30, id?: string): Promise<LetterRow[]> {
+  const sql = db();
+  return sql<LetterRow[]>`
+    select a.id, a.title, coalesce(a.result #>> '{letter,subject}', a.payload ->> 'subject') as subject, a.status,
+           coalesce(s.is_sample, false) as is_sample, a.created_at
+      from practice_os.approvals a
+      left join practice_os.referral_sources s on s.id::text = a.payload ->> 'referral_source_id'
+     where a.kind = 'referral_letter' and ${id ? sql`a.id = ${id}` : sql`true`}
+     order by a.created_at desc
+     limit ${limit}`.catch(() => []);
+}
+
+/** An Instagram post Aeon wrote (practice_os.posts). Ideas and blocked drafts are left out. */
+export type PostRow = { id: string; headline: string | null; caption: string; status: string; has_image: boolean; is_sample: boolean; created_at: Date };
+
+const POST_STATUS: Record<string, string> = {
+  draft: "Draft",
+  pending_approval: "Waiting for you",
+  ready: "Ready to post",
+  scheduled: "Ready to post",
+  publishing: "Ready to post",
+  published: "Posted",
+  failed: "Failed",
+};
+
+export function instagramPostCard(p: PostRow): DocumentCard {
+  const made = new Date(p.created_at).toISOString().slice(0, 10);
+  const firstLine = p.caption.split("\n")[0].trim();
+  return card({
+    id: `instagram_post:${p.id}`,
+    kind: "instagram_post",
+    title: (p.headline?.trim() || firstLine || "Instagram post").slice(0, 160),
+    subtitle: `Written ${niceDate(made)}${p.has_image ? " · with its picture" : ""}`,
+    status: POST_STATUS[p.status] ?? "Draft",
+    topics: words(p.headline, firstLine, "instagram post caption picture media social"),
+    open: "/media/instagram",
+    needs_her: p.status === "pending_approval" ? "Approve it in Approvals, then post it yourself from the Instagram app." : null,
+    is_sample: p.is_sample,
+  });
+}
+
+export async function listInstagramPosts(limit = 30, id?: string): Promise<PostRow[]> {
+  const sql = db();
+  return sql<PostRow[]>`
+    select id, headline, caption, status, image_jpeg is not null as has_image, is_sample, created_at
+      from practice_os.posts
+     where status not in ('idea', 'blocked') and ${id ? sql`id = ${id}` : sql`true`}
+     order by created_at desc
+     limit ${limit}`.catch(() => []);
+}
+
 /** Every document Practice-OS holds or can make, built from the live rows. */
 export async function allDocuments(): Promise<DocumentCard[]> {
   const today = await practiceToday();
-  const [deadlines, estimates, bills, apps, profile, caqh, uploads, clientForms] = await Promise.all([
+  const [deadlines, estimates, bills, apps, profile, caqh, uploads, clientForms, letters, posts] = await Promise.all([
     deadlinesView(365),
     listEstimates(20),
     listSuperbills(20).catch(() => []),
@@ -309,6 +383,8 @@ export async function allDocuments(): Promise<DocumentCard[]> {
     caqhCard(),
     listStoredDocuments(30),
     clientFormCards().catch(() => []),
+    listReferralLetters(10),
+    listInstagramPosts(10),
   ]);
   return [
     ...deadlines.due.map((o) => deadlineCard(o, today)),
@@ -322,6 +398,8 @@ export async function allDocuments(): Promise<DocumentCard[]> {
     ...clientForms,
     ...allGuides().map(guideCard),
     ...uploads.map(uploadedCard),
+    ...letters.map(referralLetterCard),
+    ...posts.map(instagramPostCard),
   ];
 }
 
@@ -339,6 +417,8 @@ const KIND_WORDS: Record<DocumentKind, string[]> = {
   caqh_checklist: ["caqh", "attest", "reattest", "attestation", "checklist"],
   guide: ["how", "guide", "steps"],
   uploaded: ["uploaded", "added", "contract", "letter", "certificate", "w9", "malpractice", "fee", "schedule"],
+  referral_letter: ["referral", "referrals", "letter", "letters", "intro", "introduction", "outreach"],
+  instagram_post: ["instagram", "post", "posts", "caption", "picture", "social"],
 };
 
 export type FindQuery = { query?: string; kind?: DocumentKind; payer?: string; due_within_days?: number };
@@ -429,6 +509,14 @@ export async function openDocument(id: string): Promise<DocumentCard | null> {
     case "uploaded": {
       const d = UUID.test(key) ? await getStoredDocument(key) : null;
       return d ? uploadedCard(d) : null;
+    }
+    case "referral_letter": {
+      const [l] = UUID.test(key) ? await listReferralLetters(1, key) : [];
+      return l ? referralLetterCard(l) : null;
+    }
+    case "instagram_post": {
+      const [p] = UUID.test(key) ? await listInstagramPosts(1, key) : [];
+      return p ? instagramPostCard(p) : null;
     }
     case "guide": {
       const g = /^[a-z0-9-]+$/.test(key) ? getGuide(key) : null;

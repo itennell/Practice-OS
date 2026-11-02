@@ -19,6 +19,8 @@ export const DOCUMENT_KINDS = [
   "caqh_checklist",
   "guide",
   "uploaded",
+  "referral_letter",
+  "instagram_post",
 ] as const;
 export type DocumentKind = (typeof DOCUMENT_KINDS)[number];
 
@@ -35,6 +37,8 @@ export const KIND_LABEL: Record<DocumentKind, string> = {
   caqh_checklist: "CAQH checklist",
   guide: "How-do-I guide",
   uploaded: "Your document",
+  referral_letter: "Referral letter",
+  instagram_post: "Instagram post",
 };
 
 /** A link inside the app: one leading slash, never "//" (another site) or a backslash. */
