@@ -4,7 +4,7 @@ import { loadApprovalSettings } from "../approval-settings";
 import { db } from "../db";
 import { localDate, whenLabel } from "./calendar/zone";
 import { deps } from "./deps";
-import { prettyPhone } from "./phone/numbers";
+import { approvalWho, maskPhone } from "./redact";
 import { isOptedOut, practice, type BookingRow } from "./store";
 import { reminderText } from "./templates";
 
@@ -45,8 +45,8 @@ export async function queueReminders(): Promise<number> {
     await withOrigin({ rule: "front_desk", rules: { ...frontDesk, text_missed_callers: frontDesk.send_reminders } }, () =>
       queueApproval({
         kind: "sms_reply",
-        title: `Remind ${b.contact_name ?? prettyPhone(b.contact_phone!)} about tomorrow's consult`,
-        preview: { to: prettyPhone(b.contact_phone!), text: body },
+        title: `Remind ${approvalWho(b.contact_name, b.contact_phone)} about tomorrow's consult`,
+        preview: { to: maskPhone(b.contact_phone), text: body },
         payload: { inquiry_id: b.inquiry_id, booking_id: b.id, to: b.contact_phone, body, purpose: "reminder" },
         createdBy: "front_desk",
       }),
