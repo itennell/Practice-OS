@@ -7,6 +7,7 @@ const TABS = [
   { href: "/media", label: "Psychology Today and directories" },
   { href: "/media/website", label: "Website" },
   { href: "/media/instagram", label: "Instagram" },
+  { href: "/media/grow", label: "Grow" },
 ];
 
 /** Media's three tabs: where she lists herself, her website, and Instagram (left out if she said it isn't for her). */

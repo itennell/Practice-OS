@@ -28,6 +28,8 @@ const KIND_LABEL: Record<string, string> = {
   gfe_issue: "Good Faith Estimate",
   aeon_action: "Change Aeon wants to make",
   file_document: "File a document",
+  ads_campaign: "Ad campaign draft",
+  website: "Website draft",
 };
 
 type Filter = "waiting" | "done" | "declined" | "all";

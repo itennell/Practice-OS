@@ -31,6 +31,9 @@ export const KIND_POLICY: Record<ApprovalKind, { helper: Helper; tier: Tier }> =
   text_consult_options: { helper: "front_desk", tier: "sensitive" },
   // What an uploaded document says changes her records only when she taps Approve, in every mode.
   file_document: { helper: "admin", tier: "clinician_only" },
+  // Grow: public words and ad budgets wait for her tap in every mode.
+  ads_campaign: { helper: "instagram", tier: "clinician_only" },
+  website: { helper: "instagram", tier: "clinician_only" },
 };
 
 // text_missed_callers: a missed caller gets a text with open consult times.

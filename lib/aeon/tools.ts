@@ -47,6 +47,7 @@ import { findReferralSources, getSource, interleave, listSources, moveSource, ST
 import * as documents from "../documents";
 import { DOCUMENT_KINDS, forModel, type DocumentCard } from "../documents/card";
 import { guard, WITHHELD } from "./guard";
+import { GROWTH_ALWAYS_RUNS, GROWTH_TOOLS } from "./tools-growth";
 import { forget, MEMORY_KINDS, MemoryRefused, recentChanges, remember } from "./memory";
 
 export type ToolContext = {
@@ -71,7 +72,7 @@ const QUEUEABLE_KINDS = APPROVAL_KINDS.filter((k) => k !== "aeon_action") as [Ex
  * Nor do the Media writers: their drafts stay on her computer until she pastes them.
  * They still count as changes, so the view-only demo copy refuses them (no writes, no Muse).
  */
-const ALWAYS_RUNS = new Set(["remember", "forget", "post_ideas", "weekly_plan", "draft_post", "plan_instagram_week", "draft_instagram_post", "directory_profile", "pt_profile_interview", "website_help"]);
+const ALWAYS_RUNS = new Set(["remember", "forget", "post_ideas", "weekly_plan", "draft_post", "plan_instagram_week", "draft_instagram_post", "directory_profile", "pt_profile_interview", "website_help", ...GROWTH_ALWAYS_RUNS]);
 
 export type ToolResult = {
   content: { type: "text"; text: string }[];
@@ -1572,6 +1573,7 @@ export const TOOLS: AeonTool[] = [
       });
     },
   }),
+  ...GROWTH_TOOLS,
 ];
 
 export const TOOLS_BY_NAME = new Map(TOOLS.map((t) => [t.name, t]));
