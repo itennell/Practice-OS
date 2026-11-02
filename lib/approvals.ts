@@ -1,6 +1,7 @@
 import { audit } from "./audit";
 import { db } from "./db";
 import { isDryRun } from "./env";
+import { FRONT_DESK_APPROVAL_KINDS, FRONT_DESK_ENABLED } from "./features";
 import { editableField, executors } from "./executors";
 import type { ApprovalKind } from "./approval-kinds";
 import { currentOrigin, shouldAutoRun } from "./approval-policy";
@@ -43,7 +44,8 @@ export function toView(row: ApprovalRow): ApprovalView {
  */
 export const visibleKind = () =>
   db()`not (kind = 'instagram_post' and exists (
-         select 1 from practice_os.clinician_profile where onboarding_answers -> 'instagram' ->> 'account' = 'no'))`;
+         select 1 from practice_os.clinician_profile where onboarding_answers -> 'instagram' ->> 'account' = 'no'))
+       and (${FRONT_DESK_ENABLED} or kind <> all(${db().array([...FRONT_DESK_APPROVAL_KINDS])}))`;
 
 /** Pending first, then the most recent decisions. */
 export async function listApprovals(opts: { includeDecided?: boolean; limit?: number } = {}) {

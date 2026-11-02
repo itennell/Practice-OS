@@ -39,9 +39,11 @@ test("Menu: Aeon, New chat, search, practice links with counts, recent chats and
   await expect(menu.getByRole("button", { name: "New chat" })).toBeVisible();
   await expect(menu.getByRole("searchbox", { name: "Search chats" })).toBeVisible();
   const main = menu.getByRole("navigation", { name: "Main" });
-  for (const name of [/^Admin/, /^Approvals/, "Referrals", "Media", "Front Desk"]) {
+  for (const name of [/^Admin/, /^Approvals/, "Referrals", "Media"]) {
     await expect(main.getByRole("link", { name })).toBeVisible();
   }
+  // Front Desk is paused (lib/features.ts): three helpers in the menu.
+  await expect(main.getByRole("link", { name: "Front Desk" })).toHaveCount(0);
   // The seeded practice has approvals waiting; the count is part of the link's name.
   await expect(main.getByRole("link", { name: /^Approvals \d+ waiting$/ })).toHaveAttribute("aria-current", "page");
   await expect(menu.getByRole("link", { name: /Dana Reyes, LCPC/ })).toBeVisible();

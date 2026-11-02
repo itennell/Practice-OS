@@ -66,6 +66,7 @@ test("Instagram needs no connection: Aeon writes posts with her, she posts them"
 });
 
 test("The phone card walks her through her own Twilio number, one step at a time", async ({ page }) => {
+  test.skip(true, "Front Desk is paused (lib/features.ts FRONT_DESK_ENABLED = false); turn these back on with it.");
   test.skip(process.env.FRONT_DESK_DEV_TWILIO === "true", "The developer demo line is on, so the phone card shows it instead.");
   await page.goto("/settings/connections");
   await page.evaluate(() => localStorage.removeItem("practice-os:twilio-setup"));

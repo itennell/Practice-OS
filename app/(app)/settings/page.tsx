@@ -10,6 +10,7 @@ import { MEMORY_CAP_CHARS, usedChars } from "@/lib/aeon/memory-ops";
 import { SOUL_PATH, soul } from "@/lib/aeon/soul";
 import { loadPracticeSettings } from "@/lib/gfe/store";
 import { DefaultModeSetting, FrontDeskRules } from "@/components/approval-settings";
+import { FRONT_DESK_ENABLED } from "@/lib/features";
 import { loadApprovalSettings } from "@/lib/approval-settings";
 
 export const metadata: Metadata = { title: "Settings · Practice-OS" };
@@ -23,7 +24,7 @@ export default function Page() {
           <h2 id="connections-heading" className="text-section font-semibold">
             Connections
           </h2>
-          <p className="max-w-[52ch] text-[var(--fg-muted)]">Aeon&rsquo;s Muse key, Google, Instagram and your phone. Each one turns on with a Connect button.</p>
+          <p className="max-w-[52ch] text-[var(--fg-muted)]">Aeon&rsquo;s Muse key, Google and Instagram. Each one turns on with a Connect button.</p>
         </div>
         <ButtonLink variant="quiet" href="/settings/connections">
           Open Connections
@@ -57,6 +58,7 @@ async function Modes() {
         </div>
         <DefaultModeSetting initial={mode} />
       </GlassCard>
+      {FRONT_DESK_ENABLED && (
       <GlassCard aria-labelledby="front-desk-heading" className="flex max-w-3xl flex-col gap-2 p-6 md:p-8">
         <div className="flex flex-col gap-1">
           <h2 id="front-desk-heading" className="text-section font-semibold">
@@ -66,6 +68,7 @@ async function Modes() {
         </div>
         <FrontDeskRules initial={frontDesk} />
       </GlassCard>
+      )}
     </>
   );
 }

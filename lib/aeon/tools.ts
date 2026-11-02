@@ -19,6 +19,7 @@ import * as cred from "../credentialing/store";
 import { getForm } from "../client-forms";
 import { FORM_IDS, type FormId } from "../client-forms/types";
 import { db } from "../db";
+import { toolEnabled } from "../features";
 import { isDryRun } from "../env";
 import { money } from "../gfe/build";
 import * as gfe from "../gfe/store";
@@ -1572,7 +1573,7 @@ export const TOOLS: AeonTool[] = [
       });
     },
   }),
-];
+].filter((t) => toolEnabled(t.name)); // Front Desk is paused (lib/features.ts)
 
 export const TOOLS_BY_NAME = new Map(TOOLS.map((t) => [t.name, t]));
 

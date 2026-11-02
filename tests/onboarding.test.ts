@@ -133,8 +133,9 @@ describe("onboarding chapters", () => {
 
   it("starts the right helpers for each stage", () => {
     expect(firstFor("beginning").helpers).toEqual(["admin", "referrals"]);
-    expect(firstFor("middle").helpers).toEqual(["referrals", "instagram", "front_desk"]);
-    expect(firstFor("late").helpers).toEqual(["front_desk", "admin"]);
+    // Front Desk is paused (lib/features.ts), so no stage starts it.
+    expect(firstFor("middle").helpers).toEqual(["referrals", "instagram"]);
+    expect(firstFor("late").helpers).toEqual(["admin"]);
   });
 
   it("reads phone numbers and tax IDs the way people type them", () => {

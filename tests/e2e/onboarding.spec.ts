@@ -148,11 +148,8 @@ test("A new clinician sets up the whole practice, and the home page lists what s
     if ((await oncology.getAttribute("aria-pressed")) !== "true") await oncology.click();
     await expect(oncology).toHaveAttribute("aria-pressed", "true");
   });
-  // Front Desk's own setup questions (lib/frontdesk/onboarding.ts).
-  // Skipping the greeting keeps the suggested one, shown on the Front Desk page.
-  await step(page, /voicemail greeting/, none, "skip");
+  // Front Desk's setup questions (voicemail greeting, "miss a call") are left out while it is paused (lib/features.ts).
   await step(page, /How should I ask/, () => radio(page, /Ask me first/));
-  await step(page, /miss a call/, () => radio(page, "No"));
 
   // 8 · Your team, then home.
   await expect(heading(page)).toHaveText("Meet your team");

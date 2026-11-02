@@ -2,6 +2,8 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { execSync } from "node:child_process";
 
+test.skip(true, "Front Desk is paused (lib/features.ts FRONT_DESK_ENABLED = false); turn these back on with it.");
+
 // "Test your Front Desk": a [Sample] voicemail goes through the real pipeline,
 // shows in the Inbox with masked number, transcript and safety check, and its
 // consult-times text waits in Approvals; approving it in DRY_RUN only logs.

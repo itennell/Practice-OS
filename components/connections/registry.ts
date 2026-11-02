@@ -2,6 +2,7 @@ import type { ComponentType } from "react";
 import { GoogleCard } from "./google-card";
 import { InstagramCard } from "./instagram-card";
 import { MuseCard } from "./muse-card";
+import { FRONT_DESK_ENABLED } from "@/lib/features";
 import { CalcomConnectionCard } from "./calcom-card";
 import { PhoneConnectionCard } from "./phone-card";
 
@@ -31,7 +32,11 @@ export const CONNECTION_CARDS: ConnectionCard[] = [
   // Instagram: publishing is cut for now (Isaiah, 2026-10-29). The card only says there is
   // nothing to connect (Aeon writes, she posts); relay/ stays in the repo for later.
   { id: "instagram", order: 30, Card: InstagramCard },
-  // Front Desk
-  { id: "phone", order: 40, Card: PhoneConnectionCard },
-  { id: "calcom", order: 50, Card: CalcomConnectionCard },
+  // Front Desk (paused: lib/features.ts)
+  ...(FRONT_DESK_ENABLED
+    ? [
+        { id: "phone", order: 40, Card: PhoneConnectionCard },
+        { id: "calcom", order: 50, Card: CalcomConnectionCard },
+      ]
+    : []),
 ];

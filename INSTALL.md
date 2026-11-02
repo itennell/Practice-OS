@@ -51,8 +51,6 @@ Only the Muse key is needed to start. Instagram needs no connection: Aeon writes
 | What | Needed for | Cost | Time | Guide |
 |---|---|---|---|---|
 | Muse key (Meta) | Aeon answering at all | Per use, on her own Meta account | 5 minutes | [muse.md](docs/self-hosting/muse.md) |
-| Cal.com | Front Desk offering consult times | Free plan works | 10 minutes | [calcom.md](docs/self-hosting/calcom.md) |
-| Practice phone (Twilio) | Front Desk answering voicemails and texts | About $2 a month for the number, plus a little per call and text | 20 minutes, then 3 to 15 business days before texts go out | [phone.md](docs/self-hosting/phone.md) |
 | Google (Gmail drafts) | Referral letters as Gmail drafts | Free | Later: not ready for self-hosting yet | [google.md](docs/self-hosting/google.md) |
 
 How to help her with each one:
