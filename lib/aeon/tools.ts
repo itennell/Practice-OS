@@ -1197,7 +1197,7 @@ export const TOOLS: AeonTool[] = [
       if (looksLikeEdit(request)) {
         const rev = await revisePost(ctx.by, request, { chat: ctx.chat });
         if (rev.outcome === "revised") return text({ written: true, revised_existing: true, headline: rev.headline, approval_id: rev.approvalId, see: "/media/instagram" });
-        if (rev.outcome !== "none") return text({ written: false, why: rev.why });
+        if (rev.outcome !== "none") return text({ written: false, revised_existing: false, why: rev.why });
       }
       const r = await instagram.requestPost(ctx.by, request, pillar ?? null, { chat: ctx.chat });
       if (r.outcome === "blocked" || r.outcome === "declined") return text({ written: false, why: r.why });
@@ -1410,7 +1410,7 @@ export const TOOLS: AeonTool[] = [
       "If it returns questions, ask them one or two at a time in plain words, then call again with her answers. " +
       "Each box fits Psychology Today's limit and is checked: no advice, client stories, testimonials, promises or rankings. " +
       "Tell her to read each box and make it hers before she pastes it (Psychology Today asks that AI text be personalized), and that the Media page has a Copy button for each box. " +
-      "For a rewrite ('make it warmer', 'shorter'), pass only tone: her saved answers are kept. Pass focus, approach and the rest only when she just gave you those words.",
+      "For a rewrite ('make it warmer', 'shorter'), pass only tone. Her saved answers are never overwritten here: answers fill only questions she hasn't answered yet (she changes an answer in the Psychology Today interview).",
     input: {
       focus: z.string().max(200).optional().describe("What people most often come to her for, in her words."),
       approach: z.string().max(200).optional().describe("How she likes to work, in her words."),
@@ -1420,21 +1420,24 @@ export const TOOLS: AeonTool[] = [
       years_in_practice: z.number().int().min(0).max(70).optional(),
       free_consult_minutes: z.union([z.literal(0), z.literal(15), z.literal(20), z.literal(30)]).optional().describe("0 if she offers no free consult."),
       tone: z.string().max(200).optional().describe("For a rewrite: the tone or style she asked for, e.g. 'warmer'. Her answers stay as they are."),
-      replace_answers: z.boolean().optional().describe("Only when she says an answer she gave before is wrong and gives a new one."),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: false },
     label: "Wrote your Psychology Today profile",
     changesData: true,
-    run: async (input: { focus?: string; approach?: string; first_session?: string; why?: string; languages?: string; years_in_practice?: number; free_consult_minutes?: 0 | 15 | 20 | 30; tone?: string; replace_answers?: boolean }, ctx) => {
+    run: async (input: { focus?: string; approach?: string; first_session?: string; why?: string; languages?: string; years_in_practice?: number; free_consult_minutes?: 0 | 15 | 20 | 30; tone?: string }, ctx) => {
       const facts = await import("../media/facts");
       const profile = await import("../media/profile");
-      // A rewrite never overwrites what she already answered (a "warmer" rewrite once replaced her answers with seed text).
-      const saved = await facts.loadMediaAnswers();
-      const given = Object.fromEntries(
-        Object.entries({ focus: input.focus, approach: input.approach, firstSession: input.first_session, why: input.why, languages: input.languages, yearsInPractice: input.years_in_practice, freeConsultMinutes: input.free_consult_minutes }).filter(
-          ([k, v]) => v !== undefined && (input.replace_answers || saved[k as keyof typeof saved] === "" || saved[k as keyof typeof saved] === null || (k === "freeConsultMinutes" && saved.freeConsultMinutes === 0)),
-        ),
-      );
+      // Answers only fill what she hasn't answered; nothing the model passes overwrites her saved words
+      // (a "warmer" rewrite once replaced her answers with seed text).
+      const given = facts.onlyUnanswered(await facts.loadMediaAnswers(), {
+        focus: input.focus,
+        approach: input.approach,
+        firstSession: input.first_session,
+        why: input.why,
+        languages: input.languages,
+        yearsInPractice: input.years_in_practice,
+        freeConsultMinutes: input.free_consult_minutes,
+      });
       try {
         if (Object.keys(given).length) await facts.saveMediaAnswers(given);
       } catch (err) {

@@ -5,6 +5,7 @@
 // topic gate, facts lint, critic) and nothing is posted: she approves, downloads
 // and posts it herself.
 import { z } from "zod";
+import { db } from "../db";
 import { revisePost } from "../instagram/revise";
 import { makeProject, type MakeEvent } from "../studio/store";
 import type { AeonTool, ToolContext, ToolResult } from "./tools";
@@ -13,6 +14,15 @@ const text = (value: unknown): ToolResult => ({ content: [{ type: "text", text: 
 
 /** Where the studio lives; it opens on her newest project, the one just made. */
 export const STUDIO_PAGE = "/media/instagram";
+
+/** Each studio make spends web research and a picture: at most this many a day from chat or MCP. */
+export const STUDIO_DAILY_CAP = 8;
+export const CAP_REACHED = `I've made ${STUDIO_DAILY_CAP} studio posts today, which is the daily limit. You can change the ones you have, or ask again tomorrow.`;
+
+async function madeToday(): Promise<number> {
+  const [row] = await db()<{ n: number }[]>`select count(*)::int as n from practice_os.studio_projects where created_at >= date_trunc('day', now())`;
+  return row?.n ?? 0;
+}
 
 function tool<I extends z.ZodRawShape>(
   def: Omit<AeonTool, "run" | "input"> & { input: I; run: (input: z.infer<z.ZodObject<I>>, ctx: ToolContext) => Promise<ToolResult> },
@@ -43,6 +53,7 @@ export const MEDIA_TOOLS: AeonTool[] = [
     label: "Made it in the studio",
     changesData: true,
     run: async ({ request, kind }, ctx) => {
+      if ((await madeToday()) >= STUDIO_DAILY_CAP) return text({ made: false, why: CAP_REACHED });
       const events: MakeEvent[] = [];
       const project = await makeProject(ctx.by, studioRequest(request, kind), (e) => events.push(e), { chat: ctx.chat });
       const stop = events.find((e) => e.type === "stop");

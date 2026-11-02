@@ -88,7 +88,7 @@ function who(f: MediaFacts): string {
 
 function consultLine(f: MediaFacts): string {
   const m = f.answers.freeConsultMinutes;
-  return m ? `You can book a free ${m}-minute call to see if we're a good fit.` : "You're welcome to email or call with a question before you book.";
+  return m ? `You can book a free ${m}-minute call to see if I'm the right fit for you.` : "You're welcome to email or call with a question before you book.";
 }
 
 function feeLine(f: MediaFacts): string {
@@ -118,7 +118,7 @@ export function templateFields(f: MediaFacts): Record<PtTextId, string> {
     ),
     statement_approach: join(a.approach ? sentence(`How I work: ${lowerFirst(a.approach)}`) : "", a.firstSession ? sentence(`In a first session, ${lowerFirst(a.firstSession)}`) : ""),
     statement_about: join(`I'm ${f.name}, ${f.credential}.`, years, sentence(a.why), `I run ${f.practiceName} in ${where}.`, langs),
-    intro: f.answers.freeConsultMinutes ? `Free ${f.answers.freeConsultMinutes}-minute call to see if we're a good fit.` : "Questions before you book? Email or call me.",
+    intro: f.answers.freeConsultMinutes ? `Free ${f.answers.freeConsultMinutes}-minute call to see if I'm the right fit for you.` : "Questions before you book? Email or call me.",
     note_finance: feeLine(f),
     note_credentials: join(`I'm a ${TITLE_WORDS[f.credential] ?? f.credential} (${f.credential}), licensed in ${stateName(f)}.`, years, f.education[0] ? sentence(`Education: ${f.education[0]}`) : ""),
     note_top_specialties: join(f.pt.topSpecialties.length ? `I focus most on ${list(f.pt.topSpecialties)}.` : "", a.focus ? sentence(`People most often come to me for ${lowerFirst(a.focus)}`) : ""),

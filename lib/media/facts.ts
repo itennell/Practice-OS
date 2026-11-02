@@ -11,6 +11,7 @@ import { guard, REFUSAL } from "../aeon/guard";
 import { loadCredentialingProfile } from "../credentialing/store";
 import { loadPracticeSettings } from "../gfe/store";
 import { listPayerApplications } from "../payers/store";
+import { loadPolicies } from "../client-forms/store";
 import { parsePt, type PtAnswers } from "./pt-answers";
 
 export type MediaAnswers = {
@@ -26,9 +27,11 @@ export type MediaAnswers = {
   yearsInPractice: number | null;
   /** 0 = no free consult. */
   freeConsultMinutes: 0 | 15 | 20 | 30;
+  /** She answered the free consult question, so 0 really means "no free consult". */
+  consultAsked: boolean;
 };
 
-export const EMPTY_ANSWERS: MediaAnswers = { why: "", firstSession: "", focus: "", approach: "", languages: "", yearsInPractice: null, freeConsultMinutes: 0 };
+export const EMPTY_ANSWERS: MediaAnswers = { why: "", firstSession: "", focus: "", approach: "", languages: "", yearsInPractice: null, freeConsultMinutes: 0, consultAsked: false };
 
 export type MediaFacts = {
   name: string;
@@ -51,8 +54,10 @@ export type MediaFacts = {
   website: string | null;
   /** From the marketing interview: has a site, would like one, or not for her. */
   websiteStatus: "has" | "wants" | "no" | null;
-  /** School, degree and year lines from her credentialing profile. */
+  /** School, degree and year lines she gave (her Psychology Today answer, else a real credentialing record; never sample data). */
   education: string[];
+  /** Sliding scale or reduced fees: her Psychology Today answer, else her saved client-form policies; null when she hasn't said. */
+  slidingScale: boolean | null;
   isSample: boolean;
   answers: MediaAnswers;
   /** Her Psychology Today interview answers (pick-lists and short facts). */
@@ -80,12 +85,28 @@ export const answersSchema = z
     languages: text(80),
     yearsInPractice: z.number().int().min(0).max(70).nullable(),
     freeConsultMinutes: z.union([z.literal(0), z.literal(15), z.literal(20), z.literal(30)]),
+    consultAsked: z.boolean(),
   })
   .strict();
 
 export function parseAnswers(raw: unknown): MediaAnswers {
   const r = answersSchema.partial().safeParse(raw ?? {});
   return { ...EMPTY_ANSWERS, ...(r.success ? r.data : {}) } as MediaAnswers;
+}
+
+/**
+ * The given answers for questions she hasn't answered yet; everything she already
+ * answered is kept as she said it. The consult counts as answered once she was asked,
+ * even when her answer was "no" (0).
+ */
+export function onlyUnanswered(saved: MediaAnswers, given: Partial<Omit<MediaAnswers, "consultAsked">>): Partial<MediaAnswers> {
+  const out: Partial<MediaAnswers> = {};
+  for (const [k, v] of Object.entries(given) as [keyof MediaAnswers, MediaAnswers[keyof MediaAnswers] | undefined][]) {
+    if (v === undefined) continue;
+    const empty = k === "freeConsultMinutes" ? !saved.consultAsked && !saved.freeConsultMinutes : saved[k] === "" || saved[k] === null;
+    if (empty) (out as Record<string, unknown>)[k] = v;
+  }
+  return out;
 }
 
 /** Which questions she hasn't answered yet (languages and years may stay empty). */
@@ -117,7 +138,8 @@ export async function checkAnswerText(value: string, by = "clinician"): Promise<
 
 export async function saveMediaAnswers(input: unknown): Promise<MediaAnswers> {
   const current = await loadMediaAnswers();
-  const merged = answersSchema.parse({ ...current, ...(input as object) });
+  const given = (input ?? {}) as Record<string, unknown>;
+  const merged = answersSchema.parse({ ...current, ...given, ...("freeConsultMinutes" in given ? { consultAsked: true } : {}) });
   for (const k of ["why", "firstSession", "focus", "approach", "languages"] as const) await checkAnswerText(merged[k]);
   await db()`
     update practice_os.clinician_profile
@@ -136,7 +158,7 @@ export async function loadMediaFacts(): Promise<MediaFacts> {
     { full_name: string; credential: string; practice_name: string; neighborhood: string | null; city: string; state: string; is_sample: boolean; answers: Record<string, unknown> | null }[]
   >`select full_name, credential, practice_name, neighborhood, city, state, is_sample, onboarding_answers as answers from practice_os.clinician_profile limit 1`;
   if (!p) throw new Error("Finish setting up your practice first, so Aeon knows what to write.");
-  const [cred, settings, payers] = await Promise.all([loadCredentialingProfile(), loadPracticeSettings(), listPayerApplications()]);
+  const [cred, settings, payers, policies] = await Promise.all([loadCredentialingProfile(), loadPracticeSettings(), listPayerApplications(), loadPolicies()]);
   const a = p.answers ?? {};
   const loc = cred?.practiceLocation;
   const media = (a.media ?? {}) as Record<string, unknown>;
@@ -159,8 +181,13 @@ export async function loadMediaFacts(): Promise<MediaFacts> {
     whoIHelp: typeof a.who_i_help === "string" ? a.who_i_help : "",
     website: typeof marketing.website_url === "string" ? marketing.website_url : null,
     websiteStatus: marketing.website === "has" || marketing.website === "wants" || marketing.website === "no" ? marketing.website : null,
-    // What she told the Psychology Today interview wins over the credentialing record (which may still hold sample data).
-    education: pt.education ? [pt.education] : (cred?.education ?? []).filter((e) => e.school).map((e) => [e.degree, e.school, e.graduated].filter(Boolean).join(", ")),
+    // What she told the Psychology Today interview wins; a sample credentialing record never feeds a box or the school check.
+    education: pt.education
+      ? [pt.education]
+      : cred?.isSample
+        ? []
+        : (cred?.education ?? []).filter((e) => e.school && !/\[sample\]/i.test(e.school)).map((e) => [e.degree, e.school, e.graduated].filter(Boolean).join(", ")),
+    slidingScale: pt.slidingScale ?? (policies.saved && typeof policies.policies.offers_sliding_scale === "boolean" ? policies.policies.offers_sliding_scale : null),
     isSample: p.is_sample,
     answers: parseAnswers(media.answers),
     pt,

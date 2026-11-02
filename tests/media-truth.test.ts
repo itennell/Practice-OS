@@ -11,9 +11,12 @@ import { DANA } from "./media-fixtures";
 import { codeCritic } from "../lib/instagram/critic";
 import { captionOf, criticContext, repaired, stockPhrases, type PracticeFacts } from "../lib/instagram/write";
 import { blocks, lintText } from "../lib/media/lint";
-import { assemble, draftProfile, type ChatFn } from "../lib/media/profile";
+import { assemble, draftProfile, templateFields, type ChatFn } from "../lib/media/profile";
 import { TEXT_IDS } from "../lib/media/schema";
-import { factProblems, feeText, fixFeeLabels, repairCopy, tidyOwnWords, truthOf } from "../lib/media/truth";
+import { dropFiller, factProblems, feeText, firstPerson, fixCadence, fixFeeLabels, priceMentions, repairCopy, splitPlaceholders, tidyOwnWords, truthOf } from "../lib/media/truth";
+import { onlyUnanswered } from "../lib/media/facts";
+import { templatePages } from "../lib/media/website";
+import { TOOLS_BY_NAME } from "../lib/aeon/tools";
 import { emptyDoc, type StudioDoc } from "../lib/studio/doc";
 import { syncFacts } from "../lib/studio/facts-sync";
 import { looksLikeEdit } from "../lib/instagram/revise";
@@ -83,20 +86,123 @@ describe("plain-code repairs", () => {
     expect(feeText(FACTS.fees[1])).toBe("$150 for a therapy session (38-52 minutes)");
   });
 
-  it("says superbills come on request, drops filler and writes as I", () => {
-    const out = repairCopy("Monthly superbills make it easy. No pressure, just reach out. We offer video sessions. Call us today.", TRUTH);
-    expect(out).toBe("Superbills on request make it easy. I offer video sessions. Call me today.");
+  it("says superbills come on request, drops only the filler clause and writes as I", () => {
+    const out = repairCopy("Superbills go out monthly. No pressure, just reach out. We offer video sessions. Call us today.", TRUTH);
+    expect(out).toBe("I can give you a superbill on request. Just reach out. I offer video sessions. Call me today.");
     expect(stockPhrases(out)).toEqual([]);
   });
 
   it("repairs a post before the critic reads it", () => {
-    const fixed = repaired({ pillar: "fees_superbills", headline: "What it costs", body: "It costs First session (intake): $200. We look forward to meeting you. We accept Aetna.", altText: "" }, POST);
-    expect(fixed.body).toBe("A first session (intake) is $200. I accept Aetna.");
+    const fixed = repaired({ pillar: "fees_superbills", headline: "What it costs", body: "It costs First session (intake): $200. We look forward to meeting you. We'll accept Aetna.", altText: "" }, POST);
+    expect(fixed.body).toBe("A first session (intake) is $200. I'll accept Aetna.");
     expect(codeCritic(captionOf(fixed.body, LICENSE), ctx).ok).toBe(true);
   });
 
-  it("cleans her casual words without changing what she said", () => {
-    expect(tidyOwnWords("i see people going thru breakups, CBT stuff & tech burnout")).toBe("I see people going through breakups, CBT and tech burnout");
+  it("cleans only the casual words whose meaning is certain", () => {
+    expect(tidyOwnWords("i see people going thru breakups, CBT stuff & tech burnout")).toBe("I see people going through breakups, CBT stuff and tech burnout");
+  });
+});
+
+// The PR #115 review, one exact case each: a repair that might change her meaning flags instead.
+describe("review fixes: repairs never change her meaning", () => {
+  it("1. 'BC' stays unless it reads as 'because'", () => {
+    expect(tidyOwnWords("BC certified, I left early bc it was late")).toBe("BC certified, I left early because it was late");
+    expect(tidyOwnWords("bc certified")).toBe("Bc certified");
+  });
+
+  it("2. only a trailing 'and stuff (like that)' goes, as a whole phrase", () => {
+    expect(tidyOwnWords("anxiety, burnout and stuff like that")).toBe("Anxiety, burnout");
+    expect(tidyOwnWords("tech and stuff.")).toBe("Tech.");
+    expect(tidyOwnWords("CBT stuff like that helps")).toBe("CBT stuff like that helps");
+  });
+
+  it("3. a superbill-only sentence becomes one fixed sentence; one with other facts is left and flagged", () => {
+    expect(fixCadence("I give a superbill for each session.")).toBe("I can give you a superbill on request.");
+    expect(fixCadence("Superbills go out after each session. Book now.")).toBe("I can give you a superbill on request. Book now.");
+    const mixed = "A session is $150 and superbills go out monthly.";
+    expect(fixCadence(mixed)).toBe(mixed);
+    expect(factProblems(mixed, TRUTH).map((p) => p.kind)).toContain("superbill");
+  });
+
+  it("4. filler: only the filler clause goes, never a clause with a fact", () => {
+    expect(dropFiller("No pressure, just book a call.")).toBe("Just book a call.");
+    expect(dropFiller("A session is $150, and I look forward to meeting you.")).toBe("A session is $150.");
+    expect(dropFiller("Feel free to call 312-555-0142 to book.")).toBe("Feel free to call 312-555-0142 to book.");
+  });
+
+  it("5. 'left out jargon' is her words, not a note", () => {
+    expect(splitPlaceholders("I kept it simple and left out jargon. I left the specialties blank for now.")).toEqual({
+      text: "I kept it simple and left out jargon.",
+      notes: ["I left the specialties blank for now."],
+    });
+  });
+
+  it("6. fees in dollars, USD, words and ranges, both ends checked", () => {
+    expect(priceMentions("175 dollars, 200 USD, one hundred and seventy-five dollars, $150-200, $150 to $250").map((p) => p.cents).sort()).toEqual([15000, 15000, 17500, 17500, 20000, 20000, 25000]);
+    const kinds = (s: string) => factProblems(s, TRUTH).map((p) => p.kind);
+    expect(kinds("Sessions are 95 dollars.")).toEqual(["fee"]);
+    expect(kinds("Sessions are 150 USD.")).toEqual([]);
+    expect(kinds("Sessions are one hundred fifty dollars.")).toEqual([]);
+    expect(kinds("Sessions are $150-200.")).toEqual([]);
+    expect(kinds("Sessions are $150-250.")).toEqual(["fee"]);
+    expect(rules("Sessions run 175 dollars.")).toContain("invented_fee");
+    expect(blocks(lintText("My fee is one hundred dollars.", FACTS))).toBe(true);
+  });
+
+  it("7. a sliding scale only when she said she offers one", () => {
+    expect(factProblems("I offer a sliding scale.", TRUTH).map((p) => p.kind)).toEqual(["sliding_scale"]);
+    expect(factProblems("Reduced fee spots open.", { ...TRUTH, slidingScale: null }).map((p) => p.kind)).toEqual(["sliding_scale"]);
+    expect(factProblems("I offer a sliding scale.", { ...TRUTH, slidingScale: true })).toEqual([]);
+    expect(factProblems("I don't offer a sliding scale.", TRUTH)).toEqual([]);
+  });
+
+  it("8. 'most insurance' is always flagged; 'not in network' contradicts her panels", () => {
+    for (const s of ["We accept most insurance.", "Most plans accepted.", "We're not in network."]) expect(factProblems(s, TRUTH).map((p) => p.kind)).toEqual(["insurance_claim"]);
+    const oon = truthOf({ ...FACTS, insurers: [], inNetwork: [] });
+    expect(factProblems("We accept most insurance.", oon).map((p) => p.kind)).toEqual(["insurance_claim"]);
+    expect(factProblems("I'm not in network.", oon)).toEqual([]);
+  });
+
+  it("9. insurer spellings and spacing", () => {
+    expect(factProblems("I'm in network with BlueCross and Aetna.", TRUTH)).toEqual([]);
+    expect(factProblems("BlueShield members welcome.", TRUTH)).toEqual([]);
+    const names = (s: string) => factProblems(s, TRUTH).filter((p) => p.kind === "insurer").map((p) => p.message);
+    expect(names("I take United Health, Amerigroup, WellPoint, Medica and Beacon Health.")).toEqual([
+      "names WellPoint, which isn't one of your plans",
+      "names Amerigroup, which isn't one of your plans",
+      "names UnitedHealthcare, which isn't one of your plans",
+      "names Beacon, which isn't one of your plans",
+      "names Medica, which isn't one of your plans",
+    ]);
+    expect(names("A beacon of calm.")).toEqual([]);
+  });
+
+  it("10. we can / we'll / we help / we meet become first person, and the templates say I", () => {
+    expect(firstPerson("We can talk first. We'll find a time. We help adults. We meet by video.")).toBe("I can talk first. I'll find a time. I help adults. I meet with clients by video.");
+    const t = templateFields(FACTS);
+    expect(t.intro).toBe("Free 15-minute call to see if I'm the right fit for you.");
+    expect(t.statement_help).toContain("call to see if I'm the right fit for you.");
+    expect(templatePages(FACTS).faq).toContain("Book a free 15-minute call, and you'll see if I'm the right fit for you.");
+    expect(JSON.stringify({ ...t, ...templatePages(FACTS) })).not.toMatch(/we('re|'ll| are| will)?/i);
+  });
+
+  it("11. profiles block the same promises as posts", () => {
+    for (const s of ["You'll feel calmer.", "You will be happier.", "You'll feel less anxious.", "You'll get better."]) {
+      expect(blocks(lintText(s, FACTS))).toBe(true);
+      expect(rules(s)).toContain("outcome_promise");
+    }
+  });
+
+  it("13. a rewrite only fills unanswered questions; an answered 'no consult' stays no", () => {
+    const saved = { ...FACTS.answers, focus: "anxiety", approach: "", freeConsultMinutes: 0 as const, consultAsked: true };
+    expect(onlyUnanswered(saved, { focus: "seed text", approach: "CBT", freeConsultMinutes: 30 })).toEqual({ approach: "CBT" });
+    expect(onlyUnanswered({ ...saved, consultAsked: false }, { freeConsultMinutes: 15 })).toEqual({ freeConsultMinutes: 15 });
+    expect(TOOLS_BY_NAME.get("directory_profile")!.input).not.toHaveProperty("replace_answers");
+  });
+
+  it("14. an edit needs an edit verb AND a word pointing at the post", () => {
+    for (const t of ["make it shorter", "change it to Wednesday", "Make the caption warmer", "change slide 2 to say $175"]) expect(looksLikeEdit(t)).toBe(true);
+    for (const t of ["Drop-in hours on Fridays", "add the fee", "a post about how booking works", "make a reel about my fees", "add a post about parking"]) expect(looksLikeEdit(t)).toBe(false);
   });
 });
 
@@ -159,8 +265,9 @@ describe("PT rewrite keeps her answers", () => {
     for (const w of ["anxiety", "burnout", "tech", "breakup", "cbt"]) expect(all).toContain(w);
   });
 
-  it("never invents a language or school, and no paste box holds a note or her casual words", () => {
-    expect(all).not.toMatch(/english only|example university|demo|sample|left the|thru|stuff/);
+  it("never invents a language or school; no paste box holds a note; casual words left in her answers are flagged", () => {
+    expect(all).not.toMatch(/english only|example university|demo|sample|left the|thru/);
+    for (const f of fields.filter((x) => /\bstuff\b/.test(x.text))) expect(f.findings.map((x) => x.rule)).toContain("casual");
     // The boxes that named "Example University" and "English only" fell back to her own facts.
     expect(by.get("statement_about")!.from).toBe("template");
     expect(by.get("statement_approach")!.from).toBe("template");
@@ -189,11 +296,6 @@ describe("PT rewrite keeps her answers", () => {
 });
 
 describe("chat routing", () => {
-  it("tells an edit from a new post", () => {
-    for (const t of ["make it shorter", "change it to Wednesday", "Make the caption warmer", "add the fee"]) expect(looksLikeEdit(t)).toBe(true);
-    for (const t of ["a post about how booking works", "make a reel about my fees", "add a post about parking"]) expect(looksLikeEdit(t)).toBe(false);
-  });
-
   it("spells out the kind she asked for", () => {
     expect(studioRequest("how booking works", "reel")).toBe("Make a reel about how booking works");
     expect(studioRequest("make a carousel about fees", "carousel")).toBe("make a carousel about fees");

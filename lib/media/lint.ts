@@ -5,7 +5,7 @@
 //
 // "block" means the text is not offered as written; "warn" shows a hint beside it.
 import type { MediaFacts } from "./facts";
-import { CASUAL, factProblems, FILLER, hersLower, INSURERS, PLACEHOLDER, truthOf } from "./truth";
+import { CASUAL, factProblems, FILLER, OUTCOME_PROMISE, PLACEHOLDER, truthOf } from "./truth";
 
 export type LintRule =
   | "too_long"
@@ -62,19 +62,8 @@ const BLOCK: { rule: LintRule; patterns: RegExp[]; message: string }[] = [
   },
   {
     rule: "guarantee",
-    patterns: [
-      R(String.raw`\bguarantee[sd]?\b`),
-      R(String.raw`\b100 ?% (success|effective)\b`),
-      R(String.raw`\bproven (results?|to work)\b`),
-      R(String.raw`\bwill (feel|get|be) (better|healed|cured|fixed)\b`),
-      R(String.raw`\byou'?ll (feel|be) (better|healed|free)\b`),
-      R(String.raw`\bcur(e|es|ed)\b`),
-      R(String.raw`\b(eliminate|end|get rid of) your\b`),
-      R(String.raw`\bin (just |only )?\d+ (sessions?|weeks?|days?)\b`),
-      R(String.raw`\bpermanent (relief|results?)\b`),
-      R(String.raw`\btransform your life\b`),
-      R(String.raw`\bworks every time\b`),
-    ],
+    // The same list as the posts' outcome_promise rule (lib/media/truth.ts).
+    patterns: OUTCOME_PROMISE,
     message: "Promises a result. Ethics codes don't allow promising how therapy will turn out.",
   },
   {
@@ -167,17 +156,9 @@ function wordsToNumber(w: string): number {
     .reduce((n, part) => n + (NUMBER_WORDS[part] ?? 0), 0);
 }
 
-/** Facts in the text that aren't in her saved details: fees, years, free consult, insurers, titles. */
+/** Facts in the text that aren't in her saved details: years, free consult, titles. Fees and insurers: factProblems. */
 function unknownFacts(text: string, f: MediaFacts): string[] {
   const out: string[] = [];
-  const cents = new Set(f.fees.map((x) => x.cents));
-  const fee = (raw: string, shown: string) => {
-    const c = Math.round(Number(raw.replace(/,/g, "")) * 100);
-    if (!cents.has(c)) out.push(`the fee ${shown.trim()}`);
-  };
-  for (const m of text.matchAll(/\$\s?(\d{1,4}(?:,\d{3})?(?:\.\d{2})?)/g)) fee(m[1], m[0]);
-  // Fees written without "$": "150 dollars", "150 per session", "150 for a session", "150/session".
-  for (const m of text.matchAll(/(?<![$\d])\b(\d{2,4}(?:\.\d{2})?)\s*(?:dollars?|usd|per (?:session|hour|visit|appointment)|(?:for )?an? (?:session|hour|visit)|\/\s?(?:session|hour|visit))\b/gi)) fee(m[1], m[0]);
   const years = (n: number, shown: string) => {
     if (f.answers.yearsInPractice === null || n !== f.answers.yearsInPractice) out.push(`"${shown}"`);
   };
@@ -186,17 +167,6 @@ function unknownFacts(text: string, f: MediaFacts): string[] {
   if (/\bfree\b[^.]{0,30}\b(consult\w*|call|phone call|session)\b/i.test(text) && !f.answers.freeConsultMinutes) out.push("a free consult");
   for (const m of text.matchAll(/\b(\d{2})[- ]minute\b[^.]{0,20}\b(consult\w*|call)\b/gi)) {
     if (Number(m[1]) !== f.answers.freeConsultMinutes) out.push(`a ${m[1]}-minute consult`);
-  }
-  const lower = text.toLowerCase();
-  const hers = hersLower(f.insurers);
-  for (const name of INSURERS) {
-    if (new RegExp(`\\b${name}\\b`).test(lower) && !hers.includes(name)) out.push(name.replace(/\b\w/g, (c) => c.toUpperCase()));
-  }
-  // "in network with X": X must be one of hers, even a payer not on the list above.
-  for (const m of text.matchAll(/\bin[- ]network with ([^.;:!?]+)/gi)) {
-    for (const part of m[1].split(/,\s*|\s+and\s+|\s+or\s+/i).map((x) => x.trim().toLowerCase()).filter(Boolean)) {
-      if (!f.insurers.some((p) => p.toLowerCase().includes(part) || part.includes(p.toLowerCase()))) out.push(part.replace(/\b\w/g, (c) => c.toUpperCase()));
-    }
   }
   if (/\bDr\.\s/.test(text) && f.credential !== "Psychologist") out.push('"Dr."');
   for (const [title, forms] of Object.entries(TITLES)) {
@@ -231,12 +201,12 @@ export function lintText(text: string, f: MediaFacts, opts: { limit?: number | n
     out.push({ rule, severity: "block", message: `Mentions ${m}, which isn't in your saved details.` });
   }
   for (const r of WARN) if (r.patterns.some((p) => p.test(text))) out.push({ rule: r.rule, severity: "warn", message: r.message });
-  // Claims her saved details contradict: "private pay" while she's on a panel, a superbill
-  // schedule she never set, a language or school she didn't give. (Insurers and consults
-  // are covered by unknownFacts above.)
+  // The one shared fee, insurer and claim check (lib/media/truth.ts), the same as posts and slides.
+  // (The free consult is covered by unknownFacts above.)
   for (const p of factProblems(text, truthOf(f))) {
-    if (p.kind === "insurer" || p.kind === "consult") continue;
-    out.push({ rule: "contradicts_facts", severity: "block", message: `It ${p.message}.` });
+    if (p.kind === "consult") continue;
+    const unknown = p.kind === "fee" || p.kind === "insurer";
+    out.push({ rule: unknown ? "unknown_fact" : "contradicts_facts", severity: "block", message: `It ${p.message}.` });
   }
   if (PLACEHOLDER.some((p) => p.test(text))) out.push({ rule: "placeholder", severity: "block", message: "Has a note or placeholder in it, not words to paste." });
   if (CASUAL.test(text)) out.push({ rule: "casual", severity: "warn", message: "Has a casual word (like \"thru\" or \"stuff\"); a profile reads better without it." });

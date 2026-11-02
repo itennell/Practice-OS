@@ -69,7 +69,7 @@ export function templatePages(f: MediaFacts): Record<PageId, string> {
   const consult = f.answers.freeConsultMinutes;
   const reach = [f.phone && `Call or text ${f.phone}.`, f.email && `Email ${f.email}.`].filter(Boolean).join(" ");
   const faq = [
-    ["How do I start?", consult ? `Book a free ${consult}-minute call. We'll see if we're a good fit.` : "Call or email me. I'll answer your questions and find a time."],
+    ["How do I start?", consult ? `Book a free ${consult}-minute call, and you'll see if I'm the right fit for you.` : "Call or email me. I'll answer your questions and find a time."],
     ["Do you see people online?", f.telehealth ? `Yes. I see people in my ${place(f)} office and online anywhere in ${stateName(f)}.` : `I see people in my office in ${place(f)}.`],
     ["What does a session cost?", fee ? `A session is ${fee}. See the Fees page for more.` : "See the Fees page."],
     ["Do you take insurance?", f.inNetwork.length ? `I'm in network with ${f.inNetwork.join(", ")}.` : "I'm not in network with any plan yet. Ask me for a superbill to send to your insurer."],
