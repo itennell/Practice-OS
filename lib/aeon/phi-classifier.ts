@@ -171,6 +171,16 @@ const NOT_NAME_WORDS = new Set(
   ).split(" "),
 );
 
+const TITLES = new Set("Dr Doctor Mr Mrs Ms Mx Miss Prof MD DO PhD PsyD EdD LCSW LICSW LCPC LPC LPCC LMHC LMFT MFT NP PMHNP APRN RN CPA JD Esq".split(" "));
+
+/** "Alan Brooks PhD" is "Alan Brooks"; "Dr Kevin Ortiz" is "Kevin Ortiz". A title alone stays as it is. */
+export function trimTitles(name: string): string {
+  const words = name.split(/\s+/);
+  while (words.length > 1 && TITLES.has(words[0].replace(/\.$/, ""))) words.shift();
+  while (words.length > 1 && TITLES.has(words.at(-1)!.replace(/\.$/, ""))) words.pop();
+  return words.join(" ");
+}
+
 /** False for a hit made only of titles, credentials, document or audience words. */
 export function isNameLike(name: string): boolean {
   const words = name.split(/[\s.,'’-]+/).filter(Boolean);
@@ -182,10 +192,19 @@ export function isNameLike(name: string): boolean {
 // covers every word, and the second read is an extra net for names with odd
 // characters glued on. Memories, messages and replies are short and stay far
 // under it; only long tool results (rule text, lists) reach it, and failing
-// closed there would withhold official sources.
+// closed there would withhold official sources. Uploads and free-text tool results
+// pass failWhenCapped, and are withheld past the cap instead (guard.ts too_long).
 const MAX_SECOND_READS = 24;
 
-export async function findNames(text: string, opts: { secondReads?: boolean } = {}): Promise<string[]> {
+/** Thrown when a text needs more second reads than MAX_SECOND_READS and the caller asked to fail closed. */
+export class TooLongToCheck extends Error {
+  constructor() {
+    super("too long for the name check");
+    this.name = "TooLongToCheck";
+  }
+}
+
+export async function findNames(text: string, opts: { secondReads?: boolean; failWhenCapped?: boolean } = {}): Promise<string[]> {
   const ner = await loadNameFinder();
   const names: string[] = [];
   // As written: the model drops the dot in "M. Zimmerman", and a possessive
@@ -204,7 +223,8 @@ export async function findNames(text: string, opts: { secondReads?: boolean } = 
       // Fails closed: a name the model is sure of still counts when it can't be found as written.
       // When it glued an app label to the next word across punctuation ("Hook: Hi" read as
       // "Hook Hi"), the label is dropped and the rest checked on its own; a greeting isn't a name.
-      let text = e.text;
+      // A credential or title the model read as part of the name ("Alan Brooks PhD") is left off.
+      let text = trimTitles(e.text);
       let found = located(text, slice);
       if (!found) {
         // Only when the slice really has the label glued on with punctuation ("Hook: Hi");
@@ -233,6 +253,7 @@ export async function findNames(text: string, opts: { secondReads?: boolean } = 
       if (names.some((n) => run.includes(n) || n.includes(run))) continue;
       runs.add(run);
     }
+    if (opts.failWhenCapped && opts.secondReads !== false && runs.size > MAX_SECOND_READS) throw new TooLongToCheck();
     for (const run of [...runs].slice(0, opts.secondReads === false ? 0 : MAX_SECOND_READS)) {
       for (const e of await people(`I spoke with ${run} yesterday.`)) {
         if (run.includes(e.text) && isNameLike(e.text)) names.push(located(e.text, slice) ?? e.text);

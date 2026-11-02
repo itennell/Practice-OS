@@ -54,7 +54,7 @@ describe("mergeEntities", () => {
 
 describe("isAllowedPerson", () => {
   it.each([
-    ["Dana", "Remember Dana likes Tuesdays"],
+    ["Dana", "Hi, I'm Dana, and I see adults in Lincoln Park"],
     ["Marcus Bell", "Marcus Bell sends me referrals"],
   ])("allows %s", (name, text) => expect(isAllowedPerson(name, text, ALLOWED)).toBe(true));
 
@@ -63,6 +63,8 @@ describe("isAllowedPerson", () => {
     // A title or credential clears no one (Nov 2 review): only her own names and her board do.
     expect(isAllowedPerson("Alan Brooks", "Dr. Alan Brooks might refer to me", ALLOWED)).toBe(false);
     expect(isAllowedPerson("Jenna Cho", "Jenna Cho, LCSW, covers for me", ALLOWED)).toBe(false);
+    // Her first name alone passes only in a sentence clearly about herself (Nov 2 hardening).
+    expect(isAllowedPerson("Dana", "Remember Dana likes Tuesdays", ALLOWED)).toBe(false);
   });
 });
 
