@@ -14,6 +14,7 @@ import type { TierResult } from "@/lib/referrals/tier";
 import type { Evidence } from "@/lib/referrals/evidence/merge";
 import type { Contact } from "@/lib/referrals/contacts";
 import { ContactLog, type CardView } from "./contact-log";
+import { DebriefButton, PartnerProfileBox } from "./debrief";
 import { EvidenceBox } from "./evidence-box";
 import { TierBadge } from "./tier-badge";
 
@@ -192,6 +193,7 @@ function Card({
   contacts,
   drafting,
   demo,
+  debriefOpen,
   onMove,
   onDraft,
   onUpdate,
@@ -206,6 +208,8 @@ function Card({
   onLogged: (view: CardView, said: string) => void;
   drafting: boolean;
   demo: boolean;
+  /** Opened from the chat ("debrief my coffee with ..."): the recorder is open on this card. */
+  debriefOpen: boolean;
   onMove: (stage: Stage) => void;
   onDraft: () => void;
 }) {
@@ -234,6 +238,11 @@ function Card({
         {tier && <TierBadge tier={tier.tier} />}
       </div>
       <p className="text-small text-[var(--fg-muted)]">{meta.join(" · ")}</p>
+      {card.suggested_from && (
+        <p className="text-small font-medium">
+          Suggested from your debrief{card.introduced_by ? ` with ${card.introduced_by}` : ""}. Not contacted.
+        </p>
+      )}
       {tier && <p className="text-small text-[var(--fg-muted)]">Why: {tier.reasons.slice(1).join("; ")}.</p>}
       {card.address && (
         <p className="flex items-start gap-1.5 text-small text-[var(--fg-muted)]">
@@ -254,6 +263,7 @@ function Card({
       {card.next_follow_up_on && card.stage !== "connected" && card.stage !== "not_a_fit" && (
         <p className="text-small font-medium">Follow up {dateLabel(card.next_follow_up_on)}</p>
       )}
+      <PartnerProfileBox card={card} />
       <EvidenceBox card={card} evidence={evidence} onUpdate={onUpdate} />
       <ContactLog card={card} contacts={contacts} onUpdate={onLogged} />
       {letter && (
@@ -272,6 +282,7 @@ function Card({
         onValueChange={(v) => onMove(v)}
         options={MOVE_OPTIONS}
       />
+      {card.stage !== "not_a_fit" && !card.suggested_from && <DebriefButton card={card} autoOpen={debriefOpen} />}
       {canDraft && (
         <Button variant="quiet" onClick={onDraft} disabled={drafting} aria-describedby={headingId}>
           {drafting ? "Aeon is writing…" : card.stage === "follow_up" ? "Draft a check-in email" : "Draft email"}
@@ -349,6 +360,7 @@ export function ReferralBoard({
   evidence: initialEvidence,
   contacts: initialContacts,
   demo,
+  openDebrief = null,
 }: {
   initial: ReferralSource[];
   letters: Record<string, LetterState>;
@@ -359,6 +371,8 @@ export function ReferralBoard({
   contacts: Record<string, Contact[]>;
   /** The fictional demo practice: letters must never reach a real provider. */
   demo: boolean;
+  /** A card id from /referrals?debrief=<id> (the chat's debrief_meeting card): its recorder opens. */
+  openDebrief?: string | null;
 }) {
   const [cards, setCards] = useState(initial);
   const [letters, setLetters] = useState(initialLetters);
@@ -458,6 +472,7 @@ export function ReferralBoard({
                     onLogged={logged}
                     drafting={drafting === c.id}
                     demo={demo}
+                    debriefOpen={openDebrief === c.id}
                     onMove={(s) => move(c.id, s)}
                     onDraft={() => draft(c)}
                   />

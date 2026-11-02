@@ -35,6 +35,15 @@ const OFF_LIMITS: [RegExp, string][] = [
   [/\b(?:suicid\w*|self-harm|diagnos\w*|treatment plan|medication)\b/i, "clinical content"],
 ];
 
+/**
+ * The money-and-gifts half of OFF_LIMITS on any text (a debrief's fields, what a
+ * partner said): what it mentions of value tied to referrals, or null.
+ */
+export function valueOffered(text: string): string | null {
+  for (const [pattern, what] of OFF_LIMITS.slice(0, -1)) if (pattern.test(text)) return what;
+  return null;
+}
+
 export type LetterCheck = { ok: true } | { ok: false; reason: string };
 
 /** Plain-code check run on Muse's letter and again on any edit before it becomes a draft. */

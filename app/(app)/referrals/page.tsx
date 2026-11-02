@@ -15,7 +15,7 @@ import { SCORE_VERSION, type TierResult } from "@/lib/referrals/tier";
 
 export const metadata = { title: "Referrals · Practice-OS" };
 
-export default function ReferralsPage() {
+export default function ReferralsPage({ searchParams }: PageProps<"/referrals">) {
   return (
     <>
       <PageHeader
@@ -23,14 +23,17 @@ export default function ReferralsPage() {
         description="Doctors and clinicians near you from the free federal NPI Registry, on a map and in the order to reach out. Add the ones you like to your board, draft a letter, and send it yourself. Nothing is ever offered in return for a referral."
       />
       <Suspense fallback={<div aria-hidden className="h-96 animate-pulse rounded-[24px] bg-[var(--hairline)]" />}>
-        <Referrals />
+        <Referrals searchParams={searchParams} />
       </Suspense>
     </>
   );
 }
 
-async function Referrals() {
+async function Referrals({ searchParams }: { searchParams: PageProps<"/referrals">["searchParams"] }) {
   await connection(); // read the database per request, never at build time
+  // The chat's debrief_meeting card opens /referrals?debrief=<card id>: that card's recorder opens.
+  const { debrief } = await searchParams;
+  const openDebrief = typeof debrief === "string" && /^[0-9a-f-]{36}$/i.test(debrief) ? debrief : null;
   const [sources, letters, setup, facts, profile] = await Promise.all([
     listSources(),
     latestLetters(),
@@ -64,7 +67,7 @@ async function Referrals() {
         <h2 id="board-heading" className="text-body font-semibold">
           Your board
         </h2>
-        <ReferralBoard initial={sources} letters={letters} tiers={tiers} evidence={evidence} contacts={contacts} demo={profile?.is_sample ?? true} />
+        <ReferralBoard initial={sources} letters={letters} tiers={tiers} evidence={evidence} contacts={contacts} demo={profile?.is_sample ?? true} openDebrief={openDebrief} />
       </section>
     </div>
   );
