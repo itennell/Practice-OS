@@ -38,6 +38,21 @@ export function timelineTime(clips: Clip[], index: number, sourceTime: number): 
   return seg.start + Math.min(seg.end - seg.start, Math.max(0, sourceTime - seg.clip.in));
 }
 
+export type SoundReport = { muted: boolean; note: string };
+
+/**
+ * What she's told when the MP4 is saved. `withFiles` are the clips (1-based)
+ * that went in with their file; `silent` the ones whose sound didn't make it.
+ * Any silent clip sets `muted` and is named; never a plain "saved".
+ */
+export function soundReport(withFiles: number[], silent: number[]): SoundReport {
+  const quiet = withFiles.filter((n) => silent.includes(n));
+  if (!quiet.length) return { muted: false, note: "Your video is saved in Downloads." };
+  if (quiet.length === withFiles.length) return { muted: true, note: "Your video is saved in Downloads, but it has no sound." };
+  const names = quiet.length === 1 ? `clip ${quiet[0]}` : `clips ${quiet.slice(0, -1).join(", ")} and ${quiet.at(-1)}`;
+  return { muted: true, note: `Your video is saved in Downloads, but ${names} ${quiet.length === 1 ? "has" : "have"} no sound in it.` };
+}
+
 export function activeOverlays(overlays: Overlay[], t: number): Overlay[] {
   return overlays.filter((o) => t >= o.start && t < o.end);
 }

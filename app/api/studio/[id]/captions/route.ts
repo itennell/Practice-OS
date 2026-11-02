@@ -19,11 +19,17 @@ import { isUuid } from "../../../approvals/responses";
 // back; the cues are saved later as one edit, which the studio checks again.
 const MAX_BYTES = 1024 * 1024; // a 4-second piece is about 192 KB
 const MAX_START = 600;
+const FORM_OVERHEAD = 16 * 1024;
 
 export async function POST(request: Request, { params }: RouteContext<"/api/studio/[id]/captions">) {
   if (!canDecide(request) || !isSameOrigin(request)) return Response.json({ error: "Not allowed to change this here." }, { status: 403 });
   const { id } = await params;
   if (!isUuid(id) || !(await getProject(id))) return Response.json({ error: "That video isn't here any more." }, { status: 404 });
+
+  // Refused before the body is read, so an oversized upload is never buffered.
+  // A little room on top of the sound for the form's own wrapping.
+  const declared = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > MAX_BYTES + FORM_OVERHEAD) return Response.json({ error: "That piece of sound is too long." }, { status: 413 });
 
   const form = await request.formData().catch(() => null);
   const audio = form?.get("audio");

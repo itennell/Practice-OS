@@ -74,6 +74,25 @@ describe("captions route", () => {
     expect(await res.json()).toEqual({ error: REFUSAL.unavailable });
     expect(m.audit).toHaveBeenCalledWith(expect.objectContaining({ action: "phi_refused" }));
   });
+
+  // Review (PR #109, second pass): an oversized body is refused from its Content-Length, before it is read.
+  it("refuses a body declared over 1 MB without reading it", async () => {
+    const body = new ReadableStream({
+      pull() {
+        throw new Error("the body was read");
+      },
+    });
+    const req = new Request(`http://127.0.0.1:3000/api/studio/${ID}/captions`, {
+      method: "POST",
+      headers: { host: "127.0.0.1:3000", "sec-fetch-site": "same-origin", "content-type": "multipart/form-data; boundary=x", "content-length": String(5 * 1024 * 1024) },
+      body,
+      duplex: "half",
+    } as RequestInit);
+    const res = await POST(req, { params: Promise.resolve({ id: ID }) } as never);
+    expect(res.status).toBe(413);
+    expect(req.bodyUsed).toBe(false);
+    expect(m.transcribe).not.toHaveBeenCalled();
+  });
 });
 
 async function POST_ok() {

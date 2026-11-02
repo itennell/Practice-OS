@@ -17,8 +17,8 @@ import { checkRequest, DECLINED, practiceFacts, requestPost, researchPost } from
 import type { Angle } from "../instagram/topic-gate";
 import { criticContext } from "../instagram/write";
 import { alertCrisis, checkCrisis, CRISIS_REPLY } from "../safety";
-import { checkStep, pictureIdeaProblems, type Limits } from "./check";
-import { emptyDoc, LIMITS, parseDoc, type Kind, type StudioDoc } from "./doc";
+import { captionRun, checkStep, pictureIdeaProblems, screenCues, type Limits } from "./check";
+import { docWords, emptyDoc, LIMITS, parseDoc, type Kind, type StudioDoc } from "./doc";
 import { proposeEdit } from "./edit";
 import { applyOps, describeOp, OpSchema } from "./ops";
 
@@ -35,6 +35,8 @@ export type Project = {
   approvalStatus: string | null;
   isSample: boolean;
   updatedAt: string;
+  /** Video projects: every clip file key any project's history still uses (referencedClipKeys). */
+  clipKeys: string[];
 };
 
 type Row = { id: string; post_id: string | null; doc: unknown; cursor: number; is_sample: boolean; updated_at: Date; post_status: string | null; approval_id: string | null; approval_status: string | null };
@@ -62,7 +64,25 @@ export async function getProject(id: string): Promise<Project | null> {
     approvalStatus: row.approval_status,
     isSample: row.is_sample,
     updatedAt: new Date(row.updated_at).toISOString(),
+    clipKeys: doc.kind === "video" ? await referencedClipKeys() : [],
   };
+}
+
+/**
+ * Every clip file key any studio project still points at: its current version,
+ * how it started (base_doc) and every kept step, Undo and Redo alike. Her
+ * browser deletes private-folder files that aren't on this list. Across all
+ * projects, since they share one private folder.
+ */
+export async function referencedClipKeys(): Promise<string[]> {
+  const rows = await db()<{ source: string }[]>`
+    select distinct c->>'source' as source from (
+      select doc from practice_os.studio_projects
+      union all select base_doc from practice_os.studio_projects
+      union all select doc from practice_os.studio_steps
+    ) d(doc), jsonb_array_elements(case when jsonb_typeof(d.doc->'clips') = 'array' then d.doc->'clips' else '[]'::jsonb end) c
+     where c->>'source' is not null`;
+  return rows.map((r) => r.source).sort();
 }
 
 /** Her recent studio projects, newest first. */
@@ -461,34 +481,48 @@ export async function applyEdit(
     if (idea.problems.length) return { ok: false, status: 422, why: `I didn't change it: ${idea.problems[0]}`, project };
     applied.doc.picture = await nextPictureVersion(id, applied.doc);
   }
+  // Caption pieces that break a plain rule are left out one by one (and named), not the whole batch.
+  const screened = screenCues(project.doc, applied.doc, lim);
+  applied.doc = screened.doc;
+  applied.notes.push(...screened.skipped);
   if (Buffer.byteLength(JSON.stringify(applied.doc)) > MAX_DOC_BYTES) return { ok: false, status: 422, why: TOO_BIG, project };
-  let check;
-  try {
-    check = await checkStep(project.doc, applied.doc, lim, { chat: opts.chat });
-  } catch {
-    return { ok: false, status: 503, why: "Aeon's safety check didn't answer, so nothing changed. Try again in a minute.", project };
-  }
-  if (!check.ok) {
+  const refused = async (check: Awaited<ReturnType<typeof checkStep>>): Promise<EditResult | null> => {
+    if (check.ok) return null;
     if (check.hardStop) {
       await audit({ actor: "safety", action: "studio_edit_refused", subjectType: "studio_project", subjectId: id, details: { rule: "self_harm", by: opts.by } });
       await alertCrisis({ source: "media", category: "self_harm", by: opts.by });
     }
     return { ok: false, status: 422, why: check.hardStop ? check.why : `I didn't change it: ${check.why}`, project, hardStop: check.hardStop };
-  }
-  // Words typed directly onto the canvas reach the database without passing a
-  // chat message, so new or changed overlay text gets the client-detail guard
-  // here. (Chat's own words were already guarded before Muse proposed them.)
+  };
+  // Plain code first (the crisis check wins over everything), with no model call.
+  const plain = await refused(await checkStep(project.doc, applied.doc, lim, { muse: false }));
+  if (plain) return plain;
+  // Words typed directly onto the canvas reach here without passing a chat
+  // message, so they get the client-detail guard BEFORE Muse's critic reads
+  // them: a client detail typed on the canvas never reaches the model. The
+  // captions are guarded as one run too, since a name can be split across two
+  // pieces. (Chat's own words were already guarded before Muse proposed them.)
   if (opts.source === "canvas") {
-    const beforeText = new Map(project.doc.overlays.map((o) => [o.id, o.text]));
-    for (const o of applied.doc.overlays) {
-      if (beforeText.get(o.id) === o.text) continue;
-      const guarded = await guard(o.text, "message");
+    const before = new Set(docWords(project.doc).filter((w) => !project.doc.captions.cues.some((c) => c.text === w)));
+    const typed = docWords(applied.doc).filter((w) => !before.has(w) && !applied.doc.captions.cues.some((c) => c.text === w));
+    const run = captionRun(applied.doc);
+    if (run && run !== captionRun(project.doc)) typed.push(run);
+    for (const text of typed) {
+      const guarded = await guard(text, "message");
       if (!guarded.ok) {
         await audit({ actor: "safety", action: "phi_refused", subjectType: "studio_project", subjectId: id, details: { kind: guarded.kind, by: opts.by } });
         return { ok: false, status: 422, why: REFUSAL[guarded.kind], project };
       }
     }
   }
+  let check;
+  try {
+    check = await checkStep(project.doc, applied.doc, lim, { chat: opts.chat });
+  } catch {
+    return { ok: false, status: 503, why: "Aeon's safety check didn't answer, so nothing changed. Try again in a minute.", project };
+  }
+  const full = await refused(check);
+  if (full) return full;
   const did = ops.map((o) => describeOp(OpSchema.parse(o))).join(", ");
   const summary = applied.notes.length ? `${did} (${applied.notes.join("; ")})` : did;
   // The step is saved first (only one tab can win), then the picture is drawn for it.

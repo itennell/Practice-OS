@@ -226,45 +226,93 @@ function shiftTimed<T extends { start: number; end: number }>(list: T[], by: num
     .filter((o) => o.end > 0 && o.end > o.start);
 }
 
-/** Where a finished-video moment sits inside its file, before the clips change. */
-function sourcePoint(before: Clip[], t: number): { id: string; source: string; at: number } | null {
-  const live = segments(before).filter((s) => s.end > s.start);
-  if (!live.length) return null;
-  if (t < 0 || t > live.at(-1)!.end) return null;
-  const seg = live.find((s) => t < s.end) ?? live.at(-1)!;
-  return { id: seg.clip.id, source: seg.clip.source, at: round(seg.clip.in + Math.max(0, t - seg.start)) };
+type Piece = { id: string; source: string; from: number; to: number };
+type Span = { start: number; end: number };
+const EPS = 1e-3;
+
+/**
+ * The footage under a span of the finished video, before the clips change: one
+ * piece per clip it covers. Zero-length overlaps are skipped, so a span that
+ * ends exactly on a join stays in the earlier clip.
+ */
+function sourcePieces(before: Clip[], start: number, end: number): Piece[] {
+  const out: Piece[] = [];
+  for (const s of segments(before)) {
+    const lo = Math.max(start, s.start);
+    const hi = Math.min(end, s.end);
+    if (hi - lo > EPS) out.push({ id: s.clip.id, source: s.clip.source, from: s.clip.in + (lo - s.start), to: s.clip.in + (hi - s.start) });
+  }
+  return out;
 }
 
-/** The finished-video moment for a point inside a file, after the clips change. Null when that footage is gone. */
-function timelinePoint(after: Clip[], p: { id: string; source: string; at: number }): number | null {
-  const live = segments(after).filter((s) => s.end > s.start);
-  const seg = live.find((s) => s.clip.id === p.id && p.at >= s.clip.in && p.at <= s.clip.out) ?? live.find((s) => s.clip.source === p.source && p.at >= s.clip.in && p.at <= s.clip.out);
-  if (!seg) return null;
-  return round(seg.start + (p.at - seg.clip.in));
+/** Where that footage sits on the finished video after the clips change, as unbroken spans in order. Empty when none of it is left. */
+function timelineSpans(after: Clip[], pieces: Piece[], beforeIds: Set<string>): Span[] {
+  const spans: Span[] = [];
+  for (const s of segments(after)) {
+    const c = s.clip;
+    // The same clip, or a new clip cut from the same file (the second half of a split).
+    for (const p of pieces) {
+      if (p.id !== c.id && (beforeIds.has(c.id) || p.source !== c.source)) continue;
+      const lo = Math.max(p.from, c.in);
+      const hi = Math.min(p.to, c.out);
+      if (hi - lo > EPS) spans.push({ start: s.start + (lo - c.in), end: s.start + (hi - c.in) });
+    }
+  }
+  spans.sort((a, b) => a.start - b.start);
+  const merged: Span[] = [];
+  for (const x of spans) {
+    const last = merged.at(-1);
+    if (last && x.start <= last.end + EPS) last.end = Math.max(last.end, x.end);
+    else merged.push({ ...x });
+  }
+  return merged;
 }
 
-/** Moves timed items through a clip change so they stay on the same footage. Items whose footage is gone are dropped. */
-function remapTimed<T extends { start: number; end: number }>(list: T[], before: Clip[], after: Clip[]): { kept: T[]; lost: T[] } {
+/**
+ * Moves timed items through a clip change so they stay on the same footage. An
+ * item whose footage is partly cut away is clipped to what's left (the longest
+ * unbroken stretch, when its footage ends up in two places); only an item with
+ * none of its footage left is dropped.
+ */
+function remapTimed<T extends { start: number; end: number }>(list: T[], before: Clip[], after: Clip[]): { kept: T[]; lost: T[]; shortened: T[] } {
+  const beforeIds = new Set(before.map((c) => c.id));
   const kept: T[] = [];
   const lost: T[] = [];
+  const shortened: T[] = [];
   for (const item of list) {
-    const from = sourcePoint(before, item.start);
-    const to = sourcePoint(before, item.end);
-    const start = from && timelinePoint(after, from);
-    const end = to && timelinePoint(after, to);
-    if (start === null || end === null || end <= start) lost.push(item);
-    else kept.push({ ...item, start, end });
+    const spans = timelineSpans(after, sourcePieces(before, item.start, item.end), beforeIds);
+    const best = spans.reduce<Span | null>((a, b) => (!a || b.end - b.start > a.end - a.start + EPS ? b : a), null);
+    const next = best && { ...item, start: round(best.start), end: round(best.end) };
+    if (!next || next.end <= next.start) {
+      lost.push(item);
+      continue;
+    }
+    if (next.end - next.start < item.end - item.start - EPS) shortened.push(next);
+    kept.push(next);
   }
-  return { kept, lost };
+  return { kept, lost, shortened };
 }
 
-/** New clip order after a trim, split, move, remove or end cut: texts and captions follow their footage. */
+/** The cover frame follows its footage like a text does; if that footage is gone it keeps its moment, clamped inside the new video. */
+function remapCover(doc: StudioDoc, after: Clip[]): StudioDoc["cover"] {
+  if (!doc.cover || !("time" in doc.cover)) return doc.cover;
+  const t = doc.cover.time;
+  const total = segments(after).reduce((m, s) => Math.max(m, s.end), 0);
+  const spans = timelineSpans(after, sourcePieces(doc.clips, t, t + 2 * EPS).slice(0, 1), new Set(doc.clips.map((c) => c.id)));
+  const at = spans.length ? spans[0].start : t;
+  return { time: round(Math.max(0, Math.min(at, total))) };
+}
+
+/** New clip order after a trim, split, move, remove or end cut: texts, captions and the cover frame follow their footage. */
 function followClips(doc: StudioDoc, clips: Clip[], notes: string[]): StudioDoc {
   const overlays = remapTimed(doc.overlays, doc.clips, clips);
   const cues = remapTimed(doc.captions.cues, doc.clips, clips);
+  const n = (k: number) => (k === 1 ? "1 caption" : `${k} captions`);
   for (const o of overlays.lost) notes.push(`took out the text "${o.text}" that isn't in the video any more`);
-  if (cues.lost.length) notes.push(`took out ${cues.lost.length === 1 ? "1 caption" : `${cues.lost.length} captions`} that ${cues.lost.length === 1 ? "isn't" : "aren't"} in the video any more`);
-  return { ...doc, clips, overlays: overlays.kept, captions: { ...doc.captions, cues: cues.kept } };
+  for (const o of overlays.shortened) notes.push(`shortened the text "${o.text}" to the part still in the video`);
+  if (cues.lost.length) notes.push(`took out ${n(cues.lost.length)} that ${cues.lost.length === 1 ? "isn't" : "aren't"} in the video any more`);
+  if (cues.shortened.length) notes.push(`shortened ${n(cues.shortened.length)} to the part still in the video`);
+  return { ...doc, clips, overlays: overlays.kept, captions: { ...doc.captions, cues: cues.kept }, cover: remapCover(doc, clips) };
 }
 
 /** Validates and applies a list of ops, all or nothing. The input document is never changed. */

@@ -356,7 +356,7 @@ export function Studio({ profile, initial }: { profile: StudioProfile; initial: 
 
       <div className="min-w-0">
         {project ? (
-          <Canvas project={project} assets={assets} busy={busy} act={act} videoEditor={project.doc.kind === "video" ? <VideoEditor doc={project.doc} busy={busy} apply={apply} projectId={project.id} /> : undefined} />
+          <Canvas project={project} assets={assets} busy={busy} act={act} videoEditor={project.doc.kind === "video" ? <VideoEditor doc={project.doc} busy={busy} apply={apply} projectId={project.id} keepKeys={project.clipKeys} /> : undefined} />
         ) : (
           <section aria-label="Canvas" className="flex min-h-[360px] flex-col items-center justify-center gap-3 rounded-[24px] border border-dashed border-[var(--hairline)] p-6 text-center">
             {words ? (

@@ -3,7 +3,7 @@
 // video's timeline, and each piece (sound only, never the video) goes to
 // /api/studio/[id]/captions to be turned into words. Quiet pieces are skipped.
 import type { Clip, Cue } from "@/lib/studio/doc";
-import { chunkRanges, cueFor, isSilent, totalSeconds } from "@/lib/studio/timeline";
+import { chunkRanges, clock, cueFor, isSilent, totalSeconds } from "@/lib/studio/timeline";
 import { DICTATION_RATE, encodeWav } from "@/components/shared/dictation-audio";
 import { renderSound } from "./video-export";
 
@@ -38,7 +38,8 @@ export async function makeCaptions(
     }
     if (!res.ok) {
       if (res.status === 422) {
-        result.skipped.push(body.error ?? "One part was left out.");
+        // Named by where it sits, so she knows which part has no caption.
+        result.skipped.push(`The words at ${clock(r.start)} were left out. ${body.error ?? ""}`.trim());
         continue;
       }
       throw new Error(body.error ?? "Couldn't make captions. Try again.");

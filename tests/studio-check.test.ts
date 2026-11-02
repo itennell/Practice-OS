@@ -3,7 +3,7 @@
 // what a new picture is asked to show.
 import { describe, expect, it } from "vitest";
 import { RULE_TEXT, type ChatFn } from "../lib/instagram/critic";
-import { checkStep, joinedText, pictureIdeaProblems, textProblems, type Limits } from "../lib/studio/check";
+import { captionRun, checkStep, joinedText, pictureIdeaProblems, screenCues, textProblems, type Limits } from "../lib/studio/check";
 import { emptyDoc, type StudioDoc } from "../lib/studio/doc";
 
 const LICENSE = "Dana Reyes, LCPC (fictional demo practice)";
@@ -91,5 +91,37 @@ describe("studio check", () => {
     expect(pictureIdeaProblems("ways to manage your anxiety", limits).problems.length).toBeGreaterThan(0);
     expect(pictureIdeaProblems("me with my kids at the park", limits).problems).toContain(RULE_TEXT.never_show);
     expect(pictureIdeaProblems("someone thinking about suicide", limits)).toMatchObject({ hardStop: true });
+  });
+
+  // Review (PR #109, second pass).
+  const withCues = (cues: { start: number; end: number; text: string }[]): StudioDoc => ({ ...emptyDoc("video", "office tour"), captions: { on: true, cues } });
+
+  it("the joined run includes the captions, in time order", () => {
+    const d = withCues([{ start: 4, end: 6, text: "second" }, { start: 0, end: 2, text: "first" }]);
+    expect(joinedText(d).split("\n").slice(-2)).toEqual(["first", "second"]);
+    expect(captionRun(d)).toBe("first second");
+  });
+
+  it("two caption pieces that read as advice together are caught on the joined run", async () => {
+    const d = withCues([{ start: 0, end: 2, text: "How to cope" }, { start: 2, end: 4, text: "with anxiety" }]);
+    const r = await checkStep(emptyDoc("video", "office tour"), d, limits, { muse: false });
+    expect(r.ok).toBe(false);
+  });
+
+  it("a flagged caption piece is left out and named by where it sits; the others stay", () => {
+    const before = withCues([]);
+    const next = withCues([
+      { start: 0, end: 2, text: "Booking takes two steps" },
+      { start: 64, end: 66, text: "Tips to cope with anxiety at work" },
+      { start: 70, end: 72, text: "my family at the beach" },
+    ]);
+    const r = screenCues(before, next, limits);
+    expect(r.doc.captions.cues.map((c) => c.text)).toEqual(["Booking takes two steps"]);
+    expect(r.skipped).toHaveLength(2);
+    expect(r.skipped[0]).toMatch(/^left out the caption at 1:04: /);
+    expect(r.skipped[1]).toBe(`left out the caption at 1:10: ${RULE_TEXT.never_show}`);
+    // A self-harm piece is never quietly left out: checkStep stops on it.
+    const crisis = screenCues(before, withCues([{ start: 0, end: 2, text: "I want to kill myself" }]), limits);
+    expect(crisis.doc.captions.cues).toHaveLength(1);
   });
 });

@@ -7,6 +7,9 @@ const DIR = "studio-clips";
 /** Her clips may keep this much of her browser's storage; more is refused with plain words. */
 export const MAX_CLIP_BYTES = 500 * 1024 * 1024;
 const memory = new Map<string, File>();
+export const CAP_FULL = "That video doesn't fit in the 500 MB this browser keeps for your clips. Try a shorter or smaller video.";
+/** A file this new is never swept: it may be a clip being added right now, before its edit is saved. */
+export const SWEEP_GRACE_MS = 10 * 60 * 1000;
 
 export type SaveResult = { key: string; kept: "browser" | "memory" };
 
@@ -44,7 +47,9 @@ async function usedBytes(): Promise<number | null> {
 export async function saveClip(file: File): Promise<SaveResult> {
   const used = await usedBytes();
   if (used !== null && !fitsCap(used, file.size)) {
-    throw new Error("That video doesn't fit in the clips storage (500 MB). Remove a clip first, then add it again.");
+    // Removing a clip doesn't free room straight away (Undo can still bring it
+    // back), so the message doesn't promise that it will.
+    throw new Error(CAP_FULL);
   }
   const key = newKey(file.name);
   const dir = await folder();
@@ -66,13 +71,52 @@ export async function saveClip(file: File): Promise<SaveResult> {
 
 /**
  * Forgets in-memory copies of files no clip uses any more, so a long visit
- * doesn't hold every removed clip in RAM. The private-folder copy stays: Undo
- * and the version list can bring a removed clip back, and the missing-clip
- * notice already covers files the browser cleared on its own.
+ * doesn't hold every removed clip in RAM. The private-folder copy stays while
+ * Undo and the version list can still bring the clip back; sweepClips deletes
+ * it once no kept step uses it.
  */
 export function evictUnreferenced(keepKeys: readonly string[]): void {
   const keep = new Set(keepKeys);
   for (const key of [...memory.keys()]) if (!keep.has(key)) memory.delete(key);
+}
+
+/** Deletes one kept file (a clip whose add didn't save). */
+export async function deleteClip(key: string): Promise<void> {
+  memory.delete(key);
+  const dir = await folder();
+  await dir?.removeEntry(key).catch(() => {});
+}
+
+/** Pure, tested on its own: which private-folder files no project uses any more and are old enough to delete. */
+export function sweepable(entries: readonly { key: string; modified: number }[], keep: readonly string[], now: number, graceMs: number = SWEEP_GRACE_MS): string[] {
+  const k = new Set(keep);
+  return entries.filter((e) => !k.has(e.key) && now - e.modified > graceMs).map((e) => e.key);
+}
+
+/**
+ * Deletes private-folder files that no studio project's version or kept step
+ * points at any more (`keep`, from the server), so removed clips don't fill her
+ * storage forever. Undo can't need them: no kept step uses them.
+ */
+export async function sweepClips(keep: readonly string[]): Promise<string[]> {
+  const dir = await folder();
+  if (!dir) return [];
+  const entries: { key: string; modified: number }[] = [];
+  try {
+    for await (const [key, handle] of (dir as unknown as { entries(): AsyncIterable<[string, FileSystemHandle]> }).entries()) {
+      if (handle.kind !== "file") continue;
+      const file = await (handle as FileSystemFileHandle).getFile().catch(() => null);
+      entries.push({ key, modified: file?.lastModified ?? 0 });
+    }
+  } catch {
+    return [];
+  }
+  const gone = sweepable(entries, keep, Date.now());
+  for (const key of gone) {
+    memory.delete(key);
+    await dir.removeEntry(key).catch(() => {});
+  }
+  return gone;
 }
 
 /** The file for a key, or null when it's on another computer or was cleared. */

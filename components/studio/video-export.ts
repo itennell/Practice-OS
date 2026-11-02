@@ -20,7 +20,7 @@ import {
   Quality,
 } from "mediabunny";
 import type { Aspect, Clip, Cue, Overlay } from "@/lib/studio/doc";
-import { activeCue, activeOverlays, OUTPUT, segments, totalSeconds } from "@/lib/studio/timeline";
+import { activeCue, activeOverlays, OUTPUT, segments, soundReport, totalSeconds, type SoundReport } from "@/lib/studio/timeline";
 
 export const FPS = 30;
 const HIGH = new Quality("high");
@@ -108,46 +108,64 @@ export function drawWords(ctx: Ctx, W: number, H: number, t: number, overlays: O
 
 /** Mixes the kept sound of every clip, in order, into one buffer on the finished video's timeline. Null when no clip has sound. */
 export async function renderSound(clips: Clip[], files: Map<string, Blob>, sampleRate: number, channels: number, signal?: AbortSignal): Promise<AudioBuffer | null> {
+  return (await mixSound(clips, files, sampleRate, channels, signal)).buffer;
+}
+
+/**
+ * The mix, plus which clips (1-based, as she sees them) have a file but gave no
+ * sound: no sound track, one this browser can't decode, or decoding failed part
+ * way. Those are reported, never left silent without a word.
+ */
+export async function mixSound(clips: Clip[], files: Map<string, Blob>, sampleRate: number, channels: number, signal?: AbortSignal): Promise<{ buffer: AudioBuffer | null; silent: number[] }> {
+  const silent: number[] = [];
   const total = totalSeconds(clips);
-  if (total <= 0) return null;
+  if (total <= 0) return { buffer: null, silent };
   const offline = new OfflineAudioContext(channels, Math.max(1, Math.ceil(total * sampleRate)), sampleRate);
   let any = false;
   for (const seg of segments(clips)) {
     const file = files.get(seg.clip.source);
     if (!file || seg.end <= seg.start) continue;
     const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(file) });
+    let gave = false;
     try {
       const track = await input.getPrimaryAudioTrack();
-      if (!track || !(await track.canDecode())) continue;
-      const first = Math.max(0, await input.getFirstTimestamp().catch(() => 0));
-      const from = first + seg.clip.in;
-      for await (const { buffer, timestamp } of new AudioBufferSink(track).buffers(from, first + seg.clip.out)) {
-        if (signal?.aborted) throw new DOMException("Stopped", "AbortError");
-        let when = seg.start + (timestamp - from);
-        let offset = 0;
-        if (when < seg.start) {
-          offset = seg.start - when;
-          when = seg.start;
+      if (track && (await track.canDecode())) {
+        const first = Math.max(0, await input.getFirstTimestamp().catch(() => 0));
+        const from = first + seg.clip.in;
+        for await (const { buffer, timestamp } of new AudioBufferSink(track).buffers(from, first + seg.clip.out)) {
+          if (signal?.aborted) throw new DOMException("Stopped", "AbortError");
+          let when = seg.start + (timestamp - from);
+          let offset = 0;
+          if (when < seg.start) {
+            offset = seg.start - when;
+            when = seg.start;
+          }
+          const length = Math.min(buffer.duration - offset, seg.end - when);
+          if (length <= 0) continue;
+          const node = offline.createBufferSource();
+          node.buffer = buffer;
+          node.connect(offline.destination);
+          node.start(when, offset, length);
+          any = true;
+          gave = true;
         }
-        const length = Math.min(buffer.duration - offset, seg.end - when);
-        if (length <= 0) continue;
-        const node = offline.createBufferSource();
-        node.buffer = buffer;
-        node.connect(offline.destination);
-        node.start(when, offset, length);
-        any = true;
       }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") throw err;
+      // Its sound failed to decode: the clip goes in without it, and she's told.
+      gave = false;
     } finally {
       input.dispose();
     }
+    if (!gave) silent.push(seg.index + 1);
   }
-  return any ? offline.startRendering() : null;
+  return { buffer: any ? await offline.startRendering() : null, silent };
 }
 
 export type ExportInput = { clips: Clip[]; overlays: Overlay[]; cues: Cue[] | null; aspect: Aspect; files: Map<string, Blob> };
 
-/** Makes the MP4 (H.264, 30 fps, Instagram's size for the shape). `onProgress` gets 0..1. `muted` says the clips gave no sound, so the caller can say so instead of handing over a silent video quietly. */
-export async function exportVideo(job: ExportInput, onProgress?: (share: number) => void, signal?: AbortSignal): Promise<{ blob: Blob; muted: boolean }> {
+/** Makes the MP4 (H.264, 30 fps, Instagram's size for the shape). `onProgress` gets 0..1. `muted` is set whenever any clip with a file gave no sound, and `note` says so, so the caller never hands over a silent video quietly. */
+export async function exportVideo(job: ExportInput, onProgress?: (share: number) => void, signal?: AbortSignal): Promise<{ blob: Blob } & SoundReport> {
   const { width: W, height: H } = OUTPUT[job.aspect];
   const total = totalSeconds(job.clips);
   if (total <= 0) throw new Error("There's no video to make yet.");
@@ -164,7 +182,8 @@ export async function exportVideo(job: ExportInput, onProgress?: (share: number)
   const video = new CanvasSource(canvas, { codec: "avc", quality: HIGH });
   output.addVideoTrack(video, { frameRate: FPS });
 
-  const sound = await renderSound(job.clips, job.files, 48_000, 2, signal);
+  const mixed = await mixSound(job.clips, job.files, 48_000, 2, signal);
+  const sound = mixed.buffer;
   let audio: AudioBufferSource | null = null;
   if (sound) {
     const codec = await getFirstEncodableAudioCodec(output.format.getSupportedAudioCodecs(), { numberOfChannels: 2, sampleRate: 48_000, quality: HIGH });
@@ -214,6 +233,8 @@ export async function exportVideo(job: ExportInput, onProgress?: (share: number)
     throw err;
   }
   onProgress?.(1);
-  const anyFile = segments(job.clips).some((s) => s.end > s.start && job.files.has(s.clip.source));
-  return { blob: new Blob([output.target.buffer!], { type: "video/mp4" }), muted: anyFile && !sound };
+  const withFiles = segments(job.clips).filter((s) => s.end > s.start && job.files.has(s.clip.source)).map((s) => s.index + 1);
+  // No encodable sound codec: every clip's sound is lost, not only the silent ones.
+  const silent = sound && !audio ? withFiles : mixed.silent;
+  return { blob: new Blob([output.target.buffer!], { type: "video/mp4" }), ...soundReport(withFiles, silent) };
 }

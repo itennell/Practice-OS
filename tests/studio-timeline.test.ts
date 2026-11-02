@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { encodeWav } from "../components/shared/dictation-audio";
 import { emptyDoc, type StudioDoc } from "../lib/studio/doc";
 import { applyOps } from "../lib/studio/ops";
-import { activeCue, activeOverlays, chunkRanges, clock, coverCrop, cueFor, frameTimes, isSilent, locate, mixToMono, OUTPUT, segments, timelineTime, totalSeconds } from "../lib/studio/timeline";
+import { activeCue, activeOverlays, chunkRanges, clock, coverCrop, cueFor, frameTimes, isSilent, locate, mixToMono, OUTPUT, segments, soundReport, timelineTime, totalSeconds } from "../lib/studio/timeline";
 
 function video(): StudioDoc {
   return {
@@ -71,6 +71,16 @@ describe("timeline maths", () => {
   it("counts frames at 30 fps", () => {
     expect(frameTimes(3, 30)).toHaveLength(90);
     expect(frameTimes(3, 30)[30]).toBe(1);
+  });
+
+  // Review (PR #109, second pass): any clip with a file that gave no sound is named, never a plain "saved".
+  it("says which clips have no sound when the video is saved", () => {
+    expect(soundReport([1, 2], [])).toEqual({ muted: false, note: "Your video is saved in Downloads." });
+    expect(soundReport([1, 2, 3], [2])).toEqual({ muted: true, note: "Your video is saved in Downloads, but clip 2 has no sound in it." });
+    expect(soundReport([1, 2, 3], [1, 3])).toEqual({ muted: true, note: "Your video is saved in Downloads, but clips 1 and 3 have no sound in it." });
+    expect(soundReport([1, 2], [1, 2])).toEqual({ muted: true, note: "Your video is saved in Downloads, but it has no sound." });
+    // A clip without its file isn't in the video at all, so it isn't counted.
+    expect(soundReport([2], [1])).toEqual({ muted: false, note: "Your video is saved in Downloads." });
   });
 });
 

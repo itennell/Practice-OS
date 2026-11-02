@@ -17,7 +17,7 @@ import { ThoughtLine } from "@/components/shared/thought-line";
 import { ASPECTS, LIMITS, POSITIONS, allIds, newId, type Clip, type StudioDoc } from "@/lib/studio/doc";
 import { clock, coverCrop, locate, OUTPUT, segments, spokenSeconds, totalSeconds } from "@/lib/studio/timeline";
 import { cn } from "@/lib/utils";
-import { evictUnreferenced, loadClip, saveClip } from "./clip-store";
+import { deleteClip, evictUnreferenced, loadClip, saveClip, sweepClips } from "./clip-store";
 import { makeCaptions } from "./captions";
 import { canMakeVideo, drawWords, exportVideo, probeClip } from "./video-export";
 
@@ -27,6 +27,8 @@ export type VideoEditorProps = {
   apply: (ops: unknown[]) => Promise<boolean>;
   /** The studio project, for captions (/api/studio/[id]/captions). Without it, Make captions waits until the video is saved. */
   projectId?: string;
+  /** Every clip file key the studio's projects and their kept steps still use; other files in her browser's private folder are deleted. Without it nothing is swept. */
+  keepKeys?: string[];
 };
 
 const MISSING = "This clip is on another computer or was cleared; add it again.";
@@ -34,7 +36,7 @@ const PREVIEW_SCALE = 1 / 3;
 const POSITION_WORDS: Record<(typeof POSITIONS)[number], string> = { top: "Top", middle: "Middle", bottom: "Bottom" };
 const r1 = (n: number) => Math.round(n * 10) / 10;
 
-export function VideoEditor({ doc, busy, apply, projectId }: VideoEditorProps) {
+export function VideoEditor({ doc, busy, apply, projectId, keepKeys }: VideoEditorProps) {
   const clips = doc.clips;
   const total = totalSeconds(clips);
   const { width: OW, height: OH } = OUTPUT[doc.aspect];
@@ -139,6 +141,14 @@ export function VideoEditor({ doc, busy, apply, projectId }: VideoEditorProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sources]);
 
+  // Files in her browser's private folder that no project version or kept step
+  // uses any more are deleted, so removed clips don't fill her storage.
+  const keepList = keepKeys ? [...new Set([...keepKeys, ...clips.map((c) => c.source)])].sort().join("|") : null;
+  useEffect(() => {
+    if (keepList === null) return;
+    void sweepClips(keepList ? keepList.split("|") : []);
+  }, [keepList]);
+
   /** Moves the playhead (paused): the right file seeks there, and the frame draws when it's ready. */
   const seek = useCallback(
     (at: number) => {
@@ -223,12 +233,15 @@ export function VideoEditor({ doc, busy, apply, projectId }: VideoEditorProps) {
     setError(null);
     setNotice(null);
     setAdding(true);
+    let key: string | null = null;
+    let added = false;
     try {
       if (clips.length >= LIMITS.clips) throw new Error(`A video holds up to ${LIMITS.clips} clips.`);
       const room = LIMITS.videoSeconds - total;
       if (room < 0.5) throw new Error(`A reel is at most ${LIMITS.videoSeconds} seconds, and this one is full. Trim a clip first.`);
       const info = await probeClip(file);
       const saved = await saveClip(file);
+      key = saved.key;
       const clip: Clip = {
         id: newId("c", allIds(doc)),
         source: saved.key,
@@ -240,6 +253,7 @@ export function VideoEditor({ doc, busy, apply, projectId }: VideoEditorProps) {
         out: r3(Math.min(info.duration, room)),
       };
       const ok = await send([{ op: "add_clip", clip }]);
+      added = ok;
       if (ok) {
         setSelected(clip.id);
         const parts = [];
@@ -250,6 +264,8 @@ export function VideoEditor({ doc, busy, apply, projectId }: VideoEditorProps) {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't add that video.");
     } finally {
+      // The edit didn't save, so no version points at the file: delete it now.
+      if (key && !added) void deleteClip(key);
       setAdding(false);
       if (inputRef.current) inputRef.current.value = "";
     }
@@ -281,23 +297,31 @@ export function VideoEditor({ doc, busy, apply, projectId }: VideoEditorProps) {
   const [captioning, setCaptioning] = useState<{ done: number; of: number } | null>(null);
   const [captionNote, setCaptionNote] = useState<string | null>(null);
   const capAbort = useRef<AbortController | null>(null);
+  // Leaving the page stops captions mid-way: no more sound is sent.
+  useEffect(() => () => capAbort.current?.abort(), []);
   async function captions() {
     if (!projectId) return;
     setCaptionNote(null);
     setError(null);
+    capAbort.current?.abort();
     const ac = new AbortController();
     capAbort.current = ac;
+    // The clips the captions are made for; if they change meanwhile, the captions no longer fit.
+    const madeFor = JSON.stringify(clips);
     setCaptioning({ done: 0, of: 1 });
     try {
       const r = await makeCaptions(projectId, clips, files, (done, of) => setCaptioning({ done, of }), ac.signal);
+      const stale = ac.signal.aborted || capAbort.current !== ac || JSON.stringify(docRef.current.clips) !== madeFor;
+      const skipped = r.skipped.length ? `${r.skipped[0]}${r.skipped.length > 1 ? ` (and ${r.skipped.length - 1} more)` : ""}` : null;
       if (r.stopped) setError(r.stopped);
-      else if (!r.cues.length) setCaptionNote(r.skipped[0] ?? "No words were heard in the sound, so there are no captions.");
-      else if (await send([{ op: "set_cues", cues: r.cues }])) setCaptionNote(r.skipped.length ? `Captions are on. ${r.skipped[0]}` : "Captions are on. Check the words in the preview.");
+      else if (stale) setCaptionNote("The clips changed while the captions were being made, so they weren't added. Make captions again.");
+      else if (!r.cues.length) setCaptionNote(skipped ?? "No words were heard in the sound, so there are no captions.");
+      else if (await send([{ op: "set_cues", cues: r.cues }])) setCaptionNote(skipped ? `Captions are on. ${skipped}` : "Captions are on. Check the words in the preview.");
     } catch (err) {
       if (!(err instanceof DOMException && err.name === "AbortError")) setError(err instanceof Error ? err.message : "Couldn't make captions. Try again.");
     } finally {
       setCaptioning(null);
-      capAbort.current = null;
+      if (capAbort.current === ac) capAbort.current = null;
     }
   }
 
@@ -331,7 +355,7 @@ export function VideoEditor({ doc, busy, apply, projectId }: VideoEditorProps) {
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      setSavedNote(made.muted ? "Your video is saved in Downloads, but it has no sound." : "Your video is saved in Downloads.");
+      setSavedNote(made.note);
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") setSavedNote("Stopped. Nothing was saved.");
       else setError(err instanceof Error ? err.message : "Couldn't make the video. Try again.");
@@ -409,8 +433,10 @@ export function VideoEditor({ doc, busy, apply, projectId }: VideoEditorProps) {
           <Plus aria-hidden size={18} /> {clips.length ? "Add another video" : "Add a video"}
         </Button>
         <p className="text-small text-[var(--fg-muted)]">Your video stays on this computer. Only the times you pick are saved.</p>
-        {adding && <ThoughtLine working label="Reading your video…" showTimer={false} />}
-        {notice && <p className="text-small font-medium">{notice}</p>}
+        <div role="status" aria-live="polite" className="contents">
+          {adding && <ThoughtLine working label="Reading your video…" showTimer={false} />}
+          {notice && <p className="text-small font-medium">{notice}</p>}
+        </div>
       </div>
 
       {clips.length > 0 && (
@@ -602,7 +628,9 @@ export function VideoEditor({ doc, busy, apply, projectId }: VideoEditorProps) {
               <Button variant="quiet" disabled={locked || loading || !projectId || missingCount > 0} onClick={() => void captions()}>
                 {doc.captions.cues.length ? "Make captions again" : "Make captions"}
               </Button>
-              {loading && <p className="text-small text-[var(--fg-muted)]">Finding your clips…</p>}
+              <span role="status" aria-live="polite" className="contents">
+                {loading && <span className="text-small text-[var(--fg-muted)]">Finding your clips…</span>}
+              </span>
               {captioning && (
                 <Button variant="quiet" onClick={() => capAbort.current?.abort()}>
                   Cancel
@@ -611,8 +639,10 @@ export function VideoEditor({ doc, busy, apply, projectId }: VideoEditorProps) {
             </div>
             <p className="text-small text-[var(--fg-muted)]">The sound (not the video) goes to Meta to be turned into words.</p>
             {!projectId && <p className="text-small text-[var(--fg-muted)]">Captions work once this video is saved in the studio.</p>}
-            {captioning && <ThoughtLine working label={`Making captions… ${captioning.done} of ${captioning.of}`} showTimer={false} />}
-            {captionNote && <p className="text-small font-medium">{captionNote}</p>}
+            <div role="status" aria-live="polite" className="contents">
+              {captioning && <ThoughtLine working label={`Making captions… ${captioning.done} of ${captioning.of}`} showTimer={false} />}
+              {captionNote && <p className="text-small font-medium">{captionNote}</p>}
+            </div>
           </div>
 
           {/* Cover, shape, music */}
@@ -647,8 +677,10 @@ export function VideoEditor({ doc, busy, apply, projectId }: VideoEditorProps) {
             <Button variant="primary" className="w-full sm:w-auto sm:self-start" disabled={locked || loading || missingCount > 0 || total <= 0} onClick={() => void download()}>
               <Download aria-hidden size={18} /> Download video
             </Button>
-            {loading && <p className="text-small text-[var(--fg-muted)]">Finding your clips…</p>}
-            {missingCount > 0 && <p className="text-small text-[var(--fg-muted)]">Add the missing clip again before you download.</p>}
+            <div role="status" aria-live="polite" className="contents">
+              {loading && <p className="text-small text-[var(--fg-muted)]">Finding your clips…</p>}
+              {missingCount > 0 && <p className="text-small text-[var(--fg-muted)]">Add the missing clip again before you download.</p>}
+            </div>
             {making !== null && (
               <div className="flex items-center gap-3">
                 <div
@@ -668,7 +700,7 @@ export function VideoEditor({ doc, busy, apply, projectId }: VideoEditorProps) {
               </div>
             )}
             {saved && (
-              <p role="status" className="text-small font-medium">
+              <p role="status" aria-live="polite" className="text-small font-medium">
                 {saved}
               </p>
             )}
