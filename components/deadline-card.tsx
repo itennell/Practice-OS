@@ -44,7 +44,7 @@ export function SourceLine({ o }: { o: ObligationView }) {
     <p className="text-small text-[var(--fg-muted)]">
       {o.source_url ? "Source" : "Why"}:{" "}
       {o.source_url ? (
-        <a href={o.source_url} target="_blank" rel="noreferrer" className="text-[var(--link)] underline underline-offset-2">
+        <a href={o.source_url} target="_blank" rel="noreferrer" className="-my-3 inline-flex min-h-touch max-w-full items-center text-[var(--link)] underline underline-offset-2">
           {o.citation}
         </a>
       ) : (

@@ -125,7 +125,7 @@ function Card({ title, summary, href, children }: { title: string; summary: stri
     <li className="tile relative flex flex-col gap-1 p-5 hover:shadow-[var(--tile-shadow-hover)]">
       <h3 className="font-semibold">
         {href ? (
-          <Link href={href} scroll={false} className="flex items-center justify-between gap-2 after:absolute after:inset-0 after:rounded-[var(--radius-card-sm)] after:content-['']">
+          <Link href={href} scroll={false} className="-my-3 flex min-h-touch items-center justify-between gap-2 after:absolute after:inset-0 after:rounded-[var(--radius-card-sm)] after:content-['']">
             {title}
             <ChevronRight aria-hidden size={18} className="text-[var(--fg-muted)]" />
           </Link>

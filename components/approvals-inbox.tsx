@@ -121,7 +121,7 @@ function ApprovalItem({
 }: {
   approval: ApprovalView;
   busy: boolean;
-  now: number;
+  now: number | null;
   onApprove: (edit?: string) => void;
   onDecline: () => void;
 }) {
@@ -135,12 +135,12 @@ function ApprovalItem({
     <li aria-labelledby={headingId} className="flex flex-col gap-3 border-t border-[var(--line)] px-5 py-4 first:border-t-0">
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0 flex-1">
-          <h3 id={headingId} className="font-semibold leading-snug">
+          <h2 id={headingId} className="font-semibold leading-snug">
             {approval.title}
-          </h3>
+          </h2>
           <p className="text-small text-[var(--fg-muted)]">
-            {KIND_LABEL[approval.kind] ?? approval.kind} · from {fromLabel(approval.created_by)} ·{" "}
-            {timeAgo(approval.created_at, now)}
+            {KIND_LABEL[approval.kind] ?? approval.kind} · from {fromLabel(approval.created_by)}{now !== null && " · "}
+            {now !== null && timeAgo(approval.created_at, now)}
             {approval.decided_by?.startsWith("auto:") && " · Aeon did this automatically"}
           </p>
         </div>
@@ -228,7 +228,8 @@ export function ApprovalsInbox({
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [announcement, setAnnouncement] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
-  const [now, setNow] = useState(() => Date.now());
+  // The clock starts empty so the server and the browser draw the same first frame ("3 min ago" would differ by a second).
+  const [now, setNow] = useState<number | null>(null);
   const known = useRef(new Map(initial.map((a) => [a.id, a.status])));
 
   const announceChanges = useCallback((next: ApprovalView[]) => {
@@ -257,7 +258,7 @@ export function ApprovalsInbox({
   const anyRunning = busy.size > 0 || approvals.some((a) => a.status === "running");
   // Chat cards (ids) start empty, so they load straight away too.
   useEffect(() => {
-    const first = ids ? setTimeout(refresh, 0) : undefined;
+    const first = setTimeout(ids ? refresh : () => setNow(Date.now()), 0);
     const timer = setInterval(refresh, anyRunning ? 1000 : 10000);
     return () => {
       clearTimeout(first);
