@@ -12,6 +12,7 @@ import { db } from "../db";
 import { guard, REFUSAL, type GuardKind } from "./guard";
 import { MEMORY_KINDS, type MemoryKind, type MemoryTopic, type PlannedOp } from "./memory-ops";
 import { scanMemory, type ScanKind } from "./memory-scan";
+import { settingFor } from "./setting-text";
 
 export { MEMORY_KINDS, MEMORY_TOPICS, type MemoryKind, type MemoryTopic } from "./memory-ops";
 
@@ -31,7 +32,8 @@ export type Memory = {
 
 type Actor = AuditEntry["actor"];
 
-export type RefusalKind = GuardKind | ScanKind;
+/** setting: a fee, office days, license type or policy, which live in the app's settings, not in memory. */
+export type RefusalKind = GuardKind | ScanKind | "setting";
 
 const SCAN_REFUSAL: Record<ScanKind, string> = {
   injection: "That reads like an instruction to Aeon rather than a fact about the practice, so it wasn't saved.",
@@ -42,8 +44,18 @@ const SCAN_REFUSAL: Record<ScanKind, string> = {
 
 /** Thrown when a memory is refused. The message is the fixed refusal line, never the text. */
 export class MemoryRefused extends Error {
-  constructor(readonly kind: RefusalKind) {
-    super(kind in SCAN_REFUSAL ? SCAN_REFUSAL[kind as ScanKind] : REFUSAL[kind as GuardKind]);
+  constructor(
+    readonly kind: RefusalKind,
+    /** For a setting: the tool that saves it (set_fees, set_office_days, set_license_type, set_practice_policies). */
+    readonly useTool?: string,
+  ) {
+    super(
+      kind === "setting"
+        ? `That's one of her settings, so it isn't kept in memory: ${useTool ?? "the settings tools"} saves it where the app uses it.`
+        : kind in SCAN_REFUSAL
+          ? SCAN_REFUSAL[kind as ScanKind]
+          : REFUSAL[kind as GuardKind],
+    );
   }
 }
 
@@ -52,6 +64,9 @@ async function guarded(text: string): Promise<string> {
   const clean = text.trim().replace(/\s+/g, " ");
   const scan = scanMemory(clean);
   if (!scan.ok) throw new MemoryRefused(scan.kind);
+  // Settings live in the app; a memory of them would disagree with what the app uses.
+  const setting = settingFor(clean);
+  if (setting) throw new MemoryRefused("setting", setting.tool);
   const check = await guard(clean, "memory");
   if (!check.ok) throw new MemoryRefused(check.kind);
   return clean;

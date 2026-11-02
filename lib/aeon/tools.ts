@@ -49,7 +49,7 @@ import { DOCUMENT_KINDS, forModel, type DocumentCard } from "../documents/card";
 import { guard, WITHHELD } from "./guard";
 import { forget, MEMORY_KINDS, MemoryRefused, recentChanges, remember } from "./memory";
 import { RULES_TOOLS } from "./tools-rules";
-import { SETTINGS_TOOLS, settingFor } from "./tools-settings";
+import { SETTINGS_TOOLS } from "./tools-settings";
 
 export type ToolContext = {
   /** Who is calling, for created_by and audit rows: "mcp:<client>" or "chat:<conversation id>". */
@@ -90,6 +90,8 @@ export type AeonTool = {
   annotations: { readOnlyHint?: boolean; destructiveHint?: boolean; openWorldHint?: boolean; idempotentHint?: boolean };
   /** Left out of the chat's tool list (MCP only): the chat box has its own way in. */
   mcpOnly?: boolean;
+  /** Her settings: an MCP caller's change is queued for her approval instead of running (lib/aeon/tools-settings.ts). */
+  queuesOverMcp?: boolean;
   /** What the chat shows after it runs, in her words: "Checked your deadlines". */
   label: string;
   /** Changes saved data. Refused on the Vercel demo copy. Drafts that only queue an approval don't count. A function decides per call. */
@@ -895,18 +897,14 @@ export const TOOLS: AeonTool[] = [
     label: "Saved to memory",
     changesData: true,
     run: async ({ kind, text: memoryText, replaces }, ctx) => {
-      // Plain code: a setting saved only as a memory would disagree with what the app uses (a GFE priced at the old fee).
-      const setting = settingFor(memoryText);
-      if (setting) {
-        return {
-          content: [{ type: "text", text: JSON.stringify({ ok: false, saved: false, error: `Not saved to memory: this is ${setting.what}, a setting.`, use_tool: setting.tool }) }],
-          isError: true,
-        };
-      }
       try {
         const { memory, created } = await remember({ kind, text: memoryText, replaces }, { actor: "aeon", source: ctx.by });
         return text({ saved: created, already_remembered: !created, id: memory.id, kind: memory.kind, text: memory.text });
       } catch (err) {
+        // A setting (memory.ts refuses fees, days, license type, policies) names the tool that saves it.
+        if (err instanceof MemoryRefused && err.kind === "setting") {
+          return { content: [{ type: "text", text: JSON.stringify({ ok: false, saved: false, error: `Not saved to memory. ${err.message}`, use_tool: err.useTool }) }], isError: true };
+        }
         if (err instanceof MemoryRefused) return { content: [{ type: "text", text: `Not saved. ${err.message}` }], isError: true };
         throw err;
       }
@@ -1352,7 +1350,7 @@ export const TOOLS: AeonTool[] = [
         approval_id: r.post.approvalId,
         why: r.why,
         ...(r.outcome !== "blocked_after_rewrite"
-          ? { next: "It's waiting in Approvals. Once she approves it, the Instagram page has the caption to copy, the picture to save and the steps to post it herself." }
+          ? { status: "waiting in Approvals", after_approval: "the Instagram page has the caption to copy, the picture to save and the steps to post it herself" }
           : {}),
       });
     },
@@ -1419,7 +1417,8 @@ export const TOOLS: AeonTool[] = [
     description:
       "Writes every text box of her Psychology Today profile (and the same words for other directories) from her saved facts and a few answers in her own words. " +
       "Use when she asks to write or rewrite her Psychology Today profile, a directory listing, or her bio; to set it up step by step, use pt_profile_interview first. " +
-      "If it returns questions, ask them one or two at a time in plain words, then call again with her answers. " +
+      "If it returns written: false with questions_for_her, ask them one or two at a time in plain words, then call again with her answers. " +
+      "When it returns a profile, show the search card preview and say the boxes are on the Media page with a Copy button each. " +
       "Each box fits Psychology Today's limit and is checked: no advice, client stories, testimonials, promises or rankings. " +
       "Tell her to read each box and make it hers before she pastes it (Psychology Today asks that AI text be personalized), and that the Media page has a Copy button for each box.",
     input: {
@@ -1448,7 +1447,7 @@ export const TOOLS: AeonTool[] = [
       }
       const f = await facts.loadMediaFacts();
       const missing = facts.missingAnswers(f.answers);
-      if (missing.length) return text({ written: false, ask_her: facts.QUESTIONS.filter((q) => missing.includes(q.id)).map((q) => q.ask), why: "These need her own words; ask them, then call again." });
+      if (missing.length) return text({ written: false, questions_for_her: facts.QUESTIONS.filter((q) => missing.includes(q.id)).map((q) => q.ask), why: "These need her own words." });
       const d = await profile.draftProfile(f, { chat: ctx.chat });
       await profile.saveProfileDraft(d);
       return text({
@@ -1456,7 +1455,8 @@ export const TOOLS: AeonTool[] = [
         search_card_preview: d.cardPreview,
         boxes: d.fields.map((x) => ({ box: x.label, characters: `${x.text.length} of ${x.limit}`, text: x.text, paste_where: x.pasteWhere, notes: x.findings.map((n) => n.message) })),
         tick_in_editor: d.picks.map((p) => `${p.label}: ${p.value}`),
-        next: "Show the search card preview and say the boxes are on the Media page with a Copy button each. She reads each one and makes it hers before pasting it into psychologytoday.com.",
+        where: "the Media page, with a Copy button for each box",
+        she_does: "reads each box and makes it hers before pasting it into psychologytoday.com",
       });
     },
   }),
@@ -1520,7 +1520,7 @@ export const TOOLS: AeonTool[] = [
         has_website: has,
         website: saved ?? f.website,
         ...(has ? { checklist: WEBSITE.checklist.map((c) => c.label) } : { recommended: `${WEBSITE.default.name}: ${WEBSITE.default.cost}. ${WEBSITE.default.why}`, steps: site.SETUP_STEPS, meta: WEBSITE.meta.note }),
-        ...(pages ? { pages: pages.pages.map((p) => ({ page: p.label, text: p.text })), next: "The words and the practice details block are on the Media page, Website tab, with a Copy button each." } : {}),
+        ...(pages ? { pages: pages.pages.map((p) => ({ page: p.label, text: p.text })), where: "the Media page, Website tab, with a Copy button each" } : {}),
         hipaa: WEBSITE.hipaa,
       });
     },
@@ -1535,7 +1535,8 @@ export const TOOLS: AeonTool[] = [
       "When she answers, call it once with her answer and the step id (no need to call it with no answer first). " +
       "Then call again with her answer for that step: a string for typed or one-choice questions (pass the choice's value), an array of labels for pick-many questions (use the listed labels word for word where they match; her own words are fine otherwise), a number for years. " +
       "For a 'confirm' or 'info' step, answer true once she says it's right. Pass skip: true if she wants to skip. If it returns refused, tell her why in plain words and ask again. " +
-      "When it says done, call directory_profile to write her profile, and tell her the Media page shows the whole profile as it will read, with Copy buttons.",
+      "When it says done, call directory_profile to write her profile, and tell her the Media page shows the whole profile as it will read, with Copy buttons. " +
+      "The statement is in her own words: never suggest client stories, testimonials, promises or advice; Psychology Today asks that AI-written words be read and made hers.",
     input: {
       step: z.string().max(40).optional().describe("The step id the answer is for (from the last question)."),
       answer: z.union([z.string().max(400), z.array(z.string().max(60)).max(25), z.number().int().min(0).max(70), z.boolean()]).optional(),
@@ -1587,10 +1588,9 @@ export const TOOLS: AeonTool[] = [
                 ...(q.value !== null && q.value !== "" && !(Array.isArray(q.value) && !q.value.length) ? { already_have: q.value } : {}),
               },
             }
-          : { done: true, next: "Call directory_profile to write her profile now." }),
+          : { done: true }),
         ...(s.skipped.length ? { skipped: s.skipped.map((x) => x.label) } : {}),
         preview_page: "/media",
-        rules: "Her own words for the statement. Never suggest client stories, testimonials, promises or advice. Psychology Today asks that AI-written words be read and made hers.",
       });
     },
   }),
@@ -1630,6 +1630,17 @@ export async function runTool(name: string, args: unknown, ctx: ToolContext): Pr
     return { content: [{ type: "text", text: `Invalid input for ${name}: ${problems}` }], isError: true };
   }
   const mode = ctx.mode;
+  // Her settings change only by her own word: from another agent over MCP they wait in her Approvals, in any mode.
+  if (tool.queuesOverMcp && changes && !ctx.approved && ctx.by.startsWith("mcp:")) {
+    const approvalId = await queueApproval({
+      kind: "aeon_action",
+      title: tool.title,
+      preview: { body: `${tool.label}, asked for by another app (${ctx.by.slice(4)}). It runs only once you approve it.`, tool: tool.name, args: parsed.data },
+      payload: { tool: tool.name, args: parsed.data },
+      createdBy: ctx.by,
+    });
+    return text({ waiting_for_her: true, saved: false, approval_id: approvalId, where: "her Approvals", reason: "Settings change only with her approval when another app asks." });
+  }
   // Manual: a change to her records waits in the ask bar as one aeon_action approval.
   if (mode === "manual" && changes && !ctx.approved && !ALWAYS_RUNS.has(tool.name)) {
     const approvalId = await queueApproval({

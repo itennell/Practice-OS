@@ -77,10 +77,38 @@ export async function savePolicies(input: unknown, sql: postgres.Sql = db(), by 
   const next = policiesSchema.partial().parse(input);
   // Every free-text policy is checked. A colleague's name passes when written with a title ("Jordan Lee, LCSW") or from her Referrals list.
   await refuseClientDetails([next.records_fee_note ?? "", next.privacy_officer ?? "", next.backup_colleague ?? ""]);
-  const merged = { ...(await loadPolicies(sql)).policies, ...next };
-  await upsert("_practice", merged, sql);
-  await audit({ actor: by === "clinician" ? "clinician" : "aeon", action: "client_form_policies_saved", subjectType: "client_form", subjectId: "_practice", details: { keys: Object.keys(next), by } }, sql);
-  return merged;
+  const write = async (tx: postgres.Sql) => {
+    const before = await loadPolicies(tx);
+    const merged = { ...before.policies, ...next };
+    await upsert("_practice", merged, tx);
+    // from/to let a wrong change be undone (undo_last_setting).
+    await audit(
+      {
+        actor: by === "clinician" ? "clinician" : "aeon",
+        action: "client_form_policies_saved",
+        subjectType: "client_form",
+        subjectId: "_practice",
+        details: { keys: Object.keys(next), by, from: before, to: { saved: true, policies: merged } },
+      },
+      tx,
+    );
+    return merged;
+  };
+  return typeof sql.begin === "function" ? (sql.begin((tx) => write(tx as never)) as never) : write(sql);
+}
+
+/** Puts her policies back exactly as they were (undo): the saved values, or never saved at all. */
+export async function restorePolicies(value: { saved: boolean; policies: Partial<Policies> }, by: string, sql: postgres.Sql = db()) {
+  const policies = policiesSchema.partial().parse(value.policies);
+  return sql.begin(async (tx) => {
+    const before = await loadPolicies(tx as never);
+    if (value.saved) await upsert("_practice", policies, tx as never);
+    else await tx`delete from practice_os.client_form_templates where form_type = '_practice'`;
+    await audit(
+      { actor: by === "clinician" ? "clinician" : "aeon", action: "client_form_policies_restored", subjectType: "client_form", subjectId: "_practice", details: { by, from: before, to: value } },
+      tx as never,
+    );
+  });
 }
 
 /** Saves her edits only if they take out none of the required elements the form says without them. */

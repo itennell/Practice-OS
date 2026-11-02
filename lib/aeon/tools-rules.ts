@@ -16,6 +16,9 @@ import { allGuides, type Guide } from "../guides";
 import { listPayerApplications } from "../payers/store";
 import type { AeonTool, ToolContext, ToolResult } from "./tools";
 
+/** Said plainly instead of a null the model could fill in: a few setup reminders rest on no official page. */
+export const NO_SOURCE = "no official source";
+
 const json = (value: unknown): ToolResult => ({ content: [{ type: "text", text: JSON.stringify(value, null, 2) }] });
 
 function tool<I extends z.ZodRawShape>(
@@ -94,7 +97,7 @@ export function ruleView(r: Rule, facts: Facts | null, nextDue: ISODate | null) 
     ...(r.ce ? { ce: { hours: r.ce.hours, topics: r.ce.topics.map((t) => ({ topic: t.label, hours: t.hours, cadence: t.cadence, ...(t.optional_note ? { optional: t.optional_note } : {}) })) } } : {}),
     ...(r.schedule.type === "clock" ? { starts_when: r.schedule.event } : {}),
     next_due_on: nextDue,
-    source: { citation: r.source.citation, url: r.source.url ?? null, quote: r.source.quote ?? null, checked_on: r.source.checked_on },
+    source: { citation: r.source.citation, url: r.source.url ?? NO_SOURCE, quote: r.source.quote ?? null, checked_on: r.source.checked_on },
     verified: r.verified_by !== "agent",
     ...(r.verified_by === "agent" ? { label: "Aeon researched, please confirm" } : {}),
     ...(r.caveat ? { caveat: r.caveat } : {}),
@@ -114,7 +117,11 @@ export function guideView(g: Guide) {
   };
 }
 
-/** Rules (federal and her state's, shipped plus the researched ones she approved) and guides that match her words, best first. */
+/**
+ * Rules (federal and her state's: the shipped, maintainer-verified ones plus researched ones saved after she approved
+ * the research; until she confirms a researched rule it is labeled "Aeon researched, please confirm") and guides that
+ * match her words, best first.
+ */
 export async function lookUpRules(query: string, opts: { limit?: number } = {}) {
   const limit = opts.limit ?? 5;
   const [facts, saved] = await Promise.all([loadFacts(), loadSavedRules()]);
@@ -157,34 +164,66 @@ export function monthRange(month: string): { start: ISODate; end: ISODate } {
   return { start, end: addDays(addMonths(start, 1), -1) };
 }
 
+const RESEARCHED = "Aeon researched, please confirm";
+
+type DeadlineRow = {
+  title: string;
+  due_on: ISODate | null;
+  status?: string;
+  what_to_do: string | null;
+  you_must: string | null;
+  citation: string | null;
+  source_url: string | null;
+  last_verified_on: ISODate | null;
+  verified_by: string;
+  ce?: unknown;
+};
+
+const deadlineView = (v: DeadlineRow, today: ISODate) => ({
+  title: v.title,
+  due_on: v.due_on,
+  days_left: v.due_on ? daysBetween(today, v.due_on) : null,
+  ...(v.status === "done" ? { done: true } : { overdue: v.due_on !== null && v.due_on < today }),
+  what_to_do: v.what_to_do,
+  you_must: v.you_must,
+  source: { citation: v.citation ?? NO_SOURCE, url: v.source_url ?? NO_SOURCE, checked_on: v.last_verified_on },
+  verified: v.verified_by !== "agent",
+  ...(v.verified_by === "agent" ? { label: RESEARCHED } : {}),
+  ...(v.ce ? { ce: v.ce } : {}),
+});
+
+const asDay = (d: unknown): ISODate | null => (d instanceof Date ? d.toISOString().slice(0, 10) : ((d as string | null) ?? null));
+
 export async function deadlinesInMonth(month?: string) {
   const today = await practiceToday();
   const m = month ?? today.slice(0, 7);
   const { start, end } = monthRange(m);
-  const view = await deadlinesView(Math.max(0, daysBetween(today, end)));
   const thisMonth = m === today.slice(0, 7);
-  // The whole month: every date in it, plus anything already overdue when it's this month.
-  const inMonth = (d: ISODate | null) => d !== null && d <= end && (d >= start || (thisMonth && d < today));
-  const deadlines = view.due
-    .filter((v) => inMonth(v.due_on))
-    .map((v) => ({
-      title: v.title,
-      due_on: v.due_on,
-      days_left: v.days_left,
-      overdue: v.days_left !== null && v.days_left < 0,
-      what_to_do: v.what_to_do,
-      you_must: v.you_must,
-      source: { citation: v.citation, url: v.source_url },
-      verified: v.verified_by !== "agent",
-      ...(v.verified_by === "agent" ? { label: "Aeon researched, please confirm" } : {}),
-      ...(v.ce ? { ce: v.ce } : {}),
-    }));
+  let deadlines: ReturnType<typeof deadlineView>[];
+  let isSample = false;
+  if (end < today) {
+    // A past month: what was due in it, done ones included, straight from the calendar rows.
+    const rows = await db()`
+      select title, due_on, status, what_to_do, you_must, citation, source_url, last_verified_on, verified_by, is_sample
+        from practice_os.obligations
+       where due_on between ${start} and ${end} and kind in ('deadline', 'clock') and status <> 'not_applicable'
+       order by due_on, title`;
+    deadlines = rows.map((r) => deadlineView({ ...(r as unknown as DeadlineRow), due_on: asDay(r.due_on), last_verified_on: asDay(r.last_verified_on) }, today));
+    isSample = rows.some((r) => r.is_sample);
+  } else {
+    const view = await deadlinesView(Math.max(0, daysBetween(today, end)));
+    // The whole month: every date in it, plus anything already overdue when it's this month.
+    const inMonth = (d: ISODate | null) => d !== null && d <= end && (d >= start || (thisMonth && d < today));
+    deadlines = view.due.filter((v) => inMonth(v.due_on)).map((v) => deadlineView(v, today));
+    isSample = view.is_sample;
+  }
+  const inRange = (d: ISODate | null) => d !== null && d <= end && (d >= start || (thisMonth && d < today));
   const apps = await listPayerApplications();
   const insurance = apps.flatMap((a) => [
-    ...(inMonth(a.follow_up_on) ? [{ payer: a.payer, what: "Follow up on the application", due_on: a.follow_up_on }] : []),
-    ...(inMonth(a.recredential_on) ? [{ payer: a.payer, what: "Recredential", due_on: a.recredential_on }] : []),
+    ...(inRange(a.follow_up_on) ? [{ payer: a.payer, what: "Follow up on the application", due_on: a.follow_up_on }] : []),
+    ...(inRange(a.recredential_on) ? [{ payer: a.payer, what: "Recredential", due_on: a.recredential_on }] : []),
   ]);
-  return { today, month: m, from: start, to: end, deadlines, insurance_dates: insurance, is_sample: view.is_sample };
+  return { today, month: m, from: start, to: end, deadlines, insurance_dates: insurance, is_sample: isSample };
 }
 
 export const RULES_TOOLS: AeonTool[] = [
@@ -196,7 +235,8 @@ export const RULES_TOOLS: AeonTool[] = [
       "Use it before saying you don't know any rule, requirement or how-to: CE hours and required topics for her license, license renewal, CAQH, " +
       "HIPAA (security risk analysis, privacy notice, BAAs), Good Faith Estimates (who needs one), PLLC annual report and how to form a PLLC, NPI, Medicare, taxes, payroll. " +
       "Each rule gives what to do, the part only she can do, CE hours and topics, whether it applies to her, the next due date, and its source " +
-      "(citation, link, a short quote, date checked). Answer from it and name the source (citation and link). A rule with verified false is " +
+      "(citation, link, a short quote, date checked). Answer from it and name the source: the citation, the link and the date checked; " +
+      "when the link is 'no official source', say there is no official source for it. A rule with verified false is " +
       "'Aeon researched, please confirm'. When nothing is found, say so; don't fill the gap from memory. Read-only.",
     input: { query: z.string().trim().min(2).max(200).describe("Her question in a few words, e.g. 'Illinois LCPC CE hours', 'security risk analysis', 'form a PLLC'.") },
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
@@ -212,7 +252,7 @@ export const RULES_TOOLS: AeonTool[] = [
       "Every deadline on her calendar in one calendar month (default: this month, first to last day, plus anything overdue), with what to do, " +
       "the part only she can do and each rule's source, plus insurance follow-up and recredential dates in that month. " +
       "Use it for 'what's due this month', 'anything due in December', 'what's coming up before year end' (call once per month). " +
-      "morning_brief covers only the next 7 days. Read-only.",
+      "A past month lists what was due then, done ones included (done: true). morning_brief covers only the next 7 days. Read-only.",
     input: { month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "YYYY-MM").optional().describe("The month, YYYY-MM. Leave out for this month.") },
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     label: "Checked this month's deadlines",
