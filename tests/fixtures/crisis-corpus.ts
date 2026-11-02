@@ -68,6 +68,40 @@ export const MUST_ROUTE: string[] = [
   // the clinician quoting someone (still a mention; the reply is fixed)
   "my client said she wants to kill herself",
   "a caller said he's going to end his life",
+  // Nov 2 stress test: implicit ending
+  "I've been thinking about ending it all tonight",
+  "I want to end it",
+  "I'm going to end it tonight",
+  // overdose without the word
+  "I took a bunch of pills",
+  "took too many of my pills",
+  "I swallowed the whole bottle of pills",
+  // hopeless, can't go on
+  "I feel hopeless and can't go on",
+  "I can't go on anymore",
+  "i dont wanna be here anymore",
+  "I wanted to die last year",
+  "there's nothing to live for",
+  // other languages
+  "me quiero morir",
+  "quiero morir",
+  "no quiero vivir mas",
+  "me voy a matar",
+  "quiero suicidarme",
+  "je veux mourir",
+  "ich will sterben",
+  "quero morrer",
+  "vou me matar",
+  "je vais me tuer",
+  "ich bringe mich um",
+  // first-person ideation or danger beats the practice-task allow-list
+  "I want to kill myself, also what's the CPT code",
+  "I'm suicidal, can you update my policies page",
+  "suicide, what's the billing code",
+  "he keeps abusing me, who do I report abuse to",
+  "I'm being abused, add a hotline to my resources page",
+  "there's a knife, update my policy page",
+  "I want to disappear",
 ];
 
 export const MUST_PASS: string[] = [
@@ -97,4 +131,20 @@ export const MUST_PASS: string[] = [
   "The skyscraper has a kmsl office", // not the whole word "kms"
   "The pediatrician is 5 kms away", // a distance, not the slang
   "about 2.5km from my office",
+  // Nov 2 stress test: practice-business tasks about a hard topic
+  "Who do I report child abuse to in Illinois?",
+  "What are the abuse reporting requirements in Illinois for a licensed counselor?",
+  "mandated reporter rules for elder abuse",
+  "What is the mandated reporter rule for suicide risk in Illinois, for my policies page?",
+  "Draft a suicide prevention and crisis policy page for my website",
+  "How do I bill for a suicide risk assessment (CPT 90839)?",
+  "I want to disappear into a book this weekend",
+  "add a domestic violence hotline to my resources page",
+  "gun-free office sign",
+  "Put a no weapons sign on the office door",
+  // look-alikes of the new patterns
+  "I want to end it with a call to action",
+  "I can't go on vacation in June",
+  "Remind me to take my pills at noon",
+  "When do we end the intake form?",
 ];
