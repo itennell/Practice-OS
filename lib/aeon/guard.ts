@@ -8,8 +8,11 @@ import {
   MY_CLIENT,
   checkIdentity,
   clientLike,
+  clinicalForMemory,
+  colleagueAt,
   mentionsDiagnosis,
   namedCondition,
+  ownContext,
   personalDetail,
   referralContext,
   sentenceAt,
@@ -19,7 +22,7 @@ import {
 import { findNames, isNameLike } from "./phi-classifier";
 
 export type GuardPoint = "message" | "tool_result" | "memory" | "reply";
-export type GuardKind = PhiKind | "unavailable";
+export type GuardKind = PhiKind | "unavailable" | "too_long";
 export type GuardResult = { ok: true; text: string } | { ok: false; kind: GuardKind };
 
 /** The fixed line she sees when her message is refused. Never repeats what she typed. */
@@ -32,6 +35,7 @@ export const REFUSAL: Record<GuardKind, string> = {
   contact: "That looks like someone's email or phone number. I can't keep client contact details yet. Ask again without it.",
   address: "That looks like someone's home address. I can't keep client details yet. Ask again without it.",
   unavailable: "My privacy check isn't working right now, so I can't read messages. Try again in a minute.",
+  too_long: "That's too long for my privacy check to read in full, so I left its text out. Ask about a shorter part, or open it on the Files page.",
 };
 
 /** What a model sees in place of a tool result the rules refused. */
@@ -47,16 +51,21 @@ function wholeWord(name: string, flags: string): RegExp {
   return new RegExp(`(?<![\\p{L}\\p{N}])${escape(name)}(?![\\p{L}\\p{N}])`, `${flags}u`);
 }
 
+// Titles and credentials are not part of a name when names are compared ("Dr. Carin Gordon, LCSW" is "carin gordon").
+const TITLE_WORDS = new Set(
+  "dr doctor mr mrs ms mx miss prof professor md do phd psyd edd lcsw licsw lcpc lpc lpcc lmhc lmft mft np pmhnp aprn rn".split(" "),
+);
+
 const wordsOf = (name: string) =>
   name
     .toLowerCase()
     .replace(/['’]s?$/u, "")
     .split(/[\s.,]+/)
-    .filter(Boolean);
+    .filter((w) => w && !TITLE_WORDS.has(w));
 
 /** Every word of the name is in one entry ("Dana" in "Dana Reyes"). */
 function partOf(words: string[], list: string[]): boolean {
-  return list.some((n) => {
+  return words.length > 0 && list.some((n) => {
     const known = wordsOf(n);
     return words.every((w) => known.includes(w));
   });
@@ -70,18 +79,23 @@ function wholeOf(words: string[], list: string[]): boolean {
   });
 }
 
+const TITLE_BEFORE = /\b(?:Dr|Doctor)\.?\s+$/i;
+
 export type PersonVerdict = { verdict: "ok" } | { verdict: "blank" } | { verdict: "refuse"; kind: PhiKind };
 
 /**
  * How one name found in the text is treated, judged in the sentence around
  * EVERY place it appears. Default refuse: a name passes only when
- *  - it is her own (her profile or practice; a part such as "Dana" counts) and
- *    the sentence doesn't treat her like a client ("Dana came in for her second
- *    visit", "Dana has anxiety"), or
- *  - it is a whole name from her Referrals board and the sentence is about
- *    referrals: its card, a letter, outreach, the office, specialty or NPI
- *    ("what's the status of Gary Bucher's card").
- * A title or credential clears no one. "my client" next to any name refuses.
+ *  - it is her whole own name (profile or practice) and the sentence doesn't
+ *    treat her like a client ("Dana Reyes wants Tuesdays after 5"), or a part of
+ *    it ("Dana") in a sentence clearly about herself (I/my, her license, fees,
+ *    hours, profile, posts);
+ *  - it is a provider from her Referrals board in a referral sentence (card,
+ *    letter, outreach, office, specialty, NPI): the whole name, or the surname
+ *    with "Dr." ("Dr. Gordon's card status", "Gordon on my board");
+ *  - she introduces a colleague with role and credential ("my supervisor Jenna
+ *    Cho, LCSW") outside any client sentence.
+ * A title or credential alone clears no one. "my client" next to any name refuses.
  * Anyone else is a stranger: refused when the sentence looks like a client's
  * (a visit, a bill, a condition), otherwise blanked where blanking is allowed.
  */
@@ -89,16 +103,22 @@ export function judgePerson(name: string, text: string, allow: Allowlist): Perso
   const words = wordsOf(name);
   const directory = allow.directory ?? [];
   const own = allow.names.filter((n) => !directory.includes(n));
-  const isOwn = partOf(words, own);
-  const isBoard = wholeOf(words, directory);
-  const spots = [...text.matchAll(wholeWord(name, "gi"))].map((m) => sentenceAt(text, m.index ?? 0));
-  if (spots.length === 0) spots.push(text);
+  const ownWhole = wholeOf(words, own);
+  const ownPart = partOf(words, own);
+  const boardWhole = wholeOf(words, directory);
+  const boardPart = partOf(words, directory);
+  const spots = [...text.matchAll(wholeWord(name, "gi"))].map((m) => m.index ?? 0);
   let blank = false;
-  for (const s of spots) {
+  for (const at of spots.length ? spots : [-1]) {
+    const s = at < 0 ? text : sentenceAt(text, at);
     if (MY_CLIENT.test(s)) return { verdict: "refuse", kind: "client_name" };
     const condition = namedCondition(name, s);
-    if (isOwn && !clientLike(s, true) && !condition) continue;
-    if (isBoard && referralContext(s) && !clientLike(s, true) && !condition) continue;
+    const clean = !clientLike(s, true) && !condition;
+    if (clean && ownWhole) continue;
+    if (clean && ownPart && ownContext(s)) continue;
+    const titled = at >= 0 && TITLE_BEFORE.test(text.slice(Math.max(0, at - 8), at));
+    if (clean && (boardWhole || boardPart) && (referralContext(s) || (boardPart && titled))) continue;
+    if (at >= 0 && colleagueAt(text, at, name) && !condition) continue;
     if (condition || clientLike(s)) return { verdict: "refuse", kind: mentionsDiagnosis(s) ? "diagnosis" : "client_name" };
     blank = true;
   }
@@ -134,24 +154,53 @@ export function titleCase(text: string): string {
 }
 
 // Tool results are the practice's own records and official sources: board phone
-// numbers, renewal dates from years ago, rule text that names a disorder. Only
-// ID numbers and "client <name>" withhold one; other names are judged below.
-// Tools that return free text she or a client wrote get every rule (fullRules).
+// numbers, renewal dates from years ago, rule text that names a disorder. Every
+// tool result gets the ID and "client <name>" rules plus personalDetail (birth
+// dates, emails, home addresses, a condition someone has); names are judged
+// below. Tools that return free text she or a client wrote get every rule (fullRules).
 const TOOL_RESULT_RULES: readonly PhiKind[] = ["identifier", "client_name"];
+
+// Look-alike letters from other scripts inside a Latin word ("Кevin" with a
+// Cyrillic К) are read as the Latin letter. A word wholly in another script
+// ("Иван") stays as it is, for the non-Latin name rule.
+const LOOKALIKE: Record<string, string> = {
+  А: "A", В: "B", Е: "E", К: "K", М: "M", Н: "H", О: "O", Р: "P", С: "C", Т: "T", Х: "X", У: "Y", І: "I", Ј: "J", Ѕ: "S",
+  а: "a", е: "e", о: "o", р: "p", с: "c", у: "y", х: "x", і: "i", ј: "j", ѕ: "s", ԁ: "d", һ: "h", ӏ: "l",
+  Α: "A", Β: "B", Ε: "E", Ζ: "Z", Η: "H", Ι: "I", Κ: "K", Μ: "M", Ν: "N", Ο: "O", Ρ: "P", Τ: "T", Υ: "Y", Χ: "X",
+  ο: "o", ν: "v", ι: "i", κ: "k", ρ: "p", τ: "t", υ: "u", χ: "x",
+};
+const LOOKALIKE_CHARS = new RegExp(`[${Object.keys(LOOKALIKE).join("")}]`, "gu");
+
+function foldLookalikes(text: string): string {
+  return text.replace(/[\p{L}]+/gu, (w) => (/\p{Script=Latin}/u.test(w) ? w.replace(LOOKALIKE_CHARS, (c) => LOOKALIKE[c] ?? c) : w));
+}
+
+// "K e v i n  O r t i z": four or more single letters with single spaces read as one word,
+// split again where a capital follows a small letter ("KevinOrtiz" is "Kevin Ortiz").
+function joinSpacedLetters(text: string): string {
+  return text.replace(/(?<!\p{L})\p{L}(?:[ \t]+\p{L}(?!\p{L})){3,}/gu, (m) => m.replace(/[ \t]+/g, "").replace(/(\p{Ll})(\p{Lu})/gu, "$1 $2"));
+}
 
 /**
  * The text both layers read: look-alike letters folded (NFKC: fullwidth "Ｋｅｖｉｎ"
- * is "Kevin"), accents and stray combining marks dropped, and invisible
- * characters (zero-width spaces, joiners, direction marks) removed, so they
- * can't split or hide a name. Used for checking only; what is saved is unchanged.
+ * is "Kevin"; Cyrillic "Кevin" is "Kevin"), accents and stray combining marks
+ * dropped, invisible characters (zero-width spaces, joiners, direction marks)
+ * removed, and spaced-out letters joined, so none of them can split or hide a
+ * name. Used for checking only; what is saved is unchanged.
  */
 export function normalizeForCheck(text: string): string {
-  return text.normalize("NFKD").replace(/[\p{M}\p{Cf}]/gu, "").normalize("NFKC");
+  return joinSpacedLetters(foldLookalikes(text.normalize("NFKD").replace(/[\p{M}\p{Cf}]/gu, "").normalize("NFKC")));
 }
 
 export type GuardOptions = {
   /** A tool result holding free text (notes, memories, approval previews, documents): every rule applies. */
   fullRules?: boolean;
+  /**
+   * Text too long for the name-finder's second read in full (a long upload) is
+   * refused as too_long instead of passing on the first read alone. Set for
+   * uploads and free-text tool results.
+   */
+  failClosedWhenLong?: boolean;
 };
 
 export async function guard(text: string, at: GuardPoint, allow?: Allowlist, opts: GuardOptions = {}): Promise<GuardResult> {
@@ -168,16 +217,19 @@ export async function guard(text: string, at: GuardPoint, allow?: Allowlist, opt
   if (!rules.ok) return { ok: false, kind: rules.kind };
   const detail = light ? personalDetail(plain, list) : null;
   if (detail) return { ok: false, kind: detail };
+  // Memory holds practice-business facts only: no clinical content, even with no name.
+  if (at === "memory" && clinicalForMemory(plain)) return { ok: false, kind: "diagnosis" };
 
   let names: string[];
   let cased: string[];
   const titled = titleCase(plain);
   try {
-    names = await findNames(plain);
+    names = await findNames(plain, { failWhenCapped: opts.failClosedWhenLong || opts.fullRules });
     // A second, cheaper read with every word capitalized: names written in
     // capitals or lowercase ("KEVIN ORTIZ", "carin gordon") are found too.
     cased = titled === plain || titled.length !== plain.length ? [] : await findNames(titled, { secondReads: false });
   } catch (err) {
+    if (err instanceof Error && err.name === "TooLongToCheck") return { ok: false, kind: "too_long" };
     console.error(`[guard] name-finder unavailable: ${err instanceof Error ? err.message : String(err)}`);
     return { ok: false, kind: "unavailable" };
   }
@@ -187,14 +239,16 @@ export async function guard(text: string, at: GuardPoint, allow?: Allowlist, opt
     if (v.verdict === "refuse") return { ok: false, kind: v.kind };
     if (v.verdict === "blank") strangers.push(n);
   }
-  // A name found only in the capitalized copy is judged as written: it refuses
-  // when its sentence looks like a client's, and is otherwise left alone.
+  // A name found only in the capitalized copy is judged as written, the same
+  // way. A one-word hit there ("hope", "will") is often an everyday word, so it
+  // counts only when its sentence looks like a client's.
   for (const n of cased.filter(isNameLike)) {
     for (const m of titled.matchAll(wholeWord(n, "g"))) {
       const asWritten = plain.slice(m.index ?? 0, (m.index ?? 0) + n.length);
       if (asWritten === n) continue;
       const v = judgePerson(asWritten, plain, list);
       if (v.verdict === "refuse") return { ok: false, kind: v.kind };
+      if (v.verdict === "blank" && /\s/.test(n.trim())) strangers.push(asWritten);
     }
   }
   if (strangers.length === 0) return { ok: true, text };
