@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { execSync } from "node:child_process";
-import { FRONT_DESK_ENABLED } from "../../lib/features";
+import { FRONT_DESK_ENABLED, PHONE_ALERTS_ENABLED } from "../../lib/features";
 import { pick, typeDate } from "../helpers/controls";
 
 // Aeon's onboarding interview on a fresh install: every screen checked with axe, a full
@@ -83,7 +83,7 @@ test("A new clinician sets up the whole practice, and the home page lists what s
     await page.getByLabel("City").fill("Chicago");
     await page.getByLabel("ZIP code").fill("60614");
   });
-  await step(page, /your own cell phone/, () => page.getByLabel("Phone number").fill("312 555 0199"));
+  if (PHONE_ALERTS_ENABLED) await step(page, /your own cell phone/, () => page.getByLabel("Phone number").fill("312 555 0199"));
 
   // 2 · License and rules
   await expect(page.getByText(/License and rules · question 1 of/)).toBeVisible();

@@ -11,7 +11,7 @@ import { MEMORY_CAP_CHARS, usedChars } from "@/lib/aeon/memory-ops";
 import { SOUL_PATH, soul } from "@/lib/aeon/soul";
 import { loadPracticeSettings } from "@/lib/gfe/store";
 import { DefaultModeSetting, FrontDeskRules } from "@/components/approval-settings";
-import { FRONT_DESK_ENABLED } from "@/lib/features";
+import { FRONT_DESK_ENABLED, PHONE_ALERTS_ENABLED } from "@/lib/features";
 import { alertPhone } from "@/lib/frontdesk/crisis";
 import { loadApprovalSettings } from "@/lib/approval-settings";
 
@@ -34,7 +34,7 @@ export default function Page() {
       </GlassCard>
       <Suspense fallback={<div aria-hidden className="h-96 max-w-3xl animate-pulse rounded-[24px] bg-[var(--hairline)]" />}>
         <Modes />
-        <Alerts />
+        {PHONE_ALERTS_ENABLED && <Alerts />}
         <Office />
       </Suspense>
       <Suspense fallback={<div aria-hidden className="h-64 max-w-3xl animate-pulse rounded-[24px] bg-[var(--hairline)]" />}>
@@ -76,7 +76,7 @@ async function Modes() {
   );
 }
 
-// Her own cell for urgent alerts. Always shown: the chat's crisis check texts it (lib/safety.ts).
+// Her own cell for urgent alerts. Shown while PHONE_ALERTS_ENABLED (lib/features.ts): the chat's crisis check texts it (lib/safety.ts).
 async function Alerts() {
   await connection(); // read the database per request, never at build time
   const phone = await alertPhone().catch(() => null);

@@ -240,6 +240,12 @@ export async function alertCrisis(input: { source: "chat" | "upload" | "media"; 
   const { alertPhone } = await import("./frontdesk/crisis");
   const { sendText } = await import("./frontdesk/store");
   await audit({ actor: "safety", action: "crisis_detected", subjectType: input.source, details: { category: input.category, by: input.by } });
+  // Phone alerts are off (lib/features.ts): text no one; the urgent item at the top of Admin is the alert.
+  const { PHONE_ALERTS_ENABLED, FRONT_DESK_ENABLED } = await import("./features");
+  if (!PHONE_ALERTS_ENABLED && !FRONT_DESK_ENABLED) {
+    await audit({ actor: "safety", action: "crisis_alert_failed", subjectType: input.source, details: { error: "phone alerts are off" } });
+    return { alerted: false };
+  }
   const to = await alertPhone().catch(() => null);
   if (!to) {
     await audit({ actor: "safety", action: "crisis_alert_failed", subjectType: input.source, details: { error: "no alert phone (settings.alert_phone or CLINICIAN_ALERT_PHONE)" } });

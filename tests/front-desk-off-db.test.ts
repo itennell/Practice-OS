@@ -68,6 +68,18 @@ describe.skipIf(FRONT_DESK_ENABLED || !hasDb)("Front Desk is off (database)", ()
     expect((await loadMenuData()).counts.admin).toBeGreaterThan(0);
   });
 
+  it("with phone alerts off, texts no one even when an alert cell is saved", async () => {
+    await db()`update practice_os.settings set alert_phone = '+13125550142'`;
+    try {
+      expect(await alertCrisis({ source: "chat", category: "self_harm", by: "chat:test" })).toEqual({ alerted: false });
+      const [last] = await db()`select action, details from practice_os.audit_log where actor = 'safety' order by id desc limit 1`;
+      expect(last).toMatchObject({ action: "crisis_alert_failed", details: { error: "phone alerts are off" } });
+      expect((await loadNeeds())[0]).toMatchObject({ kind: "urgent_alert", title: "Aeon showed the 988 message in your chat", action: { label: "Open chat", href: "/" } });
+    } finally {
+      await db()`update practice_os.settings set alert_phone = null`;
+    }
+  });
+
   it("the server start-up does not start the poller while paused", () => {
     const source = readFileSync("instrumentation.ts", "utf8");
     expect(source).toMatch(/FRONT_DESK_ENABLED && !process\.env\.VERCEL/);

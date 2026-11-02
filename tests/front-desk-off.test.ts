@@ -6,7 +6,7 @@ import { CONNECTION_CARDS } from "../components/connections/registry";
 import { APPROVAL_KINDS } from "../lib/approval-kinds";
 import { shouldAutoRun } from "../lib/approval-policy";
 import { chatTools, TOOLS, TOOLS_BY_NAME, runTool } from "../lib/aeon/tools";
-import { FRONT_DESK_APPROVAL_KINDS, FRONT_DESK_ENABLED, FRONT_DESK_TOOLS } from "../lib/features";
+import { FRONT_DESK_APPROVAL_KINDS, FRONT_DESK_ENABLED, FRONT_DESK_TOOLS, PHONE_ALERTS_ENABLED, PHONE_ENABLED } from "../lib/features";
 import { checkFrontDesk } from "../lib/frontdesk/check";
 import { startFrontDeskPoller } from "../lib/frontdesk/poller";
 import { flatten, HELPERS, QUESTIONS } from "../lib/onboarding/chapters";
@@ -43,21 +43,21 @@ describe.skipIf(FRONT_DESK_ENABLED)("Front Desk is off", () => {
     }
   });
 
-  it("drops Front Desk from the menu; the phone card stays only as urgent alerts, Cal.com goes", () => {
+  it("drops Front Desk from the menu; no phone or Cal.com card while phone alerts are off too", () => {
     expect(PRACTICE.map((l) => l.label)).toEqual(["Admin", "Files", "Approvals", "Referrals", "Media"]);
     expect(PRACTICE.some((l) => l.href === "/front-desk")).toBe(false);
     const ids = CONNECTION_CARDS.map((c) => c.id);
-    expect(ids).toContain("phone"); // "Urgent alerts to your phone": the crisis text needs a line
+    expect(ids.includes("phone")).toBe(PHONE_ENABLED); // the alerts-only line comes back with PHONE_ALERTS_ENABLED
     expect(ids).not.toContain("calcom");
     expect(ids).toContain("muse");
   });
 
-  it("leaves out the phone, voicemail and consult-text setup, but keeps her own alert cell", () => {
+  it("leaves out the phone, voicemail and consult-text setup, and asks for her alert cell only while phone alerts are on", () => {
     expect(HELPERS.map((h) => h.id)).not.toContain("front_desk");
     expect(HELPER_QUESTIONS.map((b) => b.helper)).not.toContain("front_desk");
     expect(QUESTIONS.some((q) => q.id === "alert_phone")).toBe(true);
     const ids = flatten({ stage: "middle", findClients: [], instagram: null, website: null } as never, { helpers: HELPER_QUESTIONS }).map((s) => s.id);
-    expect(ids).toContain("alert_phone");
+    expect(ids.includes("alert_phone")).toBe(PHONE_ALERTS_ENABLED);
     expect(ids).not.toContain("text_missed_callers");
     expect(ids.some((id) => id.startsWith("front_desk:"))).toBe(false);
   });

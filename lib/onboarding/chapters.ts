@@ -6,7 +6,7 @@
 // Never asked, anywhere: a license number, SSN, date of birth, bank details or
 // anything about a client.
 
-import { FRONT_DESK_ENABLED } from "../features";
+import { FRONT_DESK_ENABLED, PHONE_ALERTS_ENABLED } from "../features";
 import type { HelperQuestion } from "./helper-questions";
 
 export const CHAPTERS = [
@@ -586,6 +586,7 @@ export function flatten(
   for (const q of QUESTIONS) {
     if (q.appliesWhen && !q.appliesWhen(c)) continue;
     if (!FRONT_DESK_ENABLED && FRONT_DESK_QUESTIONS.has(q.id)) continue; // paused: lib/features.ts; saved answers stay
+    if (!PHONE_ALERTS_ENABLED && q.id === "alert_phone") continue; // no phone work for now (lib/features.ts)
     out.push({
       id: q.id,
       chapter: q.chapter,
