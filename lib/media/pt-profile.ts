@@ -281,9 +281,19 @@ const REQUIRED_TEXT = new Set<string>(["focus", "approach", "firstSession", "why
 /** A step she can't skip: Psychology Today needs it to list her in searches. */
 export const isRequired = (step: Step) => step.kind === "multi" && !step.optional;
 
+/**
+ * The facts her own answer is checked against. What she types is the source of truth for
+ * her school and her languages ("MA ... DePaul University, 2019", "Spanish"), so those are
+ * read from the answer itself, never refused against what was saved before. Only
+ * Muse-written copy is checked against saved facts.
+ */
+export function factsForAnswer(value: string, f: MediaFacts): MediaFacts {
+  return { ...f, education: [...f.education, value], answers: { ...f.answers, languages: [f.answers.languages, value].filter(Boolean).join("; ") } };
+}
+
 async function checkTyped(value: string, f: MediaFacts): Promise<void> {
   await checkAnswerText(maskMethods(value));
-  const blocked = lintText(value, f).filter((x) => x.severity === "block");
+  const blocked = lintText(value, factsForAnswer(value, f)).filter((x) => x.severity === "block");
   if (blocked.length) throw new AnswerRefused(blocked.map((x) => x.message).join(" "));
 }
 

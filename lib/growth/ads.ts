@@ -148,8 +148,15 @@ export const NEGATIVE_KEYWORDS = [
   "ceu", "internship", "how to become", "psychiatrist", "medication", "rehab", "detox", "hotline", "crisis line", "reddit",
 ];
 
+/** Fee headlines (30 characters at most) naming every session price: "Private Pay $150 / $175". */
+function feeHeadlines(f: MediaFacts): string[] {
+  const fees = sessionFees(f);
+  if (!fees.length) return [];
+  const amounts = fees.map((x) => usd(x.cents)).join(" / ");
+  return [`${sampleMark(f)}Private Pay ${amounts}${fees.length === 1 ? " a Session" : ""}`, `${sampleMark(f)}Sessions ${amounts}`];
+}
+
 export function googleHeadlines(f: MediaFacts): string[] {
-  const fee = mainPrivateFee(f);
   const c = f.answers.freeConsultMinutes;
   const issues = focusIssues(f);
   const all = [
@@ -158,7 +165,7 @@ export function googleHeadlines(f: MediaFacts): string[] {
     `${f.name}, ${f.credential}`,
     c ? `Free ${c}-Minute Consult` : null,
     f.telehealth ? `Online Therapy in ${stateName(f)}` : null,
-    fee ? `Private Pay ${fee} a Session` : null,
+    ...feeHeadlines(f),
     "Superbills for Insurance",
     "Book a Consult Online",
     `Counseling in ${f.city}`,
@@ -171,7 +178,7 @@ export function googleHeadlines(f: MediaFacts): string[] {
 }
 
 export function googleDescriptions(f: MediaFacts): string[] {
-  const fee = mainPrivateFee(f);
+  const fee = feeLine(f);
   const c = f.answers.freeConsultMinutes;
   const where = f.neighborhood ?? f.city;
   const candidates = [
@@ -179,6 +186,7 @@ export function googleDescriptions(f: MediaFacts): string[] {
     `Talk with ${f.name}, ${f.credential}, in ${where}.${c ? ` Free ${c}-minute consult.` : ""}`,
     fee ? `Private-pay sessions are ${fee}. Superbills for out-of-network insurance claims.` : null,
     fee ? `Sessions are ${fee}. Ask for a superbill to send to your insurance.` : null,
+    fee ? `Sessions are ${fee}. Superbills on request.` : null,
     f.telehealth ? `In person in ${where} and by video anywhere in ${stateName(f)}. Book online.` : `In person in ${where}. Book a consult online.`,
     f.inNetwork.length ? `In network with ${f.inNetwork.join(" and ")}. Private pay welcome.` : null,
   ].filter((d): d is string => Boolean(d));
@@ -188,6 +196,53 @@ export function googleDescriptions(f: MediaFacts): string[] {
 export function mainPrivateFee(f: MediaFacts): string | null {
   const fee = f.fees.find((x) => /\b90834\b/.test(x.label)) ?? f.fees.find((x) => !/\b(intake|first session|initial|evaluation|assessment)\b/i.test(x.label)) ?? f.fees[0];
   return fee ? usd(fee.cents) : null;
+}
+
+const INTAKE = /\b(intake|first session|initial|evaluation|assessment)\b/i;
+
+/** How long a session on her fee list is, in short words: "45 min", "53+ min", "30-37 min". Null when the label doesn't say. */
+export function sessionLength(label: string): string | null {
+  const l = label.replace(/\[sample\]/gi, "");
+  const longer = l.match(/\b(\d{2,3})\s*(?:\+|min(?:ute)?s?\.?\s*(?:or (?:longer|more)|\+))/i);
+  if (longer) return `${longer[1]}+ min`;
+  const range = l.match(/\b(\d{2,3})\s*(?:-|–|to)\s*(\d{2,3})\s*min/i);
+  // 38-52 minutes is the 90834 band, known as the 45-minute session.
+  if (range) return range[1] === "38" && range[2] === "52" ? "45 min" : `${range[1]}-${range[2]} min`;
+  const one = l.match(/\b(\d{2,3})\s*min/i);
+  return one ? `${one[1]} min` : null;
+}
+
+/** Her regular (not intake) session fees, cheapest first; her whole list if every fee is an intake. */
+export function sessionFees(f: Pick<MediaFacts, "fees">): { cents: number; length: string | null }[] {
+  const regular = f.fees.filter((x) => !INTAKE.test(x.label));
+  return (regular.length ? regular : f.fees).map((x) => ({ cents: x.cents, length: sessionLength(x.label) })).sort((a, b) => a.cents - b.cents);
+}
+
+/** "[Sample] " before fee copy for the demo practice, so a sample fee never leaves unlabelled. */
+export const sampleMark = (f: Pick<MediaFacts, "isSample">) => (f.isSample ? "[Sample] " : "");
+
+/** Her session fees as one clear line: "$150 (45 min) / $175 (53+ min)". Null with no fees. */
+export function feeLine(f: Pick<MediaFacts, "fees" | "isSample">): string | null {
+  const fees = sessionFees(f);
+  if (!fees.length) return null;
+  return sampleMark(f) + fees.map((x) => (x.length && fees.length > 1 ? `${usd(x.cents)} (${x.length})` : usd(x.cents))).join(" / ");
+}
+
+/** Every fee she lists, low to high, for schema.org priceRange: "$150–$200", or "$150" for one price. */
+export function priceRange(f: Pick<MediaFacts, "fees">): string | null {
+  if (!f.fees.length) return null;
+  const c = f.fees.map((x) => x.cents);
+  const [lo, hi] = [Math.min(...c), Math.max(...c)];
+  return lo === hi ? usd(lo) : `${usd(lo)}–${usd(hi)}`;
+}
+
+/** "a" or "an" by sound: "an LCPC", "an LMFT", "a PhD", "an hour", "a counselor". */
+export function article(word: string): "a" | "an" {
+  const w = word.trim();
+  if (/^[A-Z]{2,}/.test(w)) return /^[AEFHILMNORSX]/.test(w) ? "an" : "a";
+  if (/^(?:hour|honest|honor)/i.test(w)) return "an";
+  if (/^(?:uni|use|eu|one)/i.test(w)) return "a";
+  return /^[aeiou]/i.test(w) ? "an" : "a";
 }
 
 export function checkGoogleDraft(d: Omit<GoogleAdsDraft, "check">, f: MediaFacts | null): PolicyCheck {
@@ -272,7 +327,7 @@ export function googleAdsEditorCsv(d: GoogleAdsDraft): string {
 
 export function metaAds(f: MediaFacts, s: GrowthSettings): MetaAd[] {
   const c = f.answers.freeConsultMinutes;
-  const fee = mainPrivateFee(f);
+  const fee = feeLine(f);
   const where = f.neighborhood ?? f.city;
   const url = finalUrl(f, s);
   const first: MetaAd = {

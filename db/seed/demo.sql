@@ -13,8 +13,8 @@ values (
     "note": "[Sample] Fictional demo practice",
     "who_i_help": "[Sample] Adults in Chicago going through work stress and life transitions",
     "how_i_work": "[Sample] Telehealth across Illinois and in person in Lincoln Park, weekday evenings",
-    "fees": "[Sample] Self-pay $150 per session; superbills for out-of-network reimbursement",
-    "insurance": "[Sample] Not in network yet; credentialing planned",
+    "fees": "[Sample] $200 first session, $150 for 38-52 minutes, $175 for 53 minutes or longer; a superbill on request",
+    "insurance": "[Sample] In network with Aetna; BCBSIL application waiting",
     "stage": "beginning"
   }'::jsonb,
   now(),

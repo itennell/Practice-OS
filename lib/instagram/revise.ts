@@ -38,6 +38,16 @@ export function looksLikeEdit(request: string): boolean {
   return EDIT_VERB.test(t) && POST_REF.test(t);
 }
 
+/**
+ * Her words name a new topic, not a change: no edit verb, nothing pointing at the post, and
+ * not a question ("Drop-in hours on Fridays"). Sent to the edit tool by mistake, it is drafted as a new post.
+ */
+export function looksLikeNewTopic(request: string): boolean {
+  const t = request.trim();
+  if (!t || t.length > 160 || /\?\s*$/.test(t)) return false;
+  return !EDIT_VERB.test(t) && !POST_REF.test(t) && !/^(?:shorter|longer|warmer|friendlier|simpler|more|less|too|again|undo|no|yes|ok(?:ay)?)\b/i.test(t);
+}
+
 type Target = { id: string; topic: PillarId | "other"; headline: string | null; caption: string; alt_text: string | null; approval_id: string; project_id: string | null };
 
 /** The post to change: the one she named, else her newest post still waiting for approval. */

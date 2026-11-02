@@ -11,6 +11,10 @@ const text = (value: unknown): ToolResult => ({ content: [{ type: "text", text: 
 const fail = (message: string): ToolResult => ({ content: [{ type: "text", text: message }], isError: true });
 const cents = (d: number | undefined | null) => (d === undefined || d === null ? d : Math.round(d * 100));
 
+/** A number from chat words: 95, "95", "$95", "$1,200" all read as the number she said. */
+const num = (min: number, max: number) =>
+  z.preprocess((v) => (typeof v === "string" && /^\s*\$?\s*[\d,]+(?:\.\d+)?\s*$/.test(v) ? Number(v.replace(/[$,\s]/g, "")) : v), z.number().min(min).max(max));
+
 function tool<I extends z.ZodRawShape>(
   def: Omit<AeonTool, "run" | "input"> & { input: I; run: (input: z.infer<z.ZodObject<I>>, ctx: ToolContext) => Promise<ToolResult> },
 ): AeonTool {
@@ -83,24 +87,26 @@ export const GROWTH_TOOLS: AeonTool[] = [
     description:
       "Her private-pay plan (plain-code math from her fees, her insurance panels and a few numbers she gives): how many private-pay clients replace each panel's income, which panel to drop first (lowest pay for her time, admin included), and a 12-week plan with weekly consult and booking targets to fill the practice in about 3 months. " +
       "Use when she asks how to go private pay, how many clients she needs, which insurance to drop, or how to fill her practice. " +
-      "Pass any numbers she gives; never invent a payer rate, a fee, a target or a session count. If it returns asks, ask her those questions one at a time. Pass save: true once she has given her numbers.",
+      "Pass any numbers she gives; never invent a payer rate, a fee, a target or a session count. If it returns asks, ask her those questions one at a time. Pass save: true once she has given her numbers. " +
+      "needs_your_numbers is not a failure: tell her in_plain_words (say [Sample] when it does), then ask ask_her_next. " +
+      "When she gives a rate and sessions ('BCBS pays $95, I see 10 a week'), pass them on that payer's panel as rate_dollars: 95, weekly_sessions: 10.",
     input: {
       panels: z
         .array(
           z.object({
             payer: z.string().max(80),
-            weekly_sessions: z.number().min(0).max(60).optional().describe("Sessions a week she sees on this panel."),
-            rate_dollars: z.number().min(0).max(1000).optional().describe("What this payer pays her per session, only if she said it."),
-            admin_minutes: z.number().min(0).max(120).optional().describe("Unpaid admin minutes per session, if she said."),
+            weekly_sessions: num(0, 60).optional().describe("Sessions a week she sees on this panel."),
+            rate_dollars: num(0, 1000).optional().describe("What this payer pays her per session, only if she said it."),
+            admin_minutes: num(0, 120).optional().describe("Unpaid admin minutes per session, if she said."),
           }),
         )
         .max(12)
         .optional(),
-      private_fee_dollars: z.number().min(0).max(1000).optional(),
-      current_private_weekly: z.number().min(0).max(60).optional().describe("Private-pay sessions a week she already sees."),
-      target_weekly_sessions: z.number().min(1).max(60).optional(),
-      target_monthly_income_dollars: z.number().min(0).max(100_000).optional(),
-      consult_to_client_percent: z.number().min(5).max(100).optional(),
+      private_fee_dollars: num(0, 1000).optional(),
+      current_private_weekly: num(0, 60).optional().describe("Private-pay sessions a week she already sees."),
+      target_weekly_sessions: num(1, 60).optional(),
+      target_monthly_income_dollars: num(0, 100_000).optional(),
+      consult_to_client_percent: num(5, 100).optional(),
       save: z.boolean().optional().describe("Save these numbers as hers."),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
@@ -112,8 +118,15 @@ export const GROWTH_TOOLS: AeonTool[] = [
       const ctx = await store.loadGrowthContext();
       const base = await store.planInputFor(ctx.saved, ctx.facts.isSample);
       const given = input.panels ?? [];
+      // "BCBS" in chat is her "BCBSIL" panel: the same name, or the same payer family.
+      const { familiesOf } = await import("../media/truth");
+      const same = (a: string, b: string) => {
+        if (a.trim().toLowerCase() === b.trim().toLowerCase()) return true;
+        const fa = familiesOf([a]);
+        return fa.size > 0 && [...familiesOf([b])].some((f) => fa.has(f));
+      };
       const merged = base.input.panels.map((p) => {
-        const g = given.find((x) => x.payer.toLowerCase() === p.payer.toLowerCase());
+        const g = given.find((x) => same(x.payer, p.payer));
         if (!g) return p;
         // A [Sample] panel she gives numbers for becomes hers: any number she didn't give is asked for, never kept from the sample.
         const keep = <T,>(mine: T | undefined, old: T | null) => (mine !== undefined ? mine : p.sample ? null : old);
@@ -126,7 +139,7 @@ export const GROWTH_TOOLS: AeonTool[] = [
         };
       });
       for (const g of given) {
-        if (!merged.some((p) => p.payer.toLowerCase() === g.payer.toLowerCase()))
+        if (!merged.some((p) => same(p.payer, g.payer)))
           merged.push({ payer: g.payer, weekly_sessions: g.weekly_sessions ?? null, rate_cents: g.rate_dollars !== undefined ? cents(g.rate_dollars)! : null, admin_minutes: g.admin_minutes, kind: "other" });
       }
       const given_fields = {
@@ -152,6 +165,9 @@ export const GROWTH_TOOLS: AeonTool[] = [
       const p = plan.privatePayPlan(next, (await loadPracticeSettings()).fees);
       return text({
         headline: p.headline,
+        // What she reads: the plan in plain words, then the first number still missing.
+        in_plain_words: plan.planInWords(p),
+        ...(p.asks.length ? { needs_your_numbers: true, ask_her_next: p.asks[0] } : {}),
         private_fee: p.privateFeeCents ? usd(p.privateFeeCents) : null,
         panels: p.panels.map((x) => ({
           payer: x.sample ? `[Sample] ${x.payer}` : x.payer,
@@ -170,7 +186,8 @@ export const GROWTH_TOOLS: AeonTool[] = [
         ...(p.asks.length ? { asks: p.asks, rule: "Ask her these. Never guess a rate, a fee or a target." } : {}),
         assumptions: p.assumptions,
         notes: p.notes,
-        saved: Boolean(input.save),
+        // Only said when it saved: "saved: false" read as a failed save to the honesty check.
+        ...(input.save ? { saved_as_hers: true } : {}),
         ...(p.sample ? { sample: SAMPLE_NOTE } : {}),
         next: `${PAGE} Then offer to draft the website and ads that fill it.`,
       });

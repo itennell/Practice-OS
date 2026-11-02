@@ -1242,6 +1242,7 @@ export const TOOLS: AeonTool[] = [
       "Writes one Instagram post she asked for, in her words, then checks it and makes its picture; it waits for her approval. " +
       "Posts cover practice logistics only. If she asks about a client, a review or anything clinical, nothing is written: tell her why and offer the logistics angle it returns (offer_instead); " +
       "suicide or self-harm topics are refused. Pass her request as she said it. " +
+      "A short statement of a new topic ('Drop-in hours on Fridays', 'parking near the office') is a request for a new post: call this right away with her words; don't ask questions first. " +
       "To change a post she already has waiting ('make it shorter', 'change it to Wednesday'), use revise_instagram_post instead; for a reel or carousel, use make_studio_post.",
     input: {
       request: z.string().trim().min(3).max(600),

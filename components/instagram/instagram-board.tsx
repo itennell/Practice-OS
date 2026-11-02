@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 import type { Research, ResearchAngle } from "@/lib/instagram/research";
 import type { PostView } from "@/lib/instagram/store";
 import { Slider } from "../shared/slider";
+import { FactsChanged } from "../studio/facts-changed";
 import { TextField } from "../shared/settings-controls";
 import { StatusPill } from "../shared/status-mark";
 import { ThoughtLine } from "../shared/thought-line";
@@ -164,7 +165,25 @@ function Retry({ post, onDone, draft = false }: { post: PostView; onDone: () => 
   );
 }
 
-function PostCard({ post, profile, onChange }: { post: PostView; profile: PreviewProfile; onChange: () => void }) {
+/** Regenerate on a "Facts changed" flag: the same topic, written again from her current facts. */
+export function regeneratePostRequest(post: Pick<PostView, "headline" | "pillar">): { request: string; pillar: PostView["pillar"] | null } {
+  const about = post.headline?.replace(/^\[Sample\]\s*/i, "").trim() || PILLAR_LABEL[post.pillar];
+  return { request: `A new post about ${about}`.slice(0, 600), pillar: post.pillar === "other" ? null : post.pillar };
+}
+
+function PostCard({
+  post,
+  profile,
+  onChange,
+  onRegenerate,
+  busy,
+}: {
+  post: PostView;
+  profile: PreviewProfile;
+  onChange: () => void;
+  onRegenerate: (post: PostView) => void;
+  busy: boolean;
+}) {
   const state = postState(post);
   const s = STATE[state];
   const headingId = `post-${post.id}`;
@@ -177,6 +196,7 @@ function PostCard({ post, profile, onChange }: { post: PostView; profile: Previe
         </h3>
         <StatusPill status={s.status}>{s.label}</StatusPill>
       </div>
+      <FactsChanged problems={post.factsChanged ?? []} busy={busy} onRegenerate={() => onRegenerate(post)} />
       {post.status === "blocked" ? (
         <div className="flex flex-col gap-2 rounded-[20px] border border-[var(--hairline)] bg-[var(--glass-strong)] p-4">
           <p className="label-caps text-[var(--fg-muted)]">{PILLAR_LABEL[post.pillar]}</p>
@@ -493,7 +513,17 @@ export function InstagramBoard({ initialPosts, profile }: { initialPosts: PostVi
         ) : (
           <ul className="grid grid-cols-1 gap-6 md:grid-cols-2">
             {initialPosts.map((p) => (
-              <PostCard key={p.id} post={p} profile={profile} onChange={refresh} />
+              <PostCard
+                key={p.id}
+                post={p}
+                profile={profile}
+                onChange={refresh}
+                busy={working !== null}
+                onRegenerate={(old) => {
+                  const r = regeneratePostRequest(old);
+                  void run("write", r.request, r.pillar);
+                }}
+              />
             ))}
           </ul>
         )}

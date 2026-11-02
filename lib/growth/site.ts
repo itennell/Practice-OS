@@ -10,7 +10,8 @@
 // words as plain sections to paste into Squarespace.
 import { STATES } from "../compliance/states";
 import type { MediaFacts } from "../media/facts";
-import { finalUrl, focusIssues, mainPrivateFee, type GrowthSettings } from "./ads";
+import { article, feeLine, finalUrl, focusIssues, priceRange, sampleMark, type GrowthSettings } from "./ads";
+import { usd } from "./plan";
 import { checkText, result, type PolicyCheck, type PolicyFinding } from "./policy";
 
 export const EMERGENCY_LINE = "This site is not for emergencies. If you are in danger, call or text 988, or call 911.";
@@ -32,10 +33,21 @@ export type SiteDraft = {
 };
 
 const stateName = (f: MediaFacts) => STATES[f.state] ?? f.state;
-const sentence = (s: string) => {
-  const t = s.trim().replace(/\s+/g, " ");
-  return t ? `${t[0].toUpperCase()}${t.slice(1)}${/[.!?]$/.test(t) ? "" : "."}` : "";
+/**
+ * Her typed words as finished sentences: each sentence starts with a capital, the lone
+ * "i" is "I" ("i like" -> "I like", "i'm" -> "I'm"), and it ends with a full stop.
+ */
+export const sentence = (s: string) => {
+  const t = s
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\bi\b(?!\.\w)/g, "I")
+    .replace(/(^|[.!?]\s+)([a-z])/g, (_m, pre: string, c: string) => pre + c.toUpperCase());
+  return t ? `${t}${/[.!?]$/.test(t) ? "" : "."}` : "";
 };
+
+/** Her answer after a lead-in ("How I work: ..."): first letter lowered unless it starts an acronym or "I". */
+const afterColon = (s: string) => s.trim().replace(/^([A-Z])(?=[a-z])/, (x) => x.toLowerCase());
 
 export function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
@@ -57,7 +69,7 @@ function booking(f: MediaFacts, s: GrowthSettings): { href: string; label: strin
 
 /** schema.org MedicalBusiness (a LocalBusiness subtype; schema.org has no counselor type). Never reviews or ratings. */
 export function siteJsonLd(f: MediaFacts, url: string): Record<string, unknown> {
-  const fee = mainPrivateFee(f);
+  const fee = priceRange(f);
   return {
     "@context": "https://schema.org",
     "@type": "MedicalBusiness",
@@ -101,7 +113,7 @@ export function whoIHelpLine(f: MediaFacts, issues: string[]): string {
 
 export function draftSite(f: MediaFacts, s: GrowthSettings, savedLicenseLine: string | null = null): SiteDraft {
   const url = finalUrl(f, s);
-  const fee = mainPrivateFee(f);
+  const fee = feeLine(f);
   const c = f.answers.freeConsultMinutes;
   const where = [f.neighborhood, f.city].filter(Boolean).join(", ");
   const book = booking(f, s);
@@ -128,8 +140,8 @@ export function draftSite(f: MediaFacts, s: GrowthSettings, savedLicenseLine: st
       paragraphs: [
         c ? `1. Book a free ${c}-minute consult. We talk about what you're looking for and whether I'm a good fit.` : "1. Book a consult. We talk about what you're looking for and whether I'm a good fit.",
         `2. Your first session. ${f.answers.firstSession ? sentence(f.answers.firstSession) : "We talk about what brought you in and what you hope will change."}`,
-        "3. After that, we meet on a schedule that works for you, usually once a week.",
-        ...(f.answers.approach ? [sentence(`How I work: ${f.answers.approach.replace(/^./, (x) => x.toLowerCase())}`)] : []),
+        "3. After that, we meet on a schedule that works for you.",
+        ...(f.answers.approach ? [sentence(`How I work: ${afterColon(f.answers.approach)}`)] : []),
       ],
     },
     {
@@ -137,7 +149,9 @@ export function draftSite(f: MediaFacts, s: GrowthSettings, savedLicenseLine: st
       title: "Fees and insurance",
       paragraphs: [
         ...(fee ? [`Private-pay sessions are ${fee}.`] : []),
-        ...f.fees.filter((x) => /\b(intake|first session)\b/i.test(x.label)).map((x) => `${x.label.replace(/\s*\(.*\)$/, "")}: $${(x.cents / 100).toFixed(x.cents % 100 ? 2 : 0)}.`),
+        ...f.fees
+          .filter((x) => /\b(intake|first session)\b/i.test(x.label))
+          .map((x) => `${sampleMark(f)}${x.label.replace(/\[sample\]\s*/gi, "").replace(/^\d{5}\s+/, "").replace(/\s*\(.*\)$/, "").trim()}: ${usd(x.cents)}.`),
         "I can give you a superbill: a receipt you send to your insurance to ask for out-of-network reimbursement.",
         f.inNetwork.length ? `I'm in network with ${f.inNetwork.join(" and ")}.` : "I'm not in network with insurance plans yet.",
         "You'll get a Good Faith Estimate of your costs before your first session.",
@@ -155,8 +169,8 @@ export function draftSite(f: MediaFacts, s: GrowthSettings, savedLicenseLine: st
       id: "about",
       title: `About ${f.name}`,
       paragraphs: [
-        `${f.name} is a ${f.credential} in ${f.city}${f.answers.yearsInPractice ? ` with ${f.answers.yearsInPractice} years in practice` : ""}.`,
-        ...(f.answers.why ? [sentence(`Why I do this work: ${f.answers.why.replace(/^./, (x) => x.toLowerCase())}`)] : []),
+        `${f.name} is ${article(f.credential)} ${f.credential} in ${f.city}${f.answers.yearsInPractice ? ` with ${f.answers.yearsInPractice} years in practice` : ""}.`,
+        ...(f.answers.why ? [sentence(`Why I do this work: ${afterColon(f.answers.why)}`)] : []),
         ...f.education.map((e) => sentence(e)),
         ...(f.answers.languages ? [`I see clients in English and ${f.answers.languages}.`] : []),
       ],

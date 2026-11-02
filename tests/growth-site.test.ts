@@ -110,3 +110,43 @@ describe("one-page website", () => {
     expect(p.bookingHref).toBe("tel:3125550142");
   });
 });
+
+describe("website copy tidy-up", () => {
+  const FEES = [
+    { label: "First session (intake)", cents: 20000 },
+    { label: "Therapy, 38-52 minutes", cents: 15000 },
+    { label: "Therapy, 53 minutes or longer", cents: 17500 },
+  ];
+  const real = {
+    ...DANA,
+    isSample: false,
+    fees: FEES,
+    answers: { ...DANA.answers, firstSession: "we talk about what brings you in. i ask what you hope will change", why: "i like this work. it matters to me" },
+  };
+  const site = draftSite(real, S);
+  const all = [...site.sections.flatMap((s) => s.paragraphs), ...site.faq.map((q) => q.a)].join("\n");
+
+  it("capitalises her sentences and the lone i", () => {
+    expect(all).toContain("We talk about what brings you in. I ask what you hope will change.");
+    expect(all).toContain("Why I do this work: I like this work. It matters to me.");
+    expect(all).not.toMatch(/(^|[.!?] )[a-z]/m);
+  });
+
+  it("uses an before LCPC and never invents how often sessions are", () => {
+    expect(all).toContain("Dana Reyes is an LCPC in Chicago");
+    expect(all).not.toMatch(/a LCPC|once a week/);
+  });
+
+  it("lists her real session fees and a price range", () => {
+    expect(all).toContain("Private-pay sessions are $150 (45 min) / $175 (53+ min).");
+    expect(all).toContain("First session: $200.");
+    expect(site.jsonLd.priceRange).toBe("$150–$200");
+    expect(site.check.ok).toBe(true);
+  });
+
+  it("labels sample fees in exported copy", () => {
+    const demo = draftSite({ ...DANA, fees: FEES }, S);
+    const text = renderSquarespaceText(demo).split("=== Practice details block")[0];
+    for (const line of text.split("\n")) if (/\$\d/.test(line)) expect(line).toMatch(/\[Sample\]/);
+  });
+});

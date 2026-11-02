@@ -61,6 +61,7 @@ const GUIDE = `Ops you can use (numbers are what she sees, 1 is the first):
 - Text on the video: add_text {text, start, end, position}; edit_text {overlay, text?, start?, end?, position?}; remove_text {overlay}
 - set_captions {on}: auto captions; set_cover {slide} or {time}
 Rules: practice logistics only (first session, fees and superbills, insurance, booking, the clinician, office and telehealth). Never mental health advice, coping tips, symptoms, client stories, testimonials or promised results; never mention suicide or self-harm. Slide text at most ${LIMITS.slideText} characters, video text at most ${LIMITS.overlayText}. "At the start" means time 0. If she asks for something no op can do, return no ops and say so in the reply.
+"Make it shorter" (or "shorten it", "less words") with no part named means the whole post: shorten the slides AND the caption (set_caption, about half as long, same facts, license line kept).
 When she changes a fact (a price, a day, a time, insurance), change it everywhere it appears: every slide that says it AND the caption, in the same answer. Never invent a price, insurer or offer.`;
 
 /** The document as she sees it: numbered slides, clips and texts. */
@@ -84,6 +85,50 @@ export function describeDoc(doc: StudioDoc): string {
 }
 
 export type Proposal = { reply: string; ops: unknown[] };
+
+/** A caption body (license line not counted) longer than this is shortened by a whole-post "make it shorter". */
+export const SHORT_CAPTION = 300;
+
+/** "Make it shorter", "shorten this", "less words": the whole post, not one named slide, the title or a clip. */
+export function wantsWholeShorter(said: string): boolean {
+  const t = said.toLowerCase();
+  if (!/\b(shorter|shorten|less words|fewer words|trim it|cut it down|too long)\b/.test(t)) return false;
+  return !/\b(slides? \d|title|headline|clip|video text|text on|overlay|seconds?|cue)\b/.test(t);
+}
+
+const SENTENCE = /[^.!?\n]+(?:[.!?]+|$)/g;
+const TAGS = /(?:\s*#[\w-]+)+\s*$/;
+
+/**
+ * Plain code: the caption about half as long (at most SHORT_CAPTION characters of body),
+ * keeping the first sentence, every sentence with a price, the hashtags and her license
+ * line exactly; the other sentences are kept in order while they fit. Null when it can't
+ * get shorter.
+ */
+export function shortenCaption(caption: string, licenseLine: string): string | null {
+  let body = caption.trim();
+  const hasLine = Boolean(licenseLine) && body.endsWith(licenseLine);
+  if (hasLine) body = body.slice(0, -licenseLine.length).trim();
+  const tagMatch = body.match(TAGS);
+  const tags = tagMatch?.[0].trim() ?? "";
+  if (tagMatch) body = body.slice(0, body.length - tagMatch[0].length).trim();
+  const sentences = (body.match(SENTENCE) ?? []).map((x) => x.trim()).filter(Boolean);
+  if (sentences.length < 2) return null;
+  const target = Math.min(SHORT_CAPTION, Math.max(140, Math.round(body.length / 2)));
+  const keep = new Set<number>([0]);
+  sentences.forEach((x, i) => {
+    if (/\$\s?\d/.test(x)) keep.add(i);
+  });
+  let used = [...keep].reduce((n, i) => n + sentences[i].length + 1, 0);
+  sentences.forEach((x, i) => {
+    if (keep.has(i) || used + x.length + 1 > target) return;
+    keep.add(i);
+    used += x.length + 1;
+  });
+  const short = sentences.filter((_, i) => keep.has(i)).join(" ");
+  if (short.length >= body.length) return null;
+  return [short, tags, hasLine ? licenseLine : ""].filter(Boolean).join("\n\n");
+}
 
 /** Drops the empty fields a model fills in, and turns numbers named "slide" etc. into what OpSchema expects. */
 function tidy(op: Record<string, unknown>): Record<string, unknown> {

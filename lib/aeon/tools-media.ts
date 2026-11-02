@@ -6,7 +6,8 @@
 // and posts it herself.
 import { z } from "zod";
 import { db } from "../db";
-import { revisePost } from "../instagram/revise";
+import { looksLikeNewTopic, revisePost } from "../instagram/revise";
+import { requestPost } from "../instagram/store";
 import { makeProject, type MakeEvent } from "../studio/store";
 import type { AeonTool, ToolContext, ToolResult } from "./tools";
 
@@ -81,6 +82,7 @@ export const MEDIA_TOOLS: AeonTool[] = [
     title: "Change a post that's waiting for her",
     description:
       "Changes the Instagram post that's waiting for her approval when she asks for an edit ('make it shorter', 'change it to Wednesday', 'say the fee is $175'). " +
+      "Only an explicit edit of that post comes here; a statement of a new topic ('Drop-in hours on Fridays') is a new post: use draft_instagram_post (or make_studio_post for a reel or carousel) without asking questions first. " +
       "Use this, NOT draft_instagram_post, for any change to a post she already has: it updates that post and its pending approval in place, so no second approval piles up. " +
       "A post made in the studio changes there too (slides and caption together). Omit post_id for her newest waiting post. If it says nothing is waiting, draft a new one.",
     input: {
@@ -91,6 +93,13 @@ export const MEDIA_TOOLS: AeonTool[] = [
     label: "Changed the post",
     changesData: true,
     run: async ({ change, post_id }, ctx) => {
+      // "Drop-in hours on Fridays" sent here is a new post, never questions about the old one.
+      if (!post_id && looksLikeNewTopic(change)) {
+        const n = await requestPost(ctx.by, change, null, { chat: ctx.chat });
+        if (n.outcome === "blocked" || n.outcome === "declined") return text({ written: false, why: n.why });
+        if (n.outcome === "off_topic") return text({ written: false, why: n.why, offer_instead: n.angle.label });
+        return text({ new_post: true, written: n.outcome !== "blocked_after_rewrite", headline: n.headline, approval_id: n.post.approvalId, why: n.why, see: "/media/instagram" });
+      }
       const r = await revisePost(ctx.by, change, { postId: post_id, chat: ctx.chat });
       if (r.outcome === "none") return text({ revised: false, why: "No post is waiting for her approval. Use draft_instagram_post for a new one." });
       if (r.outcome !== "revised") return text({ revised: false, why: r.why });

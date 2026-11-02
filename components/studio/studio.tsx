@@ -16,6 +16,7 @@ import { PromptBar } from "../shared/prompt-bar";
 import { ThoughtLine } from "../shared/thought-line";
 import type { ThoughtStep } from "../shared/thought-line-steps";
 import { Canvas, type CanvasActions } from "./canvas";
+import { FactsChanged } from "./facts-changed";
 import type { DrawAssets } from "./slide-draw";
 import { VideoEditor } from "./video-editor";
 
@@ -79,6 +80,12 @@ export function isNewRequest(text: string): boolean {
     /^\s*(please\s+)?((can|could) you\s+)?(make|create|write|draft|plan|start|build|give me)\s+(me\s+)?(an?|one|another|some|a new|new)\s+(\w+\s+)?(post|reel|carousel|video)s?\b/i.test(text) ||
     /\b(edit|upload|add) my( own)? (video|footage|clip)\b/i.test(text)
   );
+}
+
+/** Regenerate on a "Facts changed" flag: the same kind on the same topic, made again from her current facts. */
+export function regenerateRequest(doc: Pick<Project["doc"], "kind" | "topic" | "title">): string {
+  const about = (doc.topic || doc.title || "my practice").replace(/^\s*(?:make|create|write)\s+(?:me\s+)?(?:an?|one|another|a new)\s+(?:post|reel|carousel)s?\s+(?:about|on)\s+/i, "");
+  return `Make a new ${doc.kind === "video" ? "post" : doc.kind} about ${about}`.slice(0, 600);
 }
 
 function Bubble({ entry, onPick, disabled }: { entry: Entry; onPick: (text: string) => void; disabled: boolean }) {
@@ -355,6 +362,11 @@ export function Studio({ profile, initial }: { profile: StudioProfile; initial: 
       </section>
 
       <div className="min-w-0">
+        {project && project.doc.kind !== "video" && (project.factsChanged?.length ?? 0) > 0 && (
+          <div className="mb-4">
+            <FactsChanged problems={project.factsChanged} busy={busy} onRegenerate={() => void send(regenerateRequest(project.doc))} />
+          </div>
+        )}
         {project ? (
           <Canvas project={project} assets={assets} busy={busy} act={act} videoEditor={project.doc.kind === "video" ? <VideoEditor doc={project.doc} busy={busy} apply={apply} projectId={project.id} keepKeys={project.clipKeys} /> : undefined} />
         ) : (
