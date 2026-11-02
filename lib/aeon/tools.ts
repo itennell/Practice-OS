@@ -709,16 +709,16 @@ export const TOOLS: AeonTool[] = [
     name: "update_payer_application",
     title: "Add or update an insurance application",
     description:
-      "Adds a payer (no id) or updates one (with id from list_payer_applications). Status: not_started, preparing, applied, pending, follow_up, approved, denied, withdrawn. " +
-      "Applied with no follow_up_on sets a follow-up 30 days out; approved with no recredential_on sets 36 months out. " +
-      "Example: 'I sent my BCBSIL application today' -> {payer: 'BCBSIL', status: 'applied'}. Never a license number or client detail.",
+      "Adds a payer (no id) or updates one (with id from list_payer_applications). Status: not_started, preparing, approved, denied, withdrawn. " +
+      "Approved with no recredential_on sets 36 months out. Example: 'I started my Aetna application' -> {payer: 'Aetna', status: 'preparing'}. " +
+      "Never mark an application sent from chat: Applied, Pending and Follow up (and the date she applied) come only from her own change on the " +
+      "Insurance page. When she says she sent one, ask her to open Edit on its row and set the status herself at /admin?panel=insurance. " +
+      "Never a license number or client detail.",
     input: {
       id: z.string().uuid().optional(),
       payer: z.string().min(2).max(120),
       form: z.enum(["cms855i"]).optional(),
-      status: z.enum(payers.STATUSES),
-      applied_on: isoDay.optional(),
-      follow_up_on: isoDay.optional(),
+      status: z.enum(payers.CHAT_SET_STATUSES, { errorMap: () => ({ message: payers.SENT_IS_HERS }) }),
       approved_on: isoDay.optional(),
       effective_on: isoDay.optional(),
       recredential_on: isoDay.optional(),
@@ -728,7 +728,11 @@ export const TOOLS: AeonTool[] = [
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: false },
     label: "Updated your insurance applications",
     changesData: true,
-    run: async (input, ctx) => text(await payers.savePayerApplication(input, ctx.by)),
+    run: async (input, ctx) => {
+      // Belt and braces: even a status that slipped past the schema never records a sent application from chat or MCP.
+      if ((payers.WAITING as readonly string[]).includes(input.status)) return text({ not_changed: true, ask_her: payers.SENT_IS_HERS, link: "/admin?panel=insurance" });
+      return text(await payers.savePayerApplication(input, ctx.by, undefined, { fromChat: true }));
+    },
   }),
 
   // AGENTS.md > Admin: the insurance checklist. The Insurance tab and these two tools share lib/payers/checklist.ts.
