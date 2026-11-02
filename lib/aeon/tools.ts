@@ -48,6 +48,7 @@ import { findReferralSources, getSource, interleave, listSources, moveSource, ST
 import * as documents from "../documents";
 import { DOCUMENT_KINDS, forModel, type DocumentCard } from "../documents/card";
 import { guard, WITHHELD } from "./guard";
+import { fileTools } from "./tools-files";
 import { forget, MEMORY_KINDS, MemoryRefused, recentChanges, remember } from "./memory";
 
 export type ToolContext = {
@@ -400,6 +401,7 @@ export const TOOLS: AeonTool[] = [
       return withCards({ next: "Her card is in the chat under your answer." }, [c]);
     },
   }),
+  ...fileTools(), // read_document (lib/aeon/tools-files.ts)
 
   tool({
     name: "create_document",
