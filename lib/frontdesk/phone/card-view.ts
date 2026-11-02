@@ -31,7 +31,16 @@ export type PhoneCardView = {
 const OWN_LINE = "Front Desk reads your voicemails and texts from your own phone company and texts callers your open consult times.";
 const DEMO_LINE = "Front Desk answers this practice's missed calls and texts on a demo phone line and texts callers your open consult times.";
 
-export function phoneCardView(s: PhoneCardStatus): PhoneCardView {
+const ALERT_LINE =
+  "Optional. Lets Aeon text your own cell right away if a message in your chat mentions danger. It never texts anyone else, and there is no voicemail or booking.";
+
+/** `alertsOnly`: Front Desk is paused (lib/features.ts), so the line is only for urgent alerts to her own cell. */
+export function phoneCardView(s: PhoneCardStatus, opts: { alertsOnly?: boolean } = {}): PhoneCardView {
+  const v = baseView(s);
+  return opts.alertsOnly ? { ...v, description: ALERT_LINE, offerVoicemail: false, canRefreshGreeting: false } : v;
+}
+
+function baseView(s: PhoneCardStatus): PhoneCardView {
   if (s.devLine) {
     return {
       description: DEMO_LINE,

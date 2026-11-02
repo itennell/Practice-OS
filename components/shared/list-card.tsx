@@ -38,6 +38,7 @@ export function ListRow({
   title,
   detail,
   end,
+  wrapEnd = false,
 }: {
   /** A lucide icon element, drawn in a small rounded tile. */
   icon?: ReactNode;
@@ -46,6 +47,8 @@ export function ListRow({
   title: ReactNode;
   detail?: ReactNode;
   end?: ReactNode;
+  /** Keeps the title readable on a phone: the end slot moves under it when both don't fit. */
+  wrapEnd?: boolean;
 }) {
   return (
     <li className="flex min-h-[60px] flex-wrap items-center gap-x-3 gap-y-2 border-t border-[var(--line)] px-4 py-2.5">
@@ -60,7 +63,7 @@ export function ListRow({
           {icon}
         </span>
       )}
-      <div className="min-w-0 flex-1">
+      <div className={cn("min-w-0 flex-1", wrapEnd && "basis-[13rem]")}>
         <p className="line-clamp-2 text-[0.875rem] font-semibold">{title}</p>
         {detail && <p className="line-clamp-2 text-small text-[var(--fg-muted)]">{detail}</p>}
       </div>

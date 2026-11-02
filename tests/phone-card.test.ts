@@ -140,3 +140,14 @@ describe("quickCache", () => {
     expect(called).toBe(true);
   });
 });
+
+describe("phoneCardView with Front Desk paused (alerts only)", () => {
+  it("talks only about urgent alerts and offers no voicemail or greeting", () => {
+    const v = phoneCardView({ connected: true, vendor: "twilio", voicemailOn: false }, { alertsOnly: true });
+    expect(v.description).toMatch(/danger/i);
+    expect(v.description).not.toMatch(/consult times/i);
+    expect(v.offerVoicemail).toBe(false);
+    expect(v.canRefreshGreeting).toBe(false);
+    expect(v.canDisconnect).toBe(true);
+  });
+});

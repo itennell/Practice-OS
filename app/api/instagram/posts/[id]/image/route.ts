@@ -1,11 +1,15 @@
 import { toSquareJpeg } from "@/lib/instagram/image";
+import { isLocalRequest } from "@/lib/request-guard";
 import { postImage } from "@/lib/instagram/store";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // ?download=1 saves it as a file, for posting it herself in the Instagram app.
 // ?shape=square gives the 1080 x 1080 version; the default is the 4:5 feed post.
+// Only on her own computer, like the files she added (/api/documents/[id]/file). Nothing off her
+// computer fetches this route: the Connect relay gets the picture's bytes, never this link.
 export async function GET(request: Request, ctx: RouteContext<"/api/instagram/posts/[id]/image">) {
+  if (!isLocalRequest(request)) return Response.json({ error: "Your post pictures are on your own computer." }, { status: 403 });
   const { id } = await ctx.params;
   const stored = UUID.test(id) ? await postImage(id) : null;
   if (!stored) return new Response("Not found", { status: 404 });

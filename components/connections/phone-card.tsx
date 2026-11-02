@@ -9,6 +9,7 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { TextField } from "@/components/shared/settings-controls";
 import { notify } from "@/components/shared/toaster";
 import { Button, ButtonLink, chipClass } from "@/components/ui";
+import { FRONT_DESK_ENABLED } from "@/lib/features";
 import { phoneCardView, type PhoneCardStatus } from "@/lib/frontdesk/phone/card-view";
 import { TEXTING_APPROVAL, VOICEMAIL_OFFER, TWILIO_CONSOLE_URL, TWILIO_SIGNUP_URL, TWILIO_STEP_ORDER, TWILIO_STEP_TEXT, type TwilioStepId } from "@/lib/frontdesk/phone/twilio-setup";
 
@@ -266,11 +267,12 @@ export function PhoneCard({ initial }: { initial: PhoneCardStatus }) {
     if (action !== "greeting") setStatus((s) => ({ ...s, voicemailOn: action === "on" }));
   };
 
-  const view = phoneCardView(status);
+  const alertsOnly = !FRONT_DESK_ENABLED;
+  const view = phoneCardView(status, { alertsOnly });
   return (
     <ConnectionCardFrame
       icon={<Phone className="size-5" />}
-      title="Practice phone"
+      title={alertsOnly ? "Urgent alerts to your phone" : "Practice phone"}
       description={view.description}
       connected={view.connected}
       accountLabel={view.accountLabel}
@@ -320,7 +322,9 @@ export function PhoneCard({ initial }: { initial: PhoneCardStatus }) {
                   trigger={<Button variant="quiet">Disconnect</Button>}
                   title="Disconnect your phone?"
                   description={
-                    view.canUndoVoicemail
+                    alertsOnly
+                      ? "Aeon will stop texting you urgent alerts until you connect again. Your phone number and account are not changed."
+                      : view.canUndoVoicemail
                       ? "Front Desk will stop reading your voicemails and texts until you connect again. First, your number's old call setting is put back, so calls stop going to your Practice-OS voicemail. Nothing else on your account changes."
                       : "Front Desk will stop reading your voicemails and texts until you connect again. Your phone number and account are not changed."
                   }

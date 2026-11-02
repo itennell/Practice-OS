@@ -17,6 +17,7 @@ import { findByHash, keepDocument, setApproval, sha256 } from "./store";
 //   2. crisis check (lib/safety.ts)          -> not read, 988/911 line
 //   3. client-record check (plain code)      -> not read, not kept
 //   4. sensitive-info guard (lib/aeon/guard) -> names blanked; an ID number keeps it from the model
+// (screenText, also run each time Aeon reads a kept file's text: read_document).
 // Then Muse sorts it (or plain code, when the text can't go to the model), the file
 // is kept under PRACTICE_OS_DATA_DIR/documents, and any change to her records waits
 // as one file_document approval. Nothing about a refused file is written but an
@@ -53,9 +54,40 @@ function describe(f: Fact): string {
   }
 }
 
-async function refuse(reason: Exclude<FileOutcome, { ok: true }>["reason"], text: string, by: string, details: Record<string, unknown> = {}): Promise<FileOutcome> {
+async function refuse(reason: Exclude<FileOutcome, { ok: true }>["reason"], text: string, by: string, details: Record<string, unknown> = {}): Promise<Exclude<FileOutcome, { ok: true }>> {
   await audit({ actor: "safety", action: "document_refused", subjectType: "document", details: { reason, by, ...details } });
   return { ok: false, reason, text };
+}
+
+export type Screened =
+  | Exclude<FileOutcome, { ok: true }>
+  | {
+      ok: true;
+      /** The text with any stray names blanked, or null when the guard flagged an ID number. */
+      text: string | null;
+      /** Holds a tax or ID number: its text never goes to the model. */
+      private_: boolean;
+    };
+
+/**
+ * The checks every file's text passes before any model sees it, in order: crisis
+ * (988/911 line and an alert to her), client record, then the sensitive-info guard.
+ * Used when she adds a file and again each time Aeon reads one (read_document).
+ */
+export async function screenText(text: string, by: string): Promise<Screened> {
+  // Every check reads the whole text (lib/uploads/read.ts refuses a file too long to check).
+  const crisis = checkCrisis(text);
+  if (crisis.crisis) {
+    await alertCrisis({ source: "upload", category: crisis.category, by });
+    return refuse("crisis", CRISIS_FILE, by, { category: crisis.category });
+  }
+  if (looksLikeClientRecord(text)) return refuse("client_record", CLIENT_RECORD_REFUSAL, by);
+
+  const checked = await guard(text, "tool_result");
+  if (!checked.ok && checked.kind === "unavailable") return { ok: false, reason: "guard", text: GUARD_UNAVAILABLE };
+  if (!checked.ok && checked.kind === "client_name") return refuse("client_record", CLIENT_RECORD_REFUSAL, by, { guard: checked.kind });
+  // An ID number (a W-9's tax ID, an EIN or SSN) keeps the text from the model.
+  return { ok: true, text: checked.ok ? checked.text : null, private_: !checked.ok || TAX_ID.test(text) };
 }
 
 export async function fileUpload(bytes: Uint8Array, opts: { by: string; chat?: ChatFn }): Promise<FileOutcome> {
@@ -69,17 +101,8 @@ export async function fileUpload(bytes: Uint8Array, opts: { by: string; chat?: C
     throw err;
   }
 
-  // Every check reads the whole text (lib/uploads/read.ts refuses a file too long to check).
-  const crisis = checkCrisis(text);
-  if (crisis.crisis) {
-    await alertCrisis({ source: "upload", category: crisis.category, by: opts.by });
-    return refuse("crisis", CRISIS_FILE, opts.by, { category: crisis.category });
-  }
-  if (looksLikeClientRecord(text)) return refuse("client_record", CLIENT_RECORD_REFUSAL, opts.by);
-
-  const checked = await guard(text, "tool_result");
-  if (!checked.ok && checked.kind === "unavailable") return { ok: false, reason: "guard", text: GUARD_UNAVAILABLE };
-  if (!checked.ok && checked.kind === "client_name") return refuse("client_record", CLIENT_RECORD_REFUSAL, opts.by, { guard: checked.kind });
+  const screened = await screenText(text, opts.by);
+  if (!screened.ok) return screened;
 
   const hash = sha256(bytes);
   const existing = await findByHash(hash);
@@ -88,9 +111,9 @@ export async function fileUpload(bytes: Uint8Array, opts: { by: string; chat?: C
   }
 
   // An ID number (a W-9's tax ID, an EIN or SSN) keeps the text from the model: plain code sorts it.
-  const private_ = !checked.ok || TAX_ID.test(text);
+  const private_ = screened.private_;
   const today = await practiceToday();
-  const sorted: Classified = private_ ? classifyByRules(text) : await classifyWithMuse(checked.ok ? checked.text : text, today, opts.chat);
+  const sorted: Classified = private_ ? classifyByRules(text) : await classifyWithMuse(screened.text ?? text, today, opts.chat);
 
   const kept = await keepDocument({ bytes, mime, kind: sorted.kind, title: sorted.title, summary: sorted.summary, payer: sorted.payer, createdBy: opts.by });
   if (kept.duplicate) {

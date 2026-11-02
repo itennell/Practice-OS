@@ -20,6 +20,7 @@ export const DANA: MediaFacts = {
   website: null,
   websiteStatus: "wants",
   education: ["MA, Clinical Mental Health Counseling, Example University [Sample], 2019"],
+  slidingScale: false,
   isSample: true,
   answers: {
     focus: "Anxiety, big life changes, and couples who feel stuck",
@@ -29,6 +30,7 @@ export const DANA: MediaFacts = {
     languages: "Spanish",
     yearsInPractice: 6,
     freeConsultMinutes: 15,
+    consultAsked: true,
   },
   pt: EMPTY_PT,
 };

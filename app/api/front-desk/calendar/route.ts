@@ -1,3 +1,4 @@
+import { FRONT_DESK_ENABLED } from "@/lib/features";
 import { z } from "zod";
 import { canDecide } from "@/lib/admin-guard";
 import { chooseCalendar, connectCalcomAuto, disconnectCalcom } from "@/lib/frontdesk/connect";
@@ -11,6 +12,7 @@ const Body = z.discriminatedUnion("step", [
 ]);
 
 export async function POST(request: Request) {
+  if (!FRONT_DESK_ENABLED) return Response.json({ error: "Not found." }, { status: 404 }); // paused (lib/features.ts)
   if (!canDecide(request)) return Response.json({ error: "Not allowed here." }, { status: 403 });
   const parsed = Body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ ok: false, fix: "Paste your Cal.com key first." }, { status: 400 });
@@ -24,6 +26,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  if (!FRONT_DESK_ENABLED) return Response.json({ error: "Not found." }, { status: 404 }); // paused (lib/features.ts)
   if (!canDecide(request)) return Response.json({ error: "Not allowed here." }, { status: 403 });
   await disconnectCalcom();
   return Response.json({ ok: true });

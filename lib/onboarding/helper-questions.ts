@@ -6,6 +6,7 @@
 import { instagramQuestions } from "../instagram/onboarding";
 import { referralsQuestions } from "../referrals/onboarding";
 import { frontDeskQuestions } from "../frontdesk/onboarding";
+import { FRONT_DESK_ENABLED } from "../features";
 
 /** What onboarding already knows, so a block can skip or prefill a question. */
 export type PracticeBasics = {
@@ -68,4 +69,4 @@ export const HELPER_QUESTIONS: HelperBlock[] = [
   referralsQuestions,
   instagramQuestions,
   frontDeskQuestions,
-];
+].filter((b) => FRONT_DESK_ENABLED || b.helper !== "front_desk"); // Front Desk is paused (lib/features.ts)

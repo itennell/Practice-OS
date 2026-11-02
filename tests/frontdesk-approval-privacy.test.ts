@@ -4,6 +4,8 @@
 // calendar; it writes inquiries, approvals and bookings and flips the Front
 // Desk switches, so it runs only on a local throwaway database (localhost).
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+// These test Front Desk itself, so they run with it switched on (lib/features.ts).
+vi.mock("../lib/features", async (orig) => ({ ...(await orig<typeof import("../lib/features")>()), FRONT_DESK_ENABLED: true }));
 import { loadEnv } from "../lib/env";
 
 loadEnv();

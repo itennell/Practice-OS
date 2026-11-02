@@ -20,6 +20,7 @@ import { alertCrisis, checkCrisis, CRISIS_REPLY } from "../safety";
 import { captionRun, checkStep, pictureIdeaProblems, screenCues, type Limits } from "./check";
 import { docWords, emptyDoc, LIMITS, parseDoc, type Kind, type StudioDoc } from "./doc";
 import { proposeEdit } from "./edit";
+import { syncFacts } from "./facts-sync";
 import { applyOps, describeOp, OpSchema } from "./ops";
 
 export type Step = { seq: number; source: "chat" | "canvas" | "aeon"; summary: string; at: string };
@@ -468,6 +469,11 @@ export async function applyEdit(
   if (locked) return locked;
   const applied = applyOps(project.doc, ops, { from: opts.source });
   if (!applied.ok) return { ok: false, status: 422, why: applied.why, project };
+  // A price, day, time or consult length changed on one part changes on the others too
+  // (slide and caption never disagree); the new value is then fact-checked below.
+  const synced = syncFacts(project.doc, applied.doc);
+  applied.doc = synced.doc;
+  applied.notes.push(...synced.notes);
   const lim = await limits();
   // What she asked the new picture to show is checked before it reaches the image prompt.
   const picture = applied.effects.filter((e) => e.kind === "picture").at(-1);

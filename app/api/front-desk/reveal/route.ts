@@ -1,3 +1,4 @@
+import { FRONT_DESK_ENABLED } from "@/lib/features";
 import { canDecide } from "@/lib/admin-guard";
 import { audit } from "@/lib/audit";
 import { revealBody, revealNumber } from "@/lib/frontdesk/inbox";
@@ -5,6 +6,7 @@ import { revealBody, revealNumber } from "@/lib/frontdesk/inbox";
 // "Show" on one inbox row: the caller's number, or (part "body") the full words of
 // a voicemail or text. Both are masked by default; each reveal is logged.
 export async function POST(request: Request) {
+  if (!FRONT_DESK_ENABLED) return Response.json({ error: "Not found." }, { status: 404 }); // paused (lib/features.ts)
   if (!canDecide(request)) return Response.json({ error: "Not allowed here." }, { status: 403 });
   const { id, part } = ((await request.json().catch(() => ({}))) ?? {}) as { id?: unknown; part?: unknown };
   if (typeof id !== "string" || !/^[0-9a-f-]{36}$/i.test(id)) return Response.json({ error: "Unknown row." }, { status: 404 });

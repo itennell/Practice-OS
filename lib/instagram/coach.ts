@@ -11,6 +11,7 @@
 // batch, its number and the parts, so "draft the second one" finds idea 2 of her
 // latest list even though chat history keeps only text.
 import { audit } from "../audit";
+import { insuranceLine } from "../media/truth";
 import { chat as metaChat } from "../meta";
 import { db } from "../db";
 import { codeCritic, type ChatFn } from "./critic";
@@ -58,7 +59,7 @@ export function breaksNeverShow(picture: string, neverShow: string[], firstName?
 
 const FILL = (what: string) => `[fill in: ${what}]`;
 
-export function fixedIdeas(f: Pick<PracticeFacts, "clinicianName" | "credential" | "neighborhood" | "city" | "fees">): Record<PillarId, Omit<Idea, "picture">> {
+export function fixedIdeas(f: Pick<PracticeFacts, "clinicianName" | "credential" | "neighborhood" | "city" | "fees"> & Pick<Partial<PracticeFacts>, "truth">): Record<PillarId, Omit<Idea, "picture">> {
   const where = [f.neighborhood, f.city].filter(Boolean).join(", ") || FILL("where you see clients");
   const fee = f.fees[0];
   const money = (c: number) => `$${(c / 100).toFixed(c % 100 ? 2 : 0)}`;
@@ -73,7 +74,7 @@ export function fixedIdeas(f: Pick<PracticeFacts, "clinicianName" | "credential"
     fees_superbills: {
       topic: "fees_superbills",
       hook: "Here's how paying for sessions works.",
-      points: [fee ? `${fee.label}: ${money(fee.cents)}.` : `My fee: ${FILL("your fee")}.`, `Insurance: ${FILL("superbills or the plans you take")}.`],
+      points: [fee ? `${fee.label}: ${money(fee.cents)}.` : `My fee: ${FILL("your fee")}.`, f.truth ? `Insurance: ${insuranceLine(f.truth)}` : `Insurance: ${FILL("superbills or the plans you take")}.`],
       cta: `Questions about cost? ${book}`,
     },
     how_to_book: {

@@ -16,7 +16,7 @@ import type { SuperbillRow } from "../superbill/store";
 //   5. Setup questions and dates Aeon still needs from her.
 // Within a tier, sooner first; undated last; then by title so the order never jumps.
 
-export type NeedKind = "deadline" | "gfe" | "insurance" | "credentialing" | "superbill" | "setup" | "date_needed";
+export type NeedKind = "deadline" | "gfe" | "insurance" | "credentialing" | "superbill" | "setup" | "date_needed" | "urgent_alert";
 
 /** One button per item: open the right form already filled (`panel`), go to a page (`href`), or start a chat (`ask`). */
 export type NeedAction = { label: string } & ({ panel: AdminPanel } | { href: string } | { ask: string });
@@ -41,6 +41,8 @@ export type NeedsInput = {
   estimates: EstimateRow[];
   superbills: SuperbillRow[];
   profile: CredentialingProfile | null;
+  /** Crisis alerts Aeon could not text (audit_log crisis_alert_failed), newest first. */
+  alertFailures?: { id: string; at: string }[];
 };
 
 export const MAX_NEEDS = 6;
@@ -63,8 +65,23 @@ function dueWords(daysLeft: number | null): string {
 
 const join = (...parts: (string | null | undefined)[]) => parts.filter(Boolean).join(" · ");
 
-export function needsNext({ today, brief, estimates, superbills, profile }: NeedsInput): NeedItem[] {
+export function needsNext({ today, brief, estimates, superbills, profile, alertFailures = [] }: NeedsInput): NeedItem[] {
   const out: NeedItem[] = [];
+
+  // Never silent: when the chat's crisis check could not text her, say so at the very top.
+  if (alertFailures.length) {
+    const latest = alertFailures[0];
+    out.push({
+      id: `urgent_alert:${latest.id}`,
+      kind: "urgent_alert",
+      title: "Aeon showed the 988 message in your chat, but couldn't text you",
+      why: "No alert phone line is connected, so nothing reached your cell. Check your chat now",
+      due_on: null,
+      days_left: null,
+      tier: 1,
+      action: { label: "Set up alerts", href: "/settings/connections" },
+    });
+  }
 
   if (brief) {
     for (const [list, fallback] of [
@@ -171,6 +188,7 @@ export function needsNext({ today, brief, estimates, superbills, profile }: Need
 
   return out.sort(
     (a, b) =>
+      Number(b.kind === "urgent_alert") - Number(a.kind === "urgent_alert") || // a missed crisis alert is always first
       a.tier - b.tier ||
       (a.days_left ?? Number.POSITIVE_INFINITY) - (b.days_left ?? Number.POSITIVE_INFINITY) ||
       a.title.localeCompare(b.title),

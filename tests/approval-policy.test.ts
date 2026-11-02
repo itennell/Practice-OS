@@ -1,7 +1,9 @@
 // Manual, Auto and Bypass (lib/approval-policy.ts): the plain-code rule for what
 // runs without her tap, then the same rule end to end against the database.
 import { readFileSync } from "node:fs";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
+// These test Front Desk itself, so they run with it switched on (lib/features.ts).
+vi.mock("../lib/features", async (orig) => ({ ...(await orig<typeof import("../lib/features")>()), FRONT_DESK_ENABLED: true }));
 import { APPROVAL_KINDS } from "../lib/approval-kinds";
 import { BAA_IN_PLACE, capForMcp, KIND_POLICY, shouldAutoRun, withOrigin } from "../lib/approval-policy";
 import { loadEnv } from "../lib/env";
