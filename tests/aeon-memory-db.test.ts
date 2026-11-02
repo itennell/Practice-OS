@@ -85,9 +85,9 @@ describe.skipIf(!ready)("memories (live database)", () => {
   }, 120_000); // about 400 guarded writes; slow when the whole suite runs at once
 
   it("replaces an older memory and forgets on request", async () => {
-    const old = await mem.remember({ kind: "fact", text: `[Sample] Fee for 90837 is $165 (${tag})` }, by);
+    const old = await mem.remember({ kind: "fact", text: `[Sample] Sends superbills monthly (${tag})` }, by);
     made.push(old.memory.id);
-    const fresh = await mem.remember({ kind: "fact", text: `[Sample] Fee for 90837 is $175 (${tag})`, replaces: old.memory.id }, by);
+    const fresh = await mem.remember({ kind: "fact", text: `[Sample] Sends superbills every two weeks (${tag})`, replaces: old.memory.id }, by);
     made.push(fresh.memory.id);
     expect((await mem.getMemory(old.memory.id))?.archived).toBe(true);
     expect(fresh.memory.supersedes_id).toBe(old.memory.id);

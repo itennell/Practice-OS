@@ -72,7 +72,10 @@ export async function syncCalendar(
   const cal = buildCalendar(rules, facts, today);
   const rows = rowsFor(cal);
 
-  return sql.begin(async (tx) => {
+  // Inside a caller's transaction (lib/db.ts begin hands a reserved connection with no begin), the rebuild joins it.
+  const inTx = <T,>(fn: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> =>
+    typeof sql.begin === "function" ? (sql.begin(fn) as Promise<T>) : fn(sql as unknown as postgres.TransactionSql);
+  return inTx(async (tx) => {
     const keep: string[] = [];
     for (const r of rows) {
       const { rule } = r;

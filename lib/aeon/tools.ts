@@ -52,6 +52,8 @@ import { guard, WITHHELD } from "./guard";
 import { GROWTH_ALWAYS_RUNS, GROWTH_TOOLS } from "./tools-growth";
 import { fileTools } from "./tools-files";
 import { forget, MEMORY_KINDS, MemoryRefused, recentChanges, remember } from "./memory";
+import { RULES_TOOLS } from "./tools-rules";
+import { SETTINGS_TOOLS } from "./tools-settings";
 import { MEDIA_ALWAYS_RUNS, MEDIA_TOOLS } from "./tools-media";
 
 export type ToolContext = {
@@ -93,6 +95,8 @@ export type AeonTool = {
   annotations: { readOnlyHint?: boolean; destructiveHint?: boolean; openWorldHint?: boolean; idempotentHint?: boolean };
   /** Left out of the chat's tool list (MCP only): the chat box has its own way in. */
   mcpOnly?: boolean;
+  /** Her settings: an MCP caller's change is queued for her approval instead of running (lib/aeon/tools-settings.ts). */
+  queuesOverMcp?: boolean;
   /** What the chat shows after it runs, in her words: "Checked your deadlines". */
   label: string;
   /** Changes saved data. Refused on the Vercel demo copy. Drafts that only queue an approval don't count. A function decides per call. */
@@ -168,8 +172,10 @@ const releaseInput = {
   expires_on: isoDay.describe("The calendar date the consent ends. Required."),
 };
 
-// What a document tool hands back: what Muse reads (the cards in short, plus what to
-// tell her) and the full cards in structuredContent, which the chat draws.
+// What a document tool hands back: what Muse reads (the cards in short, plus plain
+// facts about them) and the full cards in structuredContent, which the chat draws.
+// Results are data only: how to talk about the cards lives in the tool descriptions
+// and SOUL.md, never in a result (Aeon treats results as data and would narrate it).
 function withCards(said: Record<string, unknown>, cards: DocumentCard[]): ToolResult {
   return {
     content: [{ type: "text", text: JSON.stringify({ ...said, documents: cards.map(forModel) }, null, 2) }],
@@ -177,18 +183,21 @@ function withCards(said: Record<string, unknown>, cards: DocumentCard[]): ToolRe
   };
 }
 
-const OPEN_CARD = "Her card in the chat opens it, already filled in; don't name a page.";
+/** Shared description text: how to talk about the cards a document tool returns. */
+const CARD_HINT = "Its card appears in the chat under your answer and opens the document already filled in: don't list it again or name a page.";
 
 /** A client form template from the library: saves nothing, holds no client details. */
 async function makeClientForm(form: FormId): Promise<ToolResult> {
   const def = getForm(form);
   const [made] = def ? await documents.clientFormCards(def) : [];
-  if (!def || !made) return { content: [{ type: "text", text: "Add the practice details on Admin › Credentialing first; client forms use them." }], isError: true };
+  if (!def || !made) return { content: [{ type: "text", text: "Not made: client forms need the practice details on Admin › Credentialing, and those aren't filled in yet." }], isError: true };
   // A form that can't download yet (policies never saved, a gap to fill, not Illinois) comes back without a PDF and says why.
-  const say = made.pdf
-    ? `${OPEN_CARD} It is a template: her practice is filled in and the client's boxes are blank. Recommend her own attorney reads it once.`
-    : `${OPEN_CARD} It can't be downloaded yet: ${made.needs_her} Tell her that plainly; her card opens the form so she can finish it.`;
-  return withCards({ made: def.title, say }, [made]);
+  return withCards(
+    made.pdf
+      ? { made: def.title, template: true, filled_in: "her practice details", left_blank: "the client's boxes", downloadable: true, attorney_review: "recommended once" }
+      : { made: def.title, template: true, downloadable: false, why_not: made.needs_her },
+    [made],
+  );
 }
 
 async function makeGfe(input: z.infer<z.ZodObject<typeof gfeInput>>, ctx: ToolContext): Promise<ToolResult> {
@@ -197,7 +206,7 @@ async function makeGfe(input: z.infer<z.ZodObject<typeof gfeInput>>, ctx: ToolCo
   const r = await gfe.draftEstimate(input, { createdBy: ctx.by });
   const [row, today] = await Promise.all([gfe.getEstimate(r.id), practiceToday()]);
   return withCards(
-    { reference: r.reference, due_on: r.dueOn, approval_id: r.approvalId, next: `She approves it in Approvals, then types the client's details to make the PDF. ${OPEN_CARD}` },
+    { reference: r.reference, due_on: r.dueOn, approval_id: r.approvalId, status: "waiting for her approval", after_approval: "she types the client's details to make the PDF" },
     row ? [documents.gfeCard(row, today)] : [],
   );
 }
@@ -211,7 +220,8 @@ async function makeSuperbill(input: z.infer<z.ZodObject<typeof superbillInput>>,
       total: money(sb.total_cents),
       paid: money(sb.paid_cents),
       balance: money(sb.total_cents - sb.paid_cents),
-      next: `Tell her: I filled in what I know. Download it from the card, type the client's name, birth date, address and diagnosis codes into the blank boxes, then give it to them your own way. ${OPEN_CARD}`,
+      left_blank_for_her: ["client name", "client birth date", "client address", "diagnosis codes"],
+      delivery: "she downloads it from the card and gives it to the client her own way; Aeon never sends it",
     },
     [documents.superbillCard(sb)],
   );
@@ -229,7 +239,7 @@ async function makeRelease(input: z.infer<z.ZodObject<typeof releaseInput>>): Pr
         open: `/admin?panel=release&draft=${draft}`,
         filled,
         left_for_her: ["client name", "client date of birth", ...["recipient", "purpose", "information"].filter((k) => !filled.includes(k)), "signatures"],
-        next: `Tell her: I filled in what I know. Download the PDF from the card, type the client's name and birth date, and have it signed. Keep a copy in the client's record. ${OPEN_CARD}`,
+        after: "she downloads the PDF from the card, types the client's name and birth date, has it signed and keeps a copy in the client's record",
       },
       [documents.releaseDraftCard(draft, fields, profile?.isSample ?? false)],
     );
@@ -240,7 +250,7 @@ async function makeRelease(input: z.infer<z.ZodObject<typeof releaseInput>>): Pr
 
 async function makeCms855i(ctx: ToolContext): Promise<ToolResult> {
   const profile = await cred.loadCredentialingProfile();
-  if (!profile) return text({ error: "Her credentialing profile isn't set up yet. Fill it in first (update_credentialing)." });
+  if (!profile) return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "Her credentialing profile isn't set up yet." }) }], isError: true };
   const r = await cms855i.fillCms855i(profile);
   const apps = await payers.listPayerApplications();
   if (!apps.some((a) => a.form === "cms855i")) await payers.savePayerApplication({ payer: "Medicare", form: "cms855i", status: "preparing" }, ctx.by);
@@ -252,7 +262,7 @@ async function makeCms855i(ctx: ToolContext): Promise<ToolResult> {
       // Kept for one release for outside MCP clients; the card has the same link.
       download: "/api/payers/cms855i",
       faster_route: "PECOS (pecos.cms.hhs.gov) lists MFT and MHC as specialties and is usually faster than paper.",
-      next: `She downloads it from the card, finishes what's left, signs and submits it herself. ${OPEN_CARD}`,
+      after: "she downloads it from the card, finishes what's left, signs and submits it herself",
       is_sample: profile.isSample,
     },
     [documents.cms855iCard(profile)],
@@ -363,7 +373,9 @@ export const TOOLS: AeonTool[] = [
       "deadlines with their official source, insurance applications (BCBSIL, Aetna, Medicare...), the prepared Medicare CMS-855I, the CAQH re-attestation checklist, " +
       "her credentialing profile and its documents (license, malpractice face sheet, diploma, CV, W-9: on file or missing), Good Faith Estimates, superbills, " +
       "release of information forms and how-do-I guides. Use it whenever she asks to see, show, pull up or find documents or forms, or 'what do I need for X'. " +
-      "Search by her words (query), a kind, a payer, or what is due within some days. Read-only.",
+      "Search by her words (query), a kind, a payer, or what is due within some days. " +
+      "Its cards appear in the chat under your answer: don't list them again or name a page; say in a few sentences what needs her first and what only she can do. " +
+      "found 0: nothing matched; say what you looked for and offer to make it if Practice-OS makes it. matched_her_words false: these are what's coming up soonest instead; say so. Read-only.",
     input: {
       query: z.string().trim().max(200).optional().describe("Her words, e.g. 'BCBS follow-up', 'CAQH', 'malpractice', 'release form'."),
       kind: z.enum(DOCUMENT_KINDS).optional().describe("Only this kind."),
@@ -376,13 +388,12 @@ export const TOOLS: AeonTool[] = [
     changesData: false,
     run: async (q) => {
       const { cards, matched } = await documents.findDocuments(q);
-      const show = "Her cards are in the chat under your answer, so don't list them again or name a page. Say in a few sentences what needs her first and what only she can do.";
       return withCards(
         !cards.length
-          ? { found: 0, next: "Nothing matched. Say what you looked for and offer to make it if it's something Practice-OS makes." }
+          ? { found: 0, looked_for: q }
           : matched
-            ? { found: cards.length, next: show }
-            : { found: cards.length, matched_her_words: false, next: `Nothing matched her words exactly, so these are what's coming up soonest. Say so. ${show}` },
+            ? { found: cards.length, cards_shown_in_chat: true }
+            : { found: cards.length, matched_her_words: false, showing: "what's coming up soonest", cards_shown_in_chat: true },
         cards,
       );
     },
@@ -393,15 +404,15 @@ export const TOOLS: AeonTool[] = [
     title: "Open one document",
     description:
       "Shows one document as a card (by its id from find_documents, e.g. 'superbill:<id>' or 'guide:caqh-reattestation'): " +
-      "its status, dates, what only she can do, and links to open it filled in and download the PDF. Read-only.",
+      "its status, dates, what only she can do, and links to open it filled in and download the PDF. " + CARD_HINT + " An unknown id: look it up with find_documents. Read-only.",
     input: { id: z.string().trim().min(3).max(120) },
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     label: "Opened a document",
     changesData: false,
     run: async ({ id }) => {
       const c = await documents.openDocument(id);
-      if (!c) return { content: [{ type: "text", text: `No document with id ${id}. Use find_documents to look it up.` }], isError: true };
-      return withCards({ next: "Her card is in the chat under your answer." }, [c]);
+      if (!c) return { content: [{ type: "text", text: `No document with id ${id}.` }], isError: true };
+      return withCards({ cards_shown_in_chat: true }, [c]);
     },
   }),
   ...fileTools(), // read_document (lib/aeon/tools-files.ts)
@@ -415,7 +426,9 @@ export const TOOLS: AeonTool[] = [
       "or a client form template (client_form: privacy notice, informed consent, telehealth consent, practice policies, intake, minor consent and the rest of the library, " +
       "filled with her practice and blank for the client; never fill in a client's answers). " +
       "Pass the fields for that kind only, the same as draft_gfe, draft_superbill and make_release_form take. Takes no client details. " +
-      "It prepares; it never signs, sends or submits anything: she does that herself.",
+      "It prepares; it never signs, sends or submits anything: she does that herself. " + CARD_HINT + " " +
+      "Tell her what the result says only she does (left_blank_for_her, after, after_approval). A client form with downloadable false can't be downloaded yet: say why_not plainly. " +
+      "A template that downloads: recommend her own attorney reads it once.",
     input: {
       kind: z.enum(["gfe", "superbill", "release_form", "payer_form", "client_form"]),
       gfe: z.object(gfeInput).optional().describe("For kind gfe."),
@@ -614,14 +627,15 @@ export const TOOLS: AeonTool[] = [
     title: "Read her credentialing profile",
     description:
       "Her credentialing profile in CAQH ProView order: identity, education, license (type, state, board; never a number), NPI, " +
-      "tax ID, malpractice, practice location, work history and documents with expiry dates, plus the last NPPES check. Read-only.",
+      "tax ID, malpractice, practice location, work history and documents with expiry dates, plus the last NPPES check. " +
+      "profile null: it isn't set up yet; ask her for her details and save them with update_credentialing. Read-only.",
     input: {},
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     label: "Read your credentialing profile",
     changesData: false,
     run: async () => {
       const profile = await cred.loadCredentialingProfile();
-      if (!profile) return text({ profile: null, next: "Ask her for her details and save them with update_credentialing." });
+      if (!profile) return text({ profile: null, set_up: false });
       const cards = documents.credentialingCards(profile, await practiceToday());
       return { ...text({ profile, sections: cred.sectionValues(profile) }), structuredContent: { documents: cards } };
     },
@@ -663,7 +677,7 @@ export const TOOLS: AeonTool[] = [
     changesData: false,
     run: async () => {
       const caqh = await credActions.currentCaqhPrep();
-      if (!caqh) return text({ prep: null, next: "Her credentialing profile isn't set up yet." });
+      if (!caqh) return text({ prep: null, reason: "Her credentialing profile isn't set up yet." });
       const [checklist, profile, today] = await Promise.all([documents.caqhCard(), cred.loadCredentialingProfile(), practiceToday()]);
       const files = profile ? documents.credentialingCards(profile, today).filter((c) => c.kind === "credential_doc" && c.status !== "On file") : [];
       return { ...text(caqh), structuredContent: { documents: [...(checklist ? [checklist] : []), ...files] } };
@@ -736,7 +750,7 @@ export const TOOLS: AeonTool[] = [
     changesData: true,
     run: async (input, ctx) => {
       // Belt and braces: even a status that slipped past the schema never records a sent application from chat or MCP.
-      if ((payers.WAITING as readonly string[]).includes(input.status)) return text({ not_changed: true, ask_her: payers.SENT_IS_HERS, link: "/admin?panel=insurance" });
+      if ((payers.WAITING as readonly string[]).includes(input.status)) return text({ not_changed: true, reason: "Only she can mark an application as sent, with Edit on that payer's row on the Insurance page.", link: "/admin?panel=insurance" });
       return text(await payers.savePayerApplication(input, ctx.by, undefined, { fromChat: true }));
     },
   }),
@@ -779,11 +793,11 @@ export const TOOLS: AeonTool[] = [
       }
       if (q) {
         const match = payerChecklist.matchPayer(list, q);
-        if (match.kind === "ambiguous") return text({ ask_her: `"${input.payer}" could mean more than one payer. Ask her which one.`, choices: match.choices });
+        if (match.kind === "ambiguous") return text({ ambiguous: true, her_words: input.payer, choices: match.choices });
         if (match.kind === "not_hers") return text({ error: `${match.name} doesn't fit a ${list.license} in ${list.state}.`, payers: list.payers.map((i) => i.fit.payer.name) });
         if (match.kind === "none") {
           return match.choices.length
-            ? text({ ask_her: `Ask her which payer she means by "${input.payer}".`, choices: match.choices })
+            ? text({ ambiguous: true, her_words: input.payer, choices: match.choices })
             : text({ error: `No payer called "${input.payer}" fits a ${list.license} in ${list.state}.`, payers: list.payers.map((i) => i.fit.payer.name) });
         }
         const found = match.item;
@@ -847,7 +861,7 @@ export const TOOLS: AeonTool[] = [
       const match = prereq ? null : payerChecklist.matchPayer(list, q);
       if (match && match.kind !== "found") {
         const choices = match.kind === "ambiguous" || match.kind === "none" ? match.choices : [];
-        return text({ error: `Not sure which payer "${input.payer}" means. Ask her which one; nothing was checked.`, ...(choices.length ? { choices } : {}) });
+        return text({ ok: false, error: `Not sure which payer "${input.payer}" means; nothing was checked.`, ...(choices.length ? { choices } : {}) });
       }
       const found = match?.item;
       const scope = prereq ? payerChecklist.PREREQ_SCOPE : found!.fit.payer.id;
@@ -857,7 +871,7 @@ export const TOOLS: AeonTool[] = [
       if ("submits" in target && target.submits) {
         return text({
           not_checked: input.step_id,
-          ask_her: `Only she can mark her ${found!.fit.payer.name} application as sent. Ask her to tick "${target.title}" herself on the Insurance page.`,
+          reason: `Only she can mark her ${found!.fit.payer.name} application as sent, by ticking "${target.title}" herself on the Insurance page.`,
           link: payerChecklist.INSURANCE_PAGE,
         });
       }
@@ -875,7 +889,9 @@ export const TOOLS: AeonTool[] = [
     title: "Remember something about the practice",
     description:
       "Saves one thing Aeon should remember about this practice for every future conversation: a preference ('prefers Tuesday consults'), " +
-      "a decision ('does not take Medicaid'), a fact ('fee for 90837 is $175') or what worked ('superbill posts got the most saves'). " +
+      "a decision ('does not take Medicaid'), a fact ('her office is on the second floor') or what worked ('superbill posts got the most saves'). " +
+      "Not for settings: fees go through set_fees, office days through set_office_days, license type through set_license_type and " +
+      "cancellation or late fees through set_practice_policies, so the app itself changes; remember refuses those. " +
       "One short sentence in plain words. Practice business only: never a client's name, birth date, contact detail, diagnosis or anything clinical " +
       "(those are refused). When it updates an older memory, pass that memory's id as replaces.",
     input: {
@@ -891,6 +907,10 @@ export const TOOLS: AeonTool[] = [
         const { memory, created } = await remember({ kind, text: memoryText, replaces }, { actor: "aeon", source: ctx.by });
         return text({ saved: created, already_remembered: !created, id: memory.id, kind: memory.kind, text: memory.text });
       } catch (err) {
+        // A setting (memory.ts refuses fees, days, license type, policies) names the tool that saves it.
+        if (err instanceof MemoryRefused && err.kind === "setting") {
+          return { content: [{ type: "text", text: JSON.stringify({ ok: false, saved: false, error: `Not saved to memory. ${err.message}`, use_tool: err.useTool }) }], isError: true };
+        }
         if (err instanceof MemoryRefused) return { content: [{ type: "text", text: `Not saved. ${err.message}` }], isError: true };
         throw err;
       }
@@ -1344,7 +1364,7 @@ export const TOOLS: AeonTool[] = [
         approval_id: r.post.approvalId,
         why: r.why,
         ...(r.outcome !== "blocked_after_rewrite"
-          ? { next: "It's waiting in Approvals. Once she approves it, the Instagram page has the caption to copy, the picture to save and the steps to post it herself." }
+          ? { status: "waiting in Approvals", after_approval: "the Instagram page has the caption to copy, the picture to save and the steps to post it herself" }
           : {}),
       });
     },
@@ -1411,10 +1431,11 @@ export const TOOLS: AeonTool[] = [
     description:
       "Writes every text box of her Psychology Today profile (and the same words for other directories) from her saved facts and a few answers in her own words. " +
       "Use when she asks to write or rewrite her Psychology Today profile, a directory listing, or her bio; to set it up step by step, use pt_profile_interview first. " +
-      "If it returns questions, ask them one or two at a time in plain words, then call again with her answers. " +
+      "If it returns written: false with questions_for_her, ask them one or two at a time in plain words, then call again with her answers. " +
+      "When it returns a profile, show the search card preview and say the boxes are on the Media page with a Copy button each. " +
       "Each box fits Psychology Today's limit and is checked: no advice, client stories, testimonials, promises or rankings. " +
       "Tell her to read each box and make it hers before she pastes it (Psychology Today asks that AI text be personalized), and that the Media page has a Copy button for each box. " +
-      "For a rewrite ('make it warmer', 'shorter'), pass only tone. Her saved answers are never overwritten here: answers fill only questions she hasn't answered yet (she changes an answer in the Psychology Today interview).",
+      "Quote the boxes exactly and add no notes about demo or sample data. For a rewrite ('make it warmer', 'shorter'), pass only tone. Her saved answers are never overwritten here: answers fill only questions she hasn't answered yet (she changes an answer in the Psychology Today interview).",
     input: {
       focus: z.string().max(200).optional().describe("What people most often come to her for, in her words."),
       approach: z.string().max(200).optional().describe("How she likes to work, in her words."),
@@ -1450,7 +1471,7 @@ export const TOOLS: AeonTool[] = [
       }
       const f = await facts.loadMediaFacts();
       const missing = facts.missingAnswers(f.answers);
-      if (missing.length) return text({ written: false, ask_her: facts.QUESTIONS.filter((q) => missing.includes(q.id)).map((q) => q.ask), why: "These need her own words; ask them, then call again." });
+      if (missing.length) return text({ written: false, questions_for_her: facts.QUESTIONS.filter((q) => missing.includes(q.id)).map((q) => q.ask), why: "These need her own words." });
       const d = await profile.draftProfile(f, { chat: ctx.chat, tone: input.tone });
       await profile.saveProfileDraft(d);
       return text({
@@ -1458,7 +1479,8 @@ export const TOOLS: AeonTool[] = [
         search_card_preview: d.cardPreview,
         boxes: d.fields.map((x) => ({ box: x.label, characters: `${x.text.length} of ${x.limit}`, text: x.text, paste_where: x.pasteWhere, notes: x.findings.map((n) => n.message) })),
         tick_in_editor: d.picks.map((p) => `${p.label}: ${p.value}`),
-        next: "Show the search card preview and say the boxes are on the Media page with a Copy button each. She reads each one and makes it hers before pasting it into psychologytoday.com. Quote boxes exactly; don't add notes about demo or sample data.",
+        where: "the Media page, with a Copy button for each box",
+        she_does: "reads each box and makes it hers before pasting it into psychologytoday.com",
       });
     },
   }),
@@ -1522,7 +1544,7 @@ export const TOOLS: AeonTool[] = [
         has_website: has,
         website: saved ?? f.website,
         ...(has ? { checklist: WEBSITE.checklist.map((c) => c.label) } : { recommended: `${WEBSITE.default.name}: ${WEBSITE.default.cost}. ${WEBSITE.default.why}`, steps: site.SETUP_STEPS, meta: WEBSITE.meta.note }),
-        ...(pages ? { pages: pages.pages.map((p) => ({ page: p.label, text: p.text })), next: "The words and the practice details block are on the Media page, Website tab, with a Copy button each." } : {}),
+        ...(pages ? { pages: pages.pages.map((p) => ({ page: p.label, text: p.text })), where: "the Media page, Website tab, with a Copy button each" } : {}),
         hipaa: WEBSITE.hipaa,
       });
     },
@@ -1537,7 +1559,8 @@ export const TOOLS: AeonTool[] = [
       "When she answers, call it once with her answer and the step id (no need to call it with no answer first). " +
       "Then call again with her answer for that step: a string for typed or one-choice questions (pass the choice's value), an array of labels for pick-many questions (use the listed labels word for word where they match; her own words are fine otherwise), a number for years. " +
       "For a 'confirm' or 'info' step, answer true once she says it's right. Pass skip: true if she wants to skip. If it returns refused, tell her why in plain words and ask again. " +
-      "When it says done, call directory_profile to write her profile, and tell her the Media page shows the whole profile as it will read, with Copy buttons.",
+      "When it says done, call directory_profile to write her profile, and tell her the Media page shows the whole profile as it will read, with Copy buttons. " +
+      "The statement is in her own words: never suggest client stories, testimonials, promises or advice; Psychology Today asks that AI-written words be read and made hers.",
     input: {
       step: z.string().max(40).optional().describe("The step id the answer is for (from the last question)."),
       answer: z.union([z.string().max(400), z.array(z.string().max(60)).max(25), z.number().int().min(0).max(70), z.boolean()]).optional(),
@@ -1589,13 +1612,13 @@ export const TOOLS: AeonTool[] = [
                 ...(q.value !== null && q.value !== "" && !(Array.isArray(q.value) && !q.value.length) ? { already_have: q.value } : {}),
               },
             }
-          : { done: true, next: "Call directory_profile to write her profile now." }),
+          : { done: true }),
         ...(s.skipped.length ? { skipped: s.skipped.map((x) => x.label) } : {}),
         preview_page: "/media",
-        rules: "Her own words for the statement. Never suggest client stories, testimonials, promises or advice. Psychology Today asks that AI-written words be read and made hers.",
       });
     },
   }),
+  ...SETTINGS_TOOLS, ...RULES_TOOLS,
   ...MEDIA_TOOLS,
   ...GROWTH_TOOLS,
 ].filter((t) => toolEnabled(t.name)); // Front Desk is paused (lib/features.ts)
@@ -1633,6 +1656,17 @@ export async function runTool(name: string, args: unknown, ctx: ToolContext): Pr
     return { content: [{ type: "text", text: `Invalid input for ${name}: ${problems}` }], isError: true };
   }
   const mode = ctx.mode;
+  // Her settings change only by her own word: from another agent over MCP they wait in her Approvals, in any mode.
+  if (tool.queuesOverMcp && changes && !ctx.approved && ctx.by.startsWith("mcp:")) {
+    const approvalId = await queueApproval({
+      kind: "aeon_action",
+      title: tool.title,
+      preview: { body: `${tool.label}, asked for by another app (${ctx.by.slice(4)}). It runs only once you approve it.`, tool: tool.name, args: parsed.data },
+      payload: { tool: tool.name, args: parsed.data },
+      createdBy: ctx.by,
+    });
+    return text({ waiting_for_her: true, saved: false, approval_id: approvalId, where: "her Approvals", reason: "Settings change only with her approval when another app asks." });
+  }
   // Manual: a change to her records waits in the ask bar as one aeon_action approval.
   if (mode === "manual" && changes && !ctx.approved && !ALWAYS_RUNS.has(tool.name)) {
     const approvalId = await queueApproval({
@@ -1642,7 +1676,7 @@ export async function runTool(name: string, args: unknown, ctx: ToolContext): Pr
       payload: { tool: tool.name, args: parsed.data },
       createdBy: ctx.by,
     });
-    return text({ waiting_for_her: true, approval_id: approvalId, next: "You're in Manual mode: tell her it's waiting for her OK in the bar above the chat box." });
+    return text({ waiting_for_her: true, approval_id: approvalId, mode: "manual", where: "the bar above the chat box" });
   }
   const run = () => tool.run(parsed.data as never, ctx);
   return guardResult(await (mode ? withOrigin({ mode }, run) : run()));
