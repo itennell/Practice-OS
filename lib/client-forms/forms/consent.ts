@@ -1,4 +1,4 @@
-import { dollars, ethicsCode, isLmft, replyHours, signedBy } from "../facts";
+import { dollars, ethicsCode, isLmft, repliesInBusinessDays, replyWithin, signedBy } from "../facts";
 import { REVIEW } from "../review";
 import { fillIn, type Block, type FormDef, type PracticeFacts, type RequiredElement } from "../types";
 
@@ -157,7 +157,7 @@ export const telehealthConsent: FormDef = {
     el("failure", "If the connection drops: the backup plan", "ACA H.2.a; NASW-T 2.12", ACA, "ethics", [/call drops|connection drops/i, /call you/i]),
     el("emergency", "Emergency plan, 988 and 911, the client's location and a contact", "ACA H.2.a; NASW-T 2.13", ACA, "ethics", [/988/, /911/, /address/i]),
     el("insurance", "Insurance may not pay for telehealth", "ACA H.2.a; 215 ILCS 5/356z.22", ilcs("021500050K356z.22"), "ethics", [/insurance/i]),
-    el("response_time", "When she replies to messages", "ACA H.2.a", ACA, "ethics", [/reply to messages within \d+ hours/i]),
+    el("response_time", "When she replies to messages", "ACA H.2.a", ACA, "ethics", [/reply to messages within \d+ (?:hours|business days?)/i]),
     el("social_media", "No social media contact", "ACA H.2.a; NASW-T 2.10", ACA, "ethics", [/social media/i]),
     el("recording", "No recording without written permission", "APA 4.03", APA, "ethics", [/record/i]),
   ],
@@ -177,7 +177,7 @@ export const telehealthConsent: FormDef = {
     { kind: "clause", id: "emergency", text: "If there is an emergency during a session, I may call 911 to the address you gave me. Between sessions, if you are in danger or thinking about hurting yourself, call or text 988, or call 911." },
     { kind: "heading", text: "Other things to know" },
     { kind: "clause", id: "insurance", text: "Check with your insurance that it pays for video or phone sessions. If it does not, you pay the full fee." },
-    { kind: "clause", id: "response_time", editable: true, label: "Reply time and time zone", text: `I usually reply to messages within ${replyHours(f)} hours on business days. Session times are in Central Time.` },
+    { kind: "clause", id: "response_time", editable: true, label: "Reply time and time zone", text: `I usually reply to messages within ${replyWithin(f)}${repliesInBusinessDays(f) ? "" : " on business days"}. Session times are in Central Time.` },
     { kind: "clause", id: "social_media", text: "I do not connect with clients on social media, and I do not reply to messages sent there." },
     { kind: "clause", id: "minor", text: "If you are under 12, a parent or guardian signs for you." },
     { kind: "field", id: "client_name", label: "Client name" },

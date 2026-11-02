@@ -201,11 +201,22 @@ export async function suppress(sourceId: string, reason: SuppressReason, sql: po
       "This card has no NPI, so I can't add it to your do-not-contact list. Move it to Not a fit yourself, or delete the card.",
     );
   }
-  await sql.begin(async (tx) => {
+  // A letter to them still waiting for her approval is declined with it, so Approvals never offers to write to someone on the list.
+  const declined = (await sql.begin(async (tx) => {
     await tx`update practice_os.referral_sources set stage = 'not_a_fit', next_follow_up_on = null, updated_at = now() where id = ${sourceId}`;
     await tx`insert into practice_os.referral_suppressions (npi, reason) values (${found.npi}, ${reason}) on conflict (npi) do update set reason = excluded.reason`;
-  });
-  await audit({ actor: by, action: "referral_suppressed", subjectType: "referral_source", subjectId: sourceId, details: { reason } }, sql);
+    const rows = await tx<{ id: string }[]>`
+      update practice_os.approvals
+         set status = 'rejected', decided_at = now(), decided_by = ${by === "aeon" ? "aeon:do_not_contact" : "clinician:do_not_contact"}
+       where kind = 'referral_letter' and status = 'pending' and payload ->> 'referral_source_id' = ${sourceId}
+      returning id`;
+    return rows.map((r) => r.id);
+  })) as string[];
+  await audit({ actor: by, action: "referral_suppressed", subjectType: "referral_source", subjectId: sourceId, details: { reason, letters_declined: declined.length } }, sql);
+  for (const id of declined) {
+    await audit({ actor: by, action: "approval_declined", approvalId: id, subjectType: "referral_letter", subjectId: sourceId, details: { why: "do_not_contact", reason } }, sql);
+  }
+  return { declined };
 }
 
 export class NoNpiToList extends Error {}

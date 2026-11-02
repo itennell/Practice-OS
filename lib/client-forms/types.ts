@@ -78,6 +78,8 @@ export const policiesSchema = z
     late_cancel_fee_cents: z.number().int().min(0).max(100_000),
     no_show_fee_cents: z.number().int().min(0).max(100_000),
     reply_within_hours: z.number().int().min(1).max(168).nullable(),
+    /** "Within 2 business days", kept as she said it (never turned into 48 hours). Wins over reply_within_hours. */
+    reply_within_business_days: z.number().int().min(1).max(10).nullable(),
     returned_payment_fee_cents: z.number().int().min(0).max(10_000),
     records_fee_note: z.string().trim().max(240),
     privacy_officer: z.string().trim().max(120),
@@ -102,6 +104,7 @@ export const DEFAULT_POLICIES: Policies = {
   late_cancel_fee_cents: 0,
   no_show_fee_cents: 0,
   reply_within_hours: null,
+  reply_within_business_days: null,
   returned_payment_fee_cents: 0,
   records_fee_note: "",
   privacy_officer: "",
