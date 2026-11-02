@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { execSync } from "node:child_process";
+import { FRONT_DESK_ENABLED } from "../../lib/features";
 import { pick, typeDate } from "../helpers/controls";
 
 // Aeon's onboarding interview on a fresh install: every screen checked with axe, a full
@@ -148,11 +149,11 @@ test("A new clinician sets up the whole practice, and the home page lists what s
     if ((await oncology.getAttribute("aria-pressed")) !== "true") await oncology.click();
     await expect(oncology).toHaveAttribute("aria-pressed", "true");
   });
-  // Front Desk's own setup questions (lib/frontdesk/onboarding.ts).
+  // Front Desk's setup questions (voicemail greeting, "miss a call") are asked only while it is on (lib/features.ts).
   // Skipping the greeting keeps the suggested one, shown on the Front Desk page.
-  await step(page, /voicemail greeting/, none, "skip");
+  if (FRONT_DESK_ENABLED) await step(page, /voicemail greeting/, none, "skip");
   await step(page, /How should I ask/, () => radio(page, /Ask me first/));
-  await step(page, /miss a call/, () => radio(page, "No"));
+  if (FRONT_DESK_ENABLED) await step(page, /miss a call/, () => radio(page, "No"));
 
   // 8 · Your team, then home.
   await expect(heading(page)).toHaveText("Meet your team");

@@ -5,6 +5,7 @@ import {
   WEB_CHAT_READS_PER_MINUTE,
   webChatClientIp,
 } from "@/lib/frontdesk/webchat-rate-limit";
+import { FRONT_DESK_ENABLED } from "@/lib/features";
 import { isLocalRequest, isSameOrigin } from "@/lib/request-guard";
 
 // The practice website chat. GET reads one conversation (the visitor's page
@@ -15,7 +16,7 @@ import { isLocalRequest, isSameOrigin } from "@/lib/request-guard";
 const notHere = () => Response.json({ error: "Not found." }, { status: 404 });
 
 export async function GET(request: Request) {
-  if (!isLocalRequest(request)) return notHere();
+  if (!FRONT_DESK_ENABLED || !isLocalRequest(request)) return notHere();
   if (!isSameOrigin(request)) return Response.json({ error: "Website chat requests must come from this page." }, { status: 403 });
   if (!allowWebChat(`read:${webChatClientIp(request)}`, WEB_CHAT_READS_PER_MINUTE)) {
     return Response.json({ error: "That is a lot of refreshes. Wait a minute and try again." }, { status: 429 });
@@ -49,7 +50,7 @@ async function readCapped(request: Request): Promise<string | null> {
 }
 
 export async function POST(request: Request) {
-  if (!isLocalRequest(request)) return notHere();
+  if (!FRONT_DESK_ENABLED || !isLocalRequest(request)) return notHere();
   if (!isSameOrigin(request)) return Response.json({ error: "Website chat requests must come from this page." }, { status: 403 });
   if (!(request.headers.get("content-type") ?? "").toLowerCase().startsWith("application/json")) {
     return Response.json({ error: "Send the message as JSON." }, { status: 415 });

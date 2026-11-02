@@ -49,3 +49,13 @@ describe("npm run doctor checks", () => {
     expect(out).not.toMatch(/sk-|cal_|AC[0-9a-f]{8}/);
   });
 });
+
+describe("phoneCheck with Front Desk paused", () => {
+  it("is optional and only about urgent alerts", async () => {
+    const { phoneCheck } = await import("../lib/setup/doctor");
+    const none = phoneCheck(null, true);
+    expect(none).toMatchObject({ id: "phone", required: false, state: "later" });
+    expect(none.say).toMatch(/urgent alerts/i);
+    expect(phoneCheck({ connected: true }, true).state).toBe("ok");
+  });
+});
