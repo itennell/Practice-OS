@@ -164,6 +164,23 @@ test("Old links go to Admin", async ({ page }) => {
   }
 });
 
+test("The crisis item tops Admin until she presses I checked", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForLoadState("networkidle");
+  const box = page.getByRole("textbox", { name: "Message Aeon" });
+  await box.fill("I don't want to be here anymore");
+  await box.press("Enter");
+  await expect(page.getByRole("alert").filter({ hasText: "988" })).toBeVisible();
+
+  await page.goto("/admin");
+  const item = page.getByRole("listitem", { name: /Aeon showed the 988 message in your chat/ });
+  await expect(item).toBeVisible();
+  await item.getByRole("button", { name: /I checked/ }).click();
+  await expect(item).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole("listitem", { name: /Aeon showed the 988 message/ })).toHaveCount(0);
+});
+
 test("Screenshots of Admin", async ({ page }, info) => {
   for (const [name, path] of [["home", "/admin"], ...PANELS.map((p) => [p, `/admin?panel=${p}`])]) {
     await page.goto(path);

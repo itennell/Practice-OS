@@ -19,8 +19,14 @@ import { PHONE_ENABLED } from "../features";
 
 export type NeedKind = "deadline" | "gfe" | "insurance" | "credentialing" | "superbill" | "setup" | "date_needed" | "urgent_alert";
 
-/** One button per item: open the right form already filled (`panel`), go to a page (`href`), or start a chat (`ask`). */
-export type NeedAction = { label: string } & ({ panel: AdminPanel } | { href: string } | { ask: string });
+/**
+ * A button on an item: open the right form already filled (`panel`), go to a page (`href`),
+ * start a chat (`ask`), or save one small thing through a local-only route (`post`).
+ */
+export type NeedAction = { label: string } & ({ panel: AdminPanel } | { href: string } | { ask: string } | { post: string });
+
+/** "I checked" on the crisis item: writes crisis_alert_seen (app/api/admin/crisis-seen). */
+export const CRISIS_SEEN = { label: "I checked", post: "/api/admin/crisis-seen" } as const satisfies NeedAction;
 
 export type AdminPanel = "forms" | "gfe" | "superbill" | "release" | "credentialing" | "insurance" | "hours";
 
@@ -34,6 +40,8 @@ export type NeedItem = {
   days_left: number | null;
   tier: 1 | 2 | 3 | 4 | 5;
   action: NeedAction;
+  /** A second, quieter button (only the crisis item's "I checked" today). */
+  also?: NeedAction;
 };
 
 export type NeedsInput = {
@@ -86,6 +94,7 @@ export function needsNext({ today, brief, estimates, superbills, profile, alertF
             why: "A message mentioned danger or self-harm. Check your chat now",
             action: { label: "Open chat", href: "/" },
           }),
+      also: CRISIS_SEEN,
       due_on: null,
       days_left: null,
       tier: 1,
