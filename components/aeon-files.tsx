@@ -65,7 +65,6 @@ export function AeonFiles({ files, usage }: { files: AeonFile[]; usage: string }
               key={f.id}
               type="button"
               onClick={() => setOpen(f.id)}
-              aria-label={`Open ${f.title} (read only)`}
               className={cn(
                 "group relative flex min-h-[150px] flex-col justify-between overflow-hidden rounded-[var(--radius-card-sm)] p-5 text-left text-white",
                 "shadow-[0_10px_30px_-10px_rgb(43_33_110/0.45)] transition-transform duration-200 ease-[var(--ease-soft-out)] hover:-translate-y-0.5",
@@ -81,6 +80,7 @@ export function AeonFiles({ files, usage }: { files: AeonFile[]; usage: string }
                 <span className="font-mono text-body">{cardDate(f.updated)}</span>
                 <Icon aria-hidden className="size-7 fill-white/80 stroke-white/80" />
               </span>
+              <span className="sr-only">Open, read only</span>
             </button>
           );
         })}
