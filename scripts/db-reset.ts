@@ -35,6 +35,8 @@ export const DEMO_TABLES = [
   "studio_projects",
   "studio_steps",
   "studio_pictures",
+  // Grow (042)
+  "growth_drafts",
   "inquiries",
   "messages",
   "consult_bookings",

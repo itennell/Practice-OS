@@ -16,6 +16,9 @@ export const APPROVAL_KINDS = [
   "text_consult_options",
   // Chat documents (migration 018)
   "file_document",
+  // Grow: ad and website drafts (migration 042)
+  "ads_campaign",
+  "website",
 ] as const;
 
 export type ApprovalKind = (typeof APPROVAL_KINDS)[number];
