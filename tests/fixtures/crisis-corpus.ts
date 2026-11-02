@@ -95,4 +95,6 @@ export const MUST_PASS: string[] = [
   "My fee is $150 for 50 minutes",
   "Call me at 312-555-0170",
   "The skyscraper has a kmsl office", // not the whole word "kms"
+  "The pediatrician is 5 kms away", // a distance, not the slang
+  "about 2.5km from my office",
 ];

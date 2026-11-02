@@ -79,7 +79,8 @@ const words = (text: string) => text.replace(/[^a-z0-9]+/g, " ").trim();
 
 /** The message folded to plain ASCII words, without and with leetspeak read as letters. */
 function normalize(text: string): string[] {
-  const folded = fold(text);
+  // A number then "km"/"kms" is a distance ("5 kms away"), never the slang "kms".
+  const folded = fold(text).replace(/\b\d+(?:\.\d+)?\s*kms?\b/g, " ");
   const plain = words(folded);
   const leet = words(folded.replace(/[013457@$]/g, (ch) => LEET[ch]));
   return leet === plain ? [plain] : [plain, leet];
