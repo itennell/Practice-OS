@@ -13,7 +13,7 @@ import { captionOf, criticContext, repaired, stockPhrases, type PracticeFacts } 
 import { blocks, lintText } from "../lib/media/lint";
 import { assemble, draftProfile, templateFields, type ChatFn } from "../lib/media/profile";
 import { TEXT_IDS } from "../lib/media/schema";
-import { dropFiller, factProblems, feeText, firstPerson, fixCadence, fixFeeLabels, priceMentions, repairCopy, splitPlaceholders, tidyOwnWords, truthOf } from "../lib/media/truth";
+import { weNote, dropFiller, factProblems, feeText, firstPerson, fixCadence, fixFeeLabels, priceMentions, repairCopy, splitPlaceholders, tidyOwnWords, truthOf } from "../lib/media/truth";
 import { onlyUnanswered } from "../lib/media/facts";
 import { templatePages } from "../lib/media/website";
 import { TOOLS_BY_NAME } from "../lib/aeon/tools";
@@ -93,8 +93,8 @@ describe("plain-code repairs", () => {
   });
 
   it("repairs a post before the critic reads it", () => {
-    const fixed = repaired({ pillar: "fees_superbills", headline: "What it costs", body: "It costs First session (intake): $200. We look forward to meeting you. We'll accept Aetna.", altText: "" }, POST);
-    expect(fixed.body).toBe("A first session (intake) is $200. I'll accept Aetna.");
+    const fixed = repaired({ pillar: "fees_superbills", headline: "What it costs", body: "It costs First session (intake): $200. We look forward to meeting you. We accept Aetna.", altText: "" }, POST);
+    expect(fixed.body).toBe("A first session (intake) is $200. I accept Aetna.");
     expect(codeCritic(captionOf(fixed.body, LICENSE), ctx).ok).toBe(true);
   });
 
@@ -177,8 +177,13 @@ describe("review fixes: repairs never change her meaning", () => {
     expect(names("A beacon of calm.")).toEqual([]);
   });
 
-  it("10. we can / we'll / we help / we meet become first person, and the templates say I", () => {
-    expect(firstPerson("We can talk first. We'll find a time. We help adults. We meet by video.")).toBe("I can talk first. I'll find a time. I help adults. I meet with clients by video.");
+  it("10. 'we' that may mean her and the client stays as written and is flagged; the templates say I", () => {
+    const shared = "We can talk first. We'll find a time. We help you settle in. We meet by video.";
+    expect(firstPerson(shared)).toBe(shared);
+    expect(weNote(shared)).toBe("Uses 'we': if you mean the practice, say 'I'.");
+    expect(lintText(shared, FACTS).filter((f) => f.rule === "we_voice").map((f) => [f.severity, f.message])).toEqual([["warn", "Uses 'we': if you mean the practice, say 'I'."]]);
+    expect(firstPerson("We're in network with Aetna. We accept BCBS. Call us.")).toBe("I'm in network with Aetna. I accept BCBS. Call me.");
+    expect(weNote("I'm in network with Aetna.")).toBeNull();
     const t = templateFields(FACTS);
     expect(t.intro).toBe("Free 15-minute call to see if I'm the right fit for you.");
     expect(t.statement_help).toContain("call to see if I'm the right fit for you.");

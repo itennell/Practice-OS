@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { FRONT_DESK_ENABLED } from "@/lib/features";
 import { canDecide } from "@/lib/admin-guard";
 import { isLocalAppRequest } from "@/lib/connect/local-only";
 import { connectSpruce, connectTwilio, disconnectPhone, refreshTwilioGreeting, turnOnTwilioVoicemail, undoTwilioVoicemail } from "@/lib/frontdesk/connect";
@@ -20,6 +21,8 @@ export async function POST(request: Request) {
   const parsed = Body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ ok: false, fix: "Paste your keys first." }, { status: 400 });
   const b = parsed.data;
+  // Paused: this route only connects her phone for urgent alerts, with no voicemail or greeting.
+  if (!FRONT_DESK_ENABLED && b.vendor.startsWith("twilio-")) return Response.json({ ok: false, fix: "Voicemail is paused." }, { status: 404 });
   const result =
     b.vendor === "spruce"
       ? await connectSpruce(b.token)

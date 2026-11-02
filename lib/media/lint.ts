@@ -5,7 +5,7 @@
 //
 // "block" means the text is not offered as written; "warn" shows a hint beside it.
 import type { MediaFacts } from "./facts";
-import { CASUAL, factProblems, FILLER, OUTCOME_PROMISE, PLACEHOLDER, truthOf } from "./truth";
+import { CASUAL, factProblems, FILLER, OUTCOME_PROMISE, PLACEHOLDER, truthOf, weNote } from "./truth";
 
 export type LintRule =
   | "too_long"
@@ -27,7 +27,8 @@ export type LintRule =
   | "contradicts_facts"
   | "placeholder"
   | "casual"
-  | "filler";
+  | "filler"
+  | "we_voice";
 
 export type Finding = { rule: LintRule; severity: "block" | "warn"; message: string };
 
@@ -210,6 +211,8 @@ export function lintText(text: string, f: MediaFacts, opts: { limit?: number | n
   }
   if (PLACEHOLDER.some((p) => p.test(text))) out.push({ rule: "placeholder", severity: "block", message: "Has a note or placeholder in it, not words to paste." });
   if (CASUAL.test(text)) out.push({ rule: "casual", severity: "warn", message: "Has a casual word (like \"thru\" or \"stuff\"); a profile reads better without it." });
+  const we = weNote(text);
+  if (we) out.push({ rule: "we_voice", severity: "warn", message: we });
   if (FILLER.some((p) => p.test(text))) out.push({ rule: "filler", severity: "warn", message: "Has a stock phrase (like \"no pressure\" or \"happy to help\"); plain facts read warmer." });
   const long = text.split(/[.!?]+(?:\s|$)/).some((s) => (s.match(/\S+/g) ?? []).length > 25);
   if (readingGrade(text) > 8 || long)

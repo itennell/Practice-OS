@@ -90,6 +90,7 @@ export async function saveDraft(draft: Draft, opts: { by: string; week?: string;
       alt_text: draft.altText,
       image: `/api/instagram/posts/${row.id}/image`,
       picture_check: graphic.check.ok ? "passed" : graphic.check.problems.join(" "),
+      ...(draft.notes?.length ? { notes: draft.notes } : {}),
     },
     payload: { post_id: row.id },
     createdBy: opts.by,

@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { FrontDeskRules } from "@/components/approval-settings";
@@ -10,6 +11,7 @@ import { TestConsole } from "@/components/front-desk/test-console";
 import { ChipLink, GlassCard } from "@/components/ui";
 import { loadApprovalSettings } from "@/lib/approval-settings";
 import { isDryRun } from "@/lib/env";
+import { FRONT_DESK_ENABLED } from "@/lib/features";
 import { calendarStatus, phoneStatus } from "@/lib/frontdesk/connect";
 import { alertPhone } from "@/lib/frontdesk/crisis";
 import { prettyPhone } from "@/lib/frontdesk/phone/numbers";
@@ -26,6 +28,7 @@ const when = (iso: string) =>
 const who = (s: string) => (s.startsWith("+") ? maskPhone(s) : s);
 
 export default function FrontDeskPage({ searchParams }: PageProps<"/front-desk">) {
+  if (!FRONT_DESK_ENABLED) redirect("/"); // Front Desk is paused (lib/features.ts)
   return (
     <>
       <header className="flex flex-wrap items-start justify-between gap-4">

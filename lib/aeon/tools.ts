@@ -19,6 +19,7 @@ import * as cred from "../credentialing/store";
 import { getForm } from "../client-forms";
 import { FORM_IDS, type FormId } from "../client-forms/types";
 import { db } from "../db";
+import { FRONT_DESK_APPROVAL_KINDS, FRONT_DESK_ENABLED, toolEnabled } from "../features";
 import { isDryRun } from "../env";
 import { money } from "../gfe/build";
 import * as gfe from "../gfe/store";
@@ -65,7 +66,7 @@ export type ToolContext = {
 };
 
 /** aeon_action is queued only by runTool itself in Manual mode, never by an agent. */
-const QUEUEABLE_KINDS = APPROVAL_KINDS.filter((k) => k !== "aeon_action") as [Exclude<ApprovalKind, "aeon_action">, ...Exclude<ApprovalKind, "aeon_action">[]];
+const QUEUEABLE_KINDS = APPROVAL_KINDS.filter((k) => k !== "aeon_action" && (FRONT_DESK_ENABLED || !FRONT_DESK_APPROVAL_KINDS.includes(k))) as [Exclude<ApprovalKind, "aeon_action">, ...Exclude<ApprovalKind, "aeon_action">[]];
 
 /**
  * Saving or forgetting a memory never waits for her tap, in any mode. Nor do the
@@ -1593,7 +1594,7 @@ export const TOOLS: AeonTool[] = [
     },
   }),
   ...MEDIA_TOOLS,
-];
+].filter((t) => toolEnabled(t.name)); // Front Desk is paused (lib/features.ts)
 
 export const TOOLS_BY_NAME = new Map(TOOLS.map((t) => [t.name, t]));
 

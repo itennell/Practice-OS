@@ -101,7 +101,7 @@ export async function revisePost(by: string, change: string, opts: { postId?: st
     await tx`
       update practice_os.approvals
          set title = ${`Instagram post: ${draft.headline}`},
-             preview = preview || ${tx.json({ body: draft.caption, headline: draft.headline, alt_text: draft.altText } as never)}
+             preview = preview || ${tx.json({ body: draft.caption, headline: draft.headline, alt_text: draft.altText, notes: draft.notes } as never)}
        where id = ${post.approval_id} and status = 'pending'`;
     return true;
   });

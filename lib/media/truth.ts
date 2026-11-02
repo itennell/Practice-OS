@@ -369,19 +369,28 @@ export function tidyOwnWords(s: string): string {
   return t;
 }
 
+// What only the practice does: "we accept Aetna", "we're in network". "We'll talk",
+// "we can find a time", "we help", "we meet" often mean her and the client together, so
+// those stay as written and are flagged (weNote) instead.
+const PRACTICE_STATE = String.raw`(?:in[- ]network|out[- ]of[- ]network|private[- ]pay|located|open|licensed|accepting|a (?:solo |small |private )?practice)`;
+
 /** "We" for her solo practice turned into "I", only where it's clearly the practice speaking. */
 export function firstPerson(text: string): string {
   const keep = (word: string, to: string) => (word[0] === word[0].toUpperCase() ? to[0].toUpperCase() + to.slice(1) : to);
   return text
-    .replace(/\b([Ww]e) (are|'re)\b/g, (_m, w) => `${keep(w, "I")} am`)
-    .replace(/\b([Ww]e)'re\b/g, (_m, w) => `${keep(w, "I")}'m`)
-    .replace(/\b([Ww]e)'ll\b/g, (_m, w) => `${keep(w, "I")}'ll`)
-    .replace(/\b([Ww]e)'ve\b/g, (_m, w) => `${keep(w, "I")}'ve`)
-    .replace(/\b([Ww]e)'d\b/g, (_m, w) => `${keep(w, "I")}'d`)
-    .replace(/\b([Ww]e) meet\b/g, (_m, w) => `${keep(w, "I")} meet with clients`)
-    .replace(/\b([Ww]e) (offer|accept|take|bill|charge|provide|see|specialize|work with|do not|don't|have|give|send|keep|ask|can|can't|cannot|will|help)\b/g, (_m, w, v) => `${keep(w, "I")} ${v}`)
+    .replace(new RegExp(String.raw`\b([Ww]e) are (?=${PRACTICE_STATE}\b)`, "g"), (_m, w) => `${keep(w, "I")} am `)
+    .replace(new RegExp(String.raw`\b([Ww]e)'re (?=${PRACTICE_STATE}\b)`, "g"), (_m, w) => `${keep(w, "I")}'m `)
+    .replace(/\b([Ww]e) (offer|accept|take|bill|charge|provide|specialize|do not|don't|give you a superbill|send superbills)\b/g, (_m, w, v) => `${keep(w, "I")} ${v}`)
     .replace(/\b([Oo]ur) (practice|office|fees?|rates?|team|services|policy|policies|schedule|calendar|website|site|booking|intake|forms?)\b/g, (_m, w, n) => `${keep(w, "my")} ${n}`)
     .replace(/\b(contact|reach|call|email|text|message|with|join) us\b/gi, "$1 me");
+}
+
+/** The note shown beside (never inside) text that still says "we". */
+export const WE_NOTE = "Uses 'we': if you mean the practice, say 'I'.";
+
+/** WE_NOTE when "we" is left in the text after firstPerson, else null. */
+export function weNote(text: string): string | null {
+  return /\b[Ww]e(?:'ll|'re|'ve|'d)?\b|\b[Oo]ur\b|\bus\b/.test(text) ? WE_NOTE : null;
 }
 
 const FACTISH = /\$|\d|\bsuperbills?\b|\bconsult|\binsurance\b|\bin[- ]network\b|\bbook\b/i;

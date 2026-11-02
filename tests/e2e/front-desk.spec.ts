@@ -3,6 +3,9 @@ import { expect, test } from "@playwright/test";
 import { execSync } from "node:child_process";
 import { createServer, type Server } from "node:http";
 import * as F from "../fixtures/frontdesk/calcom-setup";
+import { FRONT_DESK_ENABLED } from "../../lib/features";
+
+test.skip(!FRONT_DESK_ENABLED, "Front Desk is paused (lib/features.ts); these run when FRONT_DESK_ENABLED is true.");
 
 // Front Desk page on the demo data ([Sample] callers): what needs her, the
 // calls and texts, Up next, the phone and calendar Connect cards, the switches.

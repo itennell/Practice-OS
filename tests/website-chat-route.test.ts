@@ -1,5 +1,8 @@
 import { NextRequest } from "next/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
+// The route answers only while Front Desk is on (lib/features.ts); this file tests that behaviour.
+vi.mock("../lib/features", async (orig) => ({ ...(await orig<typeof import("../lib/features")>()), FRONT_DESK_ENABLED: true }));
+
 import { GET, POST } from "../app/api/website-chat/route";
 import {
   allowWebChat,
