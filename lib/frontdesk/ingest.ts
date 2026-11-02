@@ -15,7 +15,7 @@ import { handleCrisis } from "./crisis";
 import { deps } from "./deps";
 import { readIntent, type Extracted } from "./extract";
 import { offerTimes, passToClinician } from "./offers";
-import { prettyPhone } from "./phone/numbers";
+import { approvalWho } from "./redact";
 import type { Call, InboundText, MessageVendor, PhoneAdapter, Voicemail } from "./phone/types";
 import { maskPhone } from "./redact";
 import { parseReply } from "./reply";
@@ -133,7 +133,7 @@ export async function processVoicemail(
     update practice_os.inquiries
     set contact_name = ${x.name}, contact_phone = ${x.callbackNumber}, summary = ${x.summary}
     where id = ${inquiry.id}`;
-  const who = x.name ?? (x.callbackNumber ? prettyPhone(x.callbackNumber) : "A caller");
+  const who = x.name ?? (x.callbackNumber ? maskPhone(x.callbackNumber) : "A caller");
   const act = () => actOnIntent(inquiry.id, x.callbackNumber, x.intent, `${who} left a voicemail: ${x.summary}`, opts.calendar);
   // A [Sample] always waits for her tap, so the test shows the approval step.
   if (sample) await act();
@@ -157,7 +157,7 @@ export async function processText(t: InboundText, phone: PhoneAdapter): Promise<
   const now = deps().now();
   const offer = await openOfferFor(t.from, now);
   const reply = parseReply(t.body, offer?.slots.length ?? 3);
-  const who = inquiry.contact_name ?? prettyPhone(t.from);
+  const who = approvalWho(inquiry.contact_name, t.from);
 
   // STOP, START and HELP: the registered one-line replies (docs/sms-opt-in.md). On
   // Twilio, Advanced Opt-Out sends these same texts itself, so the app stays quiet
@@ -182,7 +182,7 @@ export async function processText(t: InboundText, phone: PhoneAdapter): Promise<
 
   await withOrigin({ rule: "front_desk", rules: await rules() }, async () => {
     const quick = async (body: string, title: string) =>
-      queueApproval({ kind: "sms_reply", title, preview: { to: prettyPhone(t.from), text: body }, payload: { inquiry_id: inquiry.id, to: t.from, body }, createdBy: "front_desk" });
+      queueApproval({ kind: "sms_reply", title, preview: { to: maskPhone(t.from), text: body }, payload: { inquiry_id: inquiry.id, to: t.from, body }, createdBy: "front_desk" });
 
     switch (reply.kind) {
       case "help":
@@ -195,7 +195,7 @@ export async function processText(t: InboundText, phone: PhoneAdapter): Promise<
         return queueApproval({
           kind,
           title: `${offer.purpose === "reschedule" ? "Move" : "Book"} ${who}'s consult (time ${reply.index})`,
-          preview: { to: prettyPhone(t.from), choice: reply.index, starts_at: offer.slots[reply.index - 1].start },
+          preview: { to: maskPhone(t.from), choice: reply.index, starts_at: offer.slots[reply.index - 1].start },
           payload: { offer_id: offer.id, index: reply.index, inquiry_id: inquiry.id },
           createdBy: "front_desk",
         });

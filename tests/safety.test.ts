@@ -7,6 +7,10 @@ describe("checkCrisis", () => {
     expect(checkCrisis(text).crisis).toBe(true);
   });
 
+  it.each(["I wish I was dead", "I don't want to be alive", "I want to disappear"])("routes indirect wording: %s", (text) => {
+    expect(checkCrisis(text)).toEqual({ crisis: true, category: "self_harm" });
+  });
+
   it.each(MUST_PASS)("lets through: %s", (text) => {
     expect(checkCrisis(text).crisis).toBe(false);
   });

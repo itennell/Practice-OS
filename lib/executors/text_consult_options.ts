@@ -1,6 +1,7 @@
 import { db } from "../db";
 import { deps } from "../frontdesk/deps";
 import { OFFER_TTL_MS } from "../frontdesk/offers";
+import { maskPhone } from "../frontdesk/redact";
 import { sendText } from "../frontdesk/store";
 import type { Executor } from "./types";
 
@@ -25,5 +26,6 @@ export const textConsultOptions: Executor = async (approval) => {
           ai_disclosed_at = coalesce(ai_disclosed_at, now())
       where id = ${inquiry_id}`;
   }
-  return { texted: to, dryRun: out.dryRun };
+  // The result shows in the approval list: the masked number, never the full one.
+  return { texted: maskPhone(to), dryRun: out.dryRun };
 };

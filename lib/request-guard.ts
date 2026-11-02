@@ -42,6 +42,16 @@ export function isSameOrigin(request: Incoming): boolean {
 /** A local request from the app's own page. */
 export const isLocalAppRequest = (request: Incoming) => isLocalRequest(request) && isSameOrigin(request);
 
+// Pages and routes that exist only on her own computer. On the Vercel copy they
+// are a plain 404: the public website chat has no visitor gate there (yet).
+const LOCAL_ONLY_PATHS = ["/website-chat", "/api/website-chat"];
+
+/** True when this path must 404 here (the Vercel copy) because it answers only on her computer. */
+export function hiddenOnThisCopy(pathname: string): boolean {
+  if (!process.env.VERCEL) return false;
+  return LOCAL_ONLY_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
 /** Why the local app refuses this request, or null to let it through. Used by proxy.ts for every request. */
 export function refusal(request: Incoming): string | null {
   if (process.env.VERCEL) return null;

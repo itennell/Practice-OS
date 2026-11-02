@@ -1,11 +1,11 @@
 "use client";
 
-import { ChevronDown, FlaskConical, MessageSquareText, PhoneCall, Voicemail } from "lucide-react";
+import { ChevronDown, FlaskConical, Globe, MessageSquareText, PhoneCall, Voicemail } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { notify } from "@/components/shared/toaster";
-import { Button, GlassCard } from "@/components/ui";
+import { Button, ButtonLink, GlassCard } from "@/components/ui";
 
 // "Test your Front Desk": how to try it with a real phone call, a test text to
 // her own phone only, and a [Sample] voicemail for when no phone is handy.
@@ -104,6 +104,18 @@ export function TestConsole({ line, texting, alertPhone, dryRun, open }: TestCon
             <Button variant="quiet" onClick={testText} disabled={!alertPhone || busy !== null} className="self-start">
               {busy === "text" ? "Setting it up…" : "Send a test text to my phone"}
             </Button>
+          </section>
+
+          <section aria-labelledby="fd-test-web" className="flex flex-col gap-3">
+            <h3 id="fd-test-web" className="flex items-center gap-2 font-semibold">
+              <Globe aria-hidden size={16} /> Try the website chat
+            </h3>
+            <p className="max-w-[65ch] text-[var(--fg-muted)]">
+              The chat a visitor to your practice website would see. Ask to book a consult: the times wait in Approvals, and show in the chat once you approve them. It works now, with no phone needed.
+            </p>
+            <ButtonLink variant="quiet" href="/website-chat" target="_blank" rel="noopener" className="self-start">
+              Open the website chat
+            </ButtonLink>
           </section>
 
           <section aria-labelledby="fd-test-sample" className="flex flex-col gap-3">
