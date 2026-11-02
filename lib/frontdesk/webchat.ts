@@ -1,12 +1,13 @@
 import { queueApprovalOnce } from "../approvals";
 import { audit } from "../audit";
 import { db } from "../db";
-import { checkCrisis, CRISIS_REPLY } from "../safety";
+import { randomUUID } from "node:crypto";
+import { checkCrisis, CRISIS_REPLY, type CrisisCategory } from "../safety";
 import { pickThree } from "./calendar/slots";
 import { shortSlotLabel } from "./calendar/zone";
 import { handleCrisis } from "./crisis";
 import { deps } from "./deps";
-import { readIntent } from "./extract";
+import { keywordIntent, readIntent } from "./extract";
 import { safetyResult } from "./ingest";
 import { spokenNumber } from "./mask";
 import { OFFER_DAYS } from "./offers";
@@ -20,7 +21,17 @@ import {
   webChatPicked,
   webChatTimes,
 } from "./templates";
-import { allowWebChat, WEB_CHAT_POSTS_PER_MINUTE } from "./webchat-rate-limit";
+import {
+  allowWebChat,
+  DAY_MS,
+  hasRoom,
+  HOUR_MS,
+  WEB_CHAT_POSTS_PER_IP_PER_DAY,
+  WEB_CHAT_POSTS_PER_MINUTE,
+} from "./webchat-rate-limit";
+import { purgeWebChatsIfDue } from "./webchat-retention";
+
+export { purgeExpiredWebChats, WEB_CHAT_RETENTION_DAYS } from "./webchat-retention";
 
 // The practice website chat (Front Desk, typing only). Same rules as texts:
 // it says it is an AI assistant before anything else, the crisis check runs on
@@ -29,13 +40,25 @@ import { allowWebChat, WEB_CHAT_POSTS_PER_MINUTE } from "./webchat-rate-limit";
 // only). The quick replies only say what happens next; the consult times
 // themselves are a web_chat_reply approval and show in the chat once she
 // approves it. Questions go to her as an alert.
+//
+// Crisis messages always get the fixed 988 reply, but the urgent text to her
+// phone and the chats they create are rate-limited, so a flood of crisis posts
+// can't flood her phone or the database: one alert per chat per 10 minutes, a
+// few per visitor per hour, and a daily cap. Held-back alerts are written to
+// audit_log and counted in the next alert that does go out.
 
 export const MAX_CHARS = 1000;
 export const MAX_MESSAGES = 40;
 export const WEB_CHAT_DAILY_MESSAGES = 250;
-export const WEB_CHAT_RETENTION_DAYS = 30;
 const CRISIS_BODY = "[Message withheld after the safety check]";
-let lastPurgeAt = 0;
+
+export const CRISIS_ALERT_GAP_MINUTES = 10;
+export const CRISIS_ALERTS_PER_IP_PER_HOUR = 3;
+export const CRISIS_ALERTS_PER_DAY = 10;
+export const CRISIS_CHATS_PER_IP_PER_HOUR = 3;
+export const CRISIS_CHATS_PER_DAY = 20;
+/** Crisis messages still saved in one chat past the 40-message limit; after that the reply is shown, not saved. */
+const CRISIS_STORED_PER_CHAT = MAX_MESSAGES + 20;
 
 export type ChatLine = { id: string; from: "visitor" | "assistant"; text: string; at: string };
 
@@ -46,31 +69,6 @@ export class WebChatError extends Error {
   constructor(message: string, public readonly status = 400) {
     super(message);
   }
-}
-
-/** Deletes expired public chats and their pending replies; the audit trail keeps category-only safety events. */
-export async function purgeExpiredWebChats(now = new Date()): Promise<number> {
-  const cutoff = new Date(now.getTime() - WEB_CHAT_RETENTION_DAYS * 86_400_000);
-  return (await db().begin(async (sql) => {
-    const expired = await sql<{ id: string }[]>`
-      select i.id from practice_os.inquiries i
-      where i.channel = 'web_chat' and i.created_at < ${cutoff}
-        and not exists (
-          select 1 from practice_os.messages m where m.inquiry_id = i.id and m.created_at >= ${cutoff}
-        )`;
-    if (expired.length === 0) return 0;
-    const ids = expired.map((row) => row.id);
-    await sql`delete from practice_os.approvals where kind = 'web_chat_reply' and payload ->> 'inquiry_id' in ${sql(ids)}`;
-    await sql`delete from practice_os.alerts where inquiry_id in ${sql(ids)}`;
-    await sql`delete from practice_os.inquiries where id in ${sql(ids)}`;
-    return ids.length;
-  })) as number;
-}
-
-async function maybePurge(now: Date): Promise<void> {
-  if (now.getTime() - lastPurgeAt < 60 * 60_000) return;
-  lastPurgeAt = now.getTime();
-  await purgeExpiredWebChats(now).catch(() => {});
 }
 
 async function dailyCapReached(now: Date): Promise<boolean> {
@@ -134,12 +132,90 @@ async function queueTimes(inquiryId: string): Promise<"queued" | "none" | "unava
   return "queued";
 }
 
-/** One message from a website visitor. Returns the conversation id and the thread. */
-export async function webChatMessage(input: {
-  conversation: string | null;
-  text: string;
-  rateLimitKey?: string;
-}): Promise<{ conversation: string; lines: ChatLine[] }> {
+const ephemeral = (text: string): ChatLine => ({ id: `local-${randomUUID()}`, from: "assistant", text, at: new Date().toISOString() });
+
+/** Web-chat crisis alerts (audit rows written by handleCrisis) in the last `minutes`, for one chat or all. */
+async function crisisAlertsSince(minutes: number, inquiryId: string | null = null): Promise<number> {
+  const [{ n }] = await db()<{ n: number }[]>`
+    select count(*)::int as n from practice_os.audit_log
+    where action = 'crisis_detected' and subject_type = 'inquiry' and details ->> 'channel' = 'web_chat'
+      and at > now() - make_interval(mins => ${minutes})
+      and (${inquiryId}::text is null or subject_id = ${inquiryId}::text)`;
+  return n;
+}
+
+/** Crisis messages whose alert was held back since the last web-chat alert that went out (at most a day back). */
+async function heldBackSinceLastAlert(): Promise<number> {
+  const [{ n }] = await db()<{ n: number }[]>`
+    select count(*)::int as n from practice_os.audit_log
+    where action = 'crisis_alert_suppressed' and details ->> 'channel' = 'web_chat'
+      and at > greatest(now() - interval '1 day', coalesce((
+        select max(at) from practice_os.audit_log
+        where action = 'crisis_detected' and subject_type = 'inquiry' and details ->> 'channel' = 'web_chat'
+      ),'-infinity'::timestamptz))`;
+  return n;
+}
+
+async function crisisChatsToday(): Promise<number> {
+  const [{ n }] = await db()<{ n: number }[]>`
+    select count(*)::int as n from practice_os.inquiries
+    where channel = 'web_chat' and crisis_flag and created_at > now() - interval '1 day'`;
+  return n;
+}
+
+async function holdBack(inquiryId: string | null, category: CrisisCategory, reason: "chat_limit" | "alert_limit") {
+  await audit({ actor: "safety", action: "crisis_alert_suppressed", subjectType: "inquiry", subjectId: inquiryId, details: { channel: "web_chat", category, reason } });
+}
+
+export type WebChatTurn = { conversation: string | null; lines: ChatLine[] };
+
+/**
+ * A crisis message: the fixed 988 reply always, before any limit. The new
+ * chat, the saved placeholder and the urgent text to her phone are each
+ * rate-limited; what is held back is audited and counted in the next alert.
+ */
+async function crisisTurn(known: string | null, category: CrisisCategory, ip: string): Promise<WebChatTurn> {
+  let inquiryId = known;
+  if (!inquiryId) {
+    const room = hasRoom(`crisis-chat:${ip}`, CRISIS_CHATS_PER_IP_PER_HOUR, Date.now(), HOUR_MS) && (await crisisChatsToday()) < CRISIS_CHATS_PER_DAY;
+    if (!room) {
+      await holdBack(null, category, "chat_limit");
+      return { conversation: null, lines: [ephemeral(webChatGreeting(await practice())), ephemeral(CRISIS_REPLY)] };
+    }
+    allowWebChat(`crisis-chat:${ip}`, CRISIS_CHATS_PER_IP_PER_HOUR, Date.now(), HOUR_MS);
+    inquiryId = await startConversation();
+  }
+
+  // Never retain the visitor's crisis words: category only, plus a neutral placeholder.
+  const [{ n }] = await db()`select count(*)::int as n from practice_os.messages where inquiry_id = ${inquiryId} and direction = 'inbound'`;
+  const stored = n < CRISIS_STORED_PER_CHAT;
+  if (stored) {
+    await addMessage({ inquiryId, direction: "inbound", channel: "web_chat", body: CRISIS_BODY, vendor: "web", providerId: null, meta: { safety: { crisis: category } } });
+    await say(inquiryId, CRISIS_REPLY);
+  }
+  await db()`update practice_os.inquiries set crisis_flag = true, status = 'needs_clinician', updated_at = now() where id = ${inquiryId}`;
+
+  const alertOk =
+    (await crisisAlertsSince(CRISIS_ALERT_GAP_MINUTES, inquiryId)) === 0 &&
+    (await crisisAlertsSince(24 * 60)) < CRISIS_ALERTS_PER_DAY &&
+    allowWebChat(`crisis-alert:${ip}`, CRISIS_ALERTS_PER_IP_PER_HOUR, Date.now(), HOUR_MS);
+  if (alertOk) {
+    const more = await heldBackSinceLastAlert();
+    await handleCrisis({ inquiryId, channel: "web_chat", from: null, category, phone: await deps().phone().catch(() => null), more });
+  } else {
+    await holdBack(inquiryId, category, "alert_limit");
+  }
+  const lines = (await webChatThread(inquiryId))!;
+  return { conversation: inquiryId, lines: stored ? lines : [...lines, ephemeral(CRISIS_REPLY)] };
+}
+
+/**
+ * One message from a website visitor. Returns the conversation id and the
+ * thread. `ip` is the platform's address for the visitor, used only for the
+ * in-memory limits; without it (tests, local tools) only the crisis limits apply.
+ * The conversation is null only when a crisis reply was shown without saving a chat.
+ */
+export async function webChatMessage(input: { conversation: string | null; text: string; ip?: string }): Promise<WebChatTurn> {
   // The safety check intentionally precedes every length, message-count, rate
   // and daily-cap refusal. A visitor at a limit still receives the fixed help.
   const crisis = checkCrisis(input.text);
@@ -148,39 +224,31 @@ export async function webChatMessage(input: {
   if (!crisis.crisis && text.length > MAX_CHARS) throw new WebChatError(`Please keep messages under ${MAX_CHARS} characters.`);
 
   const now = deps().now();
-  await maybePurge(now);
-  if (!crisis.crisis && input.rateLimitKey && !allowWebChat(input.rateLimitKey, WEB_CHAT_POSTS_PER_MINUTE)) {
-    throw new WebChatError("That is a lot of messages in a minute. Wait a minute and try again.", 429);
+  await purgeWebChatsIfDue();
+  if (!crisis.crisis && input.ip) {
+    if (!allowWebChat(`write:${input.ip}`, WEB_CHAT_POSTS_PER_MINUTE)) {
+      throw new WebChatError("That is a lot of messages in a minute. Wait a minute and try again.", 429);
+    }
+    if (!allowWebChat(`day:${input.ip}`, WEB_CHAT_POSTS_PER_IP_PER_DAY, Date.now(), DAY_MS)) {
+      throw new WebChatError("That is a lot of messages for one day. Please call the practice line instead.", 429);
+    }
   }
   if (!crisis.crisis && (await dailyCapReached(now))) {
     throw new WebChatError("The website chat has reached its limit for today. Please call the practice line instead.", 429);
   }
 
   const known = input.conversation && (await webChatThread(input.conversation)) ? input.conversation : null;
+  if (crisis.crisis) return crisisTurn(known, crisis.category, input.ip ?? "local");
   const inquiryId = known ?? (await startConversation());
-
-  if (crisis.crisis) {
-    // Never retain the visitor's crisis words: category only, plus a neutral placeholder.
-    await addMessage({
-      inquiryId,
-      direction: "inbound",
-      channel: "web_chat",
-      body: CRISIS_BODY,
-      vendor: "web",
-      providerId: null,
-      meta: { safety: { crisis: crisis.category } },
-    });
-    await db()`update practice_os.inquiries set updated_at = now() where id = ${inquiryId}`;
-    await say(inquiryId, CRISIS_REPLY);
-    await handleCrisis({ inquiryId, channel: "web_chat", from: null, category: crisis.category, phone: await deps().phone().catch(() => null) });
-    return { conversation: inquiryId, lines: (await webChatThread(inquiryId))! };
-  }
 
   const [{ n }] = await db()`select count(*)::int as n from practice_os.messages where inquiry_id = ${inquiryId} and direction = 'inbound'`;
   if (n >= MAX_MESSAGES) throw new WebChatError("This chat is full. Please call the practice line instead.", 429);
 
-  await addMessage({ inquiryId, direction: "inbound", channel: "web_chat", body: text, vendor: "web", providerId: null, meta: { safety: safetyResult(text, crisis) } });
+  const safety = safetyResult(text, crisis);
+  await addMessage({ inquiryId, direction: "inbound", channel: "web_chat", body: text, vendor: "web", providerId: null, meta: { safety } });
   await db()`update practice_os.inquiries set updated_at = now() where id = ${inquiryId}`;
+  // A diagnosis or an ID number never goes to Muse, even masked: plain-code keywords only.
+  const modelAllowed = !safety.private.some((kind) => kind === "diagnosis" || kind === "identifier");
   const p = await practice();
 
   // Contact details stay in plain code: a number or email she can reply to.
@@ -205,7 +273,7 @@ export async function webChatMessage(input: {
     // Only contact details: nothing new to decide.
     await say(inquiryId, webChatPassedOn(p));
   } else {
-    const x = await readIntent(text, null);
+    const x = modelAllowed ? await readIntent(text, null) : keywordIntent(text, null);
     if (x.name) await db()`update practice_os.inquiries set contact_name = coalesce(contact_name, ${x.name}) where id = ${inquiryId}`;
     if (x.intent === "book" && offer?.status !== "done") {
       const times = await queueTimes(inquiryId);

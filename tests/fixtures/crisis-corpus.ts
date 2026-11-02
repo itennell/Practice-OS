@@ -41,6 +41,19 @@ export const MUST_ROUTE: string[] = [
   "k i l l myself",
   "SUICIDE",
   "self   harm",
+  // lookalike letters and leetspeak
+  "kіll myself", // Cyrillic і
+  "k1ll myself",
+  "su1c1de",
+  "thinking about $u1c1d3",
+  "ѕuісidе", // Cyrillic ѕ, і, е
+  // slang
+  "I want to unalive myself",
+  "i wanna die",
+  "honestly kms",
+  "kys",
+  "I wish I were dead",
+  "I do not want to be alive",
   // negations still route
   "I'm not suicidal, I just need a time",
   "no thoughts of self-harm",
@@ -78,4 +91,8 @@ export const MUST_PASS: string[] = [
   "Update my malpractice expiry to December 2027",
   "Is the PLLC annual report due?",
   "Shoot me a reminder on Monday",
+  "I wish I was deadline-free",
+  "My fee is $150 for 50 minutes",
+  "Call me at 312-555-0170",
+  "The skyscraper has a kmsl office", // not the whole word "kms"
 ];

@@ -1,7 +1,7 @@
 // The practice website chat: AI disclosure first, crisis check before any
 // model, consult times only after her approval, fixed wording throughout.
 // Writes inquiries, messages and approvals, so it runs only on a local throwaway database.
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { loadEnv } from "../lib/env";
 
 loadEnv();
@@ -10,10 +10,23 @@ const localDb = /@(localhost|127\.0\.0\.1)[:/]/.test(url);
 
 // The local name-finder is tested on its own (guard.test.ts); here it finds nothing.
 vi.mock("../lib/aeon/phi-classifier", async (orig) => ({ ...(await orig<object>()), findNames: async () => [] }));
+// No model in these tests: every Muse call fails, so the keyword fallback answers; the count shows who called it.
+const museCalls = vi.hoisted(() => ({ n: 0 }));
+vi.mock("../lib/meta", async (orig) => ({
+  ...(await orig<object>()),
+  chat: async () => {
+    museCalls.n++;
+    throw new Error("no model in tests");
+  },
+}));
 
 const { db, closeDb } = await import("../lib/db");
 const { setFrontDeskDeps } = await import("../lib/frontdesk/deps");
-const { webChatMessage, webChatThread, purgeExpiredWebChats, WebChatError, MAX_CHARS } = await import("../lib/frontdesk/webchat");
+const { webChatMessage, webChatThread, purgeExpiredWebChats, WebChatError, MAX_CHARS, CRISIS_ALERTS_PER_IP_PER_HOUR } = await import(
+  "../lib/frontdesk/webchat"
+);
+const { alertPhone } = await import("../lib/frontdesk/crisis");
+const { resetWebChatRateLimit } = await import("../lib/frontdesk/webchat-rate-limit");
 const { sampleCalendar } = await import("../lib/frontdesk/test-console");
 const { approve } = await import("../lib/approvals");
 const { CRISIS_REPLY } = await import("../lib/safety");
@@ -60,10 +73,13 @@ afterAll(async () => {
   await closeDb();
 });
 
-const send = async (conversation: string | null, text: string) => {
-  const out = await webChatMessage({ conversation, text });
+beforeEach(() => resetWebChatRateLimit());
+
+const send = async (conversation: string | null, text: string, ip?: string) => {
+  const out = await webChatMessage({ conversation, text, ip });
+  if (!out.conversation) throw new Error("expected a saved chat");
   if (!made.includes(out.conversation)) made.push(out.conversation);
-  return out;
+  return { conversation: out.conversation, lines: out.lines };
 };
 
 describe.skipIf(!localDb)("website chat (local database only)", () => {
@@ -93,14 +109,15 @@ describe.skipIf(!localDb)("website chat (local database only)", () => {
   });
 
   it("a crisis message gets the fixed 988 reply and alerts her, before any model", async () => {
-    const [{ n: before }] = await db()`select count(*)::int as n from practice_os.model_calls`;
+    sent.length = 0;
+    const before = museCalls.n;
     const { conversation, lines } = await send(null, "I want to end my life");
     expect(lines.at(-1)).toMatchObject({ from: "assistant", text: CRISIS_REPLY });
-    const [{ n: after }] = await db()`select count(*)::int as n from practice_os.model_calls`;
-    expect(after).toBe(before);
+    expect(museCalls.n).toBe(before);
     const [inq] = await db()`select crisis_flag from practice_os.inquiries where id = ${conversation}`;
     expect(inq.crisis_flag).toBe(true);
-    expect(sent).toEqual(["+13125550199"]); // her alert only
+    // Her alert only, to whichever verified phone is set (settings.alert_phone, else CLINICIAN_ALERT_PHONE).
+    expect(sent).toEqual([await alertPhone()]);
     const [{ n: approvals }] = await db()`select count(*)::int as n from practice_os.approvals where payload ->> 'inquiry_id' = ${conversation}`;
     expect(approvals).toBe(0);
     const [msg] = await db()`select body, meta from practice_os.messages where inquiry_id = ${conversation} and direction = 'inbound'`;
@@ -173,5 +190,68 @@ describe.skipIf(!localDb)("website chat (local database only)", () => {
     expect(await webChatThread("not-a-uuid")).toBeNull();
     const { conversation } = await send("00000000-0000-4000-8000-000000000000", "hello");
     expect(conversation).not.toBe("00000000-0000-4000-8000-000000000000");
+  });
+
+  it("a flood of crisis posts gets 50 fixed replies but only a few texts to her", async () => {
+    sent.length = 0;
+    const ip = "203.0.113.50";
+    const chats = new Set<string>();
+    for (let i = 0; i < 50; i++) {
+      const out = await webChatMessage({ conversation: null, text: `I want to kill myself ${i}`, ip });
+      expect(out.lines.at(-1)).toMatchObject({ from: "assistant", text: CRISIS_REPLY });
+      if (out.conversation) chats.add(out.conversation);
+    }
+    made.push(...chats);
+    expect(sent.length).toBeGreaterThan(0);
+    expect(sent.length).toBeLessThanOrEqual(CRISIS_ALERTS_PER_IP_PER_HOUR);
+    expect(chats.size).toBeLessThanOrEqual(3); // new chats per visitor per hour
+    const [{ n: held }] = await db()`
+      select count(*)::int as n from practice_os.audit_log
+      where action = 'crisis_alert_suppressed' and details ->> 'channel' = 'web_chat' and at > now() - interval '1 minute'`;
+    expect(held).toBeGreaterThanOrEqual(50 - sent.length);
+  });
+
+  it("a crisis flood in one chat texts her once, and the next alert counts the held-back ones", async () => {
+    sent.length = 0;
+    const texts: string[] = [];
+    const recording = { ...phone, sendText: async (to: string, body: string) => (texts.push(body), phone.sendText(to)) };
+    const deps = (p: typeof recording) => ({ phone: async () => p, calendar: async () => sampleCalendar(NOW, "America/Chicago"), timeZone: async () => "America/Chicago", now: () => NOW });
+    setFrontDeskDeps(deps(recording));
+    try {
+      const first = await send(null, "A practice-hours question", "203.0.113.51");
+      for (let i = 0; i < 20; i++) {
+        const out = await send(first.conversation, "I wish I was dead", "203.0.113.51");
+        expect(out.lines.at(-1)?.text).toBe(CRISIS_REPLY);
+      }
+      expect(sent).toHaveLength(1);
+      // A different visitor's chat alerts again and counts the ones held back.
+      await send(null, "I want to end my life", "203.0.113.52");
+      expect(sent).toHaveLength(2);
+      expect(texts.at(-1)).toMatch(/\d+ more website chat messages like this came in since the last alert/);
+    } finally {
+      setFrontDeskDeps(deps(phone));
+    }
+  });
+
+  it("never sends a diagnosis or an ID number to Muse", async () => {
+    const before = museCalls.n;
+    const { lines } = await send(null, "My member ID: ABC12345. Do you take Blue Cross insurance?");
+    expect(lines.at(-1)!.text).toMatch(/^I've passed your message to /);
+    expect(museCalls.n).toBe(before);
+    await send(null, "Do you take Blue Cross insurance?");
+    expect(museCalls.n).toBe(before + 1); // an ordinary question does try Muse (and falls back)
+  });
+
+  it("limits one visitor per minute", async () => {
+    const ip = "203.0.113.60";
+    let refused: unknown = null;
+    for (let i = 0; i < 13 && !refused; i++) {
+      await webChatMessage({ conversation: null, text: "What are your hours?", ip }).then(
+        (out) => void (out.conversation && made.push(out.conversation)),
+        (e) => void (refused = e),
+      );
+    }
+    expect(refused).toBeInstanceOf(WebChatError);
+    expect((refused as InstanceType<typeof WebChatError>).status).toBe(429);
   });
 });

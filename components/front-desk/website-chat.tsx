@@ -69,13 +69,16 @@ export function WebsiteChat({ practiceName, greeting }: { practiceName: string; 
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ conversation, text }),
     }).catch(() => null);
-    const out = (await res?.json().catch(() => null)) as { conversation?: string; lines?: ChatLine[]; error?: string } | null;
+    const out = (await res?.json().catch(() => null)) as { conversation?: string | null; lines?: ChatLine[]; error?: string } | null;
     setBusy(false);
-    if (!res?.ok || !out?.conversation) return setError(out?.error ?? "That didn't send. Try again.");
+    if (!res?.ok || !out?.lines) return setError(out?.error ?? "That didn't send. Try again.");
     setText("");
-    save(out.conversation);
-    setConversation(out.conversation);
-    setLines(out.lines ?? []);
+    // No conversation: the safety reply was shown without saving a chat (a rate limit), so keep any chat we had.
+    if (out.conversation) {
+      save(out.conversation);
+      setConversation(out.conversation);
+    }
+    setLines(out.lines);
   };
 
   // Until the first message, the disclosure shows from the page; after, it's the first stored line.

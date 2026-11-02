@@ -87,9 +87,11 @@ export function helpText(p: Practice): string {
  * The urgent alert. Never quotes the caller's words. The text to her own verified
  * phone gets the full number; the alert row on the page gets the masked one.
  */
-export function crisisAlertText(channel: "voicemail" | "sms" | "web_chat", callerPhone: string | null): string {
+export function crisisAlertText(channel: "voicemail" | "sms" | "web_chat", callerPhone: string | null, more = 0): string {
   if (channel === "web_chat") {
-    return "URGENT from Practice-OS Front Desk: a website chat message mentioned danger or self-harm. The visitor got the 988/911 message. Please check Front Desk now.";
+    // Website chat alerts are rate-limited (webchat.ts); the ones held back are counted in the next one.
+    const held = more > 0 ? ` ${more} more website chat message${more === 1 ? "" : "s"} like this came in since the last alert; each got the same message.` : "";
+    return `URGENT from Practice-OS Front Desk: a website chat message mentioned danger or self-harm. The visitor got the 988/911 message.${held} Please check Front Desk now.`;
   }
   const who = callerPhone ?? "a hidden number";
   return `URGENT from Practice-OS Front Desk: a ${channel === "voicemail" ? "voicemail" : "text"} from ${who} mentioned danger or self-harm. The caller got the 988/911 message. Please check Front Desk now.`;

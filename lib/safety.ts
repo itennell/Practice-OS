@@ -23,7 +23,6 @@ const SQUASHED: Record<CrisisCategory, string[]> = {
     "takemylife", "takemyownlife", "takeherlife", "takehislife",
     "overdose", "toomanypills", "hangmyself", "hangherself", "hanghimself",
     "wanttodie", "wantstodie", "wanttobedead", "wantstobedead",
-    "wishiwasdead", "dontwanttobealive", "wanttodisappear",
     "betteroffdead", "betteroffwithoutme", "noreasontolive",
     "dontwanttobehereanymore", "dontwanttoliveanymore", "dontwanttolive", "dontwanttowakeup",
     "cantgoonliving", "wantittobeover",
@@ -38,7 +37,17 @@ const SQUASHED: Record<CrisisCategory, string[]> = {
 
 // Matched as whole words on the spaced-out message.
 const WORDS: Record<CrisisCategory, RegExp[]> = {
-  self_harm: [/\bjump(ing)? off (the|a) (bridge|building|roof|cliff)\b/],
+  self_harm: [
+    /\bjump(ing)? off (the|a) (bridge|building|roof|cliff)\b/,
+    /\bunaliv(e|ed|ing)\b/,
+    /\bwanna die\b/,
+    /\bkms\b/,
+    /\bkys\b/,
+    // Spaced, so "I wish I was deadline-free" passes.
+    /\bwish i (was|were) dead\b/,
+    /\b(dont|do not) want to be alive\b/,
+    /\b(want to|wanna) disappear\b/,
+  ],
   harm_to_others: [],
   danger: [/\b(gun|knife|weapon)\b/, /\bdomestic violence\b/, /\babus(e|ed|ing|ive)\b/],
 };
@@ -46,14 +55,34 @@ const WORDS: Record<CrisisCategory, RegExp[]> = {
 // Misspellings of the two words that matter most ("suicdal", "suacidal", "sucidal").
 const FUZZY_TARGETS = ["suicide", "suicidal"];
 
-function normalize(text: string): string {
+// Lookalike letters (Cyrillic and Greek) that NFKD leaves alone, so "kіll myself"
+// with a Cyrillic і still reads as "kill myself".
+const CONFUSABLES: Record<string, string> = {
+  а: "a", в: "b", е: "e", ё: "e", к: "k", м: "m", н: "h", о: "o", р: "p", с: "c", т: "t", у: "y", х: "x",
+  і: "i", ї: "i", ј: "j", ѕ: "s", ԁ: "d", ӏ: "l", һ: "h", ԛ: "q", ԝ: "w",
+  α: "a", β: "b", ε: "e", η: "n", ι: "i", κ: "k", ν: "v", ο: "o", ρ: "p", τ: "t", υ: "u", χ: "x", ω: "w",
+  ı: "i", ł: "l", ø: "o", ß: "ss",
+};
+// Leetspeak digits and symbols ("k1ll", "su1c1de", "$elf harm").
+const LEET: Record<string, string> = { "1": "i", "3": "e", "0": "o", "4": "a", "5": "s", "7": "t", "@": "a", $: "s" };
+
+function fold(text: string): string {
   return text
     .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
-    .replace(/[’'`]/g, "")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
+    .replace(/[^\x00-\x7f]/g, (ch) => CONFUSABLES[ch] ?? ch)
+    .replace(/[’'`]/g, "");
+}
+
+const words = (text: string) => text.replace(/[^a-z0-9]+/g, " ").trim();
+
+/** The message folded to plain ASCII words, without and with leetspeak read as letters. */
+function normalize(text: string): string[] {
+  const folded = fold(text);
+  const plain = words(folded);
+  const leet = words(folded.replace(/[013457@$]/g, (ch) => LEET[ch]));
+  return leet === plain ? [plain] : [plain, leet];
 }
 
 function editDistance(a: string, b: string): number {
@@ -70,8 +99,7 @@ function editDistance(a: string, b: string): number {
   return row[b.length];
 }
 
-export function checkCrisis(text: string): CrisisResult {
-  const spaced = normalize(text);
+function checkOne(spaced: string): CrisisResult {
   const squashed = spaced.replace(/ /g, "");
   for (const category of Object.keys(SQUASHED) as CrisisCategory[]) {
     if (SQUASHED[category].some((s) => squashed.includes(s))) return { crisis: true, category };
@@ -81,6 +109,14 @@ export function checkCrisis(text: string): CrisisResult {
     .split(" ")
     .some((word) => word.length >= 6 && word.startsWith("s") && FUZZY_TARGETS.some((t) => editDistance(word, t) <= 1));
   if (nearMiss) return { crisis: true, category: "self_harm" };
+  return { crisis: false };
+}
+
+export function checkCrisis(text: string): CrisisResult {
+  for (const spaced of normalize(text)) {
+    const result = checkOne(spaced);
+    if (result.crisis) return result;
+  }
   return { crisis: false };
 }
 
