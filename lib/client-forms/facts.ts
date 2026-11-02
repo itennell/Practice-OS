@@ -43,8 +43,16 @@ export const isIllinois = (f: PracticeFacts) => f.state.trim().toUpperCase() ===
 /** Licensed marriage and family therapist: 405 ILCS 5/3-550(c) does not name this license. */
 export const isLmft = (f: PracticeFacts) => /LMFT|MARRIAGE/.test(`${f.credential} ${f.licenseType}`.toUpperCase());
 
-/** Her reply time, or a gap to fill. */
-export const replyHours = (f: PracticeFacts) => (f.policies.reply_within_hours ? String(f.policies.reply_within_hours) : fillIn("hours"));
+/** Her reply time as she said it ("48 hours", "2 business days"), or a gap to fill. */
+export function replyWithin(f: PracticeFacts): string {
+  const days = f.policies.reply_within_business_days;
+  if (days) return `${days} business day${days === 1 ? "" : "s"}`;
+  if (f.policies.reply_within_hours) return `${f.policies.reply_within_hours} hours`;
+  return fillIn("how fast you reply to messages (Your policies)");
+}
+
+/** True when her reply time is counted in business days already. */
+export const repliesInBusinessDays = (f: PracticeFacts) => Boolean(f.policies.reply_within_business_days);
 
 /** Which ethics code her license follows, for the consent forms. */
 export function ethicsCode(f: PracticeFacts): string {

@@ -4,11 +4,12 @@
 // the same result either way. runTool() is the only way to call one: it checks
 // the input, enforces the Vercel demo's view-only rule, and passes every result
 // through the sensitive-info guard before any model or MCP client sees it.
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { APPROVAL_KINDS, type ApprovalKind } from "../approval-kinds";
 import { withOrigin, type ApprovalMode } from "../approval-policy";
-import { queueApproval } from "../approvals";
+import { queueApproval, queueApprovalOnce } from "../approvals";
 import { ANSWERS } from "../compliance/answers";
 import * as actions from "../compliance/actions";
 import { morningBrief } from "../compliance/brief";
@@ -16,7 +17,8 @@ import { recheckRules } from "../compliance/recheck";
 import { TOPICS } from "../compliance/research";
 import * as credActions from "../credentialing/actions";
 import * as cred from "../credentialing/store";
-import { getForm } from "../client-forms";
+import { getForm, prepare } from "../client-forms";
+import * as formStore from "../client-forms/store";
 import { FORM_IDS, type FormId } from "../client-forms/types";
 import { db } from "../db";
 import { FRONT_DESK_APPROVAL_KINDS, FRONT_DESK_ENABLED, toolEnabled } from "../features";
@@ -43,7 +45,7 @@ import { draftOutreach } from "../referrals/outreach";
 import { DEFAULT_SPECIALTIES, getReferralSettings } from "../referrals/settings";
 import { CONTACT_KINDS, CONTACT_LABEL, logContact, REFERRED_NOTE } from "../referrals/contacts";
 import { evidenceFor, setTypedEmail } from "../referrals/evidence/store";
-import { cardsNamed, outreachPlan } from "../referrals/plan";
+import { cardsNamed, NEW_PER_WEEK, outreachPlan } from "../referrals/plan";
 import { RecheckTooSoon, recheckDeps, recheckSource, recheckSummary } from "../referrals/sources/recheck";
 import { findReferralSources, getSource, interleave, listSources, moveSource, practiceFacts, STAGE_LABEL, STAGES } from "../referrals/store";
 import * as documents from "../documents";
@@ -52,7 +54,7 @@ import { guard, WITHHELD } from "./guard";
 import { GROWTH_ALWAYS_RUNS, GROWTH_TOOLS } from "./tools-growth";
 import { fileTools } from "./tools-files";
 import { forget, MEMORY_KINDS, MemoryRefused, recentChanges, remember } from "./memory";
-import { ABOUT_NAMES, REFERRAL_TOOLS } from "./tools-referrals";
+import { ABOUT_NAMES, ASK_WHICH, choiceOf, noCard, REFERRAL_TOOLS, whatItSays } from "./tools-referrals";
 import { outOfStateWarning } from "../referrals/states";
 import { RULES_TOOLS } from "./tools-rules";
 import { SETTINGS_TOOLS } from "./tools-settings";
@@ -69,6 +71,11 @@ export type ToolContext = {
   approved?: boolean;
   /** The model call to use inside tools that write with Muse (Instagram): the chat's own, so a recorded conversation replays end to end. */
   chat?: ChatFn;
+  /**
+   * Her own words in this chat, oldest first, her current message last. Plain code reads them so the
+   * model can't decide for her (a fee's session length, a fuzzy date, who she helps). Missing over MCP.
+   */
+  said?: string[];
 };
 
 /** aeon_action is queued only by runTool itself in Manual mode, never by an agent. */
@@ -104,6 +111,14 @@ export type AeonTool = {
   /** Changes saved data. Refused on the Vercel demo copy. Drafts that only queue an approval don't count. A function decides per call. */
   changesData: boolean | ((input: never) => boolean);
   run: (input: never, ctx: ToolContext) => Promise<ToolResult>;
+  /**
+   * Plain-code checks that run before anything waits in her ask bar or Approvals, and before the
+   * tool runs: a result here answers at once (no card by that name, ask which, a fuzzy date, which
+   * session length). Null lets the call go on. Skipped when she already approved the call.
+   */
+  preflight?: (input: never, ctx: ToolContext) => Promise<ToolResult | null>;
+  /** What her approval shows and runs, when it differs from the raw call (set_fees resolves "sessions" to its code). */
+  forApproval?: (input: never, ctx: ToolContext) => Promise<{ args: unknown; shows: string } | null>;
 };
 
 const text = (value: unknown): ToolResult => ({ content: [{ type: "text", text: JSON.stringify(value, null, 2) }] });
@@ -189,17 +204,137 @@ function withCards(said: Record<string, unknown>, cards: DocumentCard[]): ToolRe
 const CARD_HINT = "Its card appears in the chat under your answer and opens the document already filled in: don't list it again or name a page.";
 
 /** A client form template from the library: saves nothing, holds no client details. */
+/** Each [fill in] blank a form can print, and the set_practice_policies field (or tool) that fills it, in her words. */
+export const FORM_BLANKS: { blank: RegExp; field: string; ask: string }[] = [
+  { blank: /privacy notice takes effect/i, field: "npp_effective_on", ask: "What date should your privacy notice take effect?" },
+  { blank: /bill insurance/i, field: "accepts_insurance", ask: "Do you bill insurance?" },
+  { blank: /colleague who will contact clients/i, field: "backup_colleague", ask: "Which colleague will contact your clients if you can't? (name and credential, e.g. Jordan Lee, LCSW)" },
+  { blank: /text you about appointments/i, field: "texting_ok", ask: "May clients text you about appointments?" },
+  { blank: /how fast you reply|^hours$/i, field: "reply_within_hours or reply_within_business_days", ask: "How fast do you reply to messages (in hours or business days)?" },
+  { blank: /your fees/i, field: "set_fees", ask: "What are your fees?" },
+];
+
+/** The blanks one form still prints, as questions for her: exactly those, nothing else. */
+export function blanksToAsk(gaps: string[], policiesSaved: boolean): { field: string; ask: string }[] {
+  const out: { field: string; ask: string }[] = [];
+  for (const gap of gaps) {
+    const what = gap.replace(/^\[fill in:?\s*/i, "").replace(/\]$/, "").trim();
+    const known = FORM_BLANKS.find((b) => b.blank.test(what));
+    const item = known ? { field: known.field, ask: known.ask } : { field: "set_practice_policies", ask: `What should the form say for: ${what.replace(/\s*\(Your policies\)/, "")}?` };
+    if (!out.some((x) => x.field === item.field)) out.push(item);
+  }
+  if (!out.length && !policiesSaved) out.push({ field: "cancel_hours", ask: "How much notice do you ask for when a client cancels (in hours)?" });
+  return out;
+}
+
 async function makeClientForm(form: FormId): Promise<ToolResult> {
   const def = getForm(form);
   const [made] = def ? await documents.clientFormCards(def) : [];
   if (!def || !made) return { content: [{ type: "text", text: "Not made: client forms need the practice details on Admin › Credentialing, and those aren't filled in yet." }], isError: true };
-  // A form that can't download yet (policies never saved, a gap to fill, not Illinois) comes back without a PDF and says why.
+  if (made.pdf) {
+    return withCards({ made: def.title, template: true, filled_in: "her practice details", left_blank: "the client's boxes", downloadable: true, attorney_review: "recommended once" }, [made]);
+  }
+  // A form that can't download yet comes back without a PDF, with exactly the blanks she can fill from the chat.
+  const loaded = await formStore.loadFacts();
+  const prepared = loaded ? prepare(def, loaded.facts, await formStore.loadOverrides(def.id)) : null;
+  const ask = prepared && !prepared.wrongState ? blanksToAsk(prepared.gaps, loaded!.facts.policiesSaved) : [];
   return withCards(
-    made.pdf
-      ? { made: def.title, template: true, filled_in: "her practice details", left_blank: "the client's boxes", downloadable: true, attorney_review: "recommended once" }
-      : { made: def.title, template: true, downloadable: false, why_not: made.needs_her },
+    {
+      made: def.title,
+      template: true,
+      downloadable: false,
+      why_not: made.needs_her,
+      ...(ask.length
+        ? {
+            ask_her_for: ask,
+            fills_them: "set_practice_policies (fees: set_fees); the form downloads once every blank is filled",
+          }
+        : {}),
+    },
     [made],
   );
+}
+
+/** "Sunday, November 1". */
+export const longDay = (iso: string) =>
+  new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
+
+/** Words that make a date a guess: "yesterday-ish", "the other day", "a few days ago", "sometime last week". */
+export const FUZZY_DATE =
+  /\b[a-z]+-ish\b|\bor so\b|\bthe other day\b|\b(?:a few|a couple(?: of)?|several) days ago\b|\bsome ?time\b|\b(?:earlier|sometime) this week\b|\blast week\b|\b(?:around|about|roughly|maybe|probably) (?:yesterday|today|last|monday|tuesday|wednesday|thursday|friday|saturday|sunday|the \d)/i;
+
+const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+const addDaysIso = (iso: string, n: number) => new Date(Date.parse(`${iso}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+/** The words that say she did something with a referral source: the date check reads only that sentence. */
+const CONTACT_EVENT = /\b(?:call(?:ed)?|phoned|email(?:ed)?|e-mailed|met|meet|sent|mailed|dropped off|spoke|talked|left (?:a )?(?:message|voicemail)|replied|heard back|wrote|texted|visited|referred|faxed)\b/i;
+
+/** The sentence of her message that tells the contact ("I called Dr. Rivera yesterday-ish"), or null. */
+export function contactSentence(message: string): string | null {
+  return message.split(/(?<=[!?;]|(?<!\b(?:Dr|Mr|Ms|Mrs|Mx|St|Ave|Jr|Sr|Inc|vs))\.)\s+|\n+/).find((x) => CONTACT_EVENT.test(x)) ?? null;
+}
+
+/**
+ * Plain code reads the day from her words: today, yesterday, the day before yesterday, "on
+ * Tuesday" (the most recent one) and "last Tuesday" (the same day, but ambiguous: it waits for
+ * her OK). Null when the words name no day.
+ */
+export function dayFromWords(words: string, today: string): { day: string; ambiguous: boolean } | null {
+  if (/\bday before yesterday\b/i.test(words)) return { day: addDaysIso(today, -2), ambiguous: false };
+  if (/\byesterday\b/i.test(words)) return { day: addDaysIso(today, -1), ambiguous: false };
+  if (/\btoday\b|\bthis morning\b|\bthis afternoon\b|\bearlier today\b/i.test(words)) return { day: today, ambiguous: false };
+  const m = /\b(last\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/i.exec(words);
+  if (!m) return null;
+  const now = new Date(`${today}T12:00:00Z`).getUTCDay();
+  const want = WEEKDAYS.indexOf(m[2].toLowerCase());
+  const back = (now - want + 7) % 7 || (m[1] ? 7 : 0);
+  return { day: addDaysIso(today, -back), ambiguous: Boolean(m[1]) };
+}
+
+/**
+ * The day a contact is logged for, from her own words, never the model's guess. A fuzzy or
+ * ambiguous day, or a day that isn't the one her words name, comes back to ask:
+ * "I read that as ...". `day` is the day to log when it's clear.
+ */
+export function contactDay(
+  input: { happened_on?: string; date_words?: string; date_confirmed?: boolean },
+  said: string[] | undefined,
+  today: string,
+): { ask: ToolResult } | { day: string | undefined } {
+  if (input.date_confirmed) return { day: input.happened_on };
+  const sentence = said?.length ? contactSentence(said.at(-1)!) : null;
+  const words = sentence ?? input.date_words ?? "";
+  const parsed = dayFromWords(words, today) ?? (input.date_words ? dayFromWords(input.date_words, today) : null);
+  const fuzzy = FUZZY_DATE.test(words) || (!sentence && FUZZY_DATE.test(input.date_words ?? ""));
+  const day = parsed?.day ?? input.happened_on ?? today;
+  const ask = (why: string) => ({
+    ask: text({
+      logged: false,
+      needs_confirmation: `I read that as ${longDay(day)} (${day}). ${why} Nothing is logged until she confirms that date (date_confirmed: true) or gives another.`,
+    }),
+  });
+  if (fuzzy) return ask(`Her words ("${(words.match(FUZZY_DATE)?.[0] ?? input.date_words ?? "").trim()}") aren't an exact day.`);
+  if (parsed?.ambiguous) return ask(`"${words.match(/last\s+\w+day/i)?.[0] ?? "last week's day"}" could mean this week or the week before.`);
+  if (parsed && input.happened_on && input.happened_on !== parsed.day) return ask(`The date passed (${input.happened_on}) isn't the day her words name.`);
+  return { day: parsed?.day ?? input.happened_on };
+}
+
+/** contactDay with the practice's today. */
+export async function fuzzyDateCheck(
+  input: { happened_on?: string; date_words?: string; date_confirmed?: boolean },
+  ctx: Pick<ToolContext, "said">,
+  today?: string,
+): Promise<ToolResult | null> {
+  const r = contactDay(input, ctx.said, today ?? (await practiceToday()));
+  return "ask" in r ? r.ask : null;
+}
+
+/** The card a log entry is for: by id or by name; no match or several answer at once. */
+function logCard(source: string, cards: Awaited<ReturnType<typeof listSources>>): { card?: (typeof cards)[number]; result?: ToolResult } {
+  const byId = cards.find((c) => c.id === source);
+  const matches = byId ? [byId] : cardsNamed(source, cards);
+  if (matches.length === 0) return { result: text({ logged: false, why: noCard(source) }) };
+  if (matches.length > 1) return { result: text({ logged: false, why: ASK_WHICH, ask_which: matches.slice(0, 5).map(choiceOf) }) };
+  return { card: matches[0] };
 }
 
 async function makeGfe(input: z.infer<z.ZodObject<typeof gfeInput>>, ctx: ToolContext): Promise<ToolResult> {
@@ -273,7 +408,11 @@ async function makeCms855i(ctx: ToolContext): Promise<ToolResult> {
 
 // Typed per tool, stored loosely: run() is only reached through runTool(), which parses the input first.
 function tool<I extends z.ZodRawShape>(
-  def: Omit<AeonTool, "run" | "input"> & { input: I; run: (input: z.infer<z.ZodObject<I>>, ctx: ToolContext) => Promise<ToolResult> },
+  def: Omit<AeonTool, "run" | "input" | "preflight"> & {
+    input: I;
+    run: (input: z.infer<z.ZodObject<I>>, ctx: ToolContext) => Promise<ToolResult>;
+    preflight?: (input: z.infer<z.ZodObject<I>>, ctx: ToolContext) => Promise<ToolResult | null>;
+  },
 ): AeonTool {
   return def as unknown as AeonTool;
 }
@@ -431,7 +570,8 @@ export const TOOLS: AeonTool[] = [
       "filled with her practice and blank for the client; never fill in a client's answers). " +
       "Pass the fields for that kind only, the same as draft_gfe, draft_superbill and make_release_form take. Takes no client details. " +
       "It prepares; it never signs, sends or submits anything: she does that herself. " + CARD_HINT + " " +
-      "Tell her what the result says only she does (left_blank_for_her, after, after_approval). A client form with downloadable false can't be downloaded yet: say why_not plainly. " +
+      "Tell her what the result says only she does (left_blank_for_her, after, after_approval). A client form with downloadable false can't be downloaded yet: say why_not plainly, " +
+      "and when it returns ask_her_for, ask her exactly those questions in one short message, save her answers with set_practice_policies (fees with set_fees), then make the form again. " +
       "A template that downloads: recommend her own attorney reads it once.",
     input: {
       kind: z.enum(["gfe", "superbill", "release_form", "payer_form", "client_form"]),
@@ -1066,29 +1206,64 @@ export const TOOLS: AeonTool[] = [
       "Approving makes it ready to copy; the card moves to Contacted, with a follow-up a week out, only when she marks it sent " +
       "(the card's I sent it button, or log_referral_contact with sent_letter). Uses her real phone, email, in-network plans and " +
       "her log notes for this card. If a letter to them is already waiting, it is rewritten in place; to change a waiting letter " +
-      "('make it shorter') use revise_referral_letter. Takes about 10 seconds.",
+      "('make it shorter') use revise_referral_letter. Tell her what `included` and `left_out` say, never more. 'Letters for my top 3': pass top: 3 (never ids you picked), and the letters go to the " +
+      "first 3 of referral_outreach_plan's ranked list. The letter names who she helps (groups of people, from her profile and what she says in this chat). " +
+      "Takes about 10 seconds a letter.",
     input: {
-      id: z.string().uuid().describe("The referral source's id, from find_referral_sources or list_referral_sources."),
+      id: z.string().uuid().optional().describe("The referral source's id, from find_referral_sources or list_referral_sources."),
+      top: z.number().int().min(1).max(5).optional().describe("'my top 3' -> 3: letters for the first N people of this week's outreach plan, in its order. Instead of id."),
+      specialties: z
+        .array(z.enum(SPECIALTIES.map((s) => s.id) as [SpecialtyId, ...SpecialtyId[]]))
+        .min(1)
+        .optional()
+        .describe("With top: only these kinds of provider, when she named them (as for referral_outreach_plan)."),
       note: z.string().trim().max(500).optional().describe("Anything she wants the letter to mention, in her words."),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: false },
     label: "Drafted an introduction letter",
     changesData: false,
-    run: async ({ id, note }, ctx) => {
-      const { approvalId, subject, letter, source, revised } = await draftOutreach(id, { by: ctx.by, note });
+    run: async ({ id, top, specialties, note }, ctx) => {
+      if (Boolean(id) === Boolean(top)) return { content: [{ type: "text", text: "Pass either id (one card) or top (the first N of this week's plan)." }], isError: true };
+      // Who she helps: her profile, plus her own "I work with / I help / I see" statements in this chat (never search words).
+      const stated = (ctx.said ?? []).join("\n");
+      const opts = { by: ctx.by, note, focus: stated || null, ...(ctx.chat ? { chat: ctx.chat as unknown as Parameters<typeof draftOutreach>[1]["chat"] } : {}) };
+      if (top) {
+        // "My top 3" is the plan's ranked order, never a pick of the model's.
+        const plan = await outreachPlan(undefined, Math.max(top, NEW_PER_WEEK), { specialties });
+        const picked = plan.reach_out.slice(0, top);
+        if (!picked.length) return text({ drafted: 0, why: "Nobody on this week's plan is ready for a first letter.", plan: plan.summary });
+        const letters = [];
+        for (const [i, item] of picked.entries()) {
+          try {
+            const r = await draftOutreach(item.id, opts);
+            letters.push({ rank: i + 1, approval_id: r.approvalId, to: r.source.name, why: item.why, subject: r.subject, letter: r.letter, included: r.included, left_out: r.left_out });
+          } catch (err) {
+            letters.push({ rank: i + 1, to: item.name, drafted: false, why: err instanceof Error ? err.message : "couldn't write it" });
+          }
+        }
+        const made = letters.filter((l) => "approval_id" in l).length;
+        return {
+          content: [
+            { type: "text", text: `${made} of ${top} letters queued for her approval, for the top ${picked.length} of this week's outreach plan in its order${picked.length < top ? ` (only ${picked.length} are ready)` : ""}.` },
+            { type: "text", text: JSON.stringify({ from: "referral_outreach_plan", letters, about_names: ABOUT_NAMES }, null, 2) },
+          ],
+          structuredContent: { status: "pending", approval_ids: letters.flatMap((l) => ("approval_id" in l ? [l.approval_id] : [])) },
+        };
+      }
+      const { approvalId, subject, letter, source, revised, included, left_out } = await draftOutreach(id!, opts);
       const [row] = await db()<{ status: string }[]>`select status from practice_os.approvals where id = ${approvalId}`;
       return {
         content: [
           {
             type: "text",
             text:
-              row?.status === "pending"
+              (row?.status === "pending"
                 ? revised
                   ? "the letter already waiting was rewritten in place; still waiting for her approval"
                   : "queued for clinician approval"
-                : `ran on its own under her mode: ${row?.status} (ready to copy; not sent)`,
+                : `ran on its own under her mode: ${row?.status} (ready to copy; not sent)`) + ` ${whatItSays(included, left_out)}`.trimEnd(),
           },
-          { type: "text", text: JSON.stringify({ approval_id: approvalId, to: source.name, subject, letter }, null, 2) },
+          { type: "text", text: JSON.stringify({ approval_id: approvalId, to: source.name, subject, letter, included, left_out }, null, 2) },
         ],
         structuredContent: { status: row?.status ?? "pending", approval_id: approvalId },
       };
@@ -1128,7 +1303,10 @@ export const TOOLS: AeonTool[] = [
       "Logs what she did with someone on her Referrals board: called, emailed, met, sent_letter, replied (they answered), note, or " +
       "referred (they referred someone to her). Name the card as she said it ('Dr. Rivera', 'Lakeview Pediatrics') or pass its id. " +
       "Reaching out moves the card to Contacted and sets a follow-up a week out unless she gives a date; a reply, meeting or referral " +
-      "moves it to Connected and raises its tier. For 'referred', record NOTHING about who was referred: no name, initials, age or reason; " +
+      "moves it to Connected and raises its tier. Pass her words for when in date_words; a fuzzy day ('yesterday-ish') comes back " +
+      "needs_confirmation with the date it reads as: ask her, then call again with date_confirmed: true. Always tell her the date logged (logged_for). " +
+      "If more than one card fits it returns ask_which: list them (name, credential, address) and let her choose; never pick one. " +
+      "For 'referred', record NOTHING about who was referred: no name, initials, age or reason; " +
       "Aeon never tells the referrer someone became a client without that person's written consent. If more than one card fits, ask which. " +
       "If she says they aren't interested or not to contact them again, use set_do_not_contact (a note alone changes nothing). " +
       "If she says she sent the letter, log sent_letter.",
@@ -1136,28 +1314,37 @@ export const TOOLS: AeonTool[] = [
       source: z.string().trim().min(2).max(160).describe("The card's name as she said it, or its id."),
       kind: z.enum(CONTACT_KINDS),
       happened_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("YYYY-MM-DD; today when left out."),
+      date_words: z.string().trim().max(80).optional().describe("Her exact words for when it happened, if she said any ('yesterday', 'last Tuesday', 'yesterday-ish')."),
+      date_confirmed: z.boolean().optional().describe("True only after she confirmed the date in this chat, when an earlier call asked."),
       note: z.string().trim().max(500).optional().describe("Her words about the contact. Never anything about a client. Ignored for 'referred'."),
       follow_up_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("YYYY-MM-DD for the next follow-up, if she said one."),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: false },
     label: "Logged a referral contact",
     changesData: true,
-    run: async ({ source, kind, happened_on, note, follow_up_on }) => {
-      const cards = await listSources();
-      const byId = cards.find((c) => c.id === source);
-      const matches = byId ? [byId] : cardsNamed(source, cards);
-      if (matches.length === 0) return text({ logged: false, why: `No card on her Referrals board is named "${source}".` });
-      if (matches.length > 1 && !byId) {
-        return text({ logged: false, ask_which: matches.slice(0, 5).map((c) => ({ id: c.id, name: c.name, column: STAGE_LABEL[c.stage] })) });
+    preflight: async (input, ctx) => {
+      const found = logCard(input.source, await listSources());
+      if (found.result) return found.result;
+      return fuzzyDateCheck(input, ctx);
+    },
+    run: async ({ source, kind, happened_on, date_words, date_confirmed, note, follow_up_on }, ctx) => {
+      const found = logCard(source, await listSources());
+      if (found.result) return found.result;
+      const card = found.card!;
+      let day = happened_on;
+      if (!ctx.approved) {
+        const read = contactDay({ happened_on, date_words, date_confirmed }, ctx.said, await practiceToday());
+        if ("ask" in read) return read.ask;
+        day = read.day;
       }
-      const card = matches[0];
       try {
-        const r = await logContact(card.id, { kind, happenedOn: happened_on, note, followUpOn: follow_up_on, by: "aeon" });
+        const r = await logContact(card.id, { kind, happenedOn: day, note, followUpOn: follow_up_on, by: "aeon" });
         return text({
           logged: true,
           name: card.name,
           what: CONTACT_LABEL[kind],
           on: r.contact.happened_on,
+          logged_for: longDay(r.contact.happened_on),
           column: STAGE_LABEL[r.stage],
           next_follow_up_on: r.nextFollowUpOn,
           ...(kind === "referred" ? { note: REFERRED_NOTE } : {}),
@@ -1692,6 +1879,28 @@ export async function guardResult(result: ToolResult, tool?: string): Promise<To
   return { ...result, content, structuredContent: check.text === raw ? result.structuredContent : JSON.parse(check.text) };
 }
 
+/** The same tool with the same arguments, keys in any order. */
+export function callKey(tool: string, args: unknown): string {
+  const sorted = (v: unknown): unknown =>
+    Array.isArray(v) ? v.map(sorted) : v && typeof v === "object" ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => a.localeCompare(b)).map(([k, x]) => [k, sorted(x)])) : v;
+  return createHash("sha256").update(JSON.stringify([tool, sorted(args)])).digest("hex").slice(0, 32);
+}
+
+/** One aeon_action approval per identical call: a second ask for the same change returns the one already waiting. */
+/** Tools whose same call can rightly happen twice (she called the same office twice): never deduped. */
+const REPEATABLE = new Set(["log_referral_contact"]);
+
+async function queueCallOnce(tool: AeonTool, input: unknown, ctx: ToolContext, body: string) {
+  // A tool may show what will really change (set_fees: the code, its label, old and new fee) and queue exactly that.
+  const shown = tool.forApproval ? await tool.forApproval(input as never, ctx) : null;
+  const args = shown?.args ?? input;
+  const said = shown?.shows ? `${body}\n${shown.shows}` : body;
+  const call_key = callKey(tool.name, args);
+  const approval = { kind: "aeon_action" as const, title: tool.title, preview: { body: said, tool: tool.name, args }, payload: { tool: tool.name, args, call_key }, createdBy: ctx.by };
+  if (REPEATABLE.has(tool.name)) return { id: await queueApproval(approval), created: true };
+  return queueApprovalOnce(approval, { payloadField: "call_key", value: call_key }, ["pending"]);
+}
+
 /** The one way to call a tool, from MCP or the chat. */
 export async function runTool(name: string, args: unknown, ctx: ToolContext): Promise<ToolResult> {
   const tool = TOOLS_BY_NAME.get(name);
@@ -1706,27 +1915,21 @@ export async function runTool(name: string, args: unknown, ctx: ToolContext): Pr
     return { content: [{ type: "text", text: `Invalid input for ${name}: ${problems}` }], isError: true };
   }
   const mode = ctx.mode;
+  // Plain-code checks first: a card that isn't there, several that fit, a fuzzy date or an unnamed
+  // session length answer now, before anything waits for her approval.
+  if (tool.preflight && !ctx.approved) {
+    const stop = await tool.preflight(parsed.data as never, ctx);
+    if (stop) return guardResult(stop);
+  }
   // Her settings change only by her own word: from another agent over MCP they wait in her Approvals, in any mode.
   if (tool.queuesOverMcp && changes && !ctx.approved && ctx.by.startsWith("mcp:")) {
-    const approvalId = await queueApproval({
-      kind: "aeon_action",
-      title: tool.title,
-      preview: { body: `${tool.label}, asked for by another app (${ctx.by.slice(4)}). It runs only once you approve it.`, tool: tool.name, args: parsed.data },
-      payload: { tool: tool.name, args: parsed.data },
-      createdBy: ctx.by,
-    });
-    return text({ waiting_for_her: true, saved: false, approval_id: approvalId, where: "her Approvals", reason: "Settings change only with her approval when another app asks." });
+    const { id: approvalId, created } = await queueCallOnce(tool, parsed.data, ctx, `${tool.label}, asked for by another app (${ctx.by.slice(4)}). It runs only once you approve it.`);
+    return text({ waiting_for_her: true, saved: false, approval_id: approvalId, where: "her Approvals", reason: "Settings change only with her approval when another app asks.", ...(created ? {} : { already_waiting: true }) });
   }
-  // Manual: a change to her records waits in the ask bar as one aeon_action approval.
+  // Manual: a change to her records waits in the ask bar as one aeon_action approval (the same call twice is one approval).
   if (mode === "manual" && changes && !ctx.approved && !ALWAYS_RUNS.has(tool.name)) {
-    const approvalId = await queueApproval({
-      kind: "aeon_action",
-      title: tool.title,
-      preview: { body: `${tool.label}. Aeon will run this once you approve it.`, tool: tool.name, args: parsed.data },
-      payload: { tool: tool.name, args: parsed.data },
-      createdBy: ctx.by,
-    });
-    return text({ waiting_for_her: true, approval_id: approvalId, mode: "manual", where: "the bar above the chat box" });
+    const { id: approvalId, created } = await queueCallOnce(tool, parsed.data, ctx, `${tool.label}. Aeon will run this once you approve it.`);
+    return text({ waiting_for_her: true, approval_id: approvalId, mode: "manual", where: "the bar above the chat box", ...(created ? {} : { already_waiting: true }) });
   }
   const run = () => tool.run(parsed.data as never, ctx);
   return guardResult(await (mode ? withOrigin({ mode }, run) : run()), name);

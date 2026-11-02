@@ -1,4 +1,4 @@
-import { dollars, fullAddress, replyHours, signedBy } from "../facts";
+import { dollars, fullAddress, repliesInBusinessDays, replyWithin, signedBy } from "../facts";
 import { REVIEW } from "../review";
 import { fillIn, type FormDef, type PracticeFacts } from "../types";
 
@@ -85,7 +85,7 @@ export const practicePolicies: FormDef = {
       id: "communication",
       editable: true,
       label: "How to reach you",
-      text: `Call ${f.phone} or email ${f.email}. I reply within ${replyHours(f)} hours on days the office is open. Email and text are for scheduling only. I am not an emergency service: if you are in danger or thinking about hurting yourself, call or text 988, or call 911.`,
+      text: `Call ${f.phone} or email ${f.email}. I reply within ${replyWithin(f)}${repliesInBusinessDays(f) ? "" : " on days the office is open"}. Email and text are for scheduling only. I am not an emergency service: if you are in danger or thinking about hurting yourself, call or text 988, or call 911.`,
     },
     { kind: "heading", text: "Records" },
     { kind: "clause", id: "closing", text: `If I ever close my practice, I will give at least 30 days' notice and explain how to get your records. ${f.practiceName}, ${fullAddress(f)}.` },

@@ -5,7 +5,7 @@ import { useState } from "react";
 import { DateField } from "@/components/shared/date-field";
 import { SettingSelect, SettingSwitch, TextAreaField, TextField } from "@/components/shared/settings-controls";
 import { Button } from "@/components/ui";
-import type { Policies } from "@/lib/client-forms/types";
+import { replyFields, type Policies, type ReplyUnit } from "@/lib/client-forms/types";
 
 // The two editors on Admin › Client forms: her practice policies (used by every
 // form) and her wording for one form. Both save practice wording only; the
@@ -111,11 +111,20 @@ const YES_NO: { value: YesNo; label: string }[] = [
   { value: "no", label: "No" },
 ];
 
+const REPLY_UNITS: { value: ReplyUnit; label: string }[] = [
+  { value: "hours", label: "Hours" },
+  { value: "business_days", label: "Business days" },
+];
+
 export function PolicyEditor({ initial }: { initial: Policies }) {
   const router = useRouter();
   const [p, setP] = useState(initial);
   const [money, setMoney] = useState({ late: toDollars(initial.late_cancel_fee_cents), noShow: toDollars(initial.no_show_fee_cents), returned: toDollars(initial.returned_payment_fee_cents) });
-  const [reply, setReply] = useState(initial.reply_within_hours ? String(initial.reply_within_hours) : "");
+  // Her reply time in the unit she said it: hours, or business days (never one turned into the other).
+  const [replyUnit, setReplyUnit] = useState<ReplyUnit>(initial.reply_within_business_days ? "business_days" : "hours");
+  const [reply, setReply] = useState(
+    initial.reply_within_business_days ? String(initial.reply_within_business_days) : initial.reply_within_hours ? String(initial.reply_within_hours) : "",
+  );
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<Message>(null);
   const set = <K extends keyof Policies>(k: K, v: Policies[K]) => setP((x) => ({ ...x, [k]: v }));
@@ -124,10 +133,9 @@ export function PolicyEditor({ initial }: { initial: Policies }) {
     setBusy(true);
     setMessage(null);
     try {
-      const hours = Number(reply);
       await send("/api/client-forms/policies", "PUT", {
         ...p,
-        reply_within_hours: reply && hours >= 1 ? Math.min(168, Math.round(hours)) : null,
+        ...replyFields(replyUnit, reply),
         late_cancel_fee_cents: toCents(money.late),
         no_show_fee_cents: toCents(money.noShow),
         returned_payment_fee_cents: toCents(money.returned),
@@ -148,7 +156,14 @@ export function PolicyEditor({ initial }: { initial: Policies }) {
         <TextField label="Late cancellation fee ($)" inputMode="decimal" value={money.late} onChange={(e) => setMoney((m) => ({ ...m, late: e.target.value.replace(/[^\d.]/g, "") }))} />
         <TextField label="Missed session fee ($)" inputMode="decimal" value={money.noShow} onChange={(e) => setMoney((m) => ({ ...m, noShow: e.target.value.replace(/[^\d.]/g, "") }))} />
         <TextField label="Returned payment fee ($)" inputMode="decimal" value={money.returned} onChange={(e) => setMoney((m) => ({ ...m, returned: e.target.value.replace(/[^\d.]/g, "") }))} />
-        <TextField label="You reply to messages within (hours)" description={reply ? undefined : "Not set yet: forms show [fill in]."} inputMode="numeric" value={reply} onChange={(e) => setReply(e.target.value.replace(/\D/g, "").slice(0, 3))} />
+        <TextField
+          label={replyUnit === "hours" ? "You reply to messages within (hours)" : "You reply to messages within (business days)"}
+          description={reply ? "Empty it to clear your reply time." : "Not set yet: forms show [fill in]."}
+          inputMode="numeric"
+          value={reply}
+          onChange={(e) => setReply(e.target.value.replace(/\D/g, "").slice(0, 3))}
+        />
+        <SettingSelect label="Reply time is counted in" value={replyUnit} onValueChange={setReplyUnit} options={REPLY_UNITS} />
         <TextField label="Privacy contact (if not you)" value={p.privacy_officer} maxLength={120} onChange={(e) => set("privacy_officer", e.target.value)} />
         <TextField
           label="Colleague who contacts clients if you can't"

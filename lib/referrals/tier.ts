@@ -104,7 +104,7 @@ export const SPECIALTY_POINTS = WEIGHTS.specialty;
 const tierOf = (score: number): Tier => (score >= WEIGHTS.min.first ? "first" : score >= WEIGHTS.min.next ? "next" : "later");
 
 export type Focus = "children" | "teens" | "adults" | "older_adults" | "couples" | "families" | "perinatal";
-const FOCUS_WORDS: Record<Focus, string> = {
+export const FOCUS_WORDS: Record<Focus, string> = {
   children: "children",
   teens: "teens",
   adults: "adults",
@@ -133,7 +133,7 @@ const FOCUS_PATTERNS: [Focus, RegExp][] = [
   ["adults", /\b(adults?|college students?|professionals?|grown-ups?)\b/i],
   ["couples", /\b(couples?|partners?|marriage|marital)\b/i],
   ["families", /\b(famil(y|ies)|parents?|parenting)\b/i],
-  ["perinatal", /\b(perinatal|postpartum|pregnan\w*|new (?:moms?|mothers?|parents?)|maternal|fertility)\b/i],
+  ["perinatal", /\b(perinatal|postpartum|pregnan\w*|new (?:moms?|mothers?|parents?)|new and expecting|expect(?:ing|ant) (?:parents?|moms?|mothers?)|maternal|fertility)\b/i],
 ];
 
 // OB/GYN subspecialties that don't care for pregnancy (NUCC 207V*): no new or expecting parents there.

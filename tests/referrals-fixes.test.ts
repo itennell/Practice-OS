@@ -428,11 +428,12 @@ describe.skipIf(!hasDb)("review fixes against the database", () => {
     const { id } = await makeCard("[Sample] Rory Blocked, MD");
     const { approvalId } = await draftOutreach(id, { by: "test", chat: fakeChat([LETTER]) });
     approvals.push(approvalId);
-    await suppress(id, "not_interested", db(), "clinician");
+    // Putting them on the list declines the waiting letter, so it can't be approved at all.
+    const { declined } = await suppress(id, "not_interested", db(), "clinician");
+    expect(declined).toEqual([approvalId]);
     process.env.DRY_RUN = "true";
     const res = await approve(approvalId, { by: "test" });
-    expect(res.ok && res.approval.status).toBe("failed");
-    expect(res.ok && res.approval.error).toMatch(/do-not-contact list/);
+    expect(res.ok).toBe(false);
     await expect(draftOutreach(id, { by: "test", chat: fakeChat([LETTER]) })).rejects.toThrow(/do-not-contact list/);
   });
 

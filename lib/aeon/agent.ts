@@ -17,6 +17,8 @@ import { getProfile, STAGE_LABEL, type Profile } from "../profile";
 import type { ApprovalMode } from "../approval-policy";
 import { cardsFrom, type DocumentCard } from "../documents/card";
 import { TOOLS_BY_NAME, chatTools, runTool, type ToolResult } from "./tools";
+/** How many of her earlier messages the tools may read (with the current one). */
+const SAID_TURNS = 5;
 
 export const FEATURE = "aeon_chat";
 const MAX_ROUNDS = 6;
@@ -211,6 +213,8 @@ export async function respond(message: string, opts: RespondOptions): Promise<Re
   const steps: Step[] = [];
   const attempts: Attempt[] = [];
   const approvalIds: string[] = [];
+  // Her own words, for the plain-code checks inside tools (a fee's session length, a fuzzy date, who she helps).
+  const said = [...(opts.history ?? []).filter((t) => t.role === "clinician").slice(-SAID_TURNS).map((t) => t.content), message];
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
     const res = await callModel(FEATURE, { messages, tools });
@@ -230,7 +234,7 @@ export async function respond(message: string, opts: RespondOptions): Promise<Re
     for (const call of calls) {
       const started = Date.now();
       const result: ToolResult = call.argsValid
-        ? await runTool(call.name, call.args, { by: opts.by, viewOnly: opts.viewOnly, mode: opts.mode, ...(opts.chat ? { chat: opts.chat as never } : {}) }).catch(
+        ? await runTool(call.name, call.args, { by: opts.by, viewOnly: opts.viewOnly, mode: opts.mode, said, ...(opts.chat ? { chat: opts.chat as never } : {}) }).catch(
             (err): ToolResult => ({ content: [{ type: "text", text: `Error: ${err instanceof Error ? err.message : String(err)}` }], isError: true }),
           )
         : { content: [{ type: "text", text: "Error: the arguments were not valid JSON." }], isError: true };
