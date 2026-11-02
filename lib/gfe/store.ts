@@ -63,20 +63,33 @@ export async function savePracticeSettings(
   next: { hours: OfficeHours; fees: Fee[] },
   by: string,
   sql: postgres.Sql = db(),
-): Promise<void> {
+): Promise<{ before: { hours: OfficeHours; fees: Fee[] }; after: { hours: OfficeHours; fees: Fee[] } }> {
   const hours = officeHoursSchema.parse({ ...next.hours, weekdays: [...new Set(next.hours.weekdays)].sort() });
   const fees = feeScheduleSchema.parse(next.fees);
   const codes = fees.map((f) => f.code);
   if (new Set(codes).size !== codes.length) throw new Error("Each fee code can appear once.");
-  const [row] = await sql`
-    update practice_os.clinician_profile
-       set office_hours = ${sql.json(hours as never)}, fee_schedule = ${sql.json(fees as never)}
-    returning id`;
-  if (!row) throw new Error("Finish onboarding first.");
-  await audit(
-    { actor: "clinician", action: "office_settings_saved", subjectType: "clinician_profile", details: { by, hours, fee_codes: codes } },
-    sql,
-  );
+  const write = async (tx: postgres.Sql) => {
+    const [profile] = await tx<{ id: string }[]>`select id from practice_os.clinician_profile limit 1`;
+    if (!profile) throw new Error("Finish onboarding first.");
+    const before = await loadPracticeSettings(tx);
+    await tx`
+      update practice_os.clinician_profile
+         set office_hours = ${tx.json(hours as never)}, fee_schedule = ${tx.json(fees as never)}
+       where id = ${profile.id}`;
+    // Aeon's writes (chat:..., mcp:...) are audited as Aeon's, saying who asked. from/to let a wrong change be undone.
+    await audit(
+      {
+        actor: by === "clinician" ? "clinician" : "aeon",
+        action: "office_settings_saved",
+        subjectType: "clinician_profile",
+        details: { by, hours, fee_codes: codes, from: before, to: { hours, fees } },
+      },
+      tx,
+    );
+    return { before, after: { hours, fees } };
+  };
+  // Inside a caller's transaction (no begin), write there; otherwise in a transaction of our own.
+  return typeof sql.begin === "function" ? sql.begin((tx) => write(tx as never)) as never : write(sql);
 }
 
 // --- Drafting an estimate -------------------------------------------------------------------
