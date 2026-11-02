@@ -4,7 +4,18 @@
 // local name-finder (phi-classifier.ts). Nothing is sent anywhere to be checked.
 // It fails closed: if the name-finder can't load, the text is refused.
 import { db } from "../db";
-import { checkIdentity, mentionsDiagnosis, namedCondition, type Allowlist, type PhiKind } from "./identity-filter";
+import {
+  MY_CLIENT,
+  checkIdentity,
+  clientLike,
+  mentionsDiagnosis,
+  namedCondition,
+  personalDetail,
+  referralContext,
+  sentenceAt,
+  type Allowlist,
+  type PhiKind,
+} from "./identity-filter";
 import { findNames, isNameLike } from "./phi-classifier";
 
 export type GuardPoint = "message" | "tool_result" | "memory" | "reply";
@@ -27,15 +38,6 @@ export const REFUSAL: Record<GuardKind, string> = {
 export const WITHHELD = "[withheld: this result may contain a client detail]";
 const NAME_WITHHELD = "[name withheld]";
 
-// "Dr. Zimmerman", "Dr. M. Zimmerman", "Zimmerman, PhD".
-const PROVIDER_BEFORE = /\b(?:Dr\.?|Doctor)\s+(?:\p{Lu}[\p{L}'’-]*\.?\s+){0,2}$/u;
-const PROVIDER_AFTER = /^,?\s+(?:LCSW|LICSW|LCPC|LPC|LPCC|LMHC|LMFT|MFT|MD|DO|PhD|PsyD|NP|PMHNP|APRN|RN)\b/;
-// A sentence that treats a person as a client: "my client", a session, a
-// no-show, a copay, a superbill or a Good Faith Estimate. A provider from her
-// Referrals board named this way is a client, not directory data.
-const CLIENT_CONTEXT =
-  /\b(?:my|our|a|the|this|her|his|their)\s+(?:client|patient)\b|\bsessions?\b|\bno[- ]?shows?\b|\bcopays?\b|\bsuperbills?\b|\bgood faith estimates?\b|\bGFE\b/i;
-
 function escape(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -45,49 +47,67 @@ function wholeWord(name: string, flags: string): RegExp {
   return new RegExp(`(?<![\\p{L}\\p{N}])${escape(name)}(?![\\p{L}\\p{N}])`, `${flags}u`);
 }
 
-function onList(words: string[], list: string[]): boolean {
+const wordsOf = (name: string) =>
+  name
+    .toLowerCase()
+    .replace(/['’]s?$/u, "")
+    .split(/[\s.,]+/)
+    .filter(Boolean);
+
+/** Every word of the name is in one entry ("Dana" in "Dana Reyes"). */
+function partOf(words: string[], list: string[]): boolean {
   return list.some((n) => {
-    const known = n.toLowerCase().split(/[\s,]+/);
+    const known = wordsOf(n);
     return words.every((w) => known.includes(w));
   });
 }
 
-function sentenceAt(text: string, at: number): string {
-  const start = Math.max(...[".", "!", "?", "\n"].map((p) => text.lastIndexOf(p, at - 1))) + 1;
-  const ends = ["!", "?", "\n"].map((p) => text.indexOf(p, at)).filter((i) => i >= 0);
-  // A period ends the sentence unless it is a title's ("Dr.") or an initial's.
-  for (const m of text.slice(at).matchAll(/\.(?=\s|$)/g)) {
-    const before = text.slice(0, at + (m.index ?? 0));
-    if (!/(?:\bDr|\bMr|\bMs|\bMrs|\b\p{Lu})$/u.test(before)) {
-      ends.push(at + (m.index ?? 0));
-      break;
-    }
-  }
-  return text.slice(start, ends.length ? Math.min(...ends) : text.length);
+/** The name is a whole entry, in any case ("Carin Gordon", "carin gordon"), never a piece of one. */
+function wholeOf(words: string[], list: string[]): boolean {
+  return list.some((n) => {
+    const known = wordsOf(n);
+    return known.length === words.length && known.every((w) => words.includes(w));
+  });
 }
 
+export type PersonVerdict = { verdict: "ok" } | { verdict: "blank" } | { verdict: "refuse"; kind: PhiKind };
+
 /**
- * Her own name, the practice, her Referrals list, or a name written with a
- * provider title. A name from her Referrals board is public directory data, so
- * it passes ("what's the status of Gary Bucher's card") unless its sentence
- * treats the person as a client ("Gary Bucher missed his session") or gives
- * them a condition ("Gary Bucher has bipolar disorder").
+ * How one name found in the text is treated, judged in the sentence around
+ * EVERY place it appears. Default refuse: a name passes only when
+ *  - it is her own (her profile or practice; a part such as "Dana" counts) and
+ *    the sentence doesn't treat her like a client ("Dana came in for her second
+ *    visit", "Dana has anxiety"), or
+ *  - it is a whole name from her Referrals board and the sentence is about
+ *    referrals: its card, a letter, outreach, the office, specialty or NPI
+ *    ("what's the status of Gary Bucher's card").
+ * A title or credential clears no one. "my client" next to any name refuses.
+ * Anyone else is a stranger: refused when the sentence looks like a client's
+ * (a visit, a bill, a condition), otherwise blanked where blanking is allowed.
  */
-export function isAllowedPerson(name: string, text: string, allow: Allowlist): boolean {
-  const words = name.toLowerCase().split(/\s+/);
-  const at = text.search(wholeWord(name, "i"));
-  if (onList(words, allow.names)) {
-    const directory = new Set(allow.directory ?? []);
-    if (onList(words, allow.names.filter((n) => !directory.has(n))) || at < 0) return true;
-    const sentence = sentenceAt(text, at);
-    return !CLIENT_CONTEXT.test(sentence) && !namedCondition(name, sentence);
+export function judgePerson(name: string, text: string, allow: Allowlist): PersonVerdict {
+  const words = wordsOf(name);
+  const directory = allow.directory ?? [];
+  const own = allow.names.filter((n) => !directory.includes(n));
+  const isOwn = partOf(words, own);
+  const isBoard = wholeOf(words, directory);
+  const spots = [...text.matchAll(wholeWord(name, "gi"))].map((m) => sentenceAt(text, m.index ?? 0));
+  if (spots.length === 0) spots.push(text);
+  let blank = false;
+  for (const s of spots) {
+    if (MY_CLIENT.test(s)) return { verdict: "refuse", kind: "client_name" };
+    const condition = namedCondition(name, s);
+    if (isOwn && !clientLike(s, true) && !condition) continue;
+    if (isBoard && referralContext(s) && !clientLike(s, true) && !condition) continue;
+    if (condition || clientLike(s)) return { verdict: "refuse", kind: mentionsDiagnosis(s) ? "diagnosis" : "client_name" };
+    blank = true;
   }
-  if (at < 0) return false;
-  if (namedCondition(name, sentenceAt(text, at))) return false;
-  // The title goes before the whole word: "Lee" in "Dr. Zimmerman-Lee" is checked from "Zimmerman".
-  let start = at;
-  while (start > 0 && /[\p{L}'’-]/u.test(text[start - 1])) start--;
-  return PROVIDER_BEFORE.test(text.slice(Math.max(0, start - 40), start)) || PROVIDER_AFTER.test(text.slice(at + name.length));
+  return blank ? { verdict: "blank" } : { verdict: "ok" };
+}
+
+/** A name that passes where it stands (see judgePerson). */
+export function isAllowedPerson(name: string, text: string, allow: Allowlist): boolean {
+  return judgePerson(name, text, allow).verdict === "ok";
 }
 
 /**
@@ -104,9 +124,19 @@ export function blankNames(text: string, names: string[]): string {
   return out;
 }
 
+/** Every word capitalized the usual way, same length, so "KEVIN ORTIZ" and "kevin ortiz" read as names. */
+export function titleCase(text: string): string {
+  return text.replace(/\p{L}[\p{L}'’]*/gu, (w) => {
+    const first = w[0].toUpperCase();
+    const rest = w.slice(1).toLowerCase();
+    return first.length === 1 && rest.length === w.length - 1 ? first + rest : w;
+  });
+}
+
 // Tool results are the practice's own records and official sources: board phone
 // numbers, renewal dates from years ago, rule text that names a disorder. Only
-// ID numbers and "client <name>" withhold one; other names are blanked below.
+// ID numbers and "client <name>" withhold one; other names are judged below.
+// Tools that return free text she or a client wrote get every rule (fullRules).
 const TOOL_RESULT_RULES: readonly PhiKind[] = ["identifier", "client_name"];
 
 /**
@@ -119,7 +149,12 @@ export function normalizeForCheck(text: string): string {
   return text.normalize("NFKD").replace(/[\p{M}\p{Cf}]/gu, "").normalize("NFKC");
 }
 
-export async function guard(text: string, at: GuardPoint, allow?: Allowlist): Promise<GuardResult> {
+export type GuardOptions = {
+  /** A tool result holding free text (notes, memories, approval previews, documents): every rule applies. */
+  fullRules?: boolean;
+};
+
+export async function guard(text: string, at: GuardPoint, allow?: Allowlist, opts: GuardOptions = {}): Promise<GuardResult> {
   // The allowlist is cleaned the same way, so an allowed "José García" matches "Jose Garcia".
   const raw = allow ?? (await practiceAllowlist());
   const list: Allowlist = {
@@ -128,23 +163,41 @@ export async function guard(text: string, at: GuardPoint, allow?: Allowlist): Pr
     ...(raw.directory ? { directory: raw.directory.map(normalizeForCheck) } : {}),
   };
   const plain = normalizeForCheck(text);
-  const rules = at === "tool_result" ? checkIdentity(plain, list, TOOL_RESULT_RULES) : checkIdentity(plain, list);
+  const light = at === "tool_result" && !opts.fullRules;
+  const rules = light ? checkIdentity(plain, list, TOOL_RESULT_RULES) : checkIdentity(plain, list);
   if (!rules.ok) return { ok: false, kind: rules.kind };
+  const detail = light ? personalDetail(plain, list) : null;
+  if (detail) return { ok: false, kind: detail };
 
   let names: string[];
+  let cased: string[];
+  const titled = titleCase(plain);
   try {
     names = await findNames(plain);
+    // A second, cheaper read with every word capitalized: names written in
+    // capitals or lowercase ("KEVIN ORTIZ", "carin gordon") are found too.
+    cased = titled === plain || titled.length !== plain.length ? [] : await findNames(titled, { secondReads: false });
   } catch (err) {
     console.error(`[guard] name-finder unavailable: ${err instanceof Error ? err.message : String(err)}`);
     return { ok: false, kind: "unavailable" };
   }
-  const strangers = names.filter((n) => isNameLike(n) && !isAllowedPerson(n, plain, list));
-  if (strangers.length === 0) return { ok: true, text };
-  // A diagnosis next to an unknown name is about that person: refused at every point but a
-  // tool result (whose names are blanked below, leaving rule text that names a disorder).
-  if (at !== "tool_result" && strangers.some((n) => mentionsDiagnosis(sentenceAt(plain, Math.max(0, plain.search(wholeWord(n, "i"))))))) {
-    return { ok: false, kind: "diagnosis" };
+  const strangers: string[] = [];
+  for (const n of names.filter(isNameLike)) {
+    const v = judgePerson(n, plain, list);
+    if (v.verdict === "refuse") return { ok: false, kind: v.kind };
+    if (v.verdict === "blank") strangers.push(n);
   }
+  // A name found only in the capitalized copy is judged as written: it refuses
+  // when its sentence looks like a client's, and is otherwise left alone.
+  for (const n of cased.filter(isNameLike)) {
+    for (const m of titled.matchAll(wholeWord(n, "g"))) {
+      const asWritten = plain.slice(m.index ?? 0, (m.index ?? 0) + n.length);
+      if (asWritten === n) continue;
+      const v = judgePerson(asWritten, plain, list);
+      if (v.verdict === "refuse") return { ok: false, kind: v.kind };
+    }
+  }
+  if (strangers.length === 0) return { ok: true, text };
   // A tool result or Aeon's own reply keeps its content with the names blanked
   // out, so one word misread as a name doesn't throw away a whole answer.
   // Anything she typed or Aeon would save is refused outright.

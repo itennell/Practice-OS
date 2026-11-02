@@ -185,7 +185,7 @@ export function isNameLike(name: string): boolean {
 // closed there would withhold official sources.
 const MAX_SECOND_READS = 24;
 
-export async function findNames(text: string): Promise<string[]> {
+export async function findNames(text: string, opts: { secondReads?: boolean } = {}): Promise<string[]> {
   const ner = await loadNameFinder();
   const names: string[] = [];
   // As written: the model drops the dot in "M. Zimmerman", and a possessive
@@ -233,7 +233,7 @@ export async function findNames(text: string): Promise<string[]> {
       if (names.some((n) => run.includes(n) || n.includes(run))) continue;
       runs.add(run);
     }
-    for (const run of [...runs].slice(0, MAX_SECOND_READS)) {
+    for (const run of [...runs].slice(0, opts.secondReads === false ? 0 : MAX_SECOND_READS)) {
       for (const e of await people(`I spoke with ${run} yesterday.`)) {
         if (run.includes(e.text) && isNameLike(e.text)) names.push(located(e.text, slice) ?? e.text);
       }

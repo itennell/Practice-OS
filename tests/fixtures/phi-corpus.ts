@@ -58,6 +58,9 @@ export const PHI_CASES: PhiCase[] = [
   { text: "Draft a superbill for Gary Bucher", expect: "refuse", category: "client_name", layer: "ner" },
   { text: "Text Rachel about Thursday", expect: "refuse", category: "client_name", layer: "ner" },
   { text: "Note that Daniel Kim switched to biweekly", expect: "refuse", category: "client_name", layer: "ner" },
+  // A title or credential clears no one: a provider must be on her board (Nov 2 review).
+  { text: "Dr. Alan Brooks might refer to me", expect: "refuse", category: "client_name", layer: "ner" },
+  { text: "Jenna Cho, LCSW, covers for me in August", expect: "refuse", category: "client_name", layer: "ner" },
 
   // ---- diagnoses tied to a person
   { text: "My client has GAD", expect: "refuse", category: "diagnosis", layer: "rules" },
@@ -114,8 +117,6 @@ export const PHI_CASES: PhiCase[] = [
   { text: "Reyes Counseling PLLC files its annual report in March", expect: "pass" },
   { text: "Dr. Priya Shah refers clients to me", expect: "pass", note: "referral source with title" },
   { text: "Marcus Bell from the clinic sends me referrals", expect: "pass", note: "on Referrals list" },
-  { text: "Dr. Alan Brooks might refer to me", expect: "pass", note: "provider title" },
-  { text: "Jenna Cho, LCSW, covers for me in August", expect: "pass", note: "provider credential" },
   { text: "My office is at 2400 N Lincoln Ave", expect: "pass", note: "her own address" },
   { text: "My practice phone is (312) 555-0142", expect: "pass", note: "her own phone" },
   { text: "Use dana@reyescounseling.example for the Gmail drafts", expect: "pass" },
@@ -186,7 +187,6 @@ export const PHI_CASES: PhiCase[] = [
   { text: "Payers want a diagnosis code for anxiety on the claim", expect: "pass", note: "billing, no person" },
   { text: "Check the CMS Physician Fee Schedule lookup for 90837.", expect: "pass", note: "official document name" },
   { text: "What's the status of Gary Bucher's card?", expect: "pass", note: "provider on her board" },
-  { text: "Send it to the address on file. Dr. Zimmerman takes Aetna.", expect: "pass", note: "title, common word" },
   { text: "[Sample] Adults in Chicago going through work stress and life transitions", expect: "pass", note: "demo who-I-help" },
 ];
 
