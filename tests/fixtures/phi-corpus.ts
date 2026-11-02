@@ -14,8 +14,10 @@ export type PhiCase =
 
 /** Names and contacts that belong to the practice (her profile, Referrals list). */
 export const ALLOWED = {
-  names: ["Dana Reyes", "Reyes Counseling PLLC", "Priya Shah", "Marcus Bell"],
+  names: ["Dana Reyes", "Reyes Counseling PLLC", "Priya Shah", "Marcus Bell", "Gary Bucher"],
   contacts: ["(312) 555-0142", "dana@reyescounseling.example", "2400 N Lincoln Ave"],
+  // Names from her Referrals board (public NPPES data): allowed as providers, never as clients.
+  directory: ["Marcus Bell", "Gary Bucher"],
 };
 
 export const PHI_CASES: PhiCase[] = [
@@ -42,6 +44,8 @@ export const PHI_CASES: PhiCase[] = [
   { text: "Remember that Leo Park, my client, prefers mornings", expect: "refuse", category: "client_name", layer: "rules" },
   { text: "the caller, Brianna, wants a consult", expect: "refuse", category: "client_name", layer: "rules" },
   { text: "Send a GFE to client Omar Haddad", expect: "refuse", category: "client_name", layer: "rules" },
+  // A provider on her board is a client once she calls them one (Nov 2 re-test).
+  { text: "My client Gary Bucher wants a superbill", expect: "refuse", category: "client_name", layer: "rules" },
 
   // ---- bare names: only the name-finder can catch these
   { text: "Maria cancelled again", expect: "refuse", category: "client_name", layer: "ner" },
@@ -50,6 +54,8 @@ export const PHI_CASES: PhiCase[] = [
   { text: "Can you remember Alicia Torres likes evening slots", expect: "refuse", category: "client_name", layer: "ner" },
   { text: "Draft a receipt for Samuel Okafor", expect: "refuse", category: "client_name", layer: "ner" },
   { text: "Emily Chen still hasn't paid", expect: "refuse", category: "client_name", layer: "ner" },
+  { text: "Gary Bucher missed his session again", expect: "refuse", category: "client_name", layer: "ner" },
+  { text: "Draft a superbill for Gary Bucher", expect: "refuse", category: "client_name", layer: "ner" },
   { text: "Text Rachel about Thursday", expect: "refuse", category: "client_name", layer: "ner" },
   { text: "Note that Daniel Kim switched to biweekly", expect: "refuse", category: "client_name", layer: "ner" },
 
@@ -65,6 +71,10 @@ export const PHI_CASES: PhiCase[] = [
   { text: "her schizophrenia makes Fridays hard", expect: "refuse", category: "diagnosis", layer: "rules" },
   { text: "the caller's son has ADHD", expect: "refuse", category: "diagnosis", layer: "rules" },
   { text: "Diagnosed with an eating disorder, wants to start next week", expect: "refuse", category: "diagnosis", layer: "rules" },
+  { text: "My client Sam, a tech worker, has anxiety", expect: "refuse", category: "diagnosis", layer: "rules" },
+  { text: "Diagnosis: generalized anxiety disorder", expect: "refuse", category: "diagnosis", layer: "rules" },
+  { text: "Struggling with depression, he wants Mondays", expect: "refuse", category: "diagnosis", layer: "rules" },
+  { text: "Her son is autistic and needs a GFE", expect: "refuse", category: "diagnosis", layer: "rules" },
 
   // ---- identifiers
   { text: "SSN 123-45-6789", expect: "refuse", category: "identifier", layer: "rules" },
@@ -165,6 +175,18 @@ export const PHI_CASES: PhiCase[] = [
   // ---- who she helps (Oct 29: the "Couples" chip was read as a person)
   { text: "Couples", expect: "pass", note: "onboarding chip" },
   { text: "Couples going through big changes", expect: "pass", note: "audience word first" },
+  // ---- Nov 2 re-test: practice and legal answers that were refused or held back
+  { text: "I mostly see adults with anxiety and burnout, many of them tech workers", expect: "pass", note: "the population she serves" },
+  { text: "She specializes in anxiety and depression in adults", expect: "pass", note: "her bio, third person" },
+  { text: "She has helped adults with anxiety for ten years", expect: "pass", note: "her bio" },
+  { text: "Who do I report child abuse to in Illinois?", expect: "pass" },
+  { text: "What are my mandated reporter duties for child abuse in Illinois?", expect: "pass" },
+  { text: "Call the DCFS Child Abuse Hotline at 1-800-252-2873 (1-800-25-ABUSE).", expect: "pass", note: "toll-free agency line" },
+  { text: "How do I bill for a suicide risk assessment (CPT 90839)?", expect: "pass" },
+  { text: "Payers want a diagnosis code for anxiety on the claim", expect: "pass", note: "billing, no person" },
+  { text: "Check the CMS Physician Fee Schedule lookup for 90837.", expect: "pass", note: "official document name" },
+  { text: "What's the status of Gary Bucher's card?", expect: "pass", note: "provider on her board" },
+  { text: "Send it to the address on file. Dr. Zimmerman takes Aetna.", expect: "pass", note: "title, common word" },
   { text: "[Sample] Adults in Chicago going through work stress and life transitions", expect: "pass", note: "demo who-I-help" },
 ];
 

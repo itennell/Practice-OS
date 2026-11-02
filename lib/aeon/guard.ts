@@ -4,8 +4,8 @@
 // local name-finder (phi-classifier.ts). Nothing is sent anywhere to be checked.
 // It fails closed: if the name-finder can't load, the text is refused.
 import { db } from "../db";
-import { checkIdentity, type Allowlist, type PhiKind } from "./identity-filter";
-import { findNames } from "./phi-classifier";
+import { checkIdentity, mentionsDiagnosis, namedCondition, type Allowlist, type PhiKind } from "./identity-filter";
+import { findNames, isNameLike } from "./phi-classifier";
 
 export type GuardPoint = "message" | "tool_result" | "memory" | "reply";
 export type GuardKind = PhiKind | "unavailable";
@@ -27,21 +27,81 @@ export const REFUSAL: Record<GuardKind, string> = {
 export const WITHHELD = "[withheld: this result may contain a client detail]";
 const NAME_WITHHELD = "[name withheld]";
 
-const PROVIDER_BEFORE = /\b(?:Dr\.?|Doctor)\s+$/;
+// "Dr. Zimmerman", "Dr. M. Zimmerman", "Zimmerman, PhD".
+const PROVIDER_BEFORE = /\b(?:Dr\.?|Doctor)\s+(?:\p{Lu}[\p{L}'’-]*\.?\s+){0,2}$/u;
 const PROVIDER_AFTER = /^,?\s+(?:LCSW|LICSW|LCPC|LPC|LPCC|LMHC|LMFT|MFT|MD|DO|PhD|PsyD|NP|PMHNP|APRN|RN)\b/;
+// A sentence that treats a person as a client: "my client", a session, a
+// no-show, a copay, a superbill or a Good Faith Estimate. A provider from her
+// Referrals board named this way is a client, not directory data.
+const CLIENT_CONTEXT =
+  /\b(?:my|our|a|the|this|her|his|their)\s+(?:client|patient)\b|\bsessions?\b|\bno[- ]?shows?\b|\bcopays?\b|\bsuperbills?\b|\bgood faith estimates?\b|\bGFE\b/i;
 
 function escape(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/** Her own name, the practice, her Referrals list, or a name written with a provider title. */
+/** A whole-word, as-written match: never a piece of a longer word ("dr" in "address"). */
+function wholeWord(name: string, flags: string): RegExp {
+  return new RegExp(`(?<![\\p{L}\\p{N}])${escape(name)}(?![\\p{L}\\p{N}])`, `${flags}u`);
+}
+
+function onList(words: string[], list: string[]): boolean {
+  return list.some((n) => {
+    const known = n.toLowerCase().split(/[\s,]+/);
+    return words.every((w) => known.includes(w));
+  });
+}
+
+function sentenceAt(text: string, at: number): string {
+  const start = Math.max(...[".", "!", "?", "\n"].map((p) => text.lastIndexOf(p, at - 1))) + 1;
+  const ends = ["!", "?", "\n"].map((p) => text.indexOf(p, at)).filter((i) => i >= 0);
+  // A period ends the sentence unless it is a title's ("Dr.") or an initial's.
+  for (const m of text.slice(at).matchAll(/\.(?=\s|$)/g)) {
+    const before = text.slice(0, at + (m.index ?? 0));
+    if (!/(?:\bDr|\bMr|\bMs|\bMrs|\b\p{Lu})$/u.test(before)) {
+      ends.push(at + (m.index ?? 0));
+      break;
+    }
+  }
+  return text.slice(start, ends.length ? Math.min(...ends) : text.length);
+}
+
+/**
+ * Her own name, the practice, her Referrals list, or a name written with a
+ * provider title. A name from her Referrals board is public directory data, so
+ * it passes ("what's the status of Gary Bucher's card") unless its sentence
+ * treats the person as a client ("Gary Bucher missed his session") or gives
+ * them a condition ("Gary Bucher has bipolar disorder").
+ */
 export function isAllowedPerson(name: string, text: string, allow: Allowlist): boolean {
   const words = name.toLowerCase().split(/\s+/);
-  const known = allow.names.map((n) => n.toLowerCase().split(/[\s,]+/));
-  if (known.some((k) => words.every((w) => k.includes(w)))) return true;
-  const at = text.search(new RegExp(escape(name), "i"));
+  const at = text.search(wholeWord(name, "i"));
+  if (onList(words, allow.names)) {
+    const directory = new Set(allow.directory ?? []);
+    if (onList(words, allow.names.filter((n) => !directory.has(n))) || at < 0) return true;
+    const sentence = sentenceAt(text, at);
+    return !CLIENT_CONTEXT.test(sentence) && !namedCondition(name, sentence);
+  }
   if (at < 0) return false;
-  return PROVIDER_BEFORE.test(text.slice(Math.max(0, at - 8), at)) || PROVIDER_AFTER.test(text.slice(at + name.length));
+  if (namedCondition(name, sentenceAt(text, at))) return false;
+  // The title goes before the whole word: "Lee" in "Dr. Zimmerman-Lee" is checked from "Zimmerman".
+  let start = at;
+  while (start > 0 && /[\p{L}'’-]/u.test(text[start - 1])) start--;
+  return PROVIDER_BEFORE.test(text.slice(Math.max(0, start - 40), start)) || PROVIDER_AFTER.test(text.slice(at + name.length));
+}
+
+/**
+ * Blanks each name as a whole word. A one-word name is blanked only where it is
+ * capitalized, so "Grace" never takes "grace period" with it; a full name
+ * ("Kevin Ortiz") is blanked in any case.
+ */
+export function blankNames(text: string, names: string[]): string {
+  let out = text;
+  for (const n of names) {
+    const oneWord = !/\s/.test(n.trim());
+    out = out.replace(wholeWord(n, "gi"), (m) => (oneWord && !/^\p{Lu}/u.test(m) ? m : NAME_WITHHELD));
+  }
+  return out;
 }
 
 // Tool results are the practice's own records and official sources: board phone
@@ -62,7 +122,11 @@ export function normalizeForCheck(text: string): string {
 export async function guard(text: string, at: GuardPoint, allow?: Allowlist): Promise<GuardResult> {
   // The allowlist is cleaned the same way, so an allowed "José García" matches "Jose Garcia".
   const raw = allow ?? (await practiceAllowlist());
-  const list: Allowlist = { names: raw.names.map(normalizeForCheck), contacts: raw.contacts.map(normalizeForCheck) };
+  const list: Allowlist = {
+    names: raw.names.map(normalizeForCheck),
+    contacts: raw.contacts.map(normalizeForCheck),
+    ...(raw.directory ? { directory: raw.directory.map(normalizeForCheck) } : {}),
+  };
   const plain = normalizeForCheck(text);
   const rules = at === "tool_result" ? checkIdentity(plain, list, TOOL_RESULT_RULES) : checkIdentity(plain, list);
   if (!rules.ok) return { ok: false, kind: rules.kind };
@@ -74,20 +138,24 @@ export async function guard(text: string, at: GuardPoint, allow?: Allowlist): Pr
     console.error(`[guard] name-finder unavailable: ${err instanceof Error ? err.message : String(err)}`);
     return { ok: false, kind: "unavailable" };
   }
-  const strangers = names.filter((n) => !isAllowedPerson(n, plain, list));
+  const strangers = names.filter((n) => isNameLike(n) && !isAllowedPerson(n, plain, list));
   if (strangers.length === 0) return { ok: true, text };
+  // A diagnosis next to an unknown name is about that person: refused at every point but a
+  // tool result (whose names are blanked below, leaving rule text that names a disorder).
+  if (at !== "tool_result" && strangers.some((n) => mentionsDiagnosis(sentenceAt(plain, Math.max(0, plain.search(wholeWord(n, "i"))))))) {
+    return { ok: false, kind: "diagnosis" };
+  }
   // A tool result or Aeon's own reply keeps its content with the names blanked
   // out, so one word misread as a name doesn't throw away a whole answer.
   // Anything she typed or Aeon would save is refused outright.
   if (at !== "tool_result" && at !== "reply") return { ok: false, kind: "client_name" };
-  let redacted = text;
-  for (const n of strangers) redacted = redacted.replace(new RegExp(escape(n), "gi"), NAME_WITHHELD);
+  const redacted = blankNames(text, strangers);
   // Names are found in the cleaned copy but blanked in the original, so a copy
   // written differently ("Kévin", hidden characters) can survive. Check again:
   // if any stranger is still there, withhold the whole result.
   try {
     const again = normalizeForCheck(redacted);
-    if ((await findNames(again)).some((n) => !isAllowedPerson(n, again, list))) return { ok: false, kind: "client_name" };
+    if ((await findNames(again)).some((n) => isNameLike(n) && !isAllowedPerson(n, again, list))) return { ok: false, kind: "client_name" };
   } catch {
     return { ok: false, kind: "unavailable" };
   }
@@ -126,6 +194,7 @@ export async function practiceAllowlist(): Promise<Allowlist> {
     ...sources.flatMap((s) => [s.email, s.phone, s.address]),
   ];
   const present = (v: string | null | undefined): v is string => Boolean(v);
-  cached = { at: Date.now(), list: { names: names.filter(present), contacts: contacts.filter(present) } };
+  const directory = sources.flatMap((s) => [s.name, s.organization]).filter(present);
+  cached = { at: Date.now(), list: { names: names.filter(present), contacts: contacts.filter(present), directory } };
   return cached.list;
 }

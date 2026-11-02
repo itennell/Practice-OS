@@ -9,7 +9,12 @@ export type PhiCheck = { ok: true } | { ok: false; kind: PhiKind };
 export const ALL_KINDS: readonly PhiKind[] = ["birth_date", "client_name", "diagnosis", "identifier", "contact", "address"];
 
 /** Names and contact details that belong to the practice: her profile and her Referrals list. */
-export type Allowlist = { names: string[]; contacts: string[] };
+export type Allowlist = {
+  names: string[];
+  contacts: string[];
+  /** The names in `names` that come from her Referrals board: public directory (NPPES) data, allowed only as providers. */
+  directory?: string[];
+};
 
 // ---- dates -------------------------------------------------------------------
 
@@ -71,10 +76,16 @@ function isAllowedName(name: string, allow: Allowlist): boolean {
   return allow.names.some((n) => n.toLowerCase().includes(lower));
 }
 
+// "my client Gary Bucher": a name she calls a client is a client's, even when
+// the same name is on her Referrals board (a provider is never "my client").
+// Only a title ("Ms. Shah") falls back to the list, so a source can be named so.
+const CLIENT_PATTERNS = new Set([NAME_AFTER[0], NAME_AFTER[1], NAME_BEFORE]);
+
 function hasClientName(text: string, allow: Allowlist): boolean {
   for (const pattern of [...NAME_AFTER, NAME_BEFORE]) {
     for (const m of text.matchAll(pattern)) {
-      if (!isAllowedName(m[1], allow)) return true;
+      const allowed = CLIENT_PATTERNS.has(pattern) ? NOT_NAMES.has(m[1].split(/\s+/)[0]) : isAllowedName(m[1], allow);
+      if (!allowed) return true;
     }
   }
   return false;
@@ -87,15 +98,55 @@ function hasClientName(text: string, allow: Allowlist): boolean {
 const ICD10 = /\b[A-TV-Z][0-9][0-9A-Z]\.[0-9A-Z]{1,4}\b/;
 const DIAGNOSIS =
   /\b(depression|depressive|anxiety|gad|ptsd|c-?ptsd|bipolar|schizo\w*|adhd|ocd|bpd|borderline|autism|autistic|anorexia|bulimia|binge eating|eating disorder|psychosis|psychotic|dementia|panic disorder|disorder|substance use|alcohol use|opioid use|self[- ]?harm)\b/i;
-const DIAGNOSED = /\b(diagnos\w*|dx)\b/i;
+// "was diagnosed", "dx", or a record label ("Diagnosis: ..."). The bare noun
+// ("90839 needs a diagnosis") is billing talk, not about anyone.
+const DIAGNOSED = /\b(diagnosed|dx)\b|\bdiagnos[ie]s\s*[:#]/i;
+// Anyone named by the address rule below.
 const PERSON_REF =
   /\b(clients?|patients?|caller'?s?|he|she|they|him|her|his|their|them|son|daughter|kid|child|husband|wife|partner|mom|dad|mother|father|someone|somebody)\b/i;
 
+// A diagnosis is refused when it is about one identifiable person. Plurals and
+// populations ("adults with anxiety, many of them tech workers", "clients
+// often ask") and a bare "child" in a legal answer are a topic, not a person.
+const ONE_CLIENT =
+  /\b(client|patient|caller'?s?|son|daughter|husband|wife|partner|mom|dad|mother|father|someone|somebody|(?:my|her|his|their|our|your)\s+(?:kid|child))\b/i;
+// These can be her, a colleague or a client, so they count unless the sentence
+// is about her work ("She specializes in anxiety").
+const PRONOUN = /\b(he|she|him|her|his)\b/i;
+const PRACTICE_TOPIC =
+  /\b(speciali[sz]\w*|treat\w*|works?\s+with|working\s+with|help\w*|focus\w*\s+on|experience[ds]?\s+(?:in|with)|trained\s+in|training\s+in|serv(?:e|es|ed|ing)|support\w*|offer\w*|sees?|seeing|seen)\b/i;
+// A condition someone has: "has GAD", "they have OCD", "struggles with
+// depression", "her schizophrenia". Her own work ("she has treated anxiety") isn't.
+const SUBJECT = "(?:client|patient|caller'?s?|he|she|they|son|daughter|husband|wife|partner|mom|dad|mother|father|someone|somebody|kid|child)";
+const HAS =
+  "(?:has|have|had|having|struggl\\w*|suffer\\w*|liv(?:es|ing)\\s+with|battl\\w*)(?!\\s+(?:been\\s+)?(?:work|help|treat|speciali[sz]|serv|seen|support|focus|train|offer)\\w*)";
+const HAS_CONDITION = new RegExp(`\\b${SUBJECT}\\b(?:\\W+\\w+){0,2}?\\W+${HAS}\\b(?:\\W+\\w+){0,3}?\\W+${DIAGNOSIS.source}`, "i");
+const OWNS_CONDITION = new RegExp(`\\b(?:his|her|client'?s|patient'?s|caller'?s)\\s+(?:\\w+\\s+)?${DIAGNOSIS.source}`, "i");
+
+/** A diagnosis word or ICD-10 code anywhere in the text. */
+export function mentionsDiagnosis(text: string): boolean {
+  return ICD10.test(text) || DIAGNOSIS.test(text);
+}
+
+/**
+ * A named person who has a condition: "Gary Bucher has bipolar disorder",
+ * "Gary Bucher's PTSD". A provider's work ("Gary Bucher sees adults with
+ * anxiety") is not having it.
+ */
+export function namedCondition(name: string, text: string): boolean {
+  const who = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const has = new RegExp(`(?<![\\p{L}\\p{N}])${who}(?:'s|’s)?\\b(?:\\W+\\w+){0,2}?\\W+${HAS}\\b(?:\\W+\\w+){0,3}?\\W+${DIAGNOSIS.source}`, "iu");
+  const owns = new RegExp(`(?<![\\p{L}\\p{N}])${who}(?:'s|’s)\\s+(?:\\w+\\s+)?${DIAGNOSIS.source}`, "iu");
+  return has.test(text) || owns.test(text) || (DIAGNOSED.test(text) && new RegExp(`(?<![\\p{L}\\p{N}])${who}`, "iu").test(text));
+}
+
 function hasDiagnosis(text: string): boolean {
   if (ICD10.test(text)) return true;
-  return text
-    .split(/[.!?;\n]+/)
-    .some((sentence) => DIAGNOSIS.test(sentence) && (PERSON_REF.test(sentence) || DIAGNOSED.test(sentence)));
+  return text.split(/[.!?;\n]+/).some((sentence) => {
+    if (!DIAGNOSIS.test(sentence)) return false;
+    if (DIAGNOSED.test(sentence) || HAS_CONDITION.test(sentence) || OWNS_CONDITION.test(sentence)) return true;
+    return ONE_CLIENT.test(sentence) || (PRONOUN.test(sentence) && !PRACTICE_TOPIC.test(sentence));
+  });
 }
 
 // ---- identifiers, contacts, addresses ----------------------------------------
@@ -110,13 +161,20 @@ const PHONE = /(?:\+?1[\s.-]?)?(?:\(\d{3}\)\s?|\b\d{3}[\s.-])\d{3}[\s.-]\d{4}\b/
 const STREET =
   /\b\d{1,5}\s+(?:[NSEW]\.?\s+)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+(?:St|Street|Ave|Avenue|Rd|Road|Blvd|Boulevard|Dr|Drive|Ln|Lane|Ct|Court|Way|Pl|Place|Pkwy|Parkway|Ter|Terrace)\b\.?/g;
 
+const TOLL_FREE = /^8(?:00|33|44|55|66|77|88)/;
 const digits = (s: string) => s.replace(/\D/g, "");
 
 function hasForeignContact(text: string, allow: Allowlist): boolean {
   const ownEmails = allow.contacts.map((c) => c.toLowerCase());
   const ownPhones = allow.contacts.map(digits).filter((d) => d.length >= 10).map((d) => d.slice(-10));
   for (const m of text.matchAll(EMAIL)) if (!ownEmails.includes(m[0].toLowerCase())) return true;
-  for (const m of text.matchAll(PHONE)) if (!ownPhones.includes(digits(m[0]).slice(-10))) return true;
+  for (const m of text.matchAll(PHONE)) {
+    const number = digits(m[0]).slice(-10);
+    // A toll-free line (the DCFS hotline, a payer's provider line) belongs to an
+    // agency or company, never to a client.
+    if (TOLL_FREE.test(number) || ownPhones.includes(number)) continue;
+    return true;
+  }
   return false;
 }
 
