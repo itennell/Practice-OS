@@ -78,6 +78,27 @@ export function siteJsonLd(f: MediaFacts, url: string): Record<string, unknown> 
   };
 }
 
+const joinWords = (xs: string[]) => (xs.length < 2 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`);
+
+/** Who she sees, as plain group words (never a person). */
+const GROUPS: { re: RegExp; word: string }[] = [
+  { re: /\bolder adults?\b/i, word: "older adults" },
+  { re: /\byoung adults?\b/i, word: "young adults" },
+  { re: /(?<!older |young )\badults?\b/i, word: "adults" },
+  { re: /\b(teens?|teenagers?|adolescents?)\b/i, word: "teens" },
+  { re: /\b(children|kids)\b/i, word: "children" },
+  { re: /\bcouples?\b/i, word: "couples" },
+  { re: /\bfamil(y|ies)\b/i, word: "families" },
+];
+
+/** "I work with adults and couples on anxiety, stress and life transitions." Built from service words only. */
+export function whoIHelpLine(f: MediaFacts, issues: string[]): string {
+  const groups = GROUPS.filter((g) => g.re.test(f.whoIHelp)).map((g) => g.word);
+  const topics = issues.filter((i) => i !== "couples" && i !== "family");
+  if (!groups.length && !topics.length) return "";
+  return sentence(`I work with ${groups.length ? joinWords(groups) : "people"}${topics.length ? ` on ${joinWords(topics)}` : ""}`);
+}
+
 export function draftSite(f: MediaFacts, s: GrowthSettings, savedLicenseLine: string | null = null): SiteDraft {
   const url = finalUrl(f, s);
   const fee = mainPrivateFee(f);
@@ -97,11 +118,9 @@ export function draftSite(f: MediaFacts, s: GrowthSettings, savedLicenseLine: st
     {
       id: "who",
       title: "Who I help",
-      paragraphs: [
-        ...(f.whoIHelp ? [sentence(`I work with ${f.whoIHelp.replace(/\[Sample\]\s*/g, "").replace(/;\s*/g, " and ").toLowerCase()}`)] : []),
-        ...(f.answers.focus ? [sentence(`People often come to me for ${f.answers.focus.replace(/\.$/, "").replace(/^./, (x) => x.toLowerCase())}`)] : []),
-      ],
-      ...(issues.length ? { list: issues.map((i) => i[0].toUpperCase() + i.slice(1)) } : {}),
+      // This is the ads' landing page, so it follows the ad rules too: service words in her
+      // voice ("I work with adults on anxiety and stress"), never "you" and a condition.
+      paragraphs: [whoIHelpLine(f, issues)].filter(Boolean),
     },
     {
       id: "how",
@@ -157,10 +176,15 @@ export function draftSite(f: MediaFacts, s: GrowthSettings, savedLicenseLine: st
 }
 
 export function checkSite(d: Omit<SiteDraft, "check">, f: MediaFacts | null): PolicyCheck {
-  // The ad platforms' personal-attribute rule is for ads; her own site may name the issues she helps with in her words.
+  // The site is the ads' landing page: the top and "Who I help" follow the ad rules in full,
+  // including the personal-attribute rule. The rest may use her own words about how she works.
+  const strict = new Set(["top", "who"]);
   const site = (text: string, where: string) => checkText(text, where, null, f).filter((x) => x.rule !== "personal_attribute");
   const out: PolicyFinding[] = [];
-  for (const s of d.sections) for (const p of [...s.paragraphs, ...(s.list ?? [])]) out.push(...site(p, s.title));
+  for (const s of d.sections)
+    for (const p of [...s.paragraphs, ...(s.list ?? [])]) out.push(...(strict.has(s.id) ? checkText(p, s.title, null, f) : site(p, s.title)));
+  // Page-wide text: never a license number or a claim, in the footer, title, description or button.
+  out.push(...site(d.licenseLine, "license line"), ...site(d.title, "page title"), ...checkText(d.description, "page description", null, f), ...checkText(d.bookingLabel, "booking button", null, f));
   for (const q of d.faq) {
     if (q.q === "Is this for emergencies?") continue; // the fixed 988 line, word for word
     out.push(...site(`${q.q} ${q.a}`, "FAQ"));
@@ -259,7 +283,7 @@ export function renderSquarespaceText(d: SiteDraft): string {
   const out = [d.isSample ? "[Sample] Fictional demo practice.\n" : "", "Paste each section into its own Text block in Squarespace. Put the booking button on Home and Contact.", ""];
   for (const s of d.sections) out.push(`=== ${s.title} ===`, ...s.paragraphs, ...(s.list ?? []).map((x) => `- ${x}`), "");
   out.push("=== Questions ===", ...d.faq.flatMap((q) => [q.q, q.a, ""]), "=== Book a consult ===", `${d.bookingLabel}: ${d.bookingHref}`, EMERGENCY_LINE, "", "=== Footer ===", d.licenseLine, "");
-  out.push("=== Practice details block for Google (Settings > Advanced > Code Injection > Header) ===", `<script type="application/ld+json">${JSON.stringify(d.jsonLd)}</script>`, "");
+  out.push("=== Practice details block for Google (Settings > Advanced > Code Injection > Header) ===", `<script type="application/ld+json">${JSON.stringify(d.jsonLd).replace(/</g, "\\u003c")}</script>`, "");
   return out.join("\n");
 }
 

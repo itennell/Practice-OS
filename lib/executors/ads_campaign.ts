@@ -14,7 +14,10 @@ export async function growthReady(approval: Parameters<Executor>[0], kinds: stri
   if (typeof draftId !== "string") throw new Error("This approval has no draft.");
   const row = await getDraft(draftId);
   if (!row || !kinds.includes(row.kind)) throw new Error("That draft is no longer in Practice-OS.");
-  const facts = await loadMediaFacts().catch(() => null);
+  // Fails closed: without her saved facts the check can't run, so nothing is marked ready.
+  const facts = await loadMediaFacts().catch(() => {
+    throw new Error("Couldn't load your practice details to re-check this draft. Nothing was marked ready; try again.");
+  });
   const check =
     row.kind === "google_ads"
       ? checkGoogleDraft(row.draft as GoogleAdsDraft, facts)

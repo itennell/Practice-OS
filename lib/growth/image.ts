@@ -4,7 +4,8 @@
 // or if Muse fails, a plain-code picture in the app's own colors stands in. Always a
 // 1080 x 1080 sRGB JPEG via sharp (Meta's square feed size).
 import sharp from "sharp";
-import { generateImage } from "../meta";
+import { generateImage, MODELS } from "../meta";
+import { logModelCall } from "../model-calls";
 
 export const AD_IMAGE_SIDE = 1080;
 
@@ -38,17 +39,28 @@ export async function plainAdImage(): Promise<Buffer> {
   return toAdJpeg(Buffer.from(svg));
 }
 
-export type AdImage = { jpeg: Buffer; source: "muse" | "plain" };
+/** fallback says why the plain picture stands in when Muse was tried. */
+export type AdImage = { jpeg: Buffer; source: "muse" | "plain"; fallback?: string };
 
 export async function makeAdImage(deps: { draw?: (prompt: string) => Promise<Buffer>; hasKey?: boolean } = {}): Promise<AdImage> {
   const hasKey = deps.hasKey ?? (Boolean(deps.draw) || Boolean(process.env.MODEL_API_KEY));
-  if (hasKey) {
-    try {
-      const draw = deps.draw ?? (async (p: string) => (await generateImage("growth.meta_ad_image", p)).image);
-      return { jpeg: await toAdJpeg(await draw(AD_IMAGE_PROMPT)), source: "muse" };
-    } catch (err) {
-      console.error(`[growth] ad image: ${err instanceof Error ? err.message : String(err)}`);
-    }
+  if (!hasKey) return { jpeg: await plainAdImage(), source: "plain" };
+  let raw: Buffer;
+  try {
+    // A failed Muse call is logged to model_calls (ok: false) by lib/meta.ts itself.
+    const draw = deps.draw ?? (async (p: string) => (await generateImage("growth.meta_ad_image", p)).image);
+    raw = await draw(AD_IMAGE_PROMPT);
+  } catch (err) {
+    console.error(`[growth] ad image: ${err instanceof Error ? err.message : String(err)}`);
+    return { jpeg: await plainAdImage(), source: "plain", fallback: "Muse Image didn't answer, so a plain picture stands in." };
   }
-  return { jpeg: await plainAdImage(), source: "plain" };
+  const started = Date.now();
+  try {
+    return { jpeg: await toAdJpeg(raw), source: "muse" };
+  } catch (err) {
+    // Muse answered but its picture couldn't be made into a JPEG: record that as a failed step, then fall back.
+    console.error(`[growth] ad image convert: ${err instanceof Error ? err.message : String(err)}`);
+    await logModelCall({ model: MODELS.image, feature: "growth.meta_ad_image.convert", tokens: null, ms: Date.now() - started, ok: false });
+    return { jpeg: await plainAdImage(), source: "plain", fallback: "Muse Image's picture couldn't be converted, so a plain picture stands in." };
+  }
 }

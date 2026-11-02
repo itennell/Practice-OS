@@ -12,7 +12,7 @@ const body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("plan"), plan: planInputSchema }),
   z.object({
     action: z.literal("settings"),
-    monthly_cap_dollars: z.number().min(10).max(50_000).nullable().optional(),
+    monthly_cap_dollars: z.number().min(0).max(50_000).nullable().optional(),
     radius_miles: z.number().min(1).max(50).optional(),
     site_url: httpsOrEmpty,
     booking_url: httpsOrEmpty,

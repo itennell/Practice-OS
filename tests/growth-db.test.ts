@@ -17,6 +17,10 @@ vi.mock("../lib/meta", async (orig) => {
 });
 
 import { GET as exportRoute } from "../app/api/growth/drafts/[id]/export/route";
+import { GET as imageRoute } from "../app/api/growth/drafts/[id]/image/route";
+import { adsCampaign } from "../lib/executors/ads_campaign";
+import { loadSavedGrowth, saveGrowth } from "../lib/growth/store";
+import * as facts from "../lib/media/facts";
 import { runTool } from "../lib/aeon/tools";
 import { approve, decline } from "../lib/approvals";
 import { closeDb, db } from "../lib/db";
@@ -28,9 +32,13 @@ const hasDb = Boolean(process.env.DATABASE_URL);
 const ctx = { by: "test:growth" };
 const json = (r: { content: { text: string }[] }) => JSON.parse(r.content[0].text);
 
-async function exportOf(id: string, as?: string) {
-  const req = new Request(`http://localhost/api/growth/drafts/${id}/export${as ? `?as=${as}` : ""}`);
+async function exportOf(id: string, as?: string, headers: Record<string, string> = { "sec-fetch-site": "same-origin" }) {
+  const req = new Request(`http://localhost/api/growth/drafts/${id}/export${as ? `?as=${as}` : ""}`, { headers });
   return exportRoute(req, { params: Promise.resolve({ id }) } as never);
+}
+
+async function imageOf(id: string, headers: Record<string, string> = { "sec-fetch-site": "same-origin" }) {
+  return imageRoute(new Request(`http://localhost/api/growth/drafts/${id}/image`, { headers }), { params: Promise.resolve({ id }) } as never);
 }
 
 beforeAll(() => {
@@ -46,8 +54,9 @@ afterAll(async () => {
 describe.skipIf(!hasDb)("Grow drafts, approvals and exports", () => {
   it("private_pay_plan answers with the [Sample] plan for the demo practice", async () => {
     const r = json(await runTool("private_pay_plan", {}, ctx));
-    expect(r.headline).toBe("You need 9 private-pay clients to replace BCBSIL. 12-week plan.");
+    expect(r.headline).toBe("[Sample] You need 9 private-pay clients to replace BCBSIL: 7 more than you have now. 12-week plan.");
     expect(r.sample).toMatch(/\[Sample\]/);
+    expect(r.panels.map((p: { payer: string }) => p.payer)).toEqual(["[Sample] BCBSIL", "[Sample] Aetna"]);
     expect(r.weekly_targets).toHaveLength(12);
   });
 
@@ -57,16 +66,54 @@ describe.skipIf(!hasDb)("Grow drafts, approvals and exports", () => {
     expect(r.panels.find((p: { payer: string }) => p.payer === "Cigna").pays_per_session).toBe("unknown: ask her");
   });
 
+  it("a panel she gives numbers for becomes hers; the sample panels she didn't touch stay labelled", async () => {
+    const r = json(await runTool("private_pay_plan", { panels: [{ payer: "BCBSIL", weekly_sessions: 10 }] }, ctx));
+    const bcbs = r.panels.find((p: { payer: string }) => p.payer === "BCBSIL");
+    // her session count is kept; the sample rate is NOT kept as hers, it's asked for
+    expect(bcbs).toMatchObject({ sessions_a_week: 10, pays_per_session: "unknown: ask her" });
+    expect(r.panels.some((p: { payer: string }) => p.payer === "[Sample] Aetna")).toBe(true);
+    expect(r.headline).toMatch(/^\[Sample\] /);
+    expect(r.asks.join(" ")).toMatch(/What does BCBSIL pay you/);
+  });
+
+  it("numbers that don't fit come back as a plain error, never a thrown ZodError", async () => {
+    const r = await runTool("private_pay_plan", { panels: [{ payer: "X", rate_dollars: 999.999, weekly_sessions: 59.999 }], private_fee_dollars: 999.995 }, ctx);
+    expect(r.isError ?? false).toBe(false);
+    const bad = await runTool("private_pay_plan", { current_private_weekly: 61 }, ctx);
+    expect(bad.isError).toBe(true);
+  });
+
+  it("saves growth settings key by key; a bad value throws before writing and wipes nothing", async () => {
+    await saveGrowth({ radius_miles: 7 });
+    await saveGrowth({ site_url: "https://dana.example.com" });
+    expect(await loadSavedGrowth()).toMatchObject({ radius_miles: 7, site_url: "https://dana.example.com" });
+    await expect(saveGrowth({ monthly_cap_cents: 100 })).rejects.toThrow(/at least \$150/);
+    expect(await loadSavedGrowth()).toMatchObject({ radius_miles: 7, site_url: "https://dana.example.com" });
+    // one stored value that no longer fits hides only itself
+    await db()`update practice_os.clinician_profile set onboarding_answers = jsonb_set(onboarding_answers, '{growth,radius_miles}', '"far"'::jsonb)`;
+    expect(await loadSavedGrowth()).toEqual({ site_url: "https://dana.example.com" });
+    await db()`update practice_os.clinician_profile set onboarding_answers = onboarding_answers - 'growth'`;
+  });
+
+  it("refuses a cap under $150 with a plain message", async () => {
+    const r = await runTool("draft_google_ads", { monthly_cap_dollars: 100 }, ctx);
+    expect(r.isError).toBe(true);
+    expect(r.content[0].text).toMatch(/at least \$150/);
+  });
+
   it.each([["true"], ["false"]])("DRY_RUN=%s: Google draft waits for approval; approving unlocks the CSV and never calls Google", async (dry) => {
     process.env.DRY_RUN = dry;
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     const r = json(await runTool("draft_google_ads", {}, ctx));
-    expect(r).toMatchObject({ queued: true, policy_check: "passed", monthly_cap: "$300" });
+    expect(r).toMatchObject({ queued: true, policy_check: "passed", monthly_cap: "[Sample] $300" });
     const [row] = await db()<{ id: string; status: string }[]>`select id, status from practice_os.growth_drafts where approval_id = ${r.approval_id}`;
     expect(row.status).toBe("pending_approval");
 
     const locked = await exportOf(row.id);
     expect(locked.status).toBe(409);
+    // only the app's own page gets downloads
+    expect((await exportOf(row.id, "csv", {})).status).toBe(403);
+    expect((await exportOf(row.id, "csv", { "sec-fetch-site": "cross-site" })).status).toBe(403);
 
     const a = await approve(r.approval_id, { by: "clinician" });
     expect(a.ok && a.approval.status).toBe("done");
@@ -93,6 +140,9 @@ describe.skipIf(!hasDb)("Grow drafts, approvals and exports", () => {
       expect(vi.mocked(generateImage)).toHaveBeenCalledWith("growth.meta_ad_image", expect.stringMatching(/no people/));
       const [row] = await db()<{ id: string }[]>`select id from practice_os.growth_drafts where approval_id = ${r.approval_id}`;
       expect((await exportOf(row.id, "image")).status).toBe(409);
+      expect((await imageOf(row.id)).status).toBe(200);
+      expect((await imageOf(row.id, { "sec-fetch-site": "cross-site" })).status).toBe(403);
+      expect((await imageOf(row.id, {})).status).toBe(403);
       await approve(r.approval_id, { by: "clinician" });
       const spec = await (await exportOf(row.id, "json")).json();
       expect(spec.ad_set.detailed_targeting).toBe("none");
@@ -149,6 +199,16 @@ describe.skipIf(!hasDb)("Grow drafts, approvals and exports", () => {
     await expect(
       db()`insert into practice_os.growth_drafts (kind, draft, status, policy_ok, created_by) values ('google_ads', '{}', 'ready', false, ${ctx.by})`,
     ).rejects.toThrow(/check/);
+  });
+
+  it("the ads executor fails closed when her facts can't load", async () => {
+    const r = json(await runTool("draft_google_ads", {}, ctx));
+    const [row] = await db()<{ id: string }[]>`select id from practice_os.growth_drafts where approval_id = ${r.approval_id}`;
+    const spy = vi.spyOn(facts, "loadMediaFacts").mockRejectedValueOnce(new Error("db down"));
+    await expect(adsCampaign({ id: r.approval_id, payload: { draft_id: row.id } } as never, { dryRun: true })).rejects.toThrow(/Nothing was marked ready/);
+    spy.mockRestore();
+    const [after] = await db()`select status from practice_os.growth_drafts where id = ${row.id}`;
+    expect(after.status).toBe("pending_approval");
   });
 
   it("the view-only demo copy refuses the drafting tools", async () => {

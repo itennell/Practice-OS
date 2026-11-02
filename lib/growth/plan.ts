@@ -19,6 +19,8 @@ export const ADMIN_MINUTES: Record<string, number> = { medicare: 15, medicaid: 2
 export const SESSION_MINUTES = 60;
 export const PLAN_WEEKS = 12;
 
+export const SAMPLE_FIELDS = ["current_private_weekly", "target_weekly_sessions", "target_monthly_income_cents"] as const;
+
 export const panelInputSchema = z
   .object({
     payer: z.string().trim().min(1).max(80),
@@ -29,6 +31,8 @@ export const panelInputSchema = z
     /** Unpaid admin minutes per session; missing = the starting guess for the payer kind. */
     admin_minutes: z.number().min(0).max(120).nullable().optional(),
     kind: z.string().max(20).optional(),
+    /** [Sample] numbers for the demo practice, not hers. Cleared once she enters this panel's numbers. */
+    sample: z.boolean().optional(),
   })
   .strict();
 export type PanelInput = z.infer<typeof panelInputSchema>;
@@ -43,6 +47,8 @@ export const planInputSchema = z
     target_weekly_sessions: z.number().min(1).max(60).nullable(),
     target_monthly_income_cents: z.number().int().min(0).max(10_000_000).nullable(),
     consult_to_client: z.number().min(0.05).max(1).optional(),
+    /** Top-level numbers that are still [Sample] ones, not hers. Each leaves the list when she gives it. */
+    sample_fields: z.array(z.enum(SAMPLE_FIELDS)).optional(),
   })
   .strict();
 export type PlanInput = z.infer<typeof planInputSchema>;
@@ -55,18 +61,25 @@ export type PanelResult = {
   /** Private-pay clients (seen weekly) whose fees equal this panel's income. null until the rate is known. */
   clientsToReplace: number | null;
   adminMinutes: number;
+  /** True when adminMinutes is Aeon's starting guess, not her number. */
+  adminEstimated: boolean;
   /** What an hour of her time earns on this panel, admin included. */
   hourlyCents: number | null;
+  /** [Sample] numbers, not hers. */
+  sample: boolean;
 };
 
 export type PlanWeek = { week: number; consults: number; newClients: number; totalPrivateClients: number; focus: string };
 export type Checkpoint = { week: number; title: string; check: string };
 
 export type PrivatePayPlan = {
+  /** Any number in it is a [Sample] one: the headline says so. */
+  sample: boolean;
   privateFeeCents: number | null;
   panels: PanelResult[];
   /** The panel to drop first: lowest pay for her time. null if no rates are known. */
-  dropFirst: { payer: string; clientsToReplace: number; why: string } | null;
+  /** clientsToReplace is the total; newClients subtracts the private-pay clients she already has. */
+  dropFirst: { payer: string; clientsToReplace: number; newClients: number; why: string } | null;
   insuranceMonthlyCents: number | null;
   /** New private-pay clients to reach her monthly income goal, panels kept. */
   clientsForIncome: number | null;
@@ -110,29 +123,33 @@ export function privatePayPlan(input: PlanInput, fees: Pick<Fee, "label" | "cent
   const panels: PanelResult[] = input.panels.map((p0) => {
     if (p0.weekly_sessions === null) asks.push(`How many ${p0.payer} sessions do you see in a typical week?`);
     const p = { ...p0, weekly_sessions: p0.weekly_sessions ?? 0 };
-    const admin = p.admin_minutes ?? ADMIN_MINUTES[p.kind ?? "other"] ?? ADMIN_MINUTES.other;
+    const kind = p.kind && Object.hasOwn(ADMIN_MINUTES, p.kind) ? p.kind : "other";
+    const adminEstimated = p.admin_minutes === null || p.admin_minutes === undefined;
+    const admin = adminEstimated ? ADMIN_MINUTES[kind] : p.admin_minutes!;
     if (p.rate_cents === null && (p0.weekly_sessions === null || p.weekly_sessions > 0)) asks.push(`What does ${p.payer} pay you for one session? (Your contract or an EOB shows it.)`);
     const monthly = p.rate_cents === null ? null : Math.round(p.weekly_sessions * p.rate_cents * WEEKS_PER_MONTH);
     const clients = p.rate_cents === null || !fee ? null : ceil((p.weekly_sessions * p.rate_cents) / fee);
     const hourly = p.rate_cents === null ? null : Math.round((p.rate_cents * 60) / (SESSION_MINUTES + admin));
-    return { payer: p.payer, weeklySessions: p.weekly_sessions, rateCents: p.rate_cents, monthlyCents: monthly, clientsToReplace: clients, adminMinutes: admin, hourlyCents: hourly };
+    return { payer: p.payer, weeklySessions: p.weekly_sessions, rateCents: p.rate_cents, monthlyCents: monthly, clientsToReplace: clients, adminMinutes: admin, adminEstimated, hourlyCents: hourly, sample: Boolean(p0.sample) };
   });
 
   const active = panels.filter((p) => p.weeklySessions > 0);
   const known = active.filter((p) => p.hourlyCents !== null && p.clientsToReplace !== null);
   const drop = [...known].sort((a, b) => a.hourlyCents! - b.hourlyCents! || b.adminMinutes - a.adminMinutes || a.payer.localeCompare(b.payer))[0];
+  const currentPrivate = input.current_private_weekly ?? 0;
   const dropFirst = drop
     ? {
         payer: drop.payer,
         clientsToReplace: drop.clientsToReplace!,
-        why: `${drop.payer} pays the least for your time: about ${usd(drop.hourlyCents!)} an hour once its ${drop.adminMinutes} minutes of admin per session are counted.`,
+        // Net new: the private-pay clients she already sees count toward replacing the panel.
+        newClients: Math.max(0, drop.clientsToReplace! - Math.floor(currentPrivate)),
+        why: `${drop.payer} pays the least for your time: about ${usd(drop.hourlyCents!)} an hour once its ${drop.adminEstimated ? `about ${drop.adminMinutes} minutes (estimated)` : `${drop.adminMinutes} minutes`} of admin per session are counted.`,
       }
     : null;
   if (active.length > known.length && dropFirst) notes.push("Which panel to drop first may change once every payer's rate is known.");
 
   const allKnown = active.every((p) => p.monthlyCents !== null) && input.panels.every((p) => p.weekly_sessions !== null);
   const insuranceMonthly = allKnown ? active.reduce((n, p) => n + (p.monthlyCents ?? 0), 0) : null;
-  const currentPrivate = input.current_private_weekly ?? 0;
   const privateMonthly = fee ? currentPrivate * fee * WEEKS_PER_MONTH : 0;
 
   if (input.target_monthly_income_cents === null) asks.push("How much do you want the practice to bring in each month, before taxes?");
@@ -145,7 +162,7 @@ export function privatePayPlan(input: PlanInput, fees: Pick<Fee, "label" | "cent
   const insuranceWeekly = active.reduce((n, p) => n + p.weeklySessions, 0);
   const openSlots = input.target_weekly_sessions === null ? null : Math.max(0, Math.floor(input.target_weekly_sessions - insuranceWeekly - currentPrivate));
 
-  const candidates = [clientsForIncome, dropFirst?.clientsToReplace ?? null].filter((n): n is number => n !== null);
+  const candidates = [clientsForIncome, dropFirst?.newClients ?? null].filter((n): n is number => n !== null);
   const goal = candidates.length ? Math.max(...candidates) : null;
   if (goal !== null && openSlots !== null && goal > openSlots) {
     notes.push(
@@ -188,16 +205,19 @@ export function privatePayPlan(input: PlanInput, fees: Pick<Fee, "label" | "cent
           },
         ];
 
+  const sample = input.panels.some((p) => p.sample) || Boolean(input.sample_fields?.length);
   const headline =
-    dropFirst && fee
-      ? `You need ${dropFirst.clientsToReplace} private-pay client${dropFirst.clientsToReplace === 1 ? "" : "s"} to replace ${dropFirst.payer}. 12-week plan.`
+    (sample ? "[Sample] " : "") +
+    (dropFirst && fee
+      ? `You need ${dropFirst.clientsToReplace} private-pay client${dropFirst.clientsToReplace === 1 ? "" : "s"} to replace ${dropFirst.payer}${currentPrivate > 0 ? `: ${dropFirst.newClients} more than you have now` : ""}. 12-week plan.`
       : asks.length
         ? "Aeon needs a few numbers to finish your plan."
         : goal !== null
           ? `You need ${goal} more private-pay clients. 12-week plan.`
-          : "Your 12-week plan.";
+          : "Your 12-week plan.");
 
   return {
+    sample,
     privateFeeCents: fee,
     panels,
     dropFirst,
@@ -222,9 +242,10 @@ export function privatePayPlan(input: PlanInput, fees: Pick<Fee, "label" | "cent
 /** [Sample] numbers for the fictional demo practice, used until she gives her own. */
 export const SAMPLE_INPUT: PlanInput = {
   panels: [
-    { payer: "BCBSIL", weekly_sessions: 14, rate_cents: 9200, kind: "commercial" },
-    { payer: "Aetna", weekly_sessions: 6, rate_cents: 10500, kind: "commercial" },
+    { payer: "BCBSIL", weekly_sessions: 14, rate_cents: 9200, kind: "commercial", sample: true },
+    { payer: "Aetna", weekly_sessions: 6, rate_cents: 10500, kind: "commercial", sample: true },
   ],
+  sample_fields: [...SAMPLE_FIELDS],
   current_private_weekly: 2,
   target_weekly_sessions: 25,
   target_monthly_income_cents: 1_200_000,

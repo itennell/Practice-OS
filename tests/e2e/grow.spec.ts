@@ -20,7 +20,8 @@ test("Grow: plan, ad drafts, website preview; approve the site, then download it
   await page.goto("/media/grow");
   await expect(page.getByRole("heading", { level: 1, name: "Grow your practice" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Grow" })).toBeVisible();
-  await expect(page.getByTestId("plan-headline")).toHaveText("[Sample] You need 9 private-pay clients to replace BCBSIL. 12-week plan.");
+  await expect(page.getByTestId("plan-headline")).toHaveText("[Sample] You need 9 private-pay clients to replace BCBSIL: 7 more than you have now. 12-week plan.");
+  await expect(page.getByText("[Sample] BCBSIL", { exact: true })).toBeVisible();
   await expect(page.getByRole("table", { name: "12-week fill plan" })).toBeVisible();
 
   const google = page.getByRole("region", { name: "Google Search ads" });
@@ -55,10 +56,14 @@ test("Grow: plan, ad drafts, website preview; approve the site, then download it
   const ready = page.getByRole("region", { name: "Your one-page website" });
   await expect(ready.getByText("Approved, ready to download")).toBeVisible();
   const zip = ready.getByRole("link", { name: "Website files (zip)" });
-  const res = await page.request.get((await zip.getAttribute("href"))!);
+  // Downloads answer only the app's own page; a bare request is refused.
+  const href = (await zip.getAttribute("href"))!;
+  expect((await page.request.get(href)).status()).toBe(403);
+  const sameOrigin = { headers: { "sec-fetch-site": "same-origin" } };
+  const res = await page.request.get(href, sameOrigin);
   expect(res.status()).toBe(200);
   expect(res.headers()["content-type"]).toBe("application/zip");
-  const sq = await page.request.get((await ready.getByRole("link", { name: "Text for Squarespace" }).getAttribute("href"))!);
+  const sq = await page.request.get((await ready.getByRole("link", { name: "Text for Squarespace" }).getAttribute("href"))!, sameOrigin);
   expect(await sq.text()).toContain("=== Fees and insurance ===");
   expect(await violations(page)).toEqual([]);
 });

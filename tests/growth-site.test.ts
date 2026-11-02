@@ -2,7 +2,7 @@
 // the demo license line, no testimonials or promises, and a real zip.
 import { describe, expect, it } from "vitest";
 import type { GrowthSettings } from "../lib/growth/ads";
-import { DEMO_LICENSE_LINE, draftSite, renderLlmsTxt, renderRobotsTxt, renderSitemap, renderSiteHtml, renderSquarespaceText, siteFiles, trackerFindings } from "../lib/growth/site";
+import { checkSite, DEMO_LICENSE_LINE, draftSite, renderLlmsTxt, renderRobotsTxt, renderSitemap, renderSiteHtml, renderSquarespaceText, siteFiles, trackerFindings } from "../lib/growth/site";
 import { crc32, makeZip } from "../lib/growth/zip";
 import { DANA } from "./media-fixtures";
 
@@ -78,6 +78,31 @@ describe("one-page website", () => {
     expect(data.toString()).toBe(files[0].data);
     expect(zip.readUInt32LE(14)).toBe(crc32(data));
     expect(crc32(Buffer.from("123456789"))).toBe(0xcbf43926);
+  });
+
+  it("says who she helps in service words, never 'you' plus a condition", () => {
+    const who = d.sections.find((s) => s.id === "who")!;
+    expect(who.paragraphs).toEqual(["I work with adults and couples on anxiety and life transitions."]);
+    expect(html).not.toMatch(/feel stuck/);
+  });
+
+  it("runs the personal-attribute rule on the landing copy, and the license-number rule on page-wide text", () => {
+    const bad = { ...d, sections: d.sections.map((s) => (s.id === "who" ? { ...s, paragraphs: ["Struggling with anxiety? I can help."] } : s)) };
+    expect(checkSite(bad, DANA).findings.some((f) => f.rule === "personal_attribute")).toBe(true);
+    // the same words lower on the page (her own description of how she works) aren't held to the ad rule
+    const lower = { ...d, sections: d.sections.map((s) => (s.id === "how" ? { ...s, paragraphs: [...s.paragraphs, "People who feel stuck often start here."] } : s)) };
+    expect(checkSite(lower, DANA).ok).toBe(true);
+    expect(checkSite({ ...d, licenseLine: "Dana Reyes, LCPC, license 180.012345" }, DANA).ok).toBe(false);
+    expect(checkSite({ ...d, title: "Reyes Counseling | license no. 180012345" }, DANA).ok).toBe(false);
+    expect(checkSite({ ...d, bookingLabel: "Book with the best therapist in Chicago" }, DANA).ok).toBe(false);
+    expect(checkSite({ ...d, description: "Guaranteed results" }, DANA).ok).toBe(false);
+  });
+
+  it("escapes < in the Squarespace details block", () => {
+    const evil = { ...d, jsonLd: { ...d.jsonLd, name: "</script><script>alert(1)</script>" } };
+    const text = renderSquarespaceText(evil);
+    expect(text).not.toContain("</script><script>");
+    expect(text).toContain("\\u003c/script>");
   });
 
   it("uses her phone when there is no booking link", () => {

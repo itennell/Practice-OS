@@ -2,7 +2,8 @@
 // condition targeting, no audiences, a hard cap, and a Google Ads Editor CSV.
 import { describe, expect, it } from "vitest";
 import { checkGoogleDraft, checkMetaDraft, draftGoogleAds, draftMetaAds, googleAdsEditorCsv, metaAdsSpec, type GrowthSettings } from "../lib/growth/ads";
-import { checkKeyword, checkTargeting, checkText, LIMITS } from "../lib/growth/policy";
+import { checkKeyword, checkTargeting, checkText, LIMITS, MIN_CAP_CENTS, MIN_CAP_MESSAGE } from "../lib/growth/policy";
+import { csvField, GOOGLE_BUDGET_NOTE } from "../lib/growth/ads";
 import { DANA } from "./media-fixtures";
 
 const S: GrowthSettings = { siteUrl: "https://www.example.com", bookingUrl: null, monthlyCapCents: 30000, radiusMiles: 5 };
@@ -35,10 +36,30 @@ describe("ad policy check", () => {
   });
 
   it("blocks audiences, interests and a missing cap", () => {
-    expect(checkTargeting({ audiences: ["remarketing"], monthlyCapCents: 100 }).map((f) => f.rule)).toEqual(["audience_targeting"]);
-    expect(checkTargeting({ audiences: ["customer_match"], monthlyCapCents: 100 })[0].severity).toBe("block");
-    expect(checkTargeting({ interests: ["mental health"], monthlyCapCents: 100 })[0].rule).toBe("audience_targeting");
+    expect(checkTargeting({ audiences: ["remarketing"], monthlyCapCents: 30000 }).map((f) => f.rule)).toEqual(["audience_targeting"]);
+    expect(checkTargeting({ audiences: ["customer_match"], monthlyCapCents: 30000 })[0].severity).toBe("block");
+    expect(checkTargeting({ interests: ["mental health"], monthlyCapCents: 30000 })[0].rule).toBe("audience_targeting");
     expect(checkTargeting({ monthlyCapCents: null })[0].rule).toBe("no_budget_cap");
+  });
+
+  it("needs a cap of at least $150 a month, with a plain message", () => {
+    expect(checkTargeting({ monthlyCapCents: 14999 })[0]).toMatchObject({ rule: "no_budget_cap", message: MIN_CAP_MESSAGE });
+    expect(checkTargeting({ monthlyCapCents: MIN_CAP_CENTS })).toEqual([]);
+    expect(MIN_CAP_CENTS).toBe(15000);
+  });
+
+  it("blocks condition openers in questions and verbs, but allows plain service nouns", () => {
+    for (const t of ["Struggle with anxiety?", "Anxiety? We can help", "Tired of feeling stuck", "Do you feel alone?", "Free yourself from worry", "Overcome stress", "Relief from panic", "Is worry keeping you up?", "Get over a breakup", "Heal from trauma"]) {
+      expect(checkText(t, "x", LIMITS.googleHeadline, null).some((f) => f.rule === "personal_attribute"), t).toBe(true);
+    }
+    for (const t of ["Anxiety Therapy in Chicago", "Couples Counseling Chicago", "Help With Life Changes", "Therapy in Lincoln Park"]) {
+      expect(blocked(checkText(t, "x", LIMITS.googleHeadline, DANA)), t).toBe(false);
+    }
+  });
+
+  it("runs the certification words on ad text too", () => {
+    expect(checkText("Addiction counseling in Chicago", "x", null, null).some((f) => f.rule === "certification_keyword")).toBe(true);
+    expect(checkText("Suboxone and rehab help", "x", null, null).some((f) => f.rule === "certification_keyword")).toBe(true);
   });
 });
 
@@ -74,6 +95,25 @@ describe("Google Search draft", () => {
     expect(checkGoogleDraft({ ...body, ad: { ...body.ad, headlines: ["This headline is far longer than thirty", ...body.ad.headlines.slice(1)] } }, DANA).ok).toBe(false);
   });
 
+  it("never puts her free-text focus answer in an ad, only service words", () => {
+    const loud = { ...DANA, answers: { ...DANA.answers, focus: "Anxiety, and people who feel stuck and lonely" } };
+    const g = draftGoogleAds(loud, S);
+    expect(g.ad.descriptions.join(" ")).not.toMatch(/stuck|lonely|reach out/i);
+    expect(g.adGroup.keywords.map((k) => k.text)).toContain("anxiety therapist chicago");
+  });
+
+  it("says how Google's daily budget relates to the cap", () => {
+    expect(GOOGLE_BUDGET_NOTE).toMatch(/twice the daily budget/);
+    expect(GOOGLE_BUDGET_NOTE).toMatch(/30\.4/);
+  });
+
+  it("neutralises spreadsheet formulas in CSV cells", () => {
+    for (const bad of ["=HYPERLINK(1)", "+1", "-2", "@SUM(A1)"]) expect(csvField(bad).replace(/^"|"$/g, "").startsWith("'")).toBe(true);
+    expect(csvField("Therapy in Lincoln Park")).toBe("Therapy in Lincoln Park");
+    expect(csvField("a, b")).toBe('"a, b"');
+    expect(csvField(9.86)).toBe("9.86");
+  });
+
   it("exports a Google Ads Editor CSV: paused, daily budget, keywords, negatives and the ad", () => {
     const csv = googleAdsEditorCsv(d);
     const lines = csv.trim().split("\r\n");
@@ -98,6 +138,22 @@ describe("Meta draft", () => {
     expect(d.adSet).toMatchObject({ ageMin: 18, audiences: [], interests: [], optimization: "LINK_CLICKS" });
     expect(d.campaign.status).toBe("PAUSED");
     for (const a of d.ads) expect([...a.headline].length).toBeLessThanOrEqual(40);
+  });
+
+  it("uses a lifetime budget equal to her monthly cap, over a 30-day run", () => {
+    const m = draftMetaAds(DANA, S, "plain", new Date("2026-11-02T12:00:00Z"));
+    expect(m.campaign).toMatchObject({ budgetType: "LIFETIME", lifetimeBudgetCents: 30000, monthlyCapCents: 30000, startDate: "2026-11-02", endDate: "2026-12-02" });
+    const spec = metaAdsSpec(m);
+    expect(spec.campaign).toMatchObject({ budget_type: "lifetime", lifetime_budget: "$300", end_date: "2026-12-02" });
+    expect(spec.campaign).not.toHaveProperty("daily_budget");
+    const { check: _c, ...body } = m;
+    void _c;
+    expect(checkMetaDraft({ ...body, campaign: { ...body.campaign, lifetimeBudgetCents: 90000 } }, DANA).ok).toBe(false);
+  });
+
+  it("cuts the description by characters, not UTF-16 units", () => {
+    const m = draftMetaAds({ ...DANA, practiceName: "🌿".repeat(40) }, S);
+    expect(Array.from(m.ads[0].description)).toHaveLength(30);
   });
 
   it("fails on interest targeting or condition wording", () => {

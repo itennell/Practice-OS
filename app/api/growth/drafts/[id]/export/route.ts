@@ -3,6 +3,7 @@ import { renderSquarespaceText, siteFiles, type SiteDraft } from "@/lib/growth/s
 import { draftImage, getDraft, isReady } from "@/lib/growth/store";
 import { makeZip } from "@/lib/growth/zip";
 import { practiceToday } from "@/lib/compliance/store";
+import { refuseRead } from "../../../guard";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const FORMATS = { google_ads: ["csv"], meta_ads: ["json", "image"], website: ["zip", "squarespace"] } as const;
@@ -17,6 +18,8 @@ function file(data: string | Buffer, type: string, name: string) {
 // Downloads for an approved Grow draft. Before she approves it, every format is
 // refused: the approval is the only way to unlock an export.
 export async function GET(request: Request, ctx: RouteContext<"/api/growth/drafts/[id]/export">) {
+  const no = refuseRead(request);
+  if (no) return no;
   const { id } = await ctx.params;
   const row = UUID.test(id) ? await getDraft(id) : null;
   if (!row) return Response.json({ error: "Not found." }, { status: 404 });

@@ -8,7 +8,7 @@ import { TextField } from "@/components/shared/settings-controls";
 import { StatusPill } from "@/components/shared/status-mark";
 import { notify } from "@/components/shared/toaster";
 import { Button, ButtonLink } from "@/components/ui";
-import type { GoogleAdsDraft, GrowthSettings, MetaAdsDraft } from "@/lib/growth/ads";
+import { GOOGLE_BUDGET_NOTE, type GoogleAdsDraft, type GrowthSettings, type MetaAdsDraft } from "@/lib/growth/ads";
 import type { PlanInput, PrivatePayPlan } from "@/lib/growth/plan";
 import type { PolicyCheck } from "@/lib/growth/policy";
 import type { SiteDraft } from "@/lib/growth/site";
@@ -130,10 +130,21 @@ function num(v: string): number | null {
 
 function PlanEditor({ input, canWrite, onDone }: { input: PlanInput; canWrite: boolean; onDone: () => void }) {
   const router = useRouter();
-  const [panels, setPanels] = useState(input.panels.map((p) => ({ ...p, sessions: p.weekly_sessions?.toString() ?? "", rate: p.rate_cents === null ? "" : (p.rate_cents / 100).toString() })));
-  const [weekly, setWeekly] = useState(input.target_weekly_sessions?.toString() ?? "");
-  const [income, setIncome] = useState(input.target_monthly_income_cents === null ? "" : (input.target_monthly_income_cents / 100).toString());
-  const [current, setCurrent] = useState((input.current_private_weekly ?? 0).toString());
+  // [Sample] numbers are never put in her boxes: those start empty with the sample as a hint, and
+  // a sample panel or number she leaves alone stays [Sample] when she saves.
+  const sampleFields = new Set(input.sample_fields ?? []);
+  const own = (v: string, isSample: boolean) => (isSample ? "" : v);
+  const [panels, setPanels] = useState(
+    input.panels.map((p) => ({
+      ...p,
+      sessions: own(p.weekly_sessions?.toString() ?? "", Boolean(p.sample)),
+      rate: own(p.rate_cents === null ? "" : (p.rate_cents / 100).toString(), Boolean(p.sample)),
+    })),
+  );
+  const [weekly, setWeekly] = useState(own(input.target_weekly_sessions?.toString() ?? "", sampleFields.has("target_weekly_sessions")));
+  const [income, setIncome] = useState(own(input.target_monthly_income_cents === null ? "" : (input.target_monthly_income_cents / 100).toString(), sampleFields.has("target_monthly_income_cents")));
+  const [current, setCurrent] = useState(own((input.current_private_weekly ?? 0).toString(), sampleFields.has("current_private_weekly")));
+  const hint = (isSample: boolean, v: number | null | undefined) => (isSample && v !== null && v !== undefined ? `[Sample] ${v}` : undefined);
   const [busy, setBusy] = useState(false);
   const save = async () => {
     setBusy(true);
@@ -141,10 +152,20 @@ function PlanEditor({ input, canWrite, onDone }: { input: PlanInput; canWrite: b
       await post({
         action: "plan",
         plan: {
-          panels: panels.map(({ sessions, rate, ...p }) => ({ ...p, weekly_sessions: num(sessions), rate_cents: num(rate) === null ? null : Math.round(num(rate)! * 100) })),
-          current_private_weekly: num(current) ?? 0,
-          target_weekly_sessions: num(weekly),
-          target_monthly_income_cents: num(income) === null ? null : Math.round(num(income)! * 100),
+          panels: panels.map(({ sessions, rate, ...p }) =>
+            p.sample && !sessions.trim() && !rate.trim()
+              ? p // untouched [Sample] panel: stays labelled
+              : { ...p, sample: false, weekly_sessions: num(sessions), rate_cents: num(rate) === null ? null : Math.round(num(rate)! * 100) },
+          ),
+          current_private_weekly: sampleFields.has("current_private_weekly") && !current.trim() ? input.current_private_weekly : (num(current) ?? 0),
+          target_weekly_sessions: sampleFields.has("target_weekly_sessions") && !weekly.trim() ? input.target_weekly_sessions : num(weekly),
+          target_monthly_income_cents:
+            sampleFields.has("target_monthly_income_cents") && !income.trim() ? input.target_monthly_income_cents : num(income) === null ? null : Math.round(num(income)! * 100),
+          sample_fields: [
+            ...(sampleFields.has("current_private_weekly") && !current.trim() ? ["current_private_weekly"] : []),
+            ...(sampleFields.has("target_weekly_sessions") && !weekly.trim() ? ["target_weekly_sessions"] : []),
+            ...(sampleFields.has("target_monthly_income_cents") && !income.trim() ? ["target_monthly_income_cents"] : []),
+          ],
           ...(input.private_fee_cents !== undefined ? { private_fee_cents: input.private_fee_cents } : {}),
         },
       });
@@ -162,15 +183,15 @@ function PlanEditor({ input, canWrite, onDone }: { input: PlanInput; canWrite: b
       <p className="text-small text-[var(--fg-muted)]">Leave a box empty if you don&rsquo;t know it; Aeon asks instead of guessing.</p>
       {panels.map((p, i) => (
         <fieldset key={p.payer} className="grid gap-x-4 sm:grid-cols-2">
-          <legend className="text-small font-semibold">{p.payer}</legend>
-          <TextField compact label="Sessions a week" inputMode="decimal" value={p.sessions} onChange={(e) => setPanels(panels.map((x, j) => (j === i ? { ...x, sessions: e.target.value } : x)))} />
-          <TextField compact label="Pays per session ($)" inputMode="decimal" value={p.rate} onChange={(e) => setPanels(panels.map((x, j) => (j === i ? { ...x, rate: e.target.value } : x)))} />
+          <legend className="text-small font-semibold">{p.sample ? `[Sample] ${p.payer}` : p.payer}</legend>
+          <TextField compact label="Sessions a week" inputMode="decimal" placeholder={hint(Boolean(p.sample), p.weekly_sessions)} value={p.sessions} onChange={(e) => setPanels(panels.map((x, j) => (j === i ? { ...x, sessions: e.target.value } : x)))} />
+          <TextField compact label="Pays per session ($)" inputMode="decimal" placeholder={hint(Boolean(p.sample), p.rate_cents === null ? null : p.rate_cents / 100)} value={p.rate} onChange={(e) => setPanels(panels.map((x, j) => (j === i ? { ...x, rate: e.target.value } : x)))} />
         </fieldset>
       ))}
       <div className="grid gap-x-4 sm:grid-cols-3">
-        <TextField compact label="Private-pay sessions a week now" inputMode="decimal" value={current} onChange={(e) => setCurrent(e.target.value)} />
-        <TextField compact label="Sessions a week when full" inputMode="decimal" value={weekly} onChange={(e) => setWeekly(e.target.value)} />
-        <TextField compact label="Monthly income goal ($)" inputMode="decimal" value={income} onChange={(e) => setIncome(e.target.value)} />
+        <TextField compact label="Private-pay sessions a week now" inputMode="decimal" placeholder={hint(sampleFields.has("current_private_weekly"), input.current_private_weekly)} value={current} onChange={(e) => setCurrent(e.target.value)} />
+        <TextField compact label="Sessions a week when full" inputMode="decimal" placeholder={hint(sampleFields.has("target_weekly_sessions"), input.target_weekly_sessions)} value={weekly} onChange={(e) => setWeekly(e.target.value)} />
+        <TextField compact label="Monthly income goal ($)" inputMode="decimal" placeholder={hint(sampleFields.has("target_monthly_income_cents"), input.target_monthly_income_cents === null ? null : input.target_monthly_income_cents / 100)} value={income} onChange={(e) => setIncome(e.target.value)} />
       </div>
       <Button type="button" variant="primary" className="w-fit" disabled={!canWrite || busy} onClick={save}>
         Save my numbers
@@ -184,7 +205,6 @@ function PlanCard({ plan, input, sample, canWrite }: { plan: PrivatePayPlan; inp
   return (
     <Card id="plan-h" title="Your private-pay plan" icon={<TrendingUp className="size-4" />} status={sample ? <span className="text-small text-[var(--fg-muted)]">[Sample] numbers</span> : undefined}>
       <p className="text-section font-semibold sm:text-title" data-testid="plan-headline">
-        {sample ? "[Sample] " : ""}
         {plan.headline}
       </p>
       {plan.dropFirst && <p className="text-[var(--fg-muted)]">{plan.dropFirst.why} Keep insurance as your floor while private pay grows, then replace one panel at a time.</p>}
@@ -203,7 +223,7 @@ function PlanCard({ plan, input, sample, canWrite }: { plan: PrivatePayPlan; inp
           {plan.panels.map((p) => (
             <ListRow
               key={p.payer}
-              title={p.payer}
+              title={p.sample ? `[Sample] ${p.payer}` : p.payer}
               accent={plan.dropFirst?.payer === p.payer}
               detail={`${p.weeklySessions} sessions a week · ${p.rateCents === null ? "rate unknown" : `${usd(p.rateCents)} a session`}${p.hourlyCents === null ? "" : ` · about ${usd(p.hourlyCents)} an hour with admin`}`}
               end={<span className="text-small font-semibold">{p.clientsToReplace === null ? "?" : `${p.clientsToReplace} clients to replace`}</span>}
@@ -269,14 +289,14 @@ function PlanCard({ plan, input, sample, canWrite }: { plan: PrivatePayPlan; inp
 
 function AdSettings({ settings, canWrite }: { settings: GrowthSettings; canWrite: boolean }) {
   const router = useRouter();
-  const [cap, setCap] = useState(settings.monthlyCapCents === null ? "" : (settings.monthlyCapCents / 100).toString());
+  const [cap, setCap] = useState(settings.monthlyCapCents === null || settings.capIsSample ? "" : (settings.monthlyCapCents / 100).toString());
   const [radius, setRadius] = useState(settings.radiusMiles.toString());
   const [site, setSite] = useState(settings.siteUrl ?? "");
   const [busy, setBusy] = useState(false);
   return (
     <div className="flex flex-col gap-2 rounded-[var(--radius-card-sm)] border border-[var(--line)] p-4">
       <div className="grid gap-x-4 sm:grid-cols-3">
-        <TextField compact label="Hard monthly cap ($)" description="Ads never spend past this." inputMode="decimal" value={cap} onChange={(e) => setCap(e.target.value)} />
+        <TextField compact label="Hard monthly cap ($)" description="Ads never spend past this. At least $150." inputMode="decimal" placeholder={settings.capIsSample && settings.monthlyCapCents ? `[Sample] ${settings.monthlyCapCents / 100}` : undefined} value={cap} onChange={(e) => setCap(e.target.value)} />
         <TextField compact label="Miles from your office" inputMode="decimal" value={radius} onChange={(e) => setRadius(e.target.value)} />
         <TextField compact label="Your website address" placeholder="https://" value={site} onChange={(e) => setSite(e.target.value)} />
       </div>
@@ -288,7 +308,7 @@ function AdSettings({ settings, canWrite }: { settings: GrowthSettings; canWrite
         onClick={async () => {
           setBusy(true);
           try {
-            await post({ action: "settings", monthly_cap_dollars: num(cap), radius_miles: num(radius) ?? undefined, site_url: site.trim() });
+            await post({ action: "settings", monthly_cap_dollars: settings.capIsSample && !cap.trim() ? undefined : num(cap), radius_miles: num(radius) ?? undefined, site_url: site.trim() });
             notify.success("Saved");
             router.refresh();
           } catch (err) {
@@ -344,8 +364,9 @@ export function GrowStudio({
         <PolicyLine check={g.check} />
         <p className="text-small text-[var(--fg-muted)]">
           {g.campaign.location.label}, {g.campaign.location.radiusMiles} miles ·{" "}
-          {g.campaign.monthlyCapCents ? `cap ${usd(g.campaign.monthlyCapCents)} a month (${usd(g.campaign.dailyBudgetCents!)} a day)` : "no cap set yet"}
+          {g.campaign.monthlyCapCents ? `${settings.capIsSample ? "[Sample] " : ""}cap ${usd(g.campaign.monthlyCapCents)} a month (${usd(g.campaign.dailyBudgetCents!)} a day)` : "no cap set yet"}
         </p>
+        <p className="text-small text-[var(--fg-muted)]">{GOOGLE_BUDGET_NOTE}</p>
         <div className="flex flex-col gap-1">
           <p className="text-small font-semibold">Headlines</p>
           <ul className="flex flex-wrap gap-2">
@@ -370,6 +391,12 @@ export function GrowStudio({
         <PolicyLine check={m.check} />
         <p className="text-small text-[var(--fg-muted)]">
           {m.adSet.location.label}, {m.adSet.location.radiusMiles} miles · adults 18 to 65+ · no interest targeting
+        </p>
+        <p className="text-small text-[var(--fg-muted)]">
+          {m.campaign.lifetimeBudgetCents
+            ? `${settings.capIsSample ? "[Sample] " : ""}Lifetime budget ${usd(m.campaign.lifetimeBudgetCents)}, ${m.campaign.startDate} to ${m.campaign.endDate}. Meta stops spending when it is used up.`
+            : "No cap set yet."}
+          {m.image.fallback ? ` ${m.image.fallback}` : ""}
         </p>
         <div className="grid gap-4 sm:grid-cols-2">
           {m.ads.map((a, i) => (

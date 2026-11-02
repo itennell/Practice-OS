@@ -23,13 +23,18 @@ describe("private-pay planner", () => {
     expect(bcbs.monthlyCents).toBe(Math.round(14 * 9200 * WEEKS_PER_MONTH));
     // $92 over 70 minutes (60 + 10 admin) = $78.86 an hour; Aetna $105 -> $90
     expect(bcbs.hourlyCents).toBe(7886);
+    expect(bcbs.adminEstimated).toBe(true);
     expect(p.dropFirst?.payer).toBe("BCBSIL");
-    expect(p.headline).toBe("You need 9 private-pay clients to replace BCBSIL. 12-week plan.");
+    // She already sees 2 private-pay clients: 7 more replace the panel.
+    expect(p.dropFirst?.newClients).toBe(7);
+    expect(p.dropFirst?.why).toMatch(/about 10 minutes \(estimated\) of admin/);
+    expect(p.sample).toBe(true);
+    expect(p.headline).toBe("[Sample] You need 9 private-pay clients to replace BCBSIL: 7 more than you have now. 12-week plan.");
     // Income: $12,000 - insurance ($1,918/wk) - 2 private ($300/wk), at $150 x 4.33 per client
     const insurance = Math.round(14 * 9200 * WEEKS_PER_MONTH) + Math.round(6 * 10500 * WEEKS_PER_MONTH);
     expect(p.insuranceMonthlyCents).toBe(insurance);
     expect(p.clientsForIncome).toBe(Math.ceil((1_200_000 - insurance - 2 * 15000 * WEEKS_PER_MONTH) / (15000 * WEEKS_PER_MONTH)));
-    expect(p.goalClients).toBe(9);
+    expect(p.goalClients).toBe(7);
     expect(p.openSlots).toBe(3);
     expect(p.notes.join(" ")).toMatch(/3 open slots/);
     expect(p.asks).toEqual([]);
@@ -39,8 +44,8 @@ describe("private-pay planner", () => {
     const p = privatePayPlan(SAMPLE_INPUT, FEES);
     expect(p.weeks).toHaveLength(12);
     expect(p.weeks[0].newClients + p.weeks[1].newClients).toBe(0); // setup weeks
-    expect(p.weeks.reduce((n, w) => n + w.newClients, 0)).toBe(9);
-    expect(p.weeks[11].totalPrivateClients).toBe(2 + 9);
+    expect(p.weeks.reduce((n, w) => n + w.newClients, 0)).toBe(7);
+    expect(p.weeks[11].totalPrivateClients).toBe(2 + 7);
     for (const w of p.weeks) expect(w.consults).toBe(Math.ceil(w.newClients / 0.5));
     expect(p.checkpoints.map((c) => c.week)).toEqual([2, 4, 8, 12]);
     expect(p.checkpoints[3].check).toMatch(/contract for how much notice/);
@@ -74,6 +79,26 @@ describe("private-pay planner", () => {
     expect(p.goalClients).toBeNull();
     expect(p.weeks).toEqual([]);
     expect(p.headline).toMatch(/needs a few numbers/);
+  });
+
+  it("labels sample numbers: the headline and every untouched sample panel", () => {
+    const mine: PlanInput = { panels: [{ payer: "BCBSIL", weekly_sessions: 10, rate_cents: 9000 }, { payer: "Aetna", weekly_sessions: 6, rate_cents: 10500, sample: true }], target_weekly_sessions: 25, target_monthly_income_cents: 1_000_000 };
+    const p = privatePayPlan(mine, FEES);
+    expect(p.sample).toBe(true);
+    expect(p.headline.startsWith("[Sample] ")).toBe(true);
+    expect(p.panels.map((x) => x.sample)).toEqual([false, true]);
+    const all = privatePayPlan({ ...mine, panels: mine.panels.map((x) => ({ ...x, sample: false })) }, FEES);
+    expect(all.sample).toBe(false);
+    expect(all.headline.startsWith("[Sample]")).toBe(false);
+    expect(privatePayPlan({ ...mine, panels: [mine.panels[0]], sample_fields: ["target_weekly_sessions"] }, FEES).headline).toMatch(/^\[Sample\] /);
+  });
+
+  it("uses her own admin minutes when given, and ignores unknown or prototype payer kinds", () => {
+    const p = privatePayPlan({ panels: [{ payer: "X", weekly_sessions: 5, rate_cents: 9000, admin_minutes: 30 }, { payer: "Y", weekly_sessions: 5, rate_cents: 9000, kind: "__proto__" }, { payer: "Z", weekly_sessions: 5, rate_cents: 9000, kind: "toString" }], target_weekly_sessions: 25, target_monthly_income_cents: 0 }, FEES);
+    expect(p.panels[0]).toMatchObject({ adminMinutes: 30, adminEstimated: false });
+    expect(p.panels[1].adminMinutes).toBe(10);
+    expect(p.panels[2].adminMinutes).toBe(10);
+    expect(p.dropFirst?.why).toMatch(/its 30 minutes of admin/);
   });
 
   it("ranks by pay for her time: admin-heavy panels drop first even at a similar rate", () => {

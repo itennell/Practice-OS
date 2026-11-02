@@ -1499,6 +1499,12 @@ Meta's Privacy Violations and Personal Attributes standard bars ads that assert 
 
 - Sources: [Privacy Violations and Personal Attributes](https://transparency.meta.com/policies/ad-standards/objectionable-content/privacy-violations-personal-attributes) (fetched 2026-11-02) · [Removing certain ad targeting options](https://www.facebook.com/business/news/removing-certain-ad-targeting-options-and-expanding-our-ad-controls) (2021-11-09 announcement; date of removal per secondary summaries, UNCONFIRMED in-page) · health-and-wellness data limits per secondary summaries, UNCONFIRMED on a Meta page.
 
+## 10. Ad budgets as a real cap (checked 2026-11-02)
+
+Google: a campaign "might spend up to twice your average daily budget" on a given day, but over a month it "will have spent no more than 30.4 times your average daily budget". So Grow sets the daily budget to her monthly cap ÷ 30.4 and says so. Meta: a lifetime budget with an end date stops spending when it is used up, so Grow's Meta drafts use a lifetime budget equal to her monthly cap over a 30-day run. Grow doesn't draft for a cap under $150 a month (Aeon's floor, not a platform rule).
+
+- Sources: [About overdelivery and your average daily budget](https://support.google.com/google-ads/answer/2375423) (fetched 2026-11-02). Meta lifetime-budget behaviour is from Ads Manager's budget setting; no Meta help page was fetched (UNCONFIRMED in-page).
+
 ## Hard limits (preserved for any Phase 2 build)
 
 - Never spend money without a clinician approval and a hard monthly cap.

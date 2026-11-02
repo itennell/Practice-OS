@@ -3,6 +3,7 @@
 // saved facts, checked by lib/growth/policy.ts and queued for her approval. Nothing
 // here spends money, calls an ad platform or publishes a site.
 import { z } from "zod";
+import { GOOGLE_BUDGET_NOTE } from "../growth/ads";
 import { usd } from "../growth/plan";
 import type { AeonTool, ToolContext, ToolResult } from "./tools";
 
@@ -23,7 +24,7 @@ const PAGE = "Media > Grow shows it, with the policy check and the Export button
 const SAMPLE_NOTE = "These are [Sample] numbers for the fictional demo practice. Say so.";
 
 const adInput = {
-  monthly_cap_dollars: z.number().min(10).max(50_000).optional().describe("The hard monthly budget cap she chose, in dollars. Never pick one for her."),
+  monthly_cap_dollars: z.number().min(0).max(50_000).optional().describe("The hard monthly budget cap she chose, in dollars. Never pick one for her."),
   radius_miles: z.number().min(1).max(50).optional().describe("How far from her office to show the ads. Default 5 miles."),
   site_url: z.string().max(300).optional().describe("Her website address (https://), where the ads send people."),
 };
@@ -40,6 +41,8 @@ async function saveAdSettings(input: { monthly_cap_dollars?: number; radius_mile
 
 async function draftAds(kind: "google_ads" | "meta_ads", input: { monthly_cap_dollars?: number; radius_miles?: number; site_url?: string }, ctx: ToolContext): Promise<ToolResult> {
   const store = await import("../growth/store");
+  const { MIN_CAP_CENTS, MIN_CAP_MESSAGE } = await import("../growth/policy");
+  if (input.monthly_cap_dollars !== undefined && cents(input.monthly_cap_dollars)! < MIN_CAP_CENTS) return fail(`${MIN_CAP_MESSAGE} Ask her for a cap of $150 or more.`);
   let g;
   try {
     g = await saveAdSettings(input);
@@ -54,8 +57,10 @@ async function draftAds(kind: "google_ads" | "meta_ads", input: { monthly_cap_do
       queued: true,
       approval_id: r.approvalId,
       platform: kind === "google_ads" ? "Google Search" : "Facebook and Instagram",
-      monthly_cap: usd(d.campaign.monthlyCapCents!),
-      daily_budget: usd(d.campaign.dailyBudgetCents!),
+      monthly_cap: `${g.settings.capIsSample ? "[Sample] " : ""}${usd(d.campaign.monthlyCapCents!)}`,
+      ...(d.platform === "google"
+        ? { daily_budget: usd(d.campaign.dailyBudgetCents!), budget_note: GOOGLE_BUDGET_NOTE }
+        : { lifetime_budget: usd(d.campaign.lifetimeBudgetCents!), runs: `${d.campaign.startDate} to ${d.campaign.endDate}`, budget_note: "A lifetime budget equal to her cap: Meta stops spending when it is used up." }),
       location: d.platform === "google" ? `${d.campaign.location.label}, ${d.campaign.location.radiusMiles} miles` : `${d.adSet.location.label}, ${d.adSet.location.radiusMiles} miles`,
       ...(d.platform === "google"
         ? { keywords: d.adGroup.keywords.map((k) => k.text), headlines: d.ad.headlines, descriptions: d.ad.descriptions }
@@ -109,24 +114,39 @@ export const GROWTH_TOOLS: AeonTool[] = [
       const given = input.panels ?? [];
       const merged = base.input.panels.map((p) => {
         const g = given.find((x) => x.payer.toLowerCase() === p.payer.toLowerCase());
-        return g
-          ? { ...p, weekly_sessions: g.weekly_sessions ?? p.weekly_sessions, rate_cents: g.rate_dollars !== undefined ? cents(g.rate_dollars)! : p.rate_cents, admin_minutes: g.admin_minutes ?? p.admin_minutes }
-          : p;
+        if (!g) return p;
+        // A [Sample] panel she gives numbers for becomes hers: any number she didn't give is asked for, never kept from the sample.
+        const keep = <T,>(mine: T | undefined, old: T | null) => (mine !== undefined ? mine : p.sample ? null : old);
+        return {
+          payer: p.payer,
+          kind: p.kind,
+          weekly_sessions: keep(g.weekly_sessions, p.weekly_sessions),
+          rate_cents: g.rate_dollars !== undefined ? cents(g.rate_dollars)! : p.sample ? null : p.rate_cents,
+          admin_minutes: g.admin_minutes ?? (p.sample ? undefined : p.admin_minutes),
+        };
       });
       for (const g of given) {
         if (!merged.some((p) => p.payer.toLowerCase() === g.payer.toLowerCase()))
           merged.push({ payer: g.payer, weekly_sessions: g.weekly_sessions ?? null, rate_cents: g.rate_dollars !== undefined ? cents(g.rate_dollars)! : null, admin_minutes: g.admin_minutes, kind: "other" });
       }
-      const changed = Object.keys(input).some((k) => k !== "save");
-      const next = plan.planInputSchema.parse({
+      const given_fields = {
+        current_private_weekly: input.current_private_weekly !== undefined,
+        target_weekly_sessions: input.target_weekly_sessions !== undefined,
+        target_monthly_income_cents: input.target_monthly_income_dollars !== undefined,
+      };
+      const sampleFields = (base.input.sample_fields ?? []).filter((f) => !given_fields[f]);
+      const parsed = plan.planInputSchema.safeParse({
         ...base.input,
         panels: merged,
+        sample_fields: sampleFields,
         ...(input.private_fee_dollars !== undefined ? { private_fee_cents: cents(input.private_fee_dollars) } : {}),
         ...(input.current_private_weekly !== undefined ? { current_private_weekly: input.current_private_weekly } : {}),
         ...(input.target_weekly_sessions !== undefined ? { target_weekly_sessions: input.target_weekly_sessions } : {}),
         ...(input.target_monthly_income_dollars !== undefined ? { target_monthly_income_cents: cents(input.target_monthly_income_dollars) } : {}),
         ...(input.consult_to_client_percent !== undefined ? { consult_to_client: input.consult_to_client_percent / 100 } : {}),
       });
+      if (!parsed.success) return fail(`Those numbers don't fit: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}. Ask her again.`);
+      const next = parsed.data;
       if (input.save) await store.saveGrowth({ plan: next });
       const { loadPracticeSettings } = await import("../gfe/store");
       const p = plan.privatePayPlan(next, (await loadPracticeSettings()).fees);
@@ -134,7 +154,7 @@ export const GROWTH_TOOLS: AeonTool[] = [
         headline: p.headline,
         private_fee: p.privateFeeCents ? usd(p.privateFeeCents) : null,
         panels: p.panels.map((x) => ({
-          payer: x.payer,
+          payer: x.sample ? `[Sample] ${x.payer}` : x.payer,
           sessions_a_week: x.weeklySessions,
           pays_per_session: x.rateCents === null ? "unknown: ask her" : usd(x.rateCents),
           monthly_income: x.monthlyCents === null ? null : usd(x.monthlyCents),
@@ -151,7 +171,7 @@ export const GROWTH_TOOLS: AeonTool[] = [
         assumptions: p.assumptions,
         notes: p.notes,
         saved: Boolean(input.save),
-        ...(base.sample && !changed ? { sample: SAMPLE_NOTE } : {}),
+        ...(p.sample ? { sample: SAMPLE_NOTE } : {}),
         next: `${PAGE} Then offer to draft the website and ads that fill it.`,
       });
     },

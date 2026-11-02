@@ -20,12 +20,24 @@ export type GrowthSettings = {
   /** The hard monthly cap she chose, in cents. null = not set yet. */
   monthlyCapCents: number | null;
   radiusMiles: number;
+  /** The cap is the demo practice's [Sample] one, not hers. */
+  capIsSample?: boolean;
 };
+
+export { MIN_CAP_CENTS, MIN_CAP_MESSAGE } from "./policy";
+/** A Meta campaign runs for this many days on a lifetime budget equal to her monthly cap. */
+export const META_RUN_DAYS = 30;
 
 export const SAMPLE_SITE_URL = "https://www.example.com";
 export const DEFAULT_RADIUS_MILES = 5;
-/** Google averages 30.4 days a month: a daily budget times 30.4 is the most it bills in a month. */
+/**
+ * Google may spend up to twice the average daily budget on a given day, but over a month
+ * no more than 30.4 times it ("About overdelivery and your average daily budget",
+ * https://support.google.com/google-ads/answer/2375423; docs/research.md > Growth agent, section 10).
+ */
 export const DAYS_PER_MONTH = 30.4;
+export const GOOGLE_BUDGET_NOTE =
+  "Google may spend up to twice the daily budget on a busy day, but over a month it charges no more than the daily budget times 30.4, which stays under your cap.";
 
 export type Keyword = { text: string; match: "Phrase" | "Exact" };
 export type GoogleAdsDraft = {
@@ -52,7 +64,8 @@ export type GoogleAdsDraft = {
 export type MetaAd = { name: string; primaryText: string; headline: string; description: string; cta: "BOOK_NOW" | "LEARN_MORE"; ctaLabel: string; url: string };
 export type MetaAdsDraft = {
   platform: "meta";
-  campaign: { name: string; objective: "OUTCOME_TRAFFIC"; status: "PAUSED"; monthlyCapCents: number | null; dailyBudgetCents: number | null };
+  /** A lifetime budget equal to her monthly cap, over a fixed 30-day run: Meta stops spending at the cap. */
+  campaign: { name: string; objective: "OUTCOME_TRAFFIC"; status: "PAUSED"; budgetType: "LIFETIME"; monthlyCapCents: number | null; lifetimeBudgetCents: number | null; startDate: string; endDate: string };
   adSet: {
     location: { label: string; radiusMiles: number };
     ageMin: 18;
@@ -64,7 +77,7 @@ export type MetaAdsDraft = {
     interests: string[];
   };
   ads: MetaAd[];
-  image: { alt: string; source: "muse" | "plain" | null };
+  image: { alt: string; source: "muse" | "plain" | null; /** Why the plain picture stands in, when Muse was tried. */ fallback?: string };
   check: PolicyCheck;
   isSample: boolean;
 };
@@ -168,7 +181,6 @@ export function googleDescriptions(f: MediaFacts): string[] {
     fee ? `Sessions are ${fee}. Ask for a superbill to send to your insurance.` : null,
     f.telehealth ? `In person in ${where} and by video anywhere in ${stateName(f)}. Book online.` : `In person in ${where}. Book a consult online.`,
     f.inNetwork.length ? `In network with ${f.inNetwork.join(" and ")}. Private pay welcome.` : null,
-    f.answers.focus ? `Common reasons people reach out: ${f.answers.focus.replace(/\.$/, "")}.` : null,
   ].filter((d): d is string => Boolean(d));
   return uniq(candidates).filter((d) => !checkText(d, "description", LIMITS.googleDescription, f).some((x) => x.severity === "block")).slice(0, LIMITS.googleDescriptionsMax);
 }
@@ -225,8 +237,10 @@ export function draftGoogleAds(f: MediaFacts, s: GrowthSettings): GoogleAdsDraft
 }
 
 /** RFC 4180 field: quoted when it holds a comma, quote or line break. */
-function csvField(v: string | number | null | undefined): string {
-  const s = v === null || v === undefined ? "" : String(v);
+export function csvField(v: string | number | null | undefined): string {
+  let s = v === null || v === undefined ? "" : String(v);
+  // A cell starting with = + - @ (or a tab/return) runs as a formula in a spreadsheet: make it plain text.
+  if (typeof v === "string" && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
   return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
@@ -265,7 +279,7 @@ export function metaAds(f: MediaFacts, s: GrowthSettings): MetaAd[] {
     name: "Consult",
     primaryText: `Therapy with ${f.name}, ${f.credential}, in ${where}${f.telehealth ? ` and by video across ${stateName(f)}` : ""}.${c ? ` Book a free ${c}-minute consult to see if it's a fit.` : " Book a consult online."}`,
     headline: c ? `Free ${c}-minute consult` : `Therapy in ${where}`,
-    description: f.practiceName.slice(0, LIMITS.metaDescription),
+    description: Array.from(f.practiceName).slice(0, LIMITS.metaDescription).join(""),
     cta: "BOOK_NOW",
     ctaLabel: "Book now",
     url,
@@ -295,15 +309,30 @@ export function checkMetaDraft(d: Omit<MetaAdsDraft, "check">, f: MediaFacts | n
   });
   if (d.adSet.ageMin !== 18) out.push({ rule: "audience_targeting", severity: "block", where: "targeting", message: "Adults 18 and up only." });
   out.push(...checkTargeting({ audiences: d.adSet.audiences, interests: d.adSet.interests, monthlyCapCents: d.campaign.monthlyCapCents }));
+  // The cap is a real stop only as a lifetime budget of exactly the cap, with an end date.
+  if (d.campaign.budgetType !== "LIFETIME" || d.campaign.lifetimeBudgetCents !== d.campaign.monthlyCapCents || !d.campaign.endDate)
+    out.push({ rule: "no_budget_cap", severity: "block", where: "budget", message: "Meta needs a lifetime budget equal to your monthly cap, with an end date." });
   return result(out);
 }
 
 export const META_IMAGE_ALT = "A calm, sunlit counseling office with two armchairs and a plant. No people.";
 
-export function draftMetaAds(f: MediaFacts, s: GrowthSettings, image: MetaAdsDraft["image"]["source"] = null): MetaAdsDraft {
+const isoDay = (d: Date) => d.toISOString().slice(0, 10);
+
+export function draftMetaAds(f: MediaFacts, s: GrowthSettings, image: MetaAdsDraft["image"]["source"] = null, today: Date = new Date()): MetaAdsDraft {
+  const end = new Date(today.getTime() + META_RUN_DAYS * 86_400_000);
   const body: Omit<MetaAdsDraft, "check"> = {
     platform: "meta",
-    campaign: { name: sample(f, `${f.practiceName} - Traffic - ${f.neighborhood ?? f.city}`), objective: "OUTCOME_TRAFFIC", status: "PAUSED", monthlyCapCents: s.monthlyCapCents, dailyBudgetCents: dailyBudgetCents(s.monthlyCapCents) },
+    campaign: {
+      name: sample(f, `${f.practiceName} - Traffic - ${f.neighborhood ?? f.city}`),
+      objective: "OUTCOME_TRAFFIC",
+      status: "PAUSED",
+      budgetType: "LIFETIME",
+      monthlyCapCents: s.monthlyCapCents,
+      lifetimeBudgetCents: s.monthlyCapCents,
+      startDate: isoDay(today),
+      endDate: isoDay(end),
+    },
     adSet: { location: { label: locationLabel(f), radiusMiles: s.radiusMiles }, ageMin: 18, ageMax: 65, genders: "all", placements: "Advantage+ placements", optimization: "LINK_CLICKS", audiences: [], interests: [] },
     ads: metaAds(f, s),
     image: { alt: META_IMAGE_ALT, source: image },
@@ -320,12 +349,21 @@ export function metaAdsSpec(d: MetaAdsDraft) {
       "In Meta Ads Manager, create a campaign with the Traffic objective and leave it off (paused).",
       "Special ad categories: none apply to a therapy practice. Don't pick any audience or interest.",
       `Ad set: location ${d.adSet.location.label}, ${d.adSet.location.radiusMiles} mile radius; ages 18 to 65+; all genders; Advantage+ placements.`,
-      "Budget: use the daily budget below so the month stays under your cap.",
+      `Budget: pick a lifetime budget of exactly the amount below, with the end date below (${META_RUN_DAYS} days). Meta stops spending when it reaches it. If you start later, move the end date to ${META_RUN_DAYS} days after you start.`,
       "Ads: paste each field below, and upload the picture from Practice-OS.",
       "Don't install the Meta Pixel on your site. Count consult bookings in your own calendar instead.",
       "Turn the campaign on yourself when you're ready. Practice-OS never does.",
     ],
-    campaign: { name: d.campaign.name, objective: d.campaign.objective, status: d.campaign.status, special_ad_categories: [], daily_budget: d.campaign.dailyBudgetCents === null ? null : usd(d.campaign.dailyBudgetCents), monthly_cap: d.campaign.monthlyCapCents === null ? null : usd(d.campaign.monthlyCapCents) },
+    campaign: {
+      name: d.campaign.name,
+      objective: d.campaign.objective,
+      status: d.campaign.status,
+      special_ad_categories: [],
+      budget_type: "lifetime",
+      lifetime_budget: d.campaign.lifetimeBudgetCents === null ? null : usd(d.campaign.lifetimeBudgetCents),
+      start_date: d.campaign.startDate,
+      end_date: d.campaign.endDate,
+    },
     ad_set: {
       location: d.adSet.location,
       age_min: d.adSet.ageMin,

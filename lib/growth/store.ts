@@ -11,7 +11,7 @@ import { loadPracticeSettings } from "../gfe/store";
 import { loadMediaFacts, type MediaFacts } from "../media/facts";
 import { payerById } from "../payers/catalog";
 import { listPayerApplications } from "../payers/store";
-import { DEFAULT_RADIUS_MILES, draftGoogleAds, draftMetaAds, type GoogleAdsDraft, type GrowthSettings, type MetaAdsDraft } from "./ads";
+import { DEFAULT_RADIUS_MILES, MIN_CAP_CENTS, MIN_CAP_MESSAGE, draftGoogleAds, draftMetaAds, type GoogleAdsDraft, type GrowthSettings, type MetaAdsDraft } from "./ads";
 import { makeAdImage } from "./image";
 import { planInputSchema, privatePayPlan, SAMPLE_INPUT, type PlanInput, type PrivatePayPlan } from "./plan";
 import { draftSite, type SiteDraft } from "./site";
@@ -29,24 +29,46 @@ export const settingsSchema = z
     plan: planInputSchema.optional(),
     site_url: httpsUrl.nullable().optional(),
     booking_url: httpsUrl.nullable().optional(),
-    monthly_cap_cents: z.number().int().min(1000).max(5_000_000).nullable().optional(),
+    monthly_cap_cents: z.number().int().min(MIN_CAP_CENTS, MIN_CAP_MESSAGE).max(5_000_000).nullable().optional(),
     radius_miles: z.number().min(1).max(50).optional(),
   })
   .strict();
 export type SavedGrowth = z.infer<typeof settingsSchema>;
 
+const KEYS = Object.keys(settingsSchema.shape) as (keyof SavedGrowth)[];
+
+/** Each saved key is read on its own, so one value that no longer fits never hides the rest. */
 export async function loadSavedGrowth(): Promise<SavedGrowth> {
-  const [row] = await db()<{ g: unknown }[]>`select onboarding_answers -> 'growth' as g from practice_os.clinician_profile limit 1`;
-  const r = settingsSchema.safeParse(row?.g ?? {});
-  return r.success ? r.data : {};
+  const [row] = await db()<{ g: Record<string, unknown> | null }[]>`select onboarding_answers -> 'growth' as g from practice_os.clinician_profile limit 1`;
+  const raw = row?.g && typeof row.g === "object" ? row.g : {};
+  const out: Record<string, unknown> = {};
+  for (const k of KEYS) {
+    if (!(k in raw)) continue;
+    const r = settingsSchema.shape[k].safeParse(raw[k]);
+    if (r.success && r.data !== undefined) out[k] = r.data;
+  }
+  return out as SavedGrowth;
 }
 
+/**
+ * Saves only the keys given, each with its own jsonb_set, in one transaction. The patch is
+ * checked first, so a value that doesn't fit throws before anything is written and never
+ * wipes what she saved before.
+ */
 export async function saveGrowth(patch: SavedGrowth): Promise<SavedGrowth> {
-  const merged = settingsSchema.parse({ ...(await loadSavedGrowth()), ...patch });
-  await db()`
-    update practice_os.clinician_profile
-       set onboarding_answers = jsonb_set(coalesce(onboarding_answers, '{}'::jsonb), '{growth}', ${db().json(merged as never)}, true)`;
-  return merged;
+  const checked = settingsSchema.parse(patch);
+  const entries = Object.entries(checked).filter(([, v]) => v !== undefined);
+  await db().begin(async (sql) => {
+    await sql`
+      update practice_os.clinician_profile
+         set onboarding_answers = jsonb_set(coalesce(onboarding_answers, '{}'::jsonb), '{growth}', coalesce(onboarding_answers -> 'growth', '{}'::jsonb), true)`;
+    for (const [k, v] of entries) {
+      await sql`
+        update practice_os.clinician_profile
+           set onboarding_answers = jsonb_set(onboarding_answers, ${`{growth,${k}}`}::text[], ${sql.json(v as never)}, true)`;
+    }
+  });
+  return loadSavedGrowth();
 }
 
 export type GrowthContext = { facts: MediaFacts; settings: GrowthSettings; saved: SavedGrowth; licenseLine: string | null; usingSample: boolean };
@@ -67,6 +89,7 @@ export async function loadGrowthContext(): Promise<GrowthContext> {
       siteUrl: saved.site_url ?? null,
       bookingUrl: saved.booking_url ?? null,
       monthlyCapCents: saved.monthly_cap_cents !== undefined ? saved.monthly_cap_cents : facts.isSample ? SAMPLE_CAP_CENTS : null,
+      capIsSample: usingSample,
       radiusMiles: saved.radius_miles ?? DEFAULT_RADIUS_MILES,
     },
   };
@@ -74,7 +97,7 @@ export async function loadGrowthContext(): Promise<GrowthContext> {
 
 /** Her saved planner numbers; else panels from her approved payers with the numbers left to ask; [Sample] numbers for the demo practice. */
 export async function planInputFor(saved: SavedGrowth, isSample: boolean): Promise<{ input: PlanInput; sample: boolean }> {
-  if (saved.plan) return { input: saved.plan, sample: false };
+  if (saved.plan) return { input: saved.plan, sample: saved.plan.panels.some((p) => p.sample) || Boolean(saved.plan.sample_fields?.length) };
   if (isSample) return { input: SAMPLE_INPUT, sample: true };
   const apps = await listPayerApplications();
   const panels = apps
@@ -87,7 +110,8 @@ export async function loadPlan(patch?: Partial<PlanInput>): Promise<{ plan: Priv
   const [ctx, settings] = await Promise.all([loadGrowthContext(), loadPracticeSettings()]);
   const base = await planInputFor(ctx.saved, ctx.facts.isSample);
   const input = patch ? planInputSchema.parse({ ...base.input, ...patch }) : base.input;
-  return { plan: privatePayPlan(input, settings.fees), input, sample: base.sample && !patch };
+  const plan = privatePayPlan(input, settings.fees);
+  return { plan, input, sample: plan.sample };
 }
 
 // ---- drafts -------------------------------------------------------------------------
@@ -119,7 +143,9 @@ export async function buildDraft(kind: DraftKind, ctx: GrowthContext): Promise<{
   if (kind === "google_ads") return { draft: draftGoogleAds(ctx.facts, ctx.settings), image: null };
   if (kind === "website") return { draft: draftSite(ctx.facts, ctx.settings, ctx.licenseLine), image: null };
   const img = await makeAdImage();
-  return { draft: draftMetaAds(ctx.facts, ctx.settings, img.source), image: img.jpeg };
+  const draft = draftMetaAds(ctx.facts, ctx.settings, img.source);
+  if (img.fallback) draft.image.fallback = img.fallback;
+  return { draft, image: img.jpeg };
 }
 
 /**
