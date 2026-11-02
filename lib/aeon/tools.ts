@@ -1663,16 +1663,32 @@ export const TOOLS_BY_NAME = new Map(TOOLS.map((t) => [t.name, t]));
 const VIEW_ONLY =
   "This is the view-only demo copy of Practice-OS, so I can't change saved data here. On her own computer this works.";
 
+/**
+ * Tools whose results can hold free text she or a client wrote: referral call
+ * notes, saved memories, approval previews, uploaded files and their names,
+ * Front Desk messages. Every rule runs on these (the chat's full check);
+ * the other tools return practice records and official sources and keep the
+ * lighter check. read_document re-checks its text itself as well.
+ */
+export const FREE_TEXT_TOOLS: ReadonlySet<string> = new Set([
+  "read_document", "find_documents", "open_document",
+  "find_referral_cards", "list_referral_sources", "log_referral_contact", "recheck_referral_source",
+  "recent_memory_changes", "remember",
+  "status", "morning_brief", "queue_approval",
+  "front_desk_status", "front_desk_check_now",
+]);
+
 /** Guards every text block and the structured result. A blocked result is replaced, never passed on. */
-export async function guardResult(result: ToolResult): Promise<ToolResult> {
+export async function guardResult(result: ToolResult, tool?: string): Promise<ToolResult> {
+  const opts = { fullRules: tool !== undefined && FREE_TEXT_TOOLS.has(tool) };
   const content: ToolResult["content"] = [];
   for (const block of result.content) {
-    const check = await guard(block.text, "tool_result");
+    const check = await guard(block.text, "tool_result", undefined, opts);
     content.push({ type: "text", text: check.ok ? check.text : WITHHELD });
   }
   if (!result.structuredContent) return { ...result, content };
   const raw = JSON.stringify(result.structuredContent);
-  const check = await guard(raw, "tool_result");
+  const check = await guard(raw, "tool_result", undefined, opts);
   if (!check.ok) return { content: [{ type: "text", text: WITHHELD }], isError: true };
   return { ...result, content, structuredContent: check.text === raw ? result.structuredContent : JSON.parse(check.text) };
 }
@@ -1714,7 +1730,7 @@ export async function runTool(name: string, args: unknown, ctx: ToolContext): Pr
     return text({ waiting_for_her: true, approval_id: approvalId, mode: "manual", where: "the bar above the chat box" });
   }
   const run = () => tool.run(parsed.data as never, ctx);
-  return guardResult(await (mode ? withOrigin({ mode }, run) : run()));
+  return guardResult(await (mode ? withOrigin({ mode }, run) : run()), name);
 }
 
 /** The tool list in Chat Completions shape (cookbook 03_tool_calling.ipynb). */

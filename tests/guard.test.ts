@@ -55,13 +55,14 @@ describe("mergeEntities", () => {
 describe("isAllowedPerson", () => {
   it.each([
     ["Dana", "Remember Dana likes Tuesdays"],
-    ["Alan Brooks", "Dr. Alan Brooks might refer to me"],
-    ["Jenna Cho", "Jenna Cho, LCSW, covers for me"],
     ["Marcus Bell", "Marcus Bell sends me referrals"],
   ])("allows %s", (name, text) => expect(isAllowedPerson(name, text, ALLOWED)).toBe(true));
 
   it("does not allow a stranger", () => {
     expect(isAllowedPerson("Maria", "Maria cancelled again", ALLOWED)).toBe(false);
+    // A title or credential clears no one (Nov 2 review): only her own names and her board do.
+    expect(isAllowedPerson("Alan Brooks", "Dr. Alan Brooks might refer to me", ALLOWED)).toBe(false);
+    expect(isAllowedPerson("Jenna Cho", "Jenna Cho, LCSW, covers for me", ALLOWED)).toBe(false);
   });
 });
 

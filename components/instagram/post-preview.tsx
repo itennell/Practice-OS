@@ -75,7 +75,7 @@ export function PostPreview({
                 aria-expanded={false}
                 aria-controls={captionId}
                 onClick={() => setOpen(true)}
-                className="relative text-[var(--fg-muted)] after:absolute after:-inset-x-2 after:-inset-y-3.5 after:content-[''] hover:text-[var(--fg)]"
+                className="-my-3 inline-flex min-h-touch items-center px-1 align-middle text-[var(--fg-muted)] hover:text-[var(--fg)]"
               >
                 more<span className="sr-only"> of the caption</span>
               </button>
