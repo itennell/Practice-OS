@@ -53,14 +53,15 @@ const EDIT_SCHEMA = {
 const GUIDE = `Ops you can use (numbers are what she sees, 1 is the first):
 - move_slide {slide, to}; set_slide_text {slide, text}; shorten_slide {slide, text} (text must be shorter, same meaning); set_slide_seconds {slide, seconds}
 - add_slide {after, text}; remove_slide {slide} (only "point" slides)
-- set_title {text}; set_caption {text} (keep the license line and every price exactly as they are)
+- set_title {text}; set_caption {text} (keep the license line; keep every price unless she asked to change it)
 - set_palette {palette}: calm (neutral), warm (cream and terracotta), cool (blue-grey), bright (white and berry)
 - set_aspect {aspect}: "4:5" feed, "1:1" square, "9:16" reel
 - new_picture {idea}: a new background picture
 - Video: trim_clip {clip, in?, out?} (seconds in that clip's file); cut_start {seconds}; cut_end {seconds}; split_clip {clip, at}; move_clip {clip, to}; remove_clip {clip}
 - Text on the video: add_text {text, start, end, position}; edit_text {overlay, text?, start?, end?, position?}; remove_text {overlay}
 - set_captions {on}: auto captions; set_cover {slide} or {time}
-Rules: practice logistics only (first session, fees and superbills, insurance, booking, the clinician, office and telehealth). Never mental health advice, coping tips, symptoms, client stories, testimonials or promised results; never mention suicide or self-harm. Slide text at most ${LIMITS.slideText} characters, video text at most ${LIMITS.overlayText}. "At the start" means time 0. If she asks for something no op can do, return no ops and say so in the reply.`;
+Rules: practice logistics only (first session, fees and superbills, insurance, booking, the clinician, office and telehealth). Never mental health advice, coping tips, symptoms, client stories, testimonials or promised results; never mention suicide or self-harm. Slide text at most ${LIMITS.slideText} characters, video text at most ${LIMITS.overlayText}. "At the start" means time 0. If she asks for something no op can do, return no ops and say so in the reply.
+When she changes a fact (a price, a day, a time, insurance), change it everywhere it appears: every slide that says it AND the caption, in the same answer. Never invent a price, insurer or offer.`;
 
 /** The document as she sees it: numbered slides, clips and texts. */
 export function describeDoc(doc: StudioDoc): string {
