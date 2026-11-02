@@ -22,22 +22,24 @@ export async function alertPhone(): Promise<string | null> {
 // (CLINICIAN_ALERT_PHONE), both written to audit_log. No model sees the words.
 export async function handleCrisis(input: {
   inquiryId: string;
-  channel: "voicemail" | "sms";
+  channel: "voicemail" | "sms" | "web_chat";
   from: string | null;
   category: CrisisCategory;
   phone: PhoneAdapter | null;
+  /** Website chat only: crisis messages whose alert was held back by the rate limit since the last one. */
+  more?: number;
 }): Promise<{ replied: boolean; alerted: boolean }> {
   await db()`
     update practice_os.inquiries set crisis_flag = true, status = 'needs_clinician'
     where id = ${input.inquiryId}`;
   // The page gets the masked number; only the text to her own phone below has it in full.
-  await addAlert("crisis", crisisAlertText(input.channel, input.from ? maskPhone(input.from) : null), input.inquiryId);
+  await addAlert("crisis", crisisAlertText(input.channel, input.from ? maskPhone(input.from) : null, input.more), input.inquiryId);
   await audit({
     actor: "safety",
     action: "crisis_detected",
     subjectType: "inquiry",
     subjectId: input.inquiryId,
-    details: { channel: input.channel, category: input.category },
+    details: { channel: input.channel, category: input.category, ...(input.more ? { held_back: input.more } : {}) },
   });
 
   let replied = false;
@@ -54,7 +56,7 @@ export async function handleCrisis(input: {
   const clinician = await alertPhone();
   if (clinician) {
     try {
-      await sendText({ to: clinician, body: crisisAlertText(input.channel, input.from), inquiryId: null, actor: "safety", action: "crisis_alert_sent", force: true, phone: input.phone });
+      await sendText({ to: clinician, body: crisisAlertText(input.channel, input.from, input.more), inquiryId: null, actor: "safety", action: "crisis_alert_sent", force: true, phone: input.phone });
       alerted = true;
     } catch (e) {
       await audit({ actor: "safety", action: "crisis_alert_failed", subjectType: "inquiry", subjectId: input.inquiryId, details: { error: String(e) } });

@@ -94,3 +94,11 @@ export async function readIntent(transcript: string, callerId: string | null): P
     return { ...keywordExtraction(transcript, callerId), ...own };
   }
 }
+
+/**
+ * Plain-code keywords only, no Muse at all: for a message the safety check found
+ * a diagnosis or an ID number in, so those words never leave this computer.
+ */
+export function keywordIntent(transcript: string, callerId: string | null): Extracted {
+  return { ...keywordExtraction(transcript, callerId), name: selfName(transcript), callbackNumber: spokenNumber(transcript) ?? callerId };
+}

@@ -50,11 +50,11 @@ describe.skipIf(!hasDb)("approve flow", () => {
     expect((await auditActions(id)).map((r) => r.action)).toEqual(["approval_approved", "approval_failed"]);
   });
 
-  it("fails a kind with no executor yet", async () => {
+  it("ends failed, with the executor's words, when the payload is incomplete", async () => {
     const id = await makeApproval("web_chat_reply", {});
     const res = await approve(id, { by: "test" });
     expect(res.ok && res.approval.status).toBe("failed");
-    expect(res.ok && res.approval.error).toBe("No executor for web_chat_reply yet.");
+    expect(res.ok && res.approval.error).toBe("payload needs inquiry_id and body.");
   });
 
   it("edit then approve runs the edited text and logs before and after", async () => {
