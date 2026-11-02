@@ -17,7 +17,11 @@ import type { AeonTool, ToolContext, ToolResult } from "./tools";
 const text = (value: unknown): ToolResult => ({ content: [{ type: "text", text: JSON.stringify(value, null, 2) }] });
 
 function tool<I extends z.ZodRawShape>(
-  def: Omit<AeonTool, "run" | "input"> & { input: I; run: (input: z.infer<z.ZodObject<I>>, ctx: ToolContext) => Promise<ToolResult> },
+  def: Omit<AeonTool, "run" | "input" | "preflight"> & {
+    input: I;
+    run: (input: z.infer<z.ZodObject<I>>, ctx: ToolContext) => Promise<ToolResult>;
+    preflight?: (input: z.infer<z.ZodObject<I>>, ctx: ToolContext) => Promise<ToolResult | null>;
+  },
 ): AeonTool {
   return def as unknown as AeonTool;
 }
@@ -29,6 +33,27 @@ export const ABOUT_NAMES =
   "St or N), and say who they see (new parents, children, adults), not conditions, so the privacy check doesn't hold the answer back.";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** One card she has to choose from: enough to tell four Dr. Millers apart. */
+export function choiceOf(c: ReferralSource) {
+  return {
+    id: c.id,
+    name: c.name,
+    credential: c.credential ?? null,
+    specialty: c.specialty ?? null,
+    address: [c.address, c.city, c.state, c.zip].filter(Boolean).join(", ") || null,
+    column: STAGE_LABEL[c.stage],
+  };
+}
+
+/** Said with every ask_which: the model never picks for her. */
+export const ASK_WHICH =
+  "More than one card fits, so nothing changed and nothing was queued. She chooses one of ask_which (name, credential, address); " +
+  "the choice is hers, never Aeon's, and its id goes in the next call.";
+
+/** No card fits: said at once, before anything is queued. */
+export const noCard = (said: string) =>
+  `No card on her Referrals board is named "${said}", so nothing changed and nothing was queued.`;
 
 /** The card her words name: by id, else by name. Several that fit come back to ask which. */
 export function resolveCard(said: string, cards: ReferralSource[]): { card: ReferralSource } | { none: true } | { ask_which: ReferralSource[] } {
@@ -102,6 +127,15 @@ export function searchCards(query: string, cards: ReferralSource[]): ReferralSou
 
 type ChatFn = typeof chat;
 
+/** The honest line about a letter: what plain code found in it and what it left out. The reply says this, nothing more. */
+export function whatItSays(included: string[], leftOut: { what: string; why: string }[]): string {
+  const parts: string[] = [];
+  if (included.length) parts.push(`It says: ${included.join("; ")}.`);
+  if (leftOut.length) parts.push(`It does NOT say: ${leftOut.map((x) => `${x.what} (${x.why})`).join("; ")}.`);
+  if (!parts.length) return "";
+  return `${parts.join(" ")} Nothing else in it was checked as asked for.`;
+}
+
 export const REFERRAL_TOOLS: AeonTool[] = [
   tool({
     name: "find_referral_cards",
@@ -170,8 +204,9 @@ export const REFERRAL_TOOLS: AeonTool[] = [
     description:
       "When she says a referral source isn't interested, asked not to be contacted, or 'don't contact them again': moves the card to " +
       "Not a fit, clears its follow-up, and puts the NPI on her do-not-contact list so no search or weekly plan suggests them again. " +
-      "A note alone does NOT do this, so use this tool, not log_referral_contact. Name the card as she said it or pass its id; it acts " +
-      "only on an exact name match, otherwise it returns ask_which: ask her which and call again with the id. undo: true takes them " +
+      "A note alone does NOT do this, so use this tool, not log_referral_contact. A letter to them still waiting in Approvals is declined. " +
+      "Name the card as she said it or pass its id; it acts only on an exact name match, otherwise it returns ask_which: list them " +
+      "(name, credential, address), ask her which and call again with the id; never pick one yourself. undo: true takes them " +
       "off the list (the card stays where it is); if they asked not to be contacted, ask her to confirm first and pass confirmed: true. Sends nothing.",
     input: {
       source: z.string().trim().min(2).max(160).describe("The card's name as she said it, or its id."),
@@ -182,16 +217,17 @@ export const REFERRAL_TOOLS: AeonTool[] = [
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     label: "Updated your do-not-contact list",
     changesData: true,
+    // The card is found before anything waits in her ask bar: no match or several matches answer at once.
+    preflight: async ({ source }) => {
+      const found = resolveExact(source, await listSources());
+      if ("none" in found) return text({ done: false, why: noCard(source) });
+      if ("ask_which" in found) return text({ done: false, why: ASK_WHICH, ask_which: found.ask_which.map(choiceOf) });
+      return null;
+    },
     run: async ({ source, reason, undo, confirmed }) => {
       const found = resolveExact(source, await listSources());
-      if ("none" in found) return text({ done: false, why: `No card on her Referrals board is named "${source}". Nothing changed.` });
-      if ("ask_which" in found) {
-        return text({
-          done: false,
-          why: "Not an exact match for one card, so nothing changed. Ask her which one she means, then call again with its id.",
-          ask_which: found.ask_which.map((c) => ({ id: c.id, name: c.name, column: STAGE_LABEL[c.stage] })),
-        });
-      }
+      if ("none" in found) return text({ done: false, why: noCard(source) });
+      if ("ask_which" in found) return text({ done: false, why: ASK_WHICH, ask_which: found.ask_which.map(choiceOf) });
       const card = found.card;
       if (undo) {
         const was = await suppressionFor(card.id);
@@ -206,13 +242,15 @@ export const REFERRAL_TOOLS: AeonTool[] = [
         await unsuppress(card.id, undefined, "aeon");
         return text({ done: true, name: card.name, do_not_contact: false, column: STAGE_LABEL[card.stage], note: "Searches and the weekly plan can suggest them again." });
       }
+      let declined: string[];
       try {
-        await suppress(card.id, reason ?? "not_interested", undefined, "aeon");
+        ({ declined } = await suppress(card.id, reason ?? "not_interested", undefined, "aeon"));
       } catch (err) {
         if (err instanceof NoNpiToList) return text({ done: false, name: card.name, never_suggested_again: false, why: err.message });
         throw err;
       }
-      const waiting = await pendingLetter(card.id);
+      // A pending letter was declined with it; one she already approved stays hers to delete or ignore.
+      const ready = await pendingLetter(card.id);
       return text({
         done: true,
         name: card.name,
@@ -220,7 +258,8 @@ export const REFERRAL_TOOLS: AeonTool[] = [
         column: STAGE_LABEL.not_a_fit,
         follow_up: "cleared",
         never_suggested_again: true,
-        ...(waiting ? { letter_still_waiting: { approval_id: waiting.id, next: "A letter to them is still in Approvals; tell her she can dismiss it there." } } : {}),
+        ...(declined.length ? { letters_declined: declined.length, letters_note: "The letter to them that was waiting in Approvals was declined, so it's gone from there." } : {}),
+        ...(ready ? { letter_already_approved: "A letter to them was already approved and is ready to copy on the card; tell her not to send it." } : {}),
       });
     },
   }),
@@ -232,8 +271,9 @@ export const REFERRAL_TOOLS: AeonTool[] = [
       "Changes the introduction letter to someone on her board that is still waiting in her approvals, in place (never a second " +
       "letter): pass `change` with what she asked ('make it shorter', 'mention I take BCBS', 'say I can drop off flyers') and Aeon " +
       "rewrites it, or `letter` with her exact new text. The same rules apply: nothing of value, no fees, only insurers she is in " +
-      "network with, no years she never gave. Name the card as she said it, or pass the approval_id from draft_outreach. A letter she " +
-      "already approved or dismissed isn't changed. Sends nothing. Takes about 10 seconds.",
+      "network with (one she applied to only as 'application pending'), years only from her profile. Plain code checks what the new " +
+      "letter says: tell her exactly what `included` and `left_out` say, never more. Name the card as she said it, or pass the " +
+      "approval_id from draft_outreach. A letter she already approved or dismissed isn't changed. Sends nothing. Takes about 10 seconds.",
     input: {
       source: z.string().trim().min(2).max(160).optional().describe("The card's name as she said it, or its id."),
       approval_id: z.string().uuid().optional().describe("The letter's approval id, if you have it."),
@@ -244,16 +284,21 @@ export const REFERRAL_TOOLS: AeonTool[] = [
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: false },
     label: "Changed the waiting letter",
     changesData: true,
+    preflight: async ({ source, approval_id }) => {
+      if (approval_id || !source) return null;
+      const found = resolveCard(source, await listSources());
+      if ("none" in found) return text({ revised: false, why: noCard(source) });
+      if ("ask_which" in found) return text({ revised: false, why: ASK_WHICH, ask_which: found.ask_which.map(choiceOf) });
+      return null;
+    },
     run: async ({ source, approval_id, change, letter, subject }, ctx) => {
       if (!change && !letter && !subject) return text({ revised: false, why: "Ask her what to change in the letter." });
       let approvalId = approval_id;
       if (!approvalId) {
         if (!source) return text({ revised: false, why: "Say whose letter to change." });
         const found = resolveCard(source, await listSources());
-        if ("none" in found) return text({ revised: false, why: `No card on her Referrals board is named "${source}".` });
-        if ("ask_which" in found) {
-          return text({ revised: false, why: "More than one card fits; ask her which.", ask_which: found.ask_which.map((c) => ({ id: c.id, name: c.name })) });
-        }
+        if ("none" in found) return text({ revised: false, why: noCard(source) });
+        if ("ask_which" in found) return text({ revised: false, why: ASK_WHICH, ask_which: found.ask_which.map(choiceOf) });
         const waiting = await pendingLetter(found.card.id);
         if (waiting?.status === "ready") {
           return text({ revised: false, why: `The letter to ${found.card.name} is already approved and ready to send, so it stays as she approved it.` });
@@ -273,8 +318,15 @@ export const REFERRAL_TOOLS: AeonTool[] = [
         });
         return {
           content: [
-            { type: "text", text: "changed in place; still waiting for her approval" },
-            { type: "text", text: JSON.stringify({ revised: true, approval_id: r.approvalId, to: r.source.name, subject: r.subject, letter: r.letter }, null, 2) },
+            { type: "text", text: `changed in place; still waiting for her approval. ${whatItSays(r.included, r.left_out)}` },
+            {
+              type: "text",
+              text: JSON.stringify(
+                { revised: true, approval_id: r.approvalId, to: r.source.name, subject: r.subject, letter: r.letter, included: r.included, left_out: r.left_out },
+                null,
+                2,
+              ),
+            },
           ],
           structuredContent: { status: "pending", approval_id: r.approvalId },
         };

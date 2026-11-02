@@ -213,13 +213,15 @@ export async function queueApprovalOnce(
     createdBy: string;
   },
   dedupe: { payloadField: string; value: string },
+  /** The statuses that count as the same approval still open. */
+  open: readonly ("pending" | "running")[] = ["pending", "running"],
 ): Promise<{ id: string; created: boolean }> {
   refusePaused(input.kind);
   const result = (await db().begin(async (sql) => {
     await sql`select pg_advisory_xact_lock(hashtext(${`${input.kind}:${dedupe.payloadField}:${dedupe.value}`}))`;
     const [existing] = await sql<{ id: string }[]>`
       select id from practice_os.approvals
-      where kind = ${input.kind} and status in ('pending', 'running')
+      where kind = ${input.kind} and status in ${sql(open as string[])}
         and payload ->> ${dedupe.payloadField} = ${dedupe.value}
       order by created_at desc limit 1`;
     if (existing) return { id: existing.id, created: false };

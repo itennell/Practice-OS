@@ -44,7 +44,12 @@ class NotSaved extends Error {
 
 /** Typed per tool, stored loosely, as in tools.ts (runTool parses the input first). */
 function tool<I extends z.ZodRawShape>(
-  def: Omit<AeonTool, "run" | "input"> & { input: I; run: (input: z.infer<z.ZodObject<I>>, ctx: ToolContext) => Promise<ToolResult> },
+  def: Omit<AeonTool, "run" | "input" | "preflight" | "forApproval"> & {
+    input: I;
+    run: (input: z.infer<z.ZodObject<I>>, ctx: ToolContext) => Promise<ToolResult>;
+    preflight?: (input: z.infer<z.ZodObject<I>>, ctx: ToolContext) => Promise<ToolResult | null>;
+    forApproval?: (input: z.infer<z.ZodObject<I>>, ctx: ToolContext) => Promise<{ args: unknown; shows: string } | null>;
+  },
 ): AeonTool {
   return { queuesOverMcp: true, ...def } as unknown as AeonTool;
 }
@@ -116,6 +121,116 @@ export function applyFees(current: Fee[], changes: FeeChange[]): { fees: Fee[]; 
 }
 
 const feeList = (fees: Fee[]) => fees.map((f) => ({ code: f.code, label: f.label, fee: money(f.cents) }));
+
+// Session lengths in her own words (CPT time ranges: 90832 16-37 min, 90834 38-52, 90837 53+).
+const LENGTH_WORDS: [string, RegExp][] = [
+  ["90832", /\b90832\b|\b(?:30|thirty)[- ]?(?:min|mins|minutes?)\b|\bhalf[- ]an?[- ]hour\b|\bhalf[- ]hour\b|\b30s\b/i],
+  ["90834", /\b90834\b|\b(?:45|forty[- ]five)[- ]?(?:min|mins|minutes?)\b|\b45s\b/i],
+  ["90837", /\b90837\b|\b(?:53|55|60|sixty|fifty[- ]three)[- ]?(?:min|mins|minutes?)\b|\b(?:an?|one|full)[- ]hour\b|\bhour[- ]long\b|\b60s\b/i],
+];
+const EVERY_LENGTH = /\b(?:all|every|each|any)\s+(?:of\s+(?:my|the)\s+)?(?:session\s+)?(?:lengths?|sessions?|session types?)\b|\bsame (?:fee |price )?for (?:all|every|each|any)\b|\bregardless of (?:the )?length\b|\bno matter (?:how long|the length)\b/i;
+
+/** The session codes her words name, and whether she said the fee is the same for every length. */
+export function lengthsNamed(words: string): { codes: Set<string>; every: boolean } {
+  return { codes: new Set(LENGTH_WORDS.filter(([, re]) => re.test(words)).map(([code]) => code)), every: EVERY_LENGTH.test(words) };
+}
+
+/** Her words in clauses, each with the session codes it names and the dollar amounts in it: "45-min $130 and 60-min $160" -> two. */
+export function feeClauses(words: string): { codes: Set<string>; dollars: number[] }[] {
+  return words
+    .split(/\s*(?:[,;\n]|\band\b|\bbut\b)\s*/i)
+    .filter(Boolean)
+    .map((clause) => {
+      const codes = new Set(LENGTH_WORDS.filter(([, re]) => re.test(clause)).map(([code]) => code));
+      // The amounts once the length words and codes are taken out ("45-minute" isn't $45).
+      let rest = clause;
+      for (const [, re] of LENGTH_WORDS) rest = rest.replace(new RegExp(re.source, "gi"), " ");
+      rest = rest.replace(/\b9\d{4}\b/g, " ");
+      const dollars = [...rest.matchAll(/\$\s?(\d{1,5}(?:\.\d{1,2})?)|\b(\d{2,5}(?:\.\d{1,2})?)\b/g)].map((m) => Number(m[1] ?? m[2]));
+      return { codes, dollars };
+    });
+}
+
+export type FeeResolution = { changes: FeeChange[] } | { ask: Record<string, unknown> };
+
+/**
+ * Plain code, never the model: which code each session fee is for, from her own words.
+ * - A session fee goes to a length only when her words name it, or when she has one session
+ *   code saved and names no other length ("sessions are $130" then means that one).
+ * - Each amount belongs to its own clause ("45-min $130 and 60-min $160"): a code and amount
+ *   pairing that doesn't match her clauses asks.
+ * - Without her words (MCP, or a call she approved) a session fee needs an explicit code.
+ * The result has every change with its code, so her approval shows exactly what changes.
+ */
+export function resolveFees(current: Fee[], changes: FeeChange[], herWords: string | undefined): FeeResolution {
+  const sessions = current.filter((f) => (SESSION_CODES as readonly string[]).includes(f.code));
+  const options = sessions.length
+    ? sessions.map((s) => ({ code: s.code, label: s.label, now: money(s.cents) }))
+    : SESSION_CODES.map((code) => ({ code, label: CODES[code].label, now: null }));
+  const ask = (why: string): FeeResolution => ({ ask: { ask_which: options, why } });
+  const isSession = (c: FeeChange) => c.service === "follow_up" || (c.code !== undefined && (SESSION_CODES as readonly string[]).includes(c.code));
+  if (herWords === undefined) {
+    if (changes.some((c) => c.service === "follow_up")) return ask("Without her own words, a session fee needs its CPT code (90832, 90834 or 90837).");
+    return { changes };
+  }
+  const { codes, every } = lengthsNamed(herWords);
+  const clauses = feeClauses(herWords);
+  // code -> the amounts her clauses tie to it (only clauses that name one code).
+  const paired = new Map<string, Set<number>>();
+  for (const cl of clauses) if (cl.codes.size === 1 && cl.dollars.length) paired.set([...cl.codes][0], new Set([...(paired.get([...cl.codes][0]) ?? []), ...cl.dollars]));
+  const out: FeeChange[] = [];
+  for (const c of changes) {
+    if (!isSession(c)) {
+      out.push(c);
+      continue;
+    }
+    if (c.all_lengths) {
+      if (!every) return ask("She didn't say the fee is the same for every session length.");
+      out.push(c);
+      continue;
+    }
+    let code = c.code;
+    if (!code) {
+      // "Sessions" with one saved session code means that code, unless her words name another length.
+      if (codes.size === 1 && sessions.length === 1 && sessions[0].code !== [...codes][0]) return ask(`Her words name ${[...codes][0]}, not ${sessions[0].code}.`);
+      if (codes.size === 1) code = [...codes][0];
+      else if (codes.size === 0 && sessions.length === 1) code = sessions[0].code;
+      else if (codes.size === 0 && sessions.length > 1) return ask("She has more than one session length saved and didn't name one.");
+      else if (codes.size === 0) return ask("She hasn't saved a session length yet and didn't name one.");
+      else {
+        const fits = [...paired].filter(([, amounts]) => amounts.has(c.dollars)).map(([k]) => k);
+        if (fits.length !== 1) return ask("Her words name more than one session length; each fee needs its own length.");
+        code = fits[0];
+      }
+    }
+    if (codes.size === 0) {
+      // No length in her words: only her one saved session code.
+      if (!(sessions.length === 1 && sessions[0].code === code)) return ask(`Her words don't name ${code} or its session length.`);
+    } else if (!codes.has(code)) {
+      return ask(`Her words name ${[...codes].join(" and ")}, not ${code}.`);
+    }
+    const amounts = paired.get(code);
+    if (amounts && !amounts.has(c.dollars)) return ask(`She tied ${[...amounts].map((d) => `$${d}`).join(" or ")} to ${code}, not $${c.dollars}.`);
+    if (codes.size > 1 && !amounts) return ask(`Her words don't say which fee is for ${code}.`);
+    out.push({ code, dollars: c.dollars, ...(c.free ? { free: true } : {}) });
+  }
+  return { changes: out };
+}
+
+/** The old resolveFees question alone, for callers that only want to know whether to ask. */
+export function sessionLengthQuestion(current: Fee[], changes: FeeChange[], herWords: string): Record<string, unknown> | null {
+  const r = resolveFees(current, changes, herWords);
+  return "ask" in r ? r.ask : null;
+}
+
+/** "90834 Therapy, 38-52 minutes: $150 -> $130", one line per code her approval changes. */
+export function feeLines(changed: Changed[]): string {
+  return changed.map((c) => `${c.code} ${c.label}: ${c.from ?? "not set"} -> ${c.to}`).join("\n");
+}
+
+const ASK_LENGTH =
+  "Which session length is this fee for? Nothing was changed. List these to her and ask; never pick one yourself. " +
+  "Call again with the code she names, or all_lengths: true only if she says it's the same for every length.";
 
 // ---- Open days -----------------------------------------------------------------------------
 
@@ -215,7 +330,14 @@ const policyInput = {
   late_cancel_fee_dollars: policyDollars("Late cancellation fee"),
   no_show_fee_dollars: policyDollars("No-show fee"),
   returned_payment_fee_dollars: policyDollars("Returned payment fee"),
-  reply_within_hours: z.number().int().min(1).max(168).optional().describe("How fast she replies to messages, in hours."),
+  reply_within_hours: z.number().int().min(1).max(168).optional().describe("How fast she replies to messages, when she says hours ('within 24 hours')."),
+  reply_within_business_days: z
+    .number()
+    .int()
+    .min(1)
+    .max(10)
+    .optional()
+    .describe("When she says business days ('within 2 business days' -> 2). Never turn business days into hours."),
   records_fee_note: z.string().trim().max(240).optional().describe("What she charges for copies of records, in her words."),
   privacy_officer: z.string().trim().max(120).optional().describe("Who handles privacy questions (usually herself)."),
   backup_colleague: z.string().trim().max(160).optional().describe("The colleague who contacts clients if she can't, with a title, e.g. 'Jordan Lee, LCSW'."),
@@ -225,7 +347,7 @@ const policyInput = {
   npp_effective_on: isoDay.optional().describe("The date her Notice of Privacy Practices takes effect."),
 };
 
-/** Her chat words to the stored shape: dollars become cents, "none" becomes 0. */
+/** Her chat words to the stored shape: dollars become cents, "none" becomes 0. A reply time in one unit clears the other. */
 export function toPolicies(input: z.infer<z.ZodObject<typeof policyInput>>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(input)) {
@@ -233,7 +355,22 @@ export function toPolicies(input: z.infer<z.ZodObject<typeof policyInput>>): Rec
     if (k.endsWith("_dollars")) out[k.replace(/_dollars$/, "_cents")] = v === "none" ? 0 : Math.round((v as number) * 100);
     else out[k] = v;
   }
+  if (input.reply_within_business_days !== undefined) out.reply_within_hours = null;
+  else if (input.reply_within_hours !== undefined) out.reply_within_business_days = null;
   return out;
+}
+
+const NUMBER_WORD: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, a: 1 };
+/** The sentence of her message about her reply time ("I reply within 2 business days"), or "" when none is. */
+export function replySentence(words: string): string {
+  return words.split(/(?<=[!?;]|(?<!\b(?:Dr|Mr|Ms|Mrs|Mx|St|Ave|Jr|Sr|Inc|vs))\.)\s+|\n+/).find((x) => /\b(?:repl(?:y|ies|ying)|respond\w*|get back|answer\w*|messages?|emails?)\b/i.test(x)) ?? "";
+}
+
+/** "within 2 business days" in her words, as a number of days. */
+export function businessDaysSaid(words: string): number | null {
+  const m = /\b(\d{1,2}|one|two|three|four|five|a)\s+business\s+days?\b/i.exec(words);
+  if (!m) return null;
+  return NUMBER_WORD[m[1].toLowerCase()] ?? Number(m[1]);
 }
 
 /** Which client forms can download now, and why the rest can't (the same check as the PDF route). */
@@ -303,17 +440,40 @@ export const SETTINGS_TOOLS: AeonTool[] = [
     description:
       "Saves her fees to her fee list, the one Good Faith Estimates and superbills price from. Use it whenever she states a fee ('my intake is $150, sessions $130'), " +
       "never remember. Each change is a CPT code (90834) or a service: intake (90791) or follow_up (her regular session). " +
-      "When she has more than one session length on her list, follow_up needs a code, or all_lengths: true only if she says the fee is the same for every length; " +
-      "otherwise it returns ask_which: ask her which length. A fee is at least $1; $0 only with free: true when she says the service is free. " +
+      "Plain code reads her own words for the session length (and ties each amount to its length): when they don't name one and more than one is saved, or name a different one, " +
+      "it returns ask_which: ask her which length, never pick one. all_lengths: true only if she says the fee is the same for every length. Over MCP a session fee needs its code. A fee is at least $1; $0 only with free: true when she says the service is free. " +
       "The result lists every code it changed, from and to; tell her those. saved: false means nothing changed. If it was wrong, undo_last_setting puts it back.",
     input: { changes: z.array(feeChange).min(1).max(10) },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     label: "Updated your fees",
     changesData: true,
+    // Her own message decides the session length, before anything waits for her approval.
+    preflight: async ({ changes }, ctx) => {
+      try {
+        const current = (await loadPracticeSettings()).fees;
+        const r = resolveFees(current, changes, ctx.said?.at(-1));
+        if ("ask" in r) return failed(ASK_LENGTH, r.ask);
+        applyFees(current, r.changes); // an unknown code is refused now, not after her approval
+        return null;
+      } catch (err) {
+        if (err instanceof NotSaved) return failed(err.message, err.extra);
+        return failed(`Couldn't read her saved fees, so nothing was changed. ${err instanceof Error ? err.message.slice(0, 200) : ""}`.trim());
+      }
+    },
+    // Her approval shows and runs the resolved codes, with each label and its old and new fee.
+    forApproval: async ({ changes }, ctx) => {
+      const current = await loadPracticeSettings();
+      const r = resolveFees(current.fees, changes, ctx.said?.at(-1));
+      if ("ask" in r) return null;
+      return { args: { changes: r.changes }, shows: feeLines(applyFees(current.fees, r.changes).changed) };
+    },
     run: async ({ changes }, ctx) =>
       saving(async () => {
         const current = await loadPracticeSettings();
-        const { fees, changed } = applyFees(current.fees, changes);
+        // A call she approved already carries the resolved codes; anything else is resolved from her words again.
+        const r = resolveFees(current.fees, changes, ctx.approved ? undefined : ctx.said?.at(-1));
+        if ("ask" in r) throw new NotSaved(ASK_LENGTH, r.ask);
+        const { fees, changed } = applyFees(current.fees, r.changes);
         const { before, after } = await savePracticeSettings({ hours: current.hours, fees }, ctx.by);
         return json({ saved: true, changed, before: feeList(before.fees), after: feeList(after.fees), used_by: ["Good Faith Estimates", "superbills", "client forms"] });
       }),
@@ -367,20 +527,38 @@ export const SETTINGS_TOOLS: AeonTool[] = [
     title: "Save her practice policies for client forms",
     description:
       "Saves the practice policies every client form uses (practice policies, intake, informed consent and the rest): cancellation notice in hours, " +
-      "late-cancel and no-show fees in dollars, reply time, records fee, privacy contact, backup colleague, insurance, sliding scale, texting. " +
+      "late-cancel and no-show fees in dollars, reply time (hours, or business days as she said them), records fee, privacy contact, backup colleague, " +
+      "whether she bills insurance, sliding scale, texting, and the date her privacy notice takes effect. " +
       "Use it whenever she states one ('24h cancellation, $100 late fee' -> cancel_hours 24, late_cancel_fee_dollars 100), never remember. " +
       "No client details. The result lists which forms can download now and what still blocks the others; tell her what's still missing.",
     input: policyInput,
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     label: "Saved your practice policies",
     changesData: true,
+    // "2 business days" stays business days: plain code checks her words before anything saves or waits.
+    preflight: async (input, ctx) => {
+      const days = businessDaysSaid(replySentence(ctx.said?.at(-1) ?? ""));
+      if (days === null) return null;
+      const given = input.reply_within_hours !== undefined || input.reply_within_business_days !== undefined;
+      if (given && (input.reply_within_hours !== undefined || input.reply_within_business_days !== days)) {
+        return failed(`She said ${days} business day${days === 1 ? "" : "s"}. Call again with reply_within_business_days: ${days} and no reply_within_hours. Nothing was saved.`);
+      }
+      return null;
+    },
     run: async (input, ctx) =>
       saving(async () => {
         const next = toPolicies(input);
         if (!Object.keys(next).length) throw new NotSaved("Nothing to change.");
         const before = await forms.loadPolicies();
         const policies = await forms.savePolicies(next, db(), ctx.by);
-        return json({ saved: true, changed: Object.keys(next), before: before.policies, after: policies, forms: await formsStatus() });
+        return json({
+          saved: true,
+          changed: Object.keys(next),
+          before: before.policies,
+          after: policies,
+          ...(input.reply_within_business_days ? { reply_time: `Saved as ${input.reply_within_business_days} business day${input.reply_within_business_days === 1 ? "" : "s"}, as she said.` } : {}),
+          forms: await formsStatus(),
+        });
       }),
   }),
 
