@@ -33,7 +33,11 @@ describe("seal", () => {
     expect(unseal(sealed, key, "ctx")).toBe("token-123");
     expect(() => unseal(sealed, randomBytes(32), "ctx")).toThrow();
     expect(() => unseal(sealed, key, "other")).toThrow();
-    expect(() => unseal(sealed.slice(0, -2) + "AA", key, "ctx")).toThrow();
+    // Change one character in the middle: the tail can already end in "AA", and the very
+    // last base64 character can carry only padding bits, so tampering there is not reliable.
+    const i = Math.floor(sealed.length / 2);
+    const tampered = sealed.slice(0, i) + (sealed[i] === "A" ? "B" : "A") + sealed.slice(i + 1);
+    expect(() => unseal(tampered, key, "ctx")).toThrow();
   });
 
   it("only returns to the app on this computer", () => {
