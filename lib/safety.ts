@@ -24,8 +24,9 @@ const SQUASHED: Record<CrisisCategory, string[]> = {
     "endmylife", "endmyownlife", "endherlife", "endhislife", "endtheirlife", "enditall",
     "endingitall", "endingmylife", "endingmyownlife",
     "takemylife", "takemyownlife", "takeherlife", "takehislife", "takingmylife", "takingmyownlife",
-    "overdose", "toomanypills", "hangmyself", "hangherself", "hanghimself",
+    "overdos", "toomanypills", "toomanyofmypills", "hangmyself", "hangherself", "hanghimself",
     "wanttodie", "wantstodie", "wantedtodie", "wantingtodie", "wanttobedead", "wantstobedead",
+    "wanttoliveanymore", "wanttobealiveanymore", "wanttobehereanymore",
     "betteroffdead", "betteroffwithoutme", "noreasontolive", "nothingtolivefor", "nopointinliving", "nopointliving",
     "dontwanttobehereanymore", "dontwanttoliveanymore", "dontwanttolive", "dontwanttowakeup",
     "dontwannabehereanymore", "dontwannalive", "dontwannabealive", "dontwanttoexist", "dontwannaexist",
@@ -62,49 +63,58 @@ const WORDS: Record<CrisisCategory, RegExp[]> = {
     // Spaced, so "I wish I was deadline-free" passes.
     /\bwish i (was|were) dead\b/,
     /\b(dont|do not) want to be alive\b/,
-    // "disappear into a book" is a weekend plan, not ideation.
-    /\b(want to|wanna) disappear\b(?! into (a|an|the|my|our|some) (book|books|novel|movie|film|show|series|game|project|work|garden|kitchen|woods|forest|mountains|beach|cabin|vacation|trip|music|studio|library)\b)/,
-    // Implicit ending: "I want to end it", "going to end it tonight".
-    /\b(want to|wanna|going to|gonna|ready to|about to|planning to|plan to|thinking about|thinking of) end(ing)? (it|everything|things)( all)?( (tonight|today|now|soon|already|for good))?$/,
+    // Only "disappear into a (good) book" is exempt, and checkOne drops even
+    // that when a finality cue ("forever", "nothing matters") is present.
+    /\b(want to|wanna) disappear\b(?! into (a )?(good )?books?\b)/,
+    // Implicit ending: "I want to end it", "going to end it, hotline?". No end
+    // anchor; only a few plainly benign completions pass ("end it at 5",
+    // "end it with the vendor", "end things with him").
+    /\b(want to|wanna|going to|gonna|ready to|about to|planning to|plan to|thinking about|thinking of|need to|have to|just) end(ing)? (it|everything|things)( all)?\b(?! (at|by|early|earlier|with|after|before|on time|there|here|for the day|for today|off|up)\b)/,
     /\bend(ing)? (it|everything) (tonight|today|right now|for good)\b/,
     // Overdose without the word: "took a bunch of pills", "took too many of my pills".
-    /\b(took|take|taken|taking|swallowed|swallow) (a (bunch|lot|handful|ton|bottle) of|too many( of)?|all( of)?|every one of|(the|a) whole bottle of)( (my|the|those|these|her|his))?( \w+)? (pills|tablets|meds|medication)\b/,
-    // Can't go on, at the end or with "hopeless" ("can't go on vacation" passes).
-    /\b(cant|cannot|can not) (go on|keep going)( (anymore|any more|like this|living))?$/,
-    /\bhopeless\b.*\b(cant|cannot|can not) (go on|keep going)\b/,
-    /\b(cant|cannot|can not) (go on|keep going)\b.*\bhopeless\b/,
+    /\b(took|taken|swallowed|downed)( (a (bunch|lot|handful|ton|bottle) of|too many( of)?|all( of)?|every one of|(the|a) whole bottle of))( (my|the|those|these|her|his))?( \w+)? (pills|tablets|meds|medication|medications)\b/,
+    /\b(take|taking|swallow|swallowing) (a (bunch|lot|handful|ton|bottle) of|too many( of)?|every one of|(the|a) whole bottle of)( (my|the|those|these|her|his))?( \w+)? (pills|tablets|meds|medication)\b/,
+    /\b(take|taking|swallow|swallowing) all( of)?( (my|the|those|these))?( \w+)? (pills|tablets|meds|medication)( \w+)?( \w+)? (at once|tonight|together|right now)\b/,
+    /\b(pills|tablets|meds) (i|she|he) (took|swallowed|had) (were|was) too many\b/,
+    // Can't go on: no end anchor; a short list of benign completions passes
+    // ("can't go on vacation", "can't go on Friday", "cannot keep going with this vendor").
+    /\b(cant|cannot|can not) (go on|keep going)\b(?! (on )?(vacation|leave|holiday|a trip|trips|retreat|break|maternity|the call|a call|calls|the portal|the website|the site|the app|the system|the panel|the schedule|the calendar|camera|air|record|stage|instagram|social|live|monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow|this week|next week|with (this|the|that|our) (vendor|portal|plan|ehr|system|company|software|biller|contract|process|tool|tools))\b)/,
   ],
   harm_to_others: [],
   danger: [
     // First-person abuse, violence and weapons stay crisis in any context.
-    /\b(being|been|was|were|get|getting|got|am) abused\b/,
-    /\babus(es|ed|ing) (me|my|us)\b/,
+    /\b(i|im|i m|i am|ive|i have|i was|i keep|i get|i got)( being| been| getting)? abused\b/,
+    /\babus(es|ed|ing) (me|us)\b/,
     /\b(my|her|his) abus(er|ive)\b/,
     /\b(i am|im|i m|been|being|living with|experiencing|suffering|victim of) (in )?(a )?domestic violence\b/,
-    /\b(has|had|got|holding|grabbed|pulled|pointing|waving) (a|his|her|their) (gun|knife|weapon)\b/,
+    /\b(he|she|they|someone|somebody|my \w+|the (caller|man|guy|woman)) (has|had|got|is holding|was holding|grabbed|pulled|is pointing|pointed|is waving) (a|an|his|her|their) (gun|knife|weapon|rifle|pistol)\b/,
   ],
 };
 
 // Practice-task allow-list. Topic words (abuse, domestic violence, weapons,
-// "suicide" as a subject) are crisis unless the message is plainly a business
-// task about that topic: reporting rules, a policies or resources page, a
-// hotline list, billing codes, a gun-free sign. Each family has its own narrow
-// contexts, so "there's a knife, update my policy page" still routes. The
-// allow-list never covers first-person ideation or danger: SQUASHED and WORDS
-// above run first and always win, so "I want to kill myself, also what's the
-// CPT code" and "I'm suicidal, update my policies page" are still crisis.
+// "suicide" as a subject, the book exemption above) are crisis unless the
+// message is plainly a business task about that topic: reporting rules, a
+// policies or resources page, a hotline list, billing codes, an intake
+// question, a gun-free sign. Each family has its own narrow contexts, so
+// "there's a knife, update my policy page" still routes. The allow-list only
+// applies when the message has no personal cue at all (PERSONAL below): a
+// first-person victim or ideation phrase, a family member plus a harm word, or
+// a finality word. Ideation patterns (SQUASHED, WORDS) always win regardless.
+// A missed crisis is far worse than a false alarm: when unsure, it routes.
 const REPORTING =
-  /\b(report(ing)? (child |elder |suspected )?(abuse|neglect)|(abuse|neglect) report(ing|s)?|reporting (requirements?|rules?|laws?|duties|obligations?)|mandat(ed|ory) report(er|ers|ing))\b/;
-const POLICY_PAGE = /\b(polic(y|ies) (page|section|document|doc|statement)|(crisis|safety|reporting) polic(y|ies))\b/;
+  /\b(report(ing)? (child |elder |suspected )?(abuse|neglect)|(abuse|neglect) report(ing|s)?|reporting (requirements?|rules?|laws?|duties|obligations?)|mandat(ed|ory) report(er|ers|ing)|who do i report|report (it|this|that) to)\b/;
+const POLICY_PAGE =
+  /\b(polic(y|ies)\b.*\b(page|website|site|section|document|doc|statement|handbook)|(crisis|safety|reporting|prevention) polic(y|ies))\b/;
 const RESOURCES = /\b(hotlines?|lifeline|resources? (page|list|section))\b/;
 const BILLING = /\b(cpt|icd|risk assessments?|risk screenings?|bill(ing)? for|billing codes?)\b/;
+const INTAKE = /\b(intake|screening|questionnaire)\b/;
 const TOPICS: Array<{ category: CrisisCategory; word: RegExp; contexts: RegExp[] }> = [
   { category: "danger", word: /\babus(e|ed|ing|ive)\b/, contexts: [REPORTING, POLICY_PAGE, RESOURCES] },
-  { category: "danger", word: /\bdomestic violence\b/, contexts: [REPORTING, POLICY_PAGE, RESOURCES, BILLING] },
+  { category: "danger", word: /\bdomestic violence\b/, contexts: [REPORTING, POLICY_PAGE, RESOURCES, BILLING, INTAKE] },
   {
     category: "danger",
     word: /\b(gun|guns|knife|knives|weapon|weapons|firearm|firearms)\b/,
-    contexts: [/\b(guns?|weapons?|firearms?) free\b/, /\bno (guns|weapons|firearms)\b/, /\b(guns?|weapons?|firearms?) polic(y|ies)\b/],
+    contexts: [/\b(guns?|weapons?|firearms?) free\b/, /\bno (guns|weapons|firearms)\b/, /\b(guns?|weapons?|firearms?) polic(y|ies)\b/, INTAKE],
   },
 ];
 // "Suicide" as a subject: only these noun phrases are dropped, and only in a
@@ -112,6 +122,21 @@ const TOPICS: Array<{ category: CrisisCategory; word: RegExp; contexts: RegExp[]
 const SUICIDE_TOPIC =
   /\bsuicid(e|al) (prevention|risk|risks|assessments?|screenings?|polic(y|ies)|protocols?|awareness|hotlines?|lifeline|training|safety plans?|ideation (screening|assessment))\b/g;
 const SUICIDE_CONTEXTS = [REPORTING, POLICY_PAGE, RESOURCES, BILLING];
+
+const FINALITY =
+  /\b(never come back|nobody would (notice|care|miss me)|no one would (notice|care|miss me)|nothing matters|forever|no point|nothing helps|cant take it|cannot take it|give up on everything)\b/;
+// Personal cues: any one of these switches the allow-list off for the message.
+const HARM = "(hit|hits|hitting|hurt|hurts|hurting|abuse|abuses|abused|abusive|afraid|scared|terrified|unsafe|not safe|end it|die|dying|kill|cant go on|cannot go on|can not go on|choke|chokes|choked|beat|beats|beating|threaten|threatens|threatened|violent|violence|gun|knife|weapon)";
+const PERSONAL: RegExp[] = [
+  // First person + a harm verb or feeling. Topic nouns (abuse, violence, gun)
+  // are left out here so "Who do I report child abuse to?" is not personal.
+  /\b(i|im|i m|i am|ive|i have|i was|i feel|i keep|i get|i got)( \w+)?( \w+)?( \w+)? (hit|hits|hitting|hurt|hurts|hurting|abused|afraid|scared|terrified|unsafe|not safe|end it|die|dying|kill|cant go on|cannot go on|can not go on|choked|beaten|threatened)\b/,
+  /\b(hit|hits|hurt|hurts|abuse|abuses|abused|choke|chokes|choked|beat|beats|kick|kicks|kicked|threaten|threatens|threatened|attack|attacks|attacked|rape|raped) (me|us|my)\b/,
+  /\brisk to (myself|me)\b/,
+  /\b(im|i m|i am)( \w+)?( \w+)? suicid(e|al) risk\b/,
+  new RegExp(`\\bmy (husband|wife|partner|spouse|boyfriend|girlfriend|bf|gf|dad|father|mom|mother|stepdad|stepmom|ex|son|daughter|brother|sister|roommate|boss|uncle|aunt)s?\\b.*\\b${HARM}`),
+  FINALITY,
+];
 
 // Misspellings of the two words that matter most ("suicdal", "suacidal", "sucidal").
 const FUZZY_TARGETS = ["suicide", "suicidal"];
@@ -167,20 +192,30 @@ function nearMissSuicide(spaced: string): boolean {
     .some((word) => word.length >= 6 && word.startsWith("s") && FUZZY_TARGETS.some((t) => editDistance(word, t) <= 1));
 }
 
-function checkOne(spaced: string): CrisisResult {
+// Benign idioms removed before matching, unless a finality cue is present: "I wanted to die laughing", "quiero morir de risa", "ending it all at 5pm".
+const IDIOMS = [
+  /\b(die|died|dying|morir|morirme|mourir|sterben) (laughing|of laughter|de risa|de rire|vor lachen)\b/g,
+  /\bend(ing)? it all (at|by) (\w{1,2} ?(am|pm)|\d+|noon|midnight|close|closing|the end of)\b/g,
+];
+
+function checkOne(text: string): CrisisResult {
+  const spaced = FINALITY.test(text) ? text : IDIOMS.reduce((t, re) => t.replace(re, " "), text);
+  const personal = PERSONAL.some((re) => re.test(spaced));
   const squashed = spaced.replace(/ /g, "");
   // 1. Ideation, self-harm and direct danger: always crisis, whatever else is said.
   for (const category of Object.keys(SQUASHED) as CrisisCategory[]) {
     if (SQUASHED[category].some((s) => squashed.includes(s))) return { crisis: true, category };
     if (WORDS[category].some((re) => re.test(spaced))) return { crisis: true, category };
   }
-  // 2. "Suicide": its topic phrases are dropped only in a practice context.
-  const practice = SUICIDE_CONTEXTS.some((re) => re.test(spaced));
+  // The book exemption on "want to disappear" holds only with no personal cue.
+  if (personal && /\b(want to|wanna) disappear\b/.test(spaced)) return { crisis: true, category: "self_harm" };
+  // 2. "Suicide": its topic phrases are dropped only in a practice context with no personal cue.
+  const practice = !personal && SUICIDE_CONTEXTS.some((re) => re.test(spaced));
   const rest = practice ? spaced.replace(SUICIDE_TOPIC, " ") : spaced;
   if (rest.replace(/ /g, "").includes("suicid") || nearMissSuicide(rest)) return { crisis: true, category: "self_harm" };
-  // 3. Danger topic words, unless one of that family's practice contexts is present.
+  // 3. Danger topic words, unless that family's practice context is present and there is no personal cue.
   for (const topic of TOPICS) {
-    if (topic.word.test(spaced) && !topic.contexts.some((re) => re.test(spaced))) return { crisis: true, category: topic.category };
+    if (topic.word.test(spaced) && (personal || !topic.contexts.some((re) => re.test(spaced)))) return { crisis: true, category: topic.category };
   }
   return { crisis: false };
 }
