@@ -1,4 +1,4 @@
-import { dollars, fullAddress, replyHours, signedBy } from "../facts";
+import { dollars, fullAddress, repliesInBusinessDays, replyWithin, signedBy } from "../facts";
 import { REVIEW } from "../review";
 import { fillIn, type FormDef, type PracticeFacts } from "../types";
 
@@ -259,7 +259,7 @@ export const communicationConsent: FormDef = {
     law("stop", "Stop texts at any time (reply STOP)", "47 CFR 64.1200(a)(10)", E_64_1200, [/STOP/]),
     { id: "minimum", label: "Texts carry only the time, never care details", citation: "HHS OCR guidance", url: E_164_522, level: "practice", mustSay: [/never details about your care/i] },
     { id: "not_emergency", label: "Not for emergencies; 988 and 911", citation: "Practice-OS safety rule", url: "https://988lifeline.org/", level: "practice", mustSay: [/988/, /911/] },
-    { id: "reply_time", label: "When to expect a reply", citation: "Practice guidance", url: "https://www.apaservices.org/practice/business", level: "practice", mustSay: [/within \d+ hours/i] },
+    { id: "reply_time", label: "When to expect a reply", citation: "Practice guidance", url: "https://www.apaservices.org/practice/business", level: "practice", mustSay: [/within \d+ (?:hours|business days?)/i] },
   ],
   build: (f) => [
     { kind: "field", id: "client_name", label: "Client name" },
@@ -286,7 +286,7 @@ export const communicationConsent: FormDef = {
         ? `By ticking text, you agree that ${f.practiceName} may text or call this number about your appointments. Our texts only say the date and time, never details about your care. You can stop texts at any time by replying STOP or telling us.`
         : `We do not text clients. We call or email about appointments only, and our messages say the date and time, never details about your care. Reply STOP or tell us if you want them to end.`,
     },
-    { kind: "clause", id: "reply_time", editable: true, label: "Reply time", text: `We reply to messages within ${replyHours(f)} hours on days the office is open.` },
+    { kind: "clause", id: "reply_time", editable: true, label: "Reply time", text: `We reply to messages within ${replyWithin(f)}${repliesInBusinessDays(f) ? "" : " on days the office is open"}.` },
     { kind: "clause", id: "not_emergency", text: "Do not use text or email for an emergency. If you are in danger or thinking about hurting yourself, call or text 988, or call 911." },
     { kind: "signature", caption: "Signature of client, or parent or guardian" },
   ],

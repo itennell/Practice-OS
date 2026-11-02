@@ -167,7 +167,8 @@ describe("settings are never memories (plain code)", () => {
 
 describe.skipIf(!hasDb)("settings tools write the real stores", () => {
   it("set_fees changes the fee list GFEs price from, returns before/after and audits from/to", async () => {
-    const { body } = await run("set_fees", { changes: [{ service: "intake", dollars: 150 }, { service: "follow_up", dollars: 130, all_lengths: true }] });
+    // Without her words (as over MCP) a session fee names its code.
+    const { body } = await run("set_fees", { changes: [{ service: "intake", dollars: 150 }, { code: "90834", dollars: 130 }, { code: "90837", dollars: 130 }] });
     expect(body.saved).toBe(true);
     expect(body.before).toEqual(expect.arrayContaining([{ code: "90791", label: "First session (intake)", fee: "$200.00" }]));
     expect(body.after).toEqual(expect.arrayContaining([{ code: "90791", label: "First session (intake)", fee: "$150.00" }]));

@@ -27,6 +27,8 @@ export type FileOutcome =
   | { ok: false; reason: "unreadable" | "crisis" | "client_record" | "guard"; text: string }
   | { ok: true; text: string; card: DocumentCard; approvalId: string | null; duplicate: boolean };
 
+const TOO_LONG_TO_CHECK =
+  "This file is too long for my privacy check to read in full, so its text stays on her computer and isn't sent to Muse. She can open it on the Files page, or add a shorter part.";
 const CRISIS_FILE =
   "This file mentions self-harm or danger, so I didn't read it further. If anyone is in danger right now: call or text 988 (Suicide & Crisis Lifeline), or call 911.";
 /** Payer names match only exactly, ignoring case, spaces and punctuation ("BCBS IL" and "bcbsil"); never on a part. */
@@ -83,8 +85,9 @@ export async function screenText(text: string, by: string): Promise<Screened> {
   }
   if (looksLikeClientRecord(text)) return refuse("client_record", CLIENT_RECORD_REFUSAL, by);
 
-  const checked = await guard(text, "tool_result");
+  const checked = await guard(text, "tool_result", undefined, { failClosedWhenLong: true });
   if (!checked.ok && checked.kind === "unavailable") return { ok: false, reason: "guard", text: GUARD_UNAVAILABLE };
+  if (!checked.ok && checked.kind === "too_long") return { ok: false, reason: "guard", text: TOO_LONG_TO_CHECK };
   if (!checked.ok && checked.kind === "client_name") return refuse("client_record", CLIENT_RECORD_REFUSAL, by, { guard: checked.kind });
   // An ID number (a W-9's tax ID, an EIN or SSN) keeps the text from the model.
   return { ok: true, text: checked.ok ? checked.text : null, private_: !checked.ok || TAX_ID.test(text) };
