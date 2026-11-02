@@ -5,6 +5,7 @@
 //
 // "block" means the text is not offered as written; "warn" shows a hint beside it.
 import type { MediaFacts } from "./facts";
+import { CASUAL, factProblems, FILLER, hersLower, INSURERS, PLACEHOLDER, truthOf } from "./truth";
 
 export type LintRule =
   | "too_long"
@@ -22,7 +23,11 @@ export type LintRule =
   | "designation"
   | "soft_outcome"
   | "availability"
-  | "readability";
+  | "readability"
+  | "contradicts_facts"
+  | "placeholder"
+  | "casual"
+  | "filler";
 
 export type Finding = { rule: LintRule; severity: "block" | "warn"; message: string };
 
@@ -145,59 +150,7 @@ export function designationOf(credential: string): RegExp[] {
   return TITLES[credential] ?? [new RegExp(`\\b${credential.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`)];
 }
 
-// Payer names to look for. Any of these she isn't with is blocked. Names that are
-// also everyday words (Grow, Alma, Horizon, Empire, Devoted...) are left out here;
-// "in network with ..." below catches any payer by name.
-const INSURERS = [
-  "aetna",
-  "cigna",
-  "evernorth",
-  "blue cross",
-  "blue shield",
-  "bcbs",
-  "bcbsil",
-  "anthem",
-  "elevance",
-  "unitedhealthcare",
-  "united healthcare",
-  "uhc",
-  "optum",
-  "umr",
-  "humana",
-  "magellan",
-  "oscar",
-  "tricare",
-  "triwest",
-  "medicare",
-  "medicaid",
-  "meridian",
-  "ambetter",
-  "carelon",
-  "kaiser",
-  "molina",
-  "centene",
-  "wellcare",
-  "countycare",
-  "health alliance",
-  "harvard pilgrim",
-  "highmark",
-  "premera",
-  "regence",
-  "multiplan",
-  "first health",
-  "cofinity",
-  "lyra",
-  "spring health",
-  "headway",
-  "comPsych",
-  "health net",
-  "geha",
-  "meritain",
-  "lucet",
-  "new directions",
-  "valueoptions",
-  "cigna behavioral",
-].map((x) => x.toLowerCase());
+
 
 const NUMBER_WORDS: Record<string, number> = {
   one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
@@ -235,7 +188,7 @@ function unknownFacts(text: string, f: MediaFacts): string[] {
     if (Number(m[1]) !== f.answers.freeConsultMinutes) out.push(`a ${m[1]}-minute consult`);
   }
   const lower = text.toLowerCase();
-  const hers = f.insurers.map((p) => p.toLowerCase()).join(" | ");
+  const hers = hersLower(f.insurers);
   for (const name of INSURERS) {
     if (new RegExp(`\\b${name}\\b`).test(lower) && !hers.includes(name)) out.push(name.replace(/\b\w/g, (c) => c.toUpperCase()));
   }
@@ -278,6 +231,16 @@ export function lintText(text: string, f: MediaFacts, opts: { limit?: number | n
     out.push({ rule, severity: "block", message: `Mentions ${m}, which isn't in your saved details.` });
   }
   for (const r of WARN) if (r.patterns.some((p) => p.test(text))) out.push({ rule: r.rule, severity: "warn", message: r.message });
+  // Claims her saved details contradict: "private pay" while she's on a panel, a superbill
+  // schedule she never set, a language or school she didn't give. (Insurers and consults
+  // are covered by unknownFacts above.)
+  for (const p of factProblems(text, truthOf(f))) {
+    if (p.kind === "insurer" || p.kind === "consult") continue;
+    out.push({ rule: "contradicts_facts", severity: "block", message: `It ${p.message}.` });
+  }
+  if (PLACEHOLDER.some((p) => p.test(text))) out.push({ rule: "placeholder", severity: "block", message: "Has a note or placeholder in it, not words to paste." });
+  if (CASUAL.test(text)) out.push({ rule: "casual", severity: "warn", message: "Has a casual word (like \"thru\" or \"stuff\"); a profile reads better without it." });
+  if (FILLER.some((p) => p.test(text))) out.push({ rule: "filler", severity: "warn", message: "Has a stock phrase (like \"no pressure\" or \"happy to help\"); plain facts read warmer." });
   const long = text.split(/[.!?]+(?:\s|$)/).some((s) => (s.match(/\S+/g) ?? []).length > 25);
   if (readingGrade(text) > 8 || long)
     out.push({ rule: "readability", severity: "warn", message: "Could be simpler. Short sentences and everyday words read best." });

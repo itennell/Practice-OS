@@ -6,6 +6,7 @@
 // guidance (no method details; suicide or self-harm topics are not posted).
 import { chat as metaChat, type ChatParams } from "../meta";
 import { checkCrisis } from "../safety";
+import { factProblems, type TruthFacts } from "../media/truth";
 import { captionProblems } from "./graph";
 
 export type CriticRule =
@@ -18,7 +19,8 @@ export type CriticRule =
   | "license_line"
   | "invented_fee"
   | "caption_limits"
-  | "never_show";
+  | "never_show"
+  | "wrong_fact";
 
 export type Finding = { rule: CriticRule; by: "code" | "muse"; message: string };
 
@@ -29,7 +31,8 @@ export type CriticResult = {
   findings: Finding[];
 };
 
-export type CriticContext = { licenseLine: string; feesCents: number[] };
+/** truth: her saved practice facts (lib/media/truth.ts); with it, claims they contradict are blocked too. */
+export type CriticContext = { licenseLine: string; feesCents: number[]; truth?: TruthFacts };
 
 /** Her words, shown on the blocked card. */
 export const RULE_TEXT: Record<CriticRule, string> = {
@@ -43,6 +46,7 @@ export const RULE_TEXT: Record<CriticRule, string> = {
   invented_fee: "A price in the post doesn't match your fee list.",
   caption_limits: "The caption is over one of Instagram's limits.",
   never_show: "It shows something you said posts never show.",
+  wrong_fact: "It says something about your practice that your saved details don't.",
 };
 
 const b = (s: string) => new RegExp(`\\b(?:${s})\\b`, "i");
@@ -105,6 +109,7 @@ export function codeCritic(text: string, ctx: CriticContext): CriticResult {
   if (!text.includes(ctx.licenseLine)) findings.push({ rule: "license_line", by: "code", message: RULE_TEXT.license_line });
   const invented = dollarAmounts(clean).filter((c) => !ctx.feesCents.includes(c));
   if (invented.length) findings.push({ rule: "invented_fee", by: "code", message: RULE_TEXT.invented_fee });
+  for (const p of ctx.truth ? factProblems(clean, ctx.truth) : []) findings.push({ rule: "wrong_fact", by: "code", message: `${RULE_TEXT.wrong_fact} It ${p.message}.` });
   for (const p of captionProblems(text)) findings.push({ rule: "caption_limits", by: "code", message: p });
   return finish(findings);
 }

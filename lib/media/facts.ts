@@ -141,6 +141,7 @@ export async function loadMediaFacts(): Promise<MediaFacts> {
   const loc = cred?.practiceLocation;
   const media = (a.media ?? {}) as Record<string, unknown>;
   const marketing = (a.marketing ?? {}) as Record<string, unknown>;
+  const pt = parsePt(media.pt);
   return {
     name: p.full_name,
     credential: p.credential,
@@ -158,10 +159,11 @@ export async function loadMediaFacts(): Promise<MediaFacts> {
     whoIHelp: typeof a.who_i_help === "string" ? a.who_i_help : "",
     website: typeof marketing.website_url === "string" ? marketing.website_url : null,
     websiteStatus: marketing.website === "has" || marketing.website === "wants" || marketing.website === "no" ? marketing.website : null,
-    education: (cred?.education ?? []).filter((e) => e.school).map((e) => [e.degree, e.school, e.graduated].filter(Boolean).join(", ")),
+    // What she told the Psychology Today interview wins over the credentialing record (which may still hold sample data).
+    education: pt.education ? [pt.education] : (cred?.education ?? []).filter((e) => e.school).map((e) => [e.degree, e.school, e.graduated].filter(Boolean).join(", ")),
     isSample: p.is_sample,
     answers: parseAnswers(media.answers),
-    pt: parsePt(media.pt),
+    pt,
   };
 }
 

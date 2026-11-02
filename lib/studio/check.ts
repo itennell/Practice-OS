@@ -17,10 +17,10 @@ export type Limits = { ctx: CriticContext; neverShow: string[] };
  * Plain-code problems with one piece of slide, title, cue or video text. A price
  * must be one of her real fees (invented_fee); the license line belongs to the caption.
  */
-export function textProblems(text: string, limits: { neverShow: string[]; ctx?: Pick<CriticContext, "feesCents"> }): string[] {
+export function textProblems(text: string, limits: { neverShow: string[]; ctx?: Pick<CriticContext, "feesCents" | "truth"> }): string[] {
   const t = text.trim();
   if (!t) return [];
-  const found = codeCritic(t, { licenseLine: "", feesCents: limits.ctx?.feesCents ?? [] })
+  const found = codeCritic(t, { licenseLine: "", feesCents: limits.ctx?.feesCents ?? [], truth: limits.ctx?.truth })
     .findings.filter((f) => !["license_line", "caption_limits"].includes(f.rule))
     .map((f) => f.message);
   const gate = gateTopic(t);

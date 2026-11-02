@@ -4,7 +4,8 @@ import { queueApproval } from "../approvals";
 import { guard, REFUSAL } from "../aeon/guard";
 import { audit } from "../audit";
 import { db } from "../db";
-import { loadPracticeSettings } from "../gfe/store";
+import { loadMediaFacts } from "../media/facts";
+import { truthOf } from "../media/truth";
 import { alertCrisis, checkCrisis, CRISIS_REPLY } from "../safety";
 import type { ChatFn, CriticResult } from "./critic";
 import { designPost, type GraphicDeps } from "./graphic";
@@ -14,12 +15,18 @@ import { research, type OnResearchStep, type Research, type ResearchAngle, type 
 import { gateTopic, illnessTopic, type Angle } from "./topic-gate";
 import { writeRequested, writeSeveral, writeWeek, type Draft, type PracticeFacts } from "./write";
 
+/**
+ * Everything a post may say about the practice, read fresh for each draft: fees,
+ * insurers, consult and location come from lib/media/facts.ts (her fee list, payer
+ * applications and answers), so a change she makes in chat reaches the next post.
+ */
 export async function practiceFacts(): Promise<PracticeFacts> {
   const [p] = await db()<
     { full_name: string; credential: string; practice_name: string; neighborhood: string | null; city: string; license_line: string; is_sample: boolean }[]
   >`select full_name, credential, practice_name, neighborhood, city, license_line, is_sample from practice_os.clinician_profile limit 1`;
   if (!p) throw new Error("Finish setting up your practice first, so Aeon knows what to write.");
-  const [{ fees }, prefs] = await Promise.all([loadPracticeSettings(), loadInstagramPrefs()]);
+  const [media, prefs] = await Promise.all([loadMediaFacts(), loadInstagramPrefs()]);
+  const fees = media.fees;
   return {
     clinicianName: p.full_name,
     credential: p.credential,
@@ -34,6 +41,7 @@ export async function practiceFacts(): Promise<PracticeFacts> {
       goals: prefs.goals.map((g) => GOALS.find((x) => x.value === g)!.label),
       neverShow: prefs.neverShow,
     },
+    truth: truthOf(media),
   };
 }
 
