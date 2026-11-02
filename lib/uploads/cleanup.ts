@@ -18,8 +18,11 @@ export async function removeDocumentFiles(rows: RemovedDocument[], dir: string =
   const inboxDir = path.join(dir, "inbox");
   let documents = 0;
   let inbox = 0;
+  // Each folder must be a real folder, never a link to somewhere else on the computer.
+  const realDir = async (p: string) => (await lstat(p).catch(() => null))?.isDirectory() ?? false;
+  const [docsOk, inboxOk] = await Promise.all([realDir(documentsDir), realDir(inboxDir)]);
 
-  for (const row of rows) {
+  for (const row of docsOk ? rows : []) {
     if (!STORED.test(row.stored_as)) continue;
     const file = path.join(dir, row.stored_as);
     if (path.dirname(file) !== documentsDir) continue;
@@ -29,7 +32,7 @@ export async function removeDocumentFiles(rows: RemovedDocument[], dir: string =
   }
 
   const hashes = new Set(rows.map((r) => r.sha256));
-  if (hashes.size) {
+  if (hashes.size && inboxOk) {
     const entries = await readdir(inboxDir, { withFileTypes: true }).catch(() => []);
     for (const entry of entries) {
       if (!entry.isFile()) continue; // not links, not folders

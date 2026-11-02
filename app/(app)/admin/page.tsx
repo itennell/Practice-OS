@@ -68,7 +68,7 @@ function NeedButton({ action, title }: { action: NeedAction; title: string }) {
   if ("post" in action) {
     // Saving goes through a local-only route, so the view-only Vercel copy shows no button.
     if (process.env.VERCEL) return null;
-    return <NeedPostButton label={action.label} post={action.post} title={title} />;
+    return <NeedPostButton label={action.label} post={action.post} body={action.body} title={title} />;
   }
   return (
     <ButtonLink variant="quiet" href={actionHref(action)}>

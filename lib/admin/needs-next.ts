@@ -23,10 +23,15 @@ export type NeedKind = "deadline" | "gfe" | "insurance" | "credentialing" | "sup
  * A button on an item: open the right form already filled (`panel`), go to a page (`href`),
  * start a chat (`ask`), or save one small thing through a local-only route (`post`).
  */
-export type NeedAction = { label: string } & ({ panel: AdminPanel } | { href: string } | { ask: string } | { post: string });
+export type NeedAction = { label: string } & (
+  | { panel: AdminPanel }
+  | { href: string }
+  | { ask: string }
+  | { post: string; body: Record<string, string> }
+);
 
-/** "I checked" on the crisis item: writes crisis_alert_seen (app/api/admin/crisis-seen). */
-export const CRISIS_SEEN = { label: "I checked", post: "/api/admin/crisis-seen" } as const satisfies NeedAction;
+/** "I checked" on the crisis item she saw: writes crisis_alert_seen for that item (app/api/admin/crisis-seen). */
+export const crisisSeen = (itemId: string): NeedAction => ({ label: "I checked", post: "/api/admin/crisis-seen", body: { item: itemId } });
 
 export type AdminPanel = "forms" | "gfe" | "superbill" | "release" | "credentialing" | "insurance" | "hours";
 
@@ -94,7 +99,7 @@ export function needsNext({ today, brief, estimates, superbills, profile, alertF
             why: "A message mentioned danger or self-harm. Check your chat now",
             action: { label: "Open chat", href: "/" },
           }),
-      also: CRISIS_SEEN,
+      also: crisisSeen(`urgent_alert:${latest.id}`),
       due_on: null,
       days_left: null,
       tier: 1,
