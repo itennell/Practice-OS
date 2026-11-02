@@ -17,10 +17,16 @@ export const RECREDENTIAL_MONTHS = 36;
 
 export const STATUSES = ["not_started", "preparing", "applied", "pending", "follow_up", "approved", "denied", "withdrawn"] as const;
 export type PayerStatus = (typeof STATUSES)[number];
-/** Statuses Aeon may set from chat: everything but applied. Only her own change on the Insurance page records that an application was sent. */
-export const CHAT_SET_STATUSES = ["not_started", "preparing", "pending", "follow_up", "approved", "denied", "withdrawn"] as const;
-/** Statuses that mean she's waiting to hear back from the payer. */
+/** Statuses that mean she's waiting to hear back from the payer, so the application was sent. */
 export const WAITING: readonly PayerStatus[] = ["applied", "pending", "follow_up"];
+/**
+ * Statuses Aeon may set from chat or MCP: none of the waiting ones. Applied, pending and follow up all say
+ * the application was sent, and only her own change on the Insurance page records that.
+ */
+export const CHAT_SET_STATUSES = ["not_started", "preparing", "approved", "denied", "withdrawn"] as const;
+/** What Aeon tells her when chat asks to mark an application sent. */
+export const SENT_IS_HERS =
+  "Only she can mark an application as sent (Applied, Pending or Follow up). Nothing was changed. Ask her to open Edit on that payer's row and set the status herself at /admin?panel=insurance.";
 export const STATUS_LABEL: Record<PayerStatus, string> = {
   not_started: "Not started",
   preparing: "Preparing",
@@ -119,9 +125,19 @@ export async function listPayerApplications(sql: postgres.Sql = db()): Promise<P
   return rows.map(toRow);
 }
 
-/** Adds a payer, or updates one by id. Audited (payer and status, never notes). */
-export async function savePayerApplication(input: unknown, by: string, sql: postgres.Sql = db()): Promise<PayerApplication> {
+/**
+ * Adds a payer, or updates one by id. Audited (payer and status, never notes).
+ * fromChat (Aeon's chat and MCP tool): a waiting status is refused, and the applied and follow-up dates stay
+ * whatever her own changes saved, so chat can never record that an application was sent.
+ */
+export async function savePayerApplication(
+  input: unknown,
+  by: string,
+  sql: postgres.Sql = db(),
+  opts: { fromChat?: boolean } = {},
+): Promise<PayerApplication> {
   let a = applicationSchema.parse(input);
+  if (opts.fromChat && WAITING.includes(a.status)) throw new Error(SENT_IS_HERS);
   // Saved by name ("Aetna", "BCBSIL"): link it to the catalog payer on an exact name or alias match,
   // and update that payer's row if it already has one, so the checklist never lists it twice.
   const catalogId = a.catalog_id ?? catalogIdFor(a.payer, a.form);
@@ -131,7 +147,15 @@ export async function savePayerApplication(input: unknown, by: string, sql: post
     else if (!a.id) a = { ...a, id: held.id, catalog_id: catalogId };
     else if (held.id === a.id) a = { ...a, catalog_id: catalogId };
   }
-  const v = withDefaults(a, await practiceToday(sql));
+  let v = withDefaults(a, await practiceToday(sql));
+  if (opts.fromChat) {
+    const [held] = a.id
+      ? await sql<{ applied_on: Date | string | null; follow_up_on: Date | string | null }[]>`
+          select applied_on, follow_up_on from practice_os.payer_applications where id = ${a.id}`
+      : [];
+    // The database needs an applied date on approved, denied and withdrawn, so a new row from chat keeps that default.
+    v = { ...v, applied_on: asDate(held?.applied_on) ?? v.applied_on, follow_up_on: asDate(held?.follow_up_on) };
+  }
   const [row] = a.id
     ? await sql`
         update practice_os.payer_applications set
