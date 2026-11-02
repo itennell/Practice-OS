@@ -8,27 +8,26 @@ Practice-OS is built by **Caseload** (a sole proprietorship).
 
 ## Text messages
 
-The Front Desk helper texts people who call a practice line and leave a voicemail, to offer times for a free consultation. Scheduling only, never marketing. Reply STOP to opt out, HELP for help. Message and data rates may apply. During the demo, the practice (Reyes Counseling) is fictional and texts go only to the developer's own phone.
+(The Front Desk helper is paused and hidden in the app for now.) The Front Desk helper texts people who call a practice line and leave a voicemail, to offer times for a free consultation. Scheduling only, never marketing. Reply STOP to opt out, HELP for help. Message and data rates may apply. During the demo, the practice (Reyes Counseling) is fictional and texts go only to the developer's own phone.
 
 - [Privacy Policy](docs/privacy-policy.md)
 - [Terms & Conditions](docs/terms.md)
 - [How SMS opt-in works](docs/sms-opt-in.md)
 
-## Four helpers
+## Three helpers
 
 - **Admin**: compliance calendar, "how do I" guides, credentialing prep, Good Faith Estimates.
 - **Referrals**: find local referral sources (NPPES NPI Registry), track them, draft outreach letters as Gmail drafts.
-- **Instagram**: content coaching: post ideas, hooks and drafts about practice logistics, which she posts herself.
-- **Front Desk**: a practice phone number that handles missed calls, voicemail and consult booking by text, plus a web chat.
+- **Media**: getting her in front of people: Instagram coaching (post ideas, hooks and drafts about practice logistics, which she posts herself), her directory profile and her website.
 
 ## Why not just use a chatbot?
 
-A chatbot gives advice. Aeon runs the front office.
+A chatbot gives advice. Aeon runs the business side of the practice.
 
-- **It works while she's away.** Missed calls get a text with open consult times, and deadlines are tracked without anyone asking.
+- **It works while she's away.** Deadlines are tracked and follow-ups are lined up without anyone asking.
 - **It remembers her practice.** Her fees, hours, payers and decisions carry over from one day to the next.
 - **Its rules have sources.** Every deadline carries the official link, the quoted rule and the date it was last checked.
-- **Its safety is built for therapy.** A plain-code crisis check runs before the model on every message, and the front desk never gives therapy advice.
+- **Its safety is built for therapy.** A plain-code crisis check runs before the model on every message, and Aeon never gives therapy advice.
 - **It finishes the paperwork.** Good Faith Estimates, superbills and credentialing forms come out filled in, ready for her to check and submit.
 - **It runs on her own computer.** Her records stay in one folder on her machine, with her own accounts and keys.
 

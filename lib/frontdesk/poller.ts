@@ -1,3 +1,4 @@
+import { FRONT_DESK_ENABLED } from "../features";
 import { checkFrontDesk } from "./check";
 
 // Front Desk checks her phone company every minute while the app is open
@@ -9,7 +10,7 @@ let timer: NodeJS.Timeout | null = null;
 let running = false;
 
 export function startFrontDeskPoller(): void {
-  if (timer || process.env.VERCEL || process.env.FRONT_DESK_POLL === "off") return;
+  if (!FRONT_DESK_ENABLED || timer || process.env.VERCEL || process.env.FRONT_DESK_POLL === "off") return;
   const tick = async () => {
     if (running) return;
     running = true;

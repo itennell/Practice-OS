@@ -93,6 +93,87 @@ export function systemPrompt(memories: Pick<Memory, "id" | "kind" | "text">[], t
   return `${soul()}\n\n## Today\n\n${today}\n\n${practice}${memoryBlock(memories)}\n`;
 }
 
+// ---- No fabricated success --------------------------------------------------------------
+// A stress test found Aeon saying "Done" or "Found them, cards below" after every tool in
+// the turn had failed. Plain code checks the reply against what the tools returned.
+
+export type Outcome = { state: "ok" } | { state: "failed"; why: string } | { state: "waiting"; where: string };
+
+/**
+ * One convention for every tool: failed is an error, or JSON saying ok: false, saved: false
+ * (unless already_remembered), an error, written: false, not_changed, not_checked,
+ * moved: false, forgotten: false or prep: null. waiting_for_her is its own state.
+ */
+export function outcomeOf(result: ToolResult): Outcome {
+  const text = result.content.map((b) => b.text).join("\n").trim();
+  let p: Record<string, unknown> | null = null;
+  try {
+    const v = JSON.parse(text) as unknown;
+    if (v && typeof v === "object" && !Array.isArray(v)) p = v as Record<string, unknown>;
+  } catch {
+    // Plain text: counts as working unless isError says otherwise.
+  }
+  if (p?.waiting_for_her === true) return { state: "waiting", where: typeof p.where === "string" ? p.where : "the bar above the chat box" };
+  const failed =
+    result.isError ||
+    (p !== null &&
+      (p.ok === false ||
+        (p.saved === false && p.already_remembered !== true) ||
+        (typeof p.error === "string" && p.error !== "") ||
+        p.written === false ||
+        p.not_changed === true ||
+        "not_checked" in p ||
+        p.moved === false ||
+        p.forgotten === false ||
+        ("prep" in p && p.prep === null)));
+  if (!failed) return { state: "ok" };
+  const why = typeof p?.error === "string" ? p.error : typeof p?.reason === "string" ? p.reason : text;
+  const reason = why.replace(/^Error:\s*/i, "").replace(/\s+/g, " ").trim() || "it returned an error";
+  return { state: "failed", why: reason.length > 220 ? `${reason.slice(0, 217)}...` : reason };
+}
+
+/** Why a tool result didn't work, or null when it worked (or waits for her). */
+export function failureOf(result: ToolResult): string | null {
+  const o = outcomeOf(result);
+  return o.state === "failed" ? o.why : null;
+}
+
+/** A sentence that says something didn't work. */
+const OWNS_FAILURE = /\b(couldn'?t|could not|didn'?t|did not|wasn'?t|was not|weren'?t|hasn'?t|has not|not saved|failed|went wrong|unable to|not able to|nothing (was )?changed)\b/i;
+const SAYS_WAITING = /\b(waiting for your (ok|okay|approval)|needs your (ok|okay|approval)|once you approve|after you approve)\b/i;
+const POINTS_TO_CARDS = /\bcards? (are |is )?(below|under)\b/i;
+
+/** One tool run in this turn. writes: the tool changes saved data. waiting: where it waits for her OK. cards: document cards it returned. */
+export type Attempt = { tool: string; failure: string | null; writes?: boolean; waiting?: string; cards?: number };
+
+const owns = (text: string) => text.split(/(?<=[.!?])\s+/).some((sentence) => OWNS_FAILURE.test(sentence));
+
+/**
+ * The reply, made honest, by what the tools returned (a failure a later run of the same tool fixed doesn't count):
+ * - every change (write) failed: any reply that doesn't say so is replaced with what went wrong;
+ * - some changes failed and others worked: a line is added unless the reply says so;
+ * - only lookups failed: the reply stands (it may have answered from another tool);
+ * - a change waits for her OK: the reply must say so, never that it's saved;
+ * - the reply points to cards and none came back: a line says so.
+ */
+export function honestReply(text: string, attempts: Attempt[]): string {
+  const unresolved = attempts.filter((a, i) => a.failure && !attempts.slice(i + 1).some((b) => b.tool === a.tool && !b.failure && !b.waiting));
+  const failedWrites = unresolved.filter((a) => a.writes);
+  const okWrites = attempts.filter((a) => a.writes && !a.failure && !a.waiting);
+  const waiting = attempts.find((a) => a.waiting);
+  let out = text;
+  if (failedWrites.length && !owns(out)) {
+    if (!okWrites.length && !waiting) return `That didn't work, so nothing changed. ${failedWrites[0].failure}`;
+    out = `${out}\n\nOne change didn't work: ${failedWrites[0].failure}`;
+  }
+  if (waiting && !SAYS_WAITING.test(out)) {
+    if (!okWrites.length && !failedWrites.length) return `That's waiting for your OK in ${waiting.waiting}; nothing has changed yet.`;
+    out = `${out}\n\nOne change is waiting for your OK in ${waiting.waiting}.`;
+  }
+  if (POINTS_TO_CARDS.test(out) && !attempts.some((a) => (a.cards ?? 0) > 0)) out = `${out}\n\nNo cards came back this time.`;
+  return out;
+}
+
 function approvalIdsOf(result: ToolResult): string[] {
   const ids = new Set<string>();
   const structured = result.structuredContent?.approval_id;
@@ -128,6 +209,7 @@ export async function respond(message: string, opts: RespondOptions): Promise<Re
   const tools = chatTools();
   const callModel = opts.chat ?? metaChat;
   const steps: Step[] = [];
+  const attempts: Attempt[] = [];
   const approvalIds: string[] = [];
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
@@ -136,7 +218,7 @@ export async function respond(message: string, opts: RespondOptions): Promise<Re
     if (!reply) break;
     const calls = readToolCalls(reply);
     if (calls.length === 0) {
-      const text = (reply.content ?? "").trim() || "I don't have an answer for that yet.";
+      const text = honestReply((reply.content ?? "").trim() || "I don't have an answer for that yet.", attempts);
       const out = await guard(text, "reply");
       if (!out.ok) {
         await audit({ actor: "safety", action: "reply_held_back", subjectType: "chat", details: { kind: out.kind, by: opts.by } });
@@ -153,11 +235,20 @@ export async function respond(message: string, opts: RespondOptions): Promise<Re
           )
         : { content: [{ type: "text", text: "Error: the arguments were not valid JSON." }], isError: true };
       const cards = result.isError ? [] : cardsFrom(result.structuredContent);
+      const outcome = outcomeOf(result);
+      const failure = outcome.state === "failed" ? outcome.why : null;
+      attempts.push({
+        tool: call.name,
+        failure,
+        writes: TOOLS_BY_NAME.get(call.name)?.changesData !== false,
+        ...(outcome.state === "waiting" ? { waiting: outcome.where } : {}),
+        cards: cards.length,
+      });
       steps.push({
         tool: call.name,
         label: TOOLS_BY_NAME.get(call.name)?.label ?? call.name,
         ms: Date.now() - started,
-        ok: !result.isError,
+        ok: !failure,
         ...(cards.length ? { documents: cards } : {}),
       });
       approvalIds.push(...approvalIdsOf(result));

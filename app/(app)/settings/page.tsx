@@ -3,6 +3,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { stat } from "node:fs/promises";
 import { AeonFiles, type AeonFile } from "@/components/aeon-files";
+import { AlertPhoneSetting } from "@/components/alert-phone-setting";
 import { OfficeSettings } from "@/components/office-settings";
 import { ButtonLink, GlassCard, PageHeader } from "@/components/ui";
 import { listMemories, memoryMarkdown } from "@/lib/aeon/memory";
@@ -10,6 +11,8 @@ import { MEMORY_CAP_CHARS, usedChars } from "@/lib/aeon/memory-ops";
 import { SOUL_PATH, soul } from "@/lib/aeon/soul";
 import { loadPracticeSettings } from "@/lib/gfe/store";
 import { DefaultModeSetting, FrontDeskRules } from "@/components/approval-settings";
+import { FRONT_DESK_ENABLED } from "@/lib/features";
+import { alertPhone } from "@/lib/frontdesk/crisis";
 import { loadApprovalSettings } from "@/lib/approval-settings";
 
 export const metadata: Metadata = { title: "Settings · Practice-OS" };
@@ -23,7 +26,7 @@ export default function Page() {
           <h2 id="connections-heading" className="text-section font-semibold">
             Connections
           </h2>
-          <p className="max-w-[52ch] text-[var(--fg-muted)]">Aeon&rsquo;s Muse key, Google, Instagram and your phone. Each one turns on with a Connect button.</p>
+          <p className="max-w-[52ch] text-[var(--fg-muted)]">Aeon&rsquo;s Muse key, Google, Instagram and a phone line for urgent alerts. Each one turns on with a Connect button.</p>
         </div>
         <ButtonLink variant="quiet" href="/settings/connections">
           Open Connections
@@ -31,6 +34,7 @@ export default function Page() {
       </GlassCard>
       <Suspense fallback={<div aria-hidden className="h-96 max-w-3xl animate-pulse rounded-[24px] bg-[var(--hairline)]" />}>
         <Modes />
+        <Alerts />
         <Office />
       </Suspense>
       <Suspense fallback={<div aria-hidden className="h-64 max-w-3xl animate-pulse rounded-[24px] bg-[var(--hairline)]" />}>
@@ -57,6 +61,7 @@ async function Modes() {
         </div>
         <DefaultModeSetting initial={mode} />
       </GlassCard>
+      {FRONT_DESK_ENABLED && (
       <GlassCard aria-labelledby="front-desk-heading" className="flex max-w-3xl flex-col gap-2 p-6 md:p-8">
         <div className="flex flex-col gap-1">
           <h2 id="front-desk-heading" className="text-section font-semibold">
@@ -66,7 +71,28 @@ async function Modes() {
         </div>
         <FrontDeskRules initial={frontDesk} />
       </GlassCard>
+      )}
     </>
+  );
+}
+
+// Her own cell for urgent alerts. Always shown: the chat's crisis check texts it (lib/safety.ts).
+async function Alerts() {
+  await connection(); // read the database per request, never at build time
+  const phone = await alertPhone().catch(() => null);
+  return (
+    <GlassCard aria-labelledby="alerts-heading" className="flex max-w-3xl flex-col gap-4 p-6 md:p-8">
+      <div className="flex flex-col gap-1">
+        <h2 id="alerts-heading" className="text-section font-semibold">
+          Urgent alerts
+        </h2>
+        <p className="max-w-[60ch] text-[var(--fg-muted)]">
+          If a message in your chat mentions danger, Aeon shows the 988 message and texts this number, only this one. Texting needs your phone
+          line under Connections; without it, Aeon tells you here in the app instead.
+        </p>
+      </div>
+      <AlertPhoneSetting last4={phone ? phone.slice(-4) : null} />
+    </GlassCard>
   );
 }
 

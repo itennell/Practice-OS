@@ -3,6 +3,7 @@
 // with Aeon writing the page copy (home, about, fees, FAQ, contact) to paste in, and
 // the practice details block for Google (schema.org MedicalBusiness JSON-LD).
 // Same rules as the profile: her facts only, the lint on every page, nothing sent.
+import { factSheet, truthOf } from "./truth";
 import { audit } from "../audit";
 import { db } from "../db";
 import { STATES } from "../compliance/states";
@@ -68,10 +69,10 @@ export function templatePages(f: MediaFacts): Record<PageId, string> {
   const consult = f.answers.freeConsultMinutes;
   const reach = [f.phone && `Call or text ${f.phone}.`, f.email && `Email ${f.email}.`].filter(Boolean).join(" ");
   const faq = [
-    ["How do I start?", consult ? `Book a free ${consult}-minute call. We'll see if we're a good fit.` : "Call or email me. I'll answer your questions and find a time."],
+    ["How do I start?", consult ? `Book a free ${consult}-minute call, and you'll see if I'm the right fit for you.` : "Call or email me. I'll answer your questions and find a time."],
     ["Do you see people online?", f.telehealth ? `Yes. I see people in my ${place(f)} office and online anywhere in ${stateName(f)}.` : `I see people in my office in ${place(f)}.`],
     ["What does a session cost?", fee ? `A session is ${fee}. See the Fees page for more.` : "See the Fees page."],
-    ["Do you take insurance?", f.inNetwork.length ? `I'm in network with ${f.inNetwork.join(", ")}.` : "I don't bill insurance myself. I can give you a superbill to send to your insurer."],
+    ["Do you take insurance?", f.inNetwork.length ? `I'm in network with ${f.inNetwork.join(", ")}.` : "I'm not in network with any plan yet. Ask me for a superbill to send to your insurer."],
   ];
   return {
     home: [t.statement_help, consult ? "Book a free call to get started." : "Call or email to get started."].join("\n\n"),
@@ -95,8 +96,10 @@ const SCHEMA = {
 function prompt(f: MediaFacts): string {
   const tpl = templatePages(f);
   return [
-    `Rewrite the five pages of a practice website for ${f.name}, ${f.credential}, ${f.practiceName}, in ${place(f)}, ${stateName(f)}.${f.isSample ? " This is a fictional demo practice." : ""}`,
-    "Write in the first person, as her, warm and plain, 8th-grade words, short sentences. Keep every fact exactly; add none.",
+    `Rewrite the five pages of a practice website for ${f.name}, ${f.credential}, ${f.practiceName}, in ${place(f)}, ${stateName(f)}.`,
+    "Write in the first person, as her (\"I\", never \"we\"), warm and plain, 8th-grade words, short sentences. Keep every fact exactly; add none. No stock phrases (\"no pressure\", \"happy to help\", \"look forward\"), no notes to her, never mention a draft, demo or sample.",
+    "Her practice facts (the only ones that exist):",
+    ...factSheet(truthOf(f)),
     "The faq page keeps each question on its own line followed by its answer. The contact page keeps her phone and email exactly.",
     `Keep these lines word for word, unchanged: faq ends with """${FAQ_EMERGENCY}"""; contact contains """${CONTACT_EMERGENCY}"""`,
     "Never write: mental health advice, a diagnosis, any client story, testimonials or reviews, promises of results, rankings like best or top, a license number, or anything about suicide beyond the 988 line.",
