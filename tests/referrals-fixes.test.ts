@@ -5,12 +5,12 @@
 // stay. No live model, geocoder or NPPES calls: all stand-ins. Fake data only.
 import { afterAll, describe, expect, it } from "vitest";
 import { loadEnv } from "../lib/env";
-import { searchCards, resolveCard } from "../lib/aeon/tools-referrals";
-import { checkFacts, checkLetter, finishLetter } from "../lib/referrals/outreach";
-import { pickNew, tiersWithLog } from "../lib/referrals/plan";
+import { namesExactly, resolveCard, resolveExact, searchCards } from "../lib/aeon/tools-referrals";
+import { checkFacts, checkLetter, finishLetter, insurerMatchers, insurersNamed } from "../lib/referrals/outreach";
+import { letterWaiting, pickNew, tiersWithLog } from "../lib/referrals/plan";
 import { focusRank, tierFor } from "../lib/referrals/tier";
 import { outOfStateWarning, splitState, zipState } from "../lib/referrals/states";
-import { AreaError, searchArea, type PracticeContext } from "../lib/referrals/area";
+import { AreaError, namesPlace, searchArea, type PracticeContext } from "../lib/referrals/area";
 import { clearGeocodeCache, geocodePlace } from "../lib/referrals/geocode";
 import { isDay } from "../lib/referrals/contacts";
 import type { ReferralSource } from "../lib/referrals/store";
@@ -45,6 +45,16 @@ describe("finding a card anywhere on the board", () => {
   it("asks which when more than one card fits", () => {
     const two = [...board, card({ id: "g2", name: "Ann Gordon, NP", taxonomy: "363LX0001X" })];
     expect("ask_which" in resolveCard("Gordon", two)).toBe(true);
+  });
+  it("do-not-contact acts only on an exact name: 'Dr. Chen' never means Cheng", () => {
+    const cheng = card({ id: "cheng", name: "[Sample] Wei Cheng, MD" });
+    expect(namesExactly("Dr. Chen", cheng)).toBe(false);
+    expect(resolveExact("Dr. Chen", [cheng])).toMatchObject({ ask_which: [cheng] });
+    const chen = card({ id: "chen", name: "[Sample] Lin Chen, MD" });
+    expect(resolveExact("Dr. Chen", [chen, cheng])).toMatchObject({ ask_which: expect.arrayContaining([chen]) });
+    expect(resolveExact("Dr. Lin Chen", [chen])).toEqual({ card: chen });
+    expect(resolveExact("chen", [chen])).toEqual({ card: chen });
+    expect(resolveExact("Lakeview Pediatrics", [card({ id: "o", name: "Lakeview Pediatrics LLC", npi_type: "organization", organization: "Lakeview Pediatrics LLC" })])).toMatchObject({ card: { id: "o" } });
   });
 });
 
@@ -98,7 +108,34 @@ describe("letters", () => {
   it("may name the plans she takes and that she sees private-pay clients; still never money for referrals", () => {
     expect(checkLetter(`${base} I'm in network with Blue Cross Blue Shield and also see clients who pay privately (private pay).`)).toEqual({ ok: true });
     expect(checkLetter(`${base} I'd be glad to pay you for each one.`).ok).toBe(false);
-    expect(checkLetter(`${base} We can talk about my fees.`).ok).toBe(false);
+    expect(checkLetter(`${base} Happy to pay you a referral fee.`).ok).toBe(false);
+  });
+  it("lets her own fee and superbills through; refuses getting paid for referrals in any wording", () => {
+    for (const ok of ["My fee is $175 for a 53-minute session.", "Superbills on request for out-of-network benefits.", "We can talk about my fees."]) {
+      expect(checkLetter(`${base} ${ok}`)).toEqual({ ok: true });
+    }
+    for (const bad of [
+      "You could get paid for referrals.",
+      "Providers get paid when they send clients.",
+      "We are paid for referrals.",
+      "I offer an honorarium.",
+      "A small gratuity for your staff.",
+      "A stipend for your time.",
+      "Remuneration for each one.",
+      "No kickback, of course.",
+      "A commission on each client.",
+      "$50 for every new client.",
+    ]) {
+      expect(checkLetter(`${base} ${bad}`).ok, bad).toBe(false);
+    }
+  });
+  it("knows insurers from the payer catalog with their aliases, not everyday words", () => {
+    const m = insurerMatchers();
+    expect(insurersNamed("I take BCBS and Aetna.", m).map((x) => x.name)).toEqual(expect.arrayContaining(["Aetna (commercial, behavioral health)", "Blue Cross and Blue Shield of Illinois (BCBSIL)"]));
+    expect(insurersNamed("I'm in network with UHC.", m).map((x) => x.name)).toContain("UnitedHealthcare / Optum Behavioral Health");
+    expect(insurersNamed("Let's grow together; we're united in this.", m)).toEqual([]);
+    expect(checkFacts(`${base} I'm in network with Molina.`, { years_in_practice: null, in_network: ["Aetna"] })).toMatchObject({ ok: false });
+    expect(checkFacts(`${base} I'm in network with Blue Cross.`, { years_in_practice: null, in_network: ["BCBSIL PPO"] })).toEqual({ ok: true });
   });
   it("never Mr./Ms., never years she didn't give, never an insurer she isn't in network with", () => {
     const facts = { years_in_practice: null, in_network: ["Aetna"] };
@@ -135,6 +172,18 @@ describe("area search says where it searched", () => {
     expect(splitState("Lincoln Park")).toEqual({ place: "Lincoln Park", state: null });
     expect(splitState("Oak Park IL")).toEqual({ place: "Oak Park", state: "IL" });
     expect(outOfStateWarning(["60614"], "IL")).toBeNull();
+    expect(splitState("Port Washington")).toEqual({ place: "Port Washington", state: null });
+    expect(splitState("Port Washington WI")).toEqual({ place: "Port Washington", state: "WI" });
+    expect(splitState("Kansas City")).toEqual({ place: "Kansas City", state: null });
+    expect(splitState("Wicker Park in")).toEqual({ place: "Wicker Park in", state: null });
+    expect(splitState("Evanston, il")).toEqual({ place: "Evanston", state: "IL" });
+    expect(splitState("Springfield, Illinois", (t) => t === "Springfield, Illinois")).toEqual({ place: "Springfield, Illinois", state: null });
+  });
+  it("counts her naming the place only as whole words", () => {
+    expect(namesPlace("Collinsville IL", "Collinsville, Madison County")).toBe(true);
+    expect(namesPlace("lin", "Lincoln, Logan County")).toBe(false);
+    expect(namesPlace("Park", "Park Ridge, Cook County")).toBe(false);
+    expect(namesPlace("near Park Ridge", "Park Ridge, Cook County")).toBe(true);
   });
   it("warns that 46320 is in Indiana", async () => {
     const r = await searchArea({ area: { kind: "zips", zips: ["46320"] }, radiusMiles: 1, specialties: ["pediatrics"] }, ctx, deps);
@@ -166,6 +215,17 @@ describe("area search says where it searched", () => {
     });
     expect(new URL(urls[0]).searchParams.get("q")).toBe("Naperville, Illinois");
     expect(hit).toEqual({ point: [41.75, -88.15], label: "Naperville, DuPage County", state: "IL" });
+  });
+});
+
+describe("a letter waiting counts as in progress", () => {
+  it("pending, running, or approved and not sent", () => {
+    const l = (status: string, sent?: boolean) => ({ approvalId: "a", status, subject: null, letter: null, sent });
+    expect(letterWaiting(l("pending"))).toBe(true);
+    expect(letterWaiting(l("done", false))).toBe(true);
+    expect(letterWaiting(l("done", true))).toBe(false);
+    expect(letterWaiting(l("dismissed"))).toBe(false);
+    expect(letterWaiting(undefined)).toBe(false);
   });
 });
 
@@ -330,5 +390,102 @@ describe.skipIf(!hasDb)("dates and distances on the board", () => {
     made.push(first.added[0].id!);
     await addToBoard([{ npi, distanceMiles: null }], db(), async () => p);
     expect((await getSource(first.added[0].id!))!.distance_miles).toBe(2.4);
+  });
+});
+
+describe.skipIf(!hasDb)("review fixes against the database", () => {
+  const tools = async () => (await import("../lib/aeon/tools-referrals")).REFERRAL_TOOLS;
+  const run = async (name: string, input: unknown) => JSON.parse((await (await tools()).find((t) => t.name === name)!.run(input as never, { by: "test" })).content[0].text);
+
+  it("a card with no NPI is refused plainly, and never claims to be blocked", async () => {
+    const { db } = await import("../lib/db");
+    const [row] = await db()`
+      insert into practice_os.referral_sources (npi, name, city, state, zip) values (null, '[Sample] Noel Npiless, LCSW', 'Chicago', 'IL', '60614') returning id`;
+    made.push(row.id);
+    const out = await run("set_do_not_contact", { source: row.id });
+    expect(out).toMatchObject({ done: false, never_suggested_again: false });
+    expect(out.why).toMatch(/no NPI/);
+    expect((await db()`select stage from practice_os.referral_sources where id = ${row.id}`)[0].stage).toBe("found");
+  });
+
+  it("undoing 'asked not to be contacted' needs her confirmation, and the audit names Aeon", async () => {
+    const { db } = await import("../lib/db");
+    const { id } = await makeCard("[Sample] Quinn Askednot, MD");
+    expect(await run("set_do_not_contact", { source: id, reason: "asked_not_to" })).toMatchObject({ done: true, never_suggested_again: true });
+    expect(await run("set_do_not_contact", { source: id, undo: true })).toMatchObject({ done: false, needs_confirmation: expect.any(String) });
+    expect(await run("set_do_not_contact", { source: id, undo: true, confirmed: true })).toMatchObject({ done: true, do_not_contact: false });
+    const actors = (
+      await db()`select actor from practice_os.audit_log where subject_id = ${id} and action in ('referral_suppressed', 'referral_unsuppressed') order by id`
+    ).map((r) => r.actor);
+    expect(actors).toEqual(["aeon", "aeon"]);
+  });
+
+  it("no letter is drafted or approved for someone on the do-not-contact list", async () => {
+    const { draftOutreach } = await import("../lib/referrals/outreach");
+    const { suppress } = await import("../lib/referrals/contacts");
+    const { approve } = await import("../lib/approvals");
+    const { db } = await import("../lib/db");
+    const { id } = await makeCard("[Sample] Rory Blocked, MD");
+    const { approvalId } = await draftOutreach(id, { by: "test", chat: fakeChat([LETTER]) });
+    approvals.push(approvalId);
+    await suppress(id, "not_interested", db(), "clinician");
+    process.env.DRY_RUN = "true";
+    const res = await approve(approvalId, { by: "test" });
+    expect(res.ok && res.approval.status).toBe("failed");
+    expect(res.ok && res.approval.error).toMatch(/do-not-contact list/);
+    await expect(draftOutreach(id, { by: "test", chat: fakeChat([LETTER]) })).rejects.toThrow(/do-not-contact list/);
+  });
+
+  it("her own letter text gets the fact check too", async () => {
+    const { draftOutreach } = await import("../lib/referrals/outreach");
+    const { id } = await makeCard("[Sample] Sam Factcheck, MD");
+    const { approvalId } = await draftOutreach(id, { by: "test", chat: fakeChat([LETTER]) });
+    approvals.push(approvalId);
+    const out = await run("revise_referral_letter", { approval_id: approvalId, letter: `${LETTER}\n\nI have been practicing for 40 years.` });
+    expect(out).toMatchObject({ revised: false });
+    expect(out.why).toMatch(/years/);
+  });
+
+  it("a note that fails the full privacy check never reaches Muse or a tool result", async () => {
+    const { draftOutreach } = await import("../lib/referrals/outreach");
+    const { db } = await import("../lib/db");
+    const { id } = await makeCard("[Sample] Pat Screened, MD");
+    // Written straight to the table, as an older row might be: the screening before the model still holds it back.
+    await db()`insert into practice_os.referral_contacts (source_id, kind, happened_on, note, created_by)
+               values (${id}, 'called', current_date, 'Her client Maria Lopez was referred by them', 'clinician')`;
+    const seen: unknown[] = [];
+    const { approvalId } = await draftOutreach(id, { by: "test", chat: fakeChat([LETTER], seen) });
+    approvals.push(approvalId);
+    expect(JSON.stringify(seen[0])).not.toContain("Maria Lopez");
+    const found = await run("find_referral_cards", { query: "Pat Screened" });
+    expect(JSON.stringify(found)).not.toContain("Maria Lopez");
+    expect(found.cards[0].last_logged).toMatch(/held back/);
+  });
+
+  it("an approved letter not yet sent: no second draft, not suggested as new, and in the brief after 2 days", async () => {
+    const { draftOutreach, pendingLetter } = await import("../lib/referrals/outreach");
+    const { approve } = await import("../lib/approvals");
+    const { outreachPlan, lettersReady } = await import("../lib/referrals/plan");
+    const { summarize } = await import("../lib/compliance/brief");
+    const { db } = await import("../lib/db");
+    const { id } = await makeCard("[Sample] Robin Readyletter, MD");
+    const { approvalId } = await draftOutreach(id, { by: "test", chat: fakeChat([LETTER]) });
+    approvals.push(approvalId);
+    process.env.DRY_RUN = "true";
+    await approve(approvalId, { by: "test" });
+    expect(await pendingLetter(id)).toMatchObject({ id: approvalId, status: "ready" });
+    await expect(draftOutreach(id, { by: "test", chat: fakeChat([LETTER]) })).rejects.toThrow(/approved and ready to send/);
+    const plan = await outreachPlan(db(), 200);
+    expect(plan.reach_out.some((p) => p.id === id)).toBe(false);
+    expect(plan.letters_waiting).toBeGreaterThanOrEqual(1);
+    expect((await lettersReady()).some((r) => r.id === id)).toBe(false);
+    await db()`update practice_os.approvals set decided_at = now() - interval '3 days' where id = ${approvalId}`;
+    const ready = await lettersReady();
+    expect(ready.find((r) => r.id === id)).toMatchObject({ days: 3 });
+    const text = summarize({
+      today: "2026-11-02", this_week: [], urgent_soon: [], setup_questions: [], needs_dates: [], payer_dates: [], referral_letters_ready: ready, is_sample: true,
+    });
+    expect(text).toContain("Referral letters ready, not sent yet");
+    expect(text).toContain("[Sample] Robin Readyletter, MD: approved 3 days ago");
   });
 });

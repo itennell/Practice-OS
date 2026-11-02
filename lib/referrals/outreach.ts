@@ -14,18 +14,20 @@ import { db } from "../db";
 import { loadMediaFacts } from "../media/facts";
 import { chat } from "../meta";
 import { getProfile } from "../profile";
-import { CONTACT_LABEL, contactsFor } from "./contacts";
-import { getSource, type ReferralSource } from "./store";
+import { allPayers } from "../payers/catalog";
+import { CONTACT_LABEL, contactsFor, screenedNote, suppressedNpis } from "./contacts";
+import { getSource, latestLetters, type ReferralSource } from "./store";
 
 export const FOLLOW_UP_DAYS = 7;
 
-// Anything of value, money talk, or the referral itself as a trade. Naming the
-// insurance plans she takes, or that she sees private-pay clients, is allowed:
-// offices ask which plans a clinician takes before they refer.
+// Anything of value tied to a referral, or the referral itself as a trade.
+// Her own fees, the plans she takes, private pay and superbills are allowed:
+// offices ask about them before they refer ("my fee is $175", "superbills on
+// request"). A dollar amount is refused only next to referrals or "each/every/per".
 const OFF_LIMITS: [RegExp, string][] = [
-  [/\$\s?\d|\b\d+\s?(?:dollars|usd)\b/i, "a dollar amount"],
-  [/\b(?:fee|fees|price|pricing|cost|costs|payment|payments|compensat\w*|commission|kickback|rebate|discount\w*|coupon)\b/i, "money or payment"],
-  [/\b(?:pay|paid|paying)\s+(?:you|your|for (?:each|every|the) referral)\b/i, "money or payment"],
+  [/\$\s?\d[^.!?\n]*\b(?:referr\w*|each|every|per|new client|send)\b|\b(?:referr\w*|each|every|per)\b[^.!?\n]*\$\s?\d/i, "a dollar amount"],
+  [/\b(?:pay|paid|paying)\s+(?:you|your)\b|\bget(?:s|ting)?\s+paid\b|\bpaid\s+for\s+(?:a\s+|each\s+|every\s+|your\s+)?referrals?\b|\b(?:referral|finder'?s)\s+fees?\b/i, "money or payment"],
+  [/\b(?:compensat\w*|commissions?|kickbacks?|rebates?|discount\w*|coupons?|honorari(?:um|a|ums)|gratuit(?:y|ies)|stipends?|remunerat\w*|revenue shar\w*|split the fee)\b/i, "money or payment"],
   [/\b(?:gift|gifts|gift card|lunch|dinner|coffee on me|treat you|swag|tickets?|free (?:session|sessions|consult\w*|month))\b/i, "a gift or something free"],
   [/\b(?:per referral|for each referral|for every referral|in exchange for|reward\w*|incentive\w*|bonus\w*|thank-you gift)\b/i, "something in return for referrals"],
   [/\b(?:suicid\w*|self-harm|diagnos\w*|treatment plan|medication)\b/i, "clinical content"],
@@ -60,7 +62,7 @@ export type LetterFacts = {
   her_log: { what: string; on: string; note: string | null }[];
 };
 
-export async function letterFacts(source: ReferralSource): Promise<LetterFacts> {
+export async function letterFacts(source: ReferralSource, check?: Parameters<typeof screenedNote>[1]): Promise<LetterFacts> {
   const [profile, media, log] = await Promise.all([
     getProfile().catch(() => null),
     loadMediaFacts().catch(() => null),
@@ -75,7 +77,10 @@ export async function letterFacts(source: ReferralSource): Promise<LetterFacts> 
     in_network: media?.inNetwork ?? [],
     private_pay: Boolean(media?.fees.length),
     years_in_practice: media?.answers.yearsInPractice ?? null,
-    her_log: (log[source.id] ?? []).slice(0, 5).map((c) => ({ what: CONTACT_LABEL[c.kind], on: c.happened_on, note: c.note })),
+    // Each note is checked again with the chat's full privacy check; one that fails never reaches Muse.
+    her_log: await Promise.all(
+      (log[source.id] ?? []).slice(0, 5).map(async (c) => ({ what: CONTACT_LABEL[c.kind], on: c.happened_on, note: await screenedNote(c.note, check) })),
+    ),
   };
 }
 
@@ -88,24 +93,35 @@ const NUMBER_WORDS: Record<string, number> = {
 };
 const YEARS = /\b(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty)\+?\s+years?\b|\b(?:a|over a|more than a)\s+decades?\b|\bdecades\b/gi;
 
-// Insurers a letter might name, each with the words that mean it.
-const INSURERS: [string, RegExp][] = [
-  ["Blue Cross Blue Shield", /\b(?:bcbs\w*|blue cross|blue shield)\b/i],
-  ["Aetna", /\baetna\b/i],
-  ["Cigna", /\bcigna\b/i],
-  ["UnitedHealthcare", /\b(?:united ?health ?care|uhc|optum)\b/i],
-  ["Humana", /\bhumana\b/i],
-  ["Medicare", /\bmedicare\b/i],
-  ["Medicaid", /\bmedicaid\b/i],
-  ["Ambetter", /\bambetter\b/i],
-  ["Oscar", /\boscar health\b/i],
-  ["Magellan", /\bmagellan\b/i],
-  ["Carelon", /\bcarelon\b/i],
-  ["Tricare", /\btricare\b/i],
-  ["Meridian", /\bmeridian\b/i],
-  ["Molina", /\bmolina\b/i],
-  ["CountyCare", /\bcountycare\b/i],
-];
+// Insurers a letter might name: every payer in the catalog (data/payers), by its
+// name and aliases. A one-word alias counts only when written as a name ("Aetna",
+// "UHC", not "grow"), and everyday words are left out.
+const COMMON_WORDS = new Set(["united", "grow", "impact", "alma", "medicaid plan"]);
+const escapeRe = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+export type InsurerMatcher = { name: string; terms: string[] };
+
+export function insurerMatchers(payers = allPayers()): InsurerMatcher[] {
+  return payers.map((p) => {
+    const short = p.name.replace(/\s*\(.*?\)\s*/g, " ").split("/").map((x) => x.trim()).filter(Boolean);
+    const terms = [...new Set([...short, ...(p.aliases ?? [])].map((t) => t.trim()).filter((t) => t.length >= 3 && !COMMON_WORDS.has(t.toLowerCase())))];
+    return { name: p.name, terms };
+  });
+}
+
+function mentions(text: string, term: string): boolean {
+  const re = new RegExp(`(?<![A-Za-z])${escapeRe(term)}(?![A-Za-z])`, "gi");
+  for (const m of text.matchAll(re)) {
+    // One word must look like a name: capitalized or all capitals.
+    if (term.includes(" ") || /^[A-Z]/.test(m[0])) return true;
+  }
+  return false;
+}
+
+/** The catalog payers this text names. */
+export function insurersNamed(text: string, matchers = insurerMatchers()): InsurerMatcher[] {
+  return matchers.filter((m) => m.terms.some((t) => mentions(text, t)));
+}
 
 /** Muse's letter against her real facts: no Mr./Ms., no years she never gave, no insurer she isn't in network with. */
 export function checkFacts(letter: string, facts: Pick<LetterFacts, "years_in_practice" | "in_network">): LetterCheck {
@@ -122,10 +138,10 @@ export function checkFacts(letter: string, facts: Pick<LetterFacts, "years_in_pr
       };
     }
   }
-  const taken = facts.in_network.join(" | ");
-  for (const [name, re] of INSURERS) {
-    if (re.test(letter) && !re.test(taken)) {
-      return { ok: false, reason: `Don't name ${name}: she isn't in network with them. Name only the plans in in_network, or none.` };
+  const taken = facts.in_network.join(" | ").toLowerCase();
+  for (const m of insurersNamed(letter)) {
+    if (!m.terms.some((t) => taken.includes(t.toLowerCase()))) {
+      return { ok: false, reason: `Don't name ${m.name}: she isn't in network with them. Name only the plans in in_network, or none.` };
     }
   }
   return { ok: true };
@@ -211,16 +227,29 @@ export async function writeLetter(
   throw new Error(`I couldn't write a letter that passes the referral rules (${problem || "no reply"}). Try again.`);
 }
 
-export type PendingLetter = { id: string; sourceId: string; subject: string; letter: string };
+/** "pending": waiting for her approval. "ready": approved, not marked sent yet. */
+export type PendingLetter = { id: string; sourceId: string; subject: string; letter: string; status: "pending" | "ready" };
 
-/** The letter for this card still waiting in her approvals, if any (the newest). */
+/** The letter for this card still waiting: for her approval (newest), or approved and not sent yet. */
 export async function pendingLetter(sourceId: string): Promise<PendingLetter | null> {
   const [row] = await db()<{ id: string; subject: string | null; letter: string | null }[]>`
     select id, payload ->> 'subject' as subject, payload ->> 'letter' as letter
       from practice_os.approvals
      where kind = 'referral_letter' and status = 'pending' and payload ->> 'referral_source_id' = ${sourceId}
      order by created_at desc limit 1`;
-  return row ? { id: row.id, sourceId, subject: row.subject ?? "", letter: row.letter ?? "" } : null;
+  if (row) return { id: row.id, sourceId, subject: row.subject ?? "", letter: row.letter ?? "", status: "pending" };
+  const latest = (await latestLetters())[sourceId];
+  if (latest?.status === "done" && !latest.sent) {
+    return { id: latest.approvalId, sourceId, subject: latest.subject ?? "", letter: latest.letter ?? "", status: "ready" };
+  }
+  return null;
+}
+
+/** On her do-not-contact list or set aside as Not a fit: no letter is written or approved. */
+export async function blockedReason(source: Pick<ReferralSource, "name" | "npi" | "stage">): Promise<string | null> {
+  if (source.npi && (await suppressedNpis()).has(source.npi)) return `${source.name} is on your do-not-contact list, so I won't write to them.`;
+  if (source.stage === "not_a_fit") return `${source.name} is in Not a fit, so I won't write to them. Move the card back first if that changed.`;
+  return null;
 }
 
 /**
@@ -230,7 +259,14 @@ export async function pendingLetter(sourceId: string): Promise<PendingLetter | n
 export async function draftOutreach(sourceId: string, opts: { by: string; note?: string; chat?: ChatFn }) {
   const source = await getSource(sourceId);
   if (!source) throw new Error("That referral source isn't on the board.");
+  const blocked = await blockedReason(source);
+  if (blocked) throw new Error(blocked);
   const waiting = await pendingLetter(source.id);
+  if (waiting?.status === "ready") {
+    throw new LetterNotWaiting(
+      `A letter to ${source.name} is approved and ready to send. Copy it from the Referrals board, send it, then press I sent it; there's no need for a second one.`,
+    );
+  }
   if (waiting) {
     const r = await reviseLetter(waiting.id, { by: opts.by, chat: opts.chat, instruction: opts.note ?? "Write it again." });
     return { approvalId: r.approvalId, subject: r.subject, letter: r.letter, source, revised: true };
@@ -267,6 +303,8 @@ export async function reviseLetter(
   if (row.status !== "pending") throw new LetterNotWaiting("That letter isn't waiting anymore (it was approved or dismissed), so I left it as it is. Ask me to draft a new one.");
   const source = await getSource(row.source_id);
   if (!source) throw new LetterNotWaiting("That referral source is no longer on the board.");
+  const blocked = await blockedReason(source);
+  if (blocked) throw new LetterNotWaiting(blocked);
 
   let subject = opts.subject?.trim().slice(0, 150) || row.subject || "";
   let letter: string;
@@ -274,6 +312,8 @@ export async function reviseLetter(
     letter = opts.letter.trim();
     const check = checkLetter(letter);
     if (!check.ok) throw new Error(check.reason);
+    const facts = checkFacts(letter, await letterFacts(source));
+    if (!facts.ok) throw new Error(facts.reason);
   } else {
     if (!opts.instruction?.trim()) throw new Error("Tell me what to change in the letter.");
     const r = await writeLetter(source, { chat: opts.chat, note: opts.instruction, previous: { subject, letter: row.letter ?? "" } });

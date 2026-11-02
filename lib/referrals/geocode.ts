@@ -7,6 +7,7 @@
 // Only provider addresses from NPPES and the place she typed are sent. Never
 // anything about a client. Answers are kept in memory so each address is asked once.
 
+import { isKnownPlace } from "./places";
 import { splitState, stateCode, stateName } from "./states";
 
 export type Point = [lat: number, lon: number];
@@ -152,7 +153,7 @@ export async function geocodePlace(
   state: string,
   get: Get = nominatimGet,
 ): Promise<{ point: Point; label: string; state: string | null } | null> {
-  const typed = splitState(place);
+  const typed = splitState(place, isKnownPlace);
   const where = stateName(typed.state ?? stateCode(state) ?? state);
   const q = `${typed.place}, ${where}`;
   const key = q.toLowerCase();

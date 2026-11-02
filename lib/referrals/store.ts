@@ -269,14 +269,14 @@ export function specialtyLabel(id: SpecialtyId): string {
 }
 
 /** `sent`: she marked it sent (a sent_letter in her log) after approving it. Until then an approved letter is "Letter ready". */
-export type LetterState = { approvalId: string; status: string; subject: string | null; letter: string | null; sent?: boolean };
+export type LetterState = { approvalId: string; status: string; subject: string | null; letter: string | null; sent?: boolean; decidedAt?: string | null };
 
 /** The latest introduction letter for each card, so the board can say where it stands. */
 export async function latestLetters(sql: postgres.Sql = db()): Promise<Record<string, LetterState>> {
   // An edit made while approving is in the result; otherwise the letter as Muse wrote it.
-  const rows = await sql<{ source_id: string; id: string; status: string; subject: string | null; letter: string | null; sent: boolean }[]>`
+  const rows = await sql<{ source_id: string; id: string; status: string; subject: string | null; letter: string | null; sent: boolean; decided_at: string | null }[]>`
     select distinct on (payload ->> 'referral_source_id')
-           payload ->> 'referral_source_id' as source_id, a.id, a.status,
+           payload ->> 'referral_source_id' as source_id, a.id, a.status, a.decided_at::text as decided_at,
            coalesce(result #>> '{letter,subject}', payload ->> 'subject') as subject,
            coalesce(result #>> '{letter,body}', payload ->> 'letter') as letter,
            (a.status = 'done' and exists (
@@ -291,6 +291,6 @@ export async function latestLetters(sql: postgres.Sql = db()): Promise<Record<st
      where kind = 'referral_letter' and payload ? 'referral_source_id'
      order by payload ->> 'referral_source_id', created_at desc`;
   return Object.fromEntries(
-    rows.map((r) => [r.source_id, { approvalId: r.id, status: r.status, subject: r.subject, letter: r.letter, sent: r.sent }]),
+    rows.map((r) => [r.source_id, { approvalId: r.id, status: r.status, subject: r.subject, letter: r.letter, sent: Boolean(r.sent), decidedAt: r.decided_at }]),
   );
 }

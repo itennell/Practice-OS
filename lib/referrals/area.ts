@@ -109,6 +109,16 @@ const checkPlace = (text: string) => placeAllowed(text);
 
 export class AreaError extends Error {}
 
+/** She typed the matched place's own name, as whole words ("Collinsville IL" names Collinsville; "lin" doesn't name Lincoln). */
+export function namesPlace(typed: string, label: string): boolean {
+  const words = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s'-]/g, " ").split(/\s+/).filter(Boolean);
+  const name = words(label.split(",")[0]);
+  const said = words(typed);
+  if (name.length === 0) return false;
+  for (let i = 0; i + name.length <= said.length; i++) if (name.every((w, j) => said[i + j] === w)) return true;
+  return false;
+}
+
 const sameAddress = (p: Provider) => `${p.address}|${p.zip}`.toLowerCase();
 
 /** People whose NPPES location matches a group's in the same results get "works at". */
@@ -169,8 +179,7 @@ export async function searchArea(
       // OpenStreetMap answers something for almost any text ("abc" is a town 256 miles away).
       // A far-off match she didn't name is refused, not searched quietly.
       const miles = officePoint ? haversineMiles(officePoint, hit.point) : null;
-      const named = hit.label.split(",")[0].trim().toLowerCase();
-      const sheNamedIt = named.length > 0 && area.place.toLowerCase().includes(named);
+      const sheNamedIt = namesPlace(area.place, hit.label);
       if (miles !== null && miles > FAR_MILES && !sheNamedIt) {
         throw new AreaError(
           `"${area.place}" matched ${hit.label}, about ${Math.round(miles)} miles from your office, so I didn't search there. Try a ZIP code or the name of a nearby city.`,

@@ -65,14 +65,20 @@ export function outOfStateWarning(zips: string[], clinicianState: string | null 
  * Splits a trailing state off a typed place: "Naperville IL" and "Naperville, Illinois"
  * become { place: "Naperville", state: "IL" }. A place with no state comes back as is.
  */
-export function splitState(text: string): { place: string; state: string | null } {
+export function splitState(text: string, knownTown: (place: string) => boolean = () => false): { place: string; state: string | null } {
   const t = text.trim().replace(/\s+/g, " ");
-  const words = t.split(/(?<=,)\s*|\s+/).map((w) => w.replace(/,$/, "")).filter(Boolean);
-  // "New York" and "North Carolina" are two words; "Lincoln Park" keeps "Park" (not a state).
-  for (const n of [2, 1]) {
-    if (words.length <= n) continue;
-    const code = stateCode(words.slice(-n).join(" "));
-    if (code) return { place: words.slice(0, -n).join(" "), state: code };
+  const none = { place: t, state: null };
+  // A two-letter code wins: "Naperville IL", "Oak Park, il". Lower case only after a comma ("Wicker Park in" stays).
+  const code = t.match(/^(.+?)(,\s*|\s+)([A-Za-z]{2})$/);
+  if (code && (code[3] === code[3].toUpperCase() || code[2].includes(",")) && stateCode(code[3]) && code[3].length === 2) {
+    return { place: code[1].trim(), state: code[3].toUpperCase() };
   }
-  return { place: t, state: null };
+  // A full state name only after a comma ("Naperville, Illinois"), so a town named after
+  // a state keeps its name: "Port Washington", "Indiana Harbor", "Kansas City".
+  const named = t.match(/^(.+?),\s*([A-Za-z]+(?: [A-Za-z]+)?)$/);
+  if (named) {
+    const st = stateCode(named[2]);
+    if (st && !knownTown(t)) return { place: named[1].trim(), state: st };
+  }
+  return none;
 }

@@ -5,10 +5,11 @@
 // the sensitive-info guard on the result).
 import { z } from "zod";
 import type { chat } from "../meta";
-import { suppress, unsuppress, contactsFor, CONTACT_LABEL } from "../referrals/contacts";
+import { contactsFor, CONTACT_LABEL, NoNpiToList, screenedNote, suppress, suppressionFor, unsuppress } from "../referrals/contacts";
 import { evidenceFor } from "../referrals/evidence/store";
 import { specialtyForCode } from "../referrals/nppes";
 import { LetterNotWaiting, pendingLetter, reviseLetter } from "../referrals/outreach";
+import { normalizeName, normalizeOrg } from "../referrals/evidence/normalize";
 import { cardsNamed } from "../referrals/plan";
 import { listSources, STAGE_LABEL, STAGES, type ReferralSource } from "../referrals/store";
 import type { AeonTool, ToolContext, ToolResult } from "./tools";
@@ -37,6 +38,34 @@ export function resolveCard(said: string, cards: ReferralSource[]): { card: Refe
   if (named.length === 0) return { none: true };
   if (named.length > 1) return { ask_which: named.slice(0, 5) };
   return { card: named[0] };
+}
+
+/** Her words name this card exactly: every word of the name she said is a word of the card's name, or the practice's name. */
+export function namesExactly(said: string, card: Pick<ReferralSource, "name" | "organization" | "npi_type">): boolean {
+  const q = normalizeName(said).tokens;
+  if (card.npi_type !== "organization" && q.length > 0) {
+    const have = new Set(normalizeName(card.name).tokens);
+    if (q.every((w) => have.has(w))) return true;
+  }
+  const org = normalizeOrg(said);
+  const theirs = normalizeOrg(card.organization ?? card.name);
+  return org.length > 0 && ` ${theirs} `.includes(` ${org} `);
+}
+
+/**
+ * For changes that stop or start contact: only one card that her words name
+ * exactly ("Dr. Chen" never means Cheng). A near miss or several candidates
+ * come back to ask which; nothing changes.
+ */
+export function resolveExact(said: string, cards: ReferralSource[]): { card: ReferralSource } | { none: true } | { ask_which: ReferralSource[] } {
+  const byId = UUID.test(said.trim()) ? cards.find((c) => c.id === said.trim()) : undefined;
+  if (byId) return { card: byId };
+  const named = cardsNamed(said, cards);
+  const exact = cards.filter((c) => namesExactly(said, c));
+  const candidates = [...new Set([...exact, ...named])];
+  if (candidates.length === 0) return { none: true };
+  if (candidates.length === 1 && exact.length === 1) return { card: exact[0] };
+  return { ask_which: candidates.slice(0, 5) };
 }
 
 const squash = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -95,10 +124,17 @@ export const REFERRAL_TOOLS: AeonTool[] = [
       const all = await listSources();
       const matches = searchCards(query, all).filter((c) => !stage || c.stage === stage);
       const shown = matches.slice(0, limit ?? 10);
-      const [evidence, log] = await Promise.all([
+      const [evidence, rawLog] = await Promise.all([
         evidenceFor(shown.map((c) => ({ id: c.id, npi_type: c.npi_type }))).catch(() => ({}) as Awaited<ReturnType<typeof evidenceFor>>),
         contactsFor(shown.map((c) => c.id)).catch(() => ({}) as Awaited<ReturnType<typeof contactsFor>>),
       ]);
+      // Her notes are checked again with the chat's full privacy check; one that fails is left out.
+      const notes = new Map<string, string | null>();
+      for (const c of shown) {
+        const last = rawLog[c.id]?.[0];
+        if (last) notes.set(c.id, await screenedNote(last.note));
+      }
+      const log = rawLog;
       return text({
         searched: `all ${all.length} cards on the board`,
         matches: matches.length,
@@ -117,7 +153,9 @@ export const REFERRAL_TOOLS: AeonTool[] = [
             email: email?.value ?? c.email ?? null,
             email_from: email ? (email.origins[0] === "clinician" ? "she typed it" : "Aeon found it; she should confirm it") : c.email ? "on the card" : null,
             follow_up_on: c.next_follow_up_on,
-            last_logged: last ? `${CONTACT_LABEL[last.kind]} on ${last.happened_on}${last.note ? `: ${last.note}` : ""}` : null,
+            last_logged: last
+              ? `${CONTACT_LABEL[last.kind]} on ${last.happened_on}${notes.get(c.id) ? `: ${notes.get(c.id)}` : last.note ? " (note held back by the privacy check)" : ""}`
+              : null,
             sample: c.is_sample,
           };
         }),
@@ -132,28 +170,48 @@ export const REFERRAL_TOOLS: AeonTool[] = [
     description:
       "When she says a referral source isn't interested, asked not to be contacted, or 'don't contact them again': moves the card to " +
       "Not a fit, clears its follow-up, and puts the NPI on her do-not-contact list so no search or weekly plan suggests them again. " +
-      "A note alone does NOT do this, so use this tool, not log_referral_contact. Name the card as she said it or pass its id; if more " +
-      "than one fits, ask which. undo: true takes them off the list (the card stays where it is). Sends nothing.",
+      "A note alone does NOT do this, so use this tool, not log_referral_contact. Name the card as she said it or pass its id; it acts " +
+      "only on an exact name match, otherwise it returns ask_which: ask her which and call again with the id. undo: true takes them " +
+      "off the list (the card stays where it is); if they asked not to be contacted, ask her to confirm first and pass confirmed: true. Sends nothing.",
     input: {
       source: z.string().trim().min(2).max(160).describe("The card's name as she said it, or its id."),
       reason: z.enum(["not_interested", "asked_not_to"]).optional().describe("asked_not_to when they asked not to be contacted; else not_interested."),
       undo: z.boolean().optional().describe("True to take them off the do-not-contact list."),
+      confirmed: z.boolean().optional().describe("Undo only: true after she confirmed, in this chat, she wants to contact someone who asked not to be."),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     label: "Updated your do-not-contact list",
     changesData: true,
-    run: async ({ source, reason, undo }) => {
-      const found = resolveCard(source, await listSources());
+    run: async ({ source, reason, undo, confirmed }) => {
+      const found = resolveExact(source, await listSources());
       if ("none" in found) return text({ done: false, why: `No card on her Referrals board is named "${source}". Nothing changed.` });
       if ("ask_which" in found) {
-        return text({ done: false, why: "More than one card fits; ask her which.", ask_which: found.ask_which.map((c) => ({ id: c.id, name: c.name, column: STAGE_LABEL[c.stage] })) });
+        return text({
+          done: false,
+          why: "Not an exact match for one card, so nothing changed. Ask her which one she means, then call again with its id.",
+          ask_which: found.ask_which.map((c) => ({ id: c.id, name: c.name, column: STAGE_LABEL[c.stage] })),
+        });
       }
       const card = found.card;
       if (undo) {
-        await unsuppress(card.id);
+        const was = await suppressionFor(card.id);
+        if (!was) return text({ done: false, name: card.name, why: "They aren't on her do-not-contact list. Nothing changed." });
+        if (was === "asked_not_to" && !confirmed) {
+          return text({
+            done: false,
+            name: card.name,
+            needs_confirmation: `${card.name} asked not to be contacted. Ask her plainly whether she wants to take them off the list anyway; only after she says yes, call again with confirmed: true.`,
+          });
+        }
+        await unsuppress(card.id, undefined, "aeon");
         return text({ done: true, name: card.name, do_not_contact: false, column: STAGE_LABEL[card.stage], note: "Searches and the weekly plan can suggest them again." });
       }
-      await suppress(card.id, reason ?? "not_interested", undefined, "aeon");
+      try {
+        await suppress(card.id, reason ?? "not_interested", undefined, "aeon");
+      } catch (err) {
+        if (err instanceof NoNpiToList) return text({ done: false, name: card.name, never_suggested_again: false, why: err.message });
+        throw err;
+      }
       const waiting = await pendingLetter(card.id);
       return text({
         done: true,
@@ -185,7 +243,7 @@ export const REFERRAL_TOOLS: AeonTool[] = [
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: false },
     label: "Changed the waiting letter",
-    changesData: false,
+    changesData: true,
     run: async ({ source, approval_id, change, letter, subject }, ctx) => {
       if (!change && !letter && !subject) return text({ revised: false, why: "Ask her what to change in the letter." });
       let approvalId = approval_id;
@@ -197,6 +255,9 @@ export const REFERRAL_TOOLS: AeonTool[] = [
           return text({ revised: false, why: "More than one card fits; ask her which.", ask_which: found.ask_which.map((c) => ({ id: c.id, name: c.name })) });
         }
         const waiting = await pendingLetter(found.card.id);
+        if (waiting?.status === "ready") {
+          return text({ revised: false, why: `The letter to ${found.card.name} is already approved and ready to send, so it stays as she approved it.` });
+        }
         if (!waiting) {
           return text({ revised: false, why: `No letter to ${found.card.name} is waiting for her approval. Offer to draft one (draft_outreach).` });
         }

@@ -339,6 +339,8 @@ export const TOOLS: AeonTool[] = [
       referral_follow_ups: z
         .array(z.object({ id: z.string(), name: z.string(), on: z.string(), days_left: z.number(), stage: z.string(), last: z.string().nullable() }))
         .optional(),
+      // Approved referral letters not marked sent after 2 days.
+      referral_letters_ready: z.array(z.object({ id: z.string(), name: z.string(), approved_on: z.string(), days: z.number() })).optional(),
       is_sample: z.boolean(),
       summary: z.string(),
     },

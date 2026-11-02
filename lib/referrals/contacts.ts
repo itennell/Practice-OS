@@ -188,20 +188,46 @@ export function relationshipFrom(contacts: Pick<Contact, "kind" | "happened_on">
 
 export type SuppressReason = "asked_not_to" | "not_interested";
 
-/** Never suggest this NPI again, and move its card to Not a fit. */
+/**
+ * Never suggest this NPI again, and move its card to Not a fit. The list is kept
+ * by NPI (so a new search skips them); a card with no NPI can't be listed, so it
+ * is refused in plain words and nothing changes.
+ */
 export async function suppress(sourceId: string, reason: SuppressReason, sql: postgres.Sql = db(), by: "clinician" | "aeon" = "clinician") {
-  const [card] = await sql<{ npi: string | null }[]>`
-    update practice_os.referral_sources set stage = 'not_a_fit', next_follow_up_on = null, updated_at = now()
-     where id = ${sourceId} returning npi`;
-  if (!card) throw new Error("That referral source is no longer on the board.");
-  if (card.npi) await sql`insert into practice_os.referral_suppressions (npi, reason) values (${card.npi}, ${reason}) on conflict (npi) do update set reason = excluded.reason`;
+  const [found] = await sql<{ npi: string | null }[]>`select npi from practice_os.referral_sources where id = ${sourceId}`;
+  if (!found) throw new Error("That referral source is no longer on the board.");
+  if (!found.npi) {
+    throw new NoNpiToList(
+      "This card has no NPI, so I can't add it to your do-not-contact list. Move it to Not a fit yourself, or delete the card.",
+    );
+  }
+  await sql.begin(async (tx) => {
+    await tx`update practice_os.referral_sources set stage = 'not_a_fit', next_follow_up_on = null, updated_at = now() where id = ${sourceId}`;
+    await tx`insert into practice_os.referral_suppressions (npi, reason) values (${found.npi}, ${reason}) on conflict (npi) do update set reason = excluded.reason`;
+  });
   await audit({ actor: by, action: "referral_suppressed", subjectType: "referral_source", subjectId: sourceId, details: { reason } }, sql);
 }
 
-export async function unsuppress(sourceId: string, sql: postgres.Sql = db()) {
+export class NoNpiToList extends Error {}
+
+/** Why this card is on her do-not-contact list, or null when it isn't. */
+export async function suppressionFor(sourceId: string, sql: postgres.Sql = db()): Promise<SuppressReason | null> {
+  const [row] = await sql<{ reason: SuppressReason }[]>`
+    select s.reason from practice_os.referral_suppressions s
+      join practice_os.referral_sources c on c.npi = s.npi where c.id = ${sourceId}`;
+  return row?.reason ?? null;
+}
+
+export async function unsuppress(sourceId: string, sql: postgres.Sql = db(), by: "clinician" | "aeon" = "clinician") {
   const [card] = await sql<{ npi: string | null }[]>`select npi from practice_os.referral_sources where id = ${sourceId}`;
   if (card?.npi) await sql`delete from practice_os.referral_suppressions where npi = ${card.npi}`;
-  await audit({ actor: "clinician", action: "referral_unsuppressed", subjectType: "referral_source", subjectId: sourceId }, sql);
+  await audit({ actor: by, action: "referral_unsuppressed", subjectType: "referral_source", subjectId: sourceId }, sql);
+}
+
+/** A note from her log, screened again with the chat's full privacy check before it reaches the model or a tool result. Null when held back. */
+export async function screenedNote(note: string | null, check?: (t: string) => ReturnType<typeof guard>): Promise<string | null> {
+  if (!note) return null;
+  return (await checkNote(note, check).catch(() => "unavailable")) === null ? note : null;
 }
 
 export async function suppressedNpis(sql: postgres.Sql = db()): Promise<Set<string>> {

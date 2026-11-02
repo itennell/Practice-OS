@@ -1,5 +1,5 @@
 import { audit } from "../audit";
-import { checkLetter } from "../referrals/outreach";
+import { blockedReason, checkLetter } from "../referrals/outreach";
 import { getSource } from "../referrals/store";
 import type { Executor } from "./types";
 
@@ -19,6 +19,9 @@ export const referralLetter: Executor = async (approval, { dryRun }) => {
   if (!check.ok) throw new Error(check.reason);
   const source = await getSource(sourceId);
   if (!source) throw new Error("That referral source is no longer on the board.");
+  // Marked do-not-contact or Not a fit after the letter was drafted: it never becomes ready.
+  const blocked = await blockedReason(source);
+  if (blocked) throw new Error(blocked);
 
   await audit({
     actor: "executor",
