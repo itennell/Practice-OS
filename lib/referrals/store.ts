@@ -107,7 +107,9 @@ export async function addToBoard(
       missing.push(npi);
       continue;
     }
-    const miles = item.distanceMiles === null || !Number.isFinite(item.distanceMiles) ? null : Math.max(0, Math.min(500, item.distanceMiles));
+    const sent = item.distanceMiles === null || !Number.isFinite(item.distanceMiles) ? null : Math.max(0, Math.min(500, item.distanceMiles));
+    // Added again without a distance: keep (and score with) the one the card already has.
+    const miles = sent ?? (await knownMiles(npi, sql));
     const one: FoundSource = { ...p, distanceMiles: miles, fitScore: providerTier(p, { miles, focus, clinicianState: state }).score };
     await saveSources([one], sql);
     added.push(one);
@@ -117,6 +119,12 @@ export async function addToBoard(
     sql,
   );
   return { added, missing };
+}
+
+async function knownMiles(npi: string, sql: postgres.Sql): Promise<number | null> {
+  const [row] = await sql<{ miles: number | null }[]>`
+    select distance_miles::float8 as miles from practice_os.referral_sources where npi = ${npi}`;
+  return row?.miles ?? null;
 }
 
 /** The best of each kind in turn, so "primary care and oncology" shows both. */
@@ -154,7 +162,9 @@ export async function saveSources(found: FoundSource[], sql: postgres.Sql = db()
       name = excluded.name, organization = excluded.organization, taxonomy = excluded.taxonomy,
       specialty = excluded.specialty, npi_type = excluded.npi_type, credential = excluded.credential,
       address = excluded.address, city = excluded.city, state = excluded.state, zip = excluded.zip,
-      phone = excluded.phone, distance_miles = excluded.distance_miles, fit_score = excluded.fit_score,
+      phone = excluded.phone,
+      -- A search that doesn't know the distance never wipes the one the card has.
+      distance_miles = coalesce(excluded.distance_miles, referral_sources.distance_miles), fit_score = excluded.fit_score,
       score_version = excluded.score_version,
       updated_at = now()
     returning id, npi`;
@@ -254,35 +264,33 @@ export async function moveSource(id: string, stage: Stage, by: "clinician" | "ae
   return { ...before, stage };
 }
 
-/** The approved letter's bookkeeping: card to Contacted, follow-up a week out. */
-export async function markContacted(id: string, followUpDays: number, sql: postgres.Sql = db()): Promise<string> {
-  const today = await practiceToday(sql);
-  const [row] = await sql<{ next_follow_up_on: string }[]>`
-    update practice_os.referral_sources
-       set stage = 'contacted', last_contacted_at = now(),
-           next_follow_up_on = ${today}::date + ${followUpDays}::int, updated_at = now()
-     where id = ${id}
-    returning next_follow_up_on::text as next_follow_up_on`;
-  if (!row) throw new Error("That referral source is no longer on the board.");
-  return row.next_follow_up_on;
-}
-
 export function specialtyLabel(id: SpecialtyId): string {
   return SPECIALTY_BY_ID.get(id)!.label;
 }
 
-export type LetterState = { approvalId: string; status: string; subject: string | null; letter: string | null };
+/** `sent`: she marked it sent (a sent_letter in her log) after approving it. Until then an approved letter is "Letter ready". */
+export type LetterState = { approvalId: string; status: string; subject: string | null; letter: string | null; sent?: boolean; decidedAt?: string | null };
 
 /** The latest introduction letter for each card, so the board can say where it stands. */
 export async function latestLetters(sql: postgres.Sql = db()): Promise<Record<string, LetterState>> {
   // An edit made while approving is in the result; otherwise the letter as Muse wrote it.
-  const rows = await sql<{ source_id: string; id: string; status: string; subject: string | null; letter: string | null }[]>`
+  const rows = await sql<{ source_id: string; id: string; status: string; subject: string | null; letter: string | null; sent: boolean; decided_at: string | null }[]>`
     select distinct on (payload ->> 'referral_source_id')
-           payload ->> 'referral_source_id' as source_id, id, status,
+           payload ->> 'referral_source_id' as source_id, a.id, a.status, a.decided_at::text as decided_at,
            coalesce(result #>> '{letter,subject}', payload ->> 'subject') as subject,
-           coalesce(result #>> '{letter,body}', payload ->> 'letter') as letter
-      from practice_os.approvals
+           coalesce(result #>> '{letter,body}', payload ->> 'letter') as letter,
+           (a.status = 'done' and exists (
+             select 1 from practice_os.referral_contacts c
+              where c.source_id::text = a.payload ->> 'referral_source_id' and c.kind = 'sent_letter'
+                and c.created_at >= a.decided_at)
+             -- Letters approved before "I sent it" existed moved the card on approval.
+             or exists (
+             select 1 from practice_os.referral_sources s
+              where s.id::text = a.payload ->> 'referral_source_id' and s.last_contacted_at >= a.decided_at)) as sent
+      from practice_os.approvals a
      where kind = 'referral_letter' and payload ? 'referral_source_id'
      order by payload ->> 'referral_source_id', created_at desc`;
-  return Object.fromEntries(rows.map((r) => [r.source_id, { approvalId: r.id, status: r.status, subject: r.subject, letter: r.letter }]));
+  return Object.fromEntries(
+    rows.map((r) => [r.source_id, { approvalId: r.id, status: r.status, subject: r.subject, letter: r.letter, sent: Boolean(r.sent), decidedAt: r.decided_at }]),
+  );
 }

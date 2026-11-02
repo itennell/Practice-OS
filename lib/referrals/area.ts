@@ -12,6 +12,7 @@ import { haversineMiles, zipCenters } from "./geo";
 import { isKnownPlace } from "./places";
 import { searchProviders, SPECIALTY_BY_ID, type Provider, type SpecialtyId } from "./nppes";
 import { getReferralSettings } from "./settings";
+import { outOfStateWarning, stateCode, stateName } from "./states";
 import { capFirst, focusFrom, providerTier, TIERS, type Focus, type TierResult } from "./tier";
 
 type Centers = Record<string, Point>;
@@ -56,6 +57,8 @@ export function zipsNear(centers: Centers, points: Point[], miles: number, max: 
 }
 
 export const MAX_ZIPS = 12;
+/** A typed place matched farther than this from her office, and not by its own name, is refused. */
+export const FAR_MILES = 75;
 export const RADII = [1, 3, 5, 10] as const;
 
 export type Precision = "address" | "zip";
@@ -106,6 +109,16 @@ const checkPlace = (text: string) => placeAllowed(text);
 
 export class AreaError extends Error {}
 
+/** She typed the matched place's own name, as whole words ("Collinsville IL" names Collinsville; "lin" doesn't name Lincoln). */
+export function namesPlace(typed: string, label: string): boolean {
+  const words = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s'-]/g, " ").split(/\s+/).filter(Boolean);
+  const name = words(label.split(",")[0]);
+  const said = words(typed);
+  if (name.length === 0) return false;
+  for (let i = 0; i + name.length <= said.length; i++) if (name.every((w, j) => said[i + j] === w)) return true;
+  return false;
+}
+
 const sameAddress = (p: Provider) => `${p.address}|${p.zip}`.toLowerCase();
 
 /** People whose NPPES location matches a group's in the same results get "works at". */
@@ -138,6 +151,9 @@ export async function searchArea(
   const area = req.area.kind === "empty" && ctx.officeZip ? { kind: "zips" as const, zips: [ctx.officeZip] } : req.area;
   if (area.kind === "empty") throw new AreaError("Type a ZIP code, a city or a neighborhood.");
   if (req.specialties.length === 0) throw new AreaError("Pick at least one kind of provider.");
+  // Never a silent default: say which ZIP an empty box searched.
+  if (req.area.kind === "empty") notes.push(`You didn't type an area, so I searched around your ZIP code, ${ctx.officeZip}.`);
+  const officePoint = ctx.office ?? (ctx.officeZip ? (centers[ctx.officeZip] ?? null) : null);
 
   if (area.kind === "chicagoland") {
     zips = chicagolandZips(centers);
@@ -160,6 +176,20 @@ export async function searchArea(
       }
       const hit = await (deps.place ?? geocodePlace)(area.place, ctx.state || "Illinois");
       if (!hit) throw new AreaError(`I couldn't find "${area.place}" on the map. Try a ZIP code or a nearby city.`);
+      // OpenStreetMap answers something for almost any text ("abc" is a town 256 miles away).
+      // A far-off match she didn't name is refused, not searched quietly.
+      const miles = officePoint ? haversineMiles(officePoint, hit.point) : null;
+      const sheNamedIt = namesPlace(area.place, hit.label);
+      if (miles !== null && miles > FAR_MILES && !sheNamedIt) {
+        throw new AreaError(
+          `"${area.place}" matched ${hit.label}, about ${Math.round(miles)} miles from your office, so I didn't search there. Try a ZIP code or the name of a nearby city.`,
+        );
+      }
+      if (miles !== null && miles > FAR_MILES) notes.push(`${hit.label} is about ${Math.round(miles)} miles from your office.`);
+      const home = stateCode(ctx.state);
+      if (hit.state && home && hit.state !== home) {
+        notes.push(`${hit.label} is in ${stateName(hit.state)}, outside ${stateName(home)} where you practice. Check you can see clients from there before you reach out.`);
+      }
       points = [hit.point];
       label = hit.label;
     }
@@ -169,6 +199,9 @@ export async function searchArea(
     if (zips.length === 0) zips = zipsNear(centers, points, 50, 1).zips;
     if (near.capped) notes.push(`That radius covers more than ${MAX_ZIPS} ZIP codes, so I searched the ${MAX_ZIPS} nearest.`);
     postals = zips;
+    // A ZIP across the state line (typed, or pulled in by the radius) is searched, and said.
+    const away = outOfStateWarning(zips, ctx.state);
+    if (away && !notes.some((n) => n.includes(" where you practice"))) notes.push(away);
   }
 
   const found = await (deps.search ?? searchProviders)(req.specialties, postals, { maxRequests, deadline, now });
@@ -187,7 +220,6 @@ export async function searchArea(
   }
 
   const works = linkGroups(providers);
-  const officePoint = ctx.office ?? (ctx.officeZip ? (centers[ctx.officeZip] ?? null) : null);
   // The geocoder takes a few hundred addresses at a time, so the likely best go first.
   const rough = (p: Provider) => {
     const c = centers[p.zip];

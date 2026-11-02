@@ -72,28 +72,40 @@ describe.skipIf(!hasDb)("referral letters", () => {
     const id = await draft(sourceId);
     const [row] = await db()`select kind, status, preview, payload from practice_os.approvals where id = ${id}`;
     expect(row).toMatchObject({ kind: "referral_letter", status: "pending" });
-    expect(row.payload).toMatchObject({ referral_source_id: sourceId, letter: LETTER });
-    expect(row.preview.body).toBe(LETTER);
+    expect(row.payload).toMatchObject({ referral_source_id: sourceId });
+    // Muse's letter, with her real phone and email added to the signature when Muse left them out.
+    expect(row.payload.letter.startsWith(LETTER)).toBe(true);
+    const { loadMediaFacts } = await import("../lib/media/facts");
+    const facts = await loadMediaFacts();
+    for (const v of [facts.phone, facts.email].filter(Boolean)) expect(row.payload.letter).toContain(v);
+    expect(row.preview.body).toBe(row.payload.letter);
     expect((await getSource(sourceId))!.stage).toBe("found");
   });
 
-  it("approving sends nothing: it keeps the letter to copy, moves the card and sets a follow-up 7 days out", async () => {
+  it("approving sends nothing and moves nothing: the letter is ready; 'I sent it' moves the card and sets a follow-up 7 days out", async () => {
     process.env.DRY_RUN = "true";
+    const { logContact } = await import("../lib/referrals/contacts");
     const sourceId = await makeSource();
     const id = await draft(sourceId);
     const res = await approve(id, { by: "test" });
     expect(res.ok && res.approval.status).toBe("done");
     const result = res.ok ? (res.approval.result as Record<string, unknown>) : {};
-    expect(result).toMatchObject({ dry_run: true, moved_to: "contacted" });
-    expect(result.letter).toEqual({ subject: "Introduction from Reyes Counseling", body: LETTER });
+    expect(result).toMatchObject({ dry_run: true, letter_ready: true, moved_to: null });
+    expect((result.letter as { body: string }).body).toContain(LETTER);
     expect(result).not.toHaveProperty("gmail_draft_id");
+    const ready = (await getSource(sourceId))!;
+    expect(ready.stage).toBe("found");
+    expect(ready.next_follow_up_on).toBeNull();
+    expect((await latestLetters())[sourceId]).toMatchObject({ status: "done", sent: false });
 
+    await logContact(sourceId, { kind: "sent_letter", by: "clinician" });
     const today = await practiceToday();
     const due = new Date(`${today}T12:00:00Z`);
     due.setUTCDate(due.getUTCDate() + 7);
     const card = (await getSource(sourceId))!;
     expect(card.stage).toBe("contacted");
     expect(card.next_follow_up_on).toBe(due.toISOString().slice(0, 10));
+    expect((await latestLetters())[sourceId]).toMatchObject({ status: "done", sent: true });
     const actions = (await db()`select action from practice_os.audit_log where approval_id = ${id} order by id`).map((r) => r.action);
     expect(actions).toEqual(["approval_queued", "approval_approved", "referral_letter_approved", "approval_done"]);
   });
@@ -108,15 +120,16 @@ describe.skipIf(!hasDb)("referral letters", () => {
     expect((await getSource(sourceId))!.stage).toBe("found");
   });
 
-  it("for real (DRY_RUN=false) it still needs no Google: no Gmail call, the card moves", async () => {
+  it("for real (DRY_RUN=false) it still needs no Google: no Gmail call, the card waits as Letter ready", async () => {
     process.env.DRY_RUN = "false";
     const sourceId = await makeSource();
     const id = await draft(sourceId);
     const res = await approve(id, { by: "test" });
     expect(res.ok && res.approval.status).toBe("done");
-    expect((await getSource(sourceId))!.stage).toBe("contacted");
+    expect((await getSource(sourceId))!.stage).toBe("found");
     const letters = await latestLetters();
-    expect(letters[sourceId]).toMatchObject({ approvalId: id, status: "done", subject: "Introduction from Reyes Counseling", letter: LETTER });
+    expect(letters[sourceId]).toMatchObject({ approvalId: id, status: "done", subject: "Introduction from Reyes Counseling", sent: false });
+    expect(letters[sourceId].letter).toContain(LETTER);
   });
 
   it("moves a Contacted card to Follow up once its day comes", async () => {

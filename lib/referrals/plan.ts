@@ -10,8 +10,9 @@ import { orgNameScore } from "./evidence/match";
 import { jaroWinkler, normalizeName, normalizeOrg } from "./evidence/normalize";
 import { contactsFor, relationshipFrom, suppressedNpis, type Contact } from "./contacts";
 import { STAGE_LABEL } from "./stages";
-import { listSources, practiceFacts, type ReferralSource } from "./store";
-import { boardTier, TIER_LABEL, withRelationship, type Focus, type TierResult } from "./tier";
+import { latestLetters, listSources, practiceFacts, type LetterState, type ReferralSource } from "./store";
+import { boardTier, focusRank, TIER_LABEL, withRelationship, type Focus, type TierResult } from "./tier";
+import { SPECIALTY_BY_ID, specialtyForCode, type SpecialtyId } from "./nppes";
 
 /** At most this many new people a week: the research aims at 3 to 5 letters a month for the top tier. */
 export const NEW_PER_WEEK = 3;
@@ -20,7 +21,34 @@ const WAIT_DAYS =
 
 export type FollowUp = { id: string; name: string; on: string; days_left: number; stage: string; last: string | null };
 export type PlanItem = { id: string; name: string; why: string; next_step: string; tier: string; score: number };
-export type OutreachPlan = { today: string; follow_ups: FollowUp[]; reach_out: PlanItem[]; waiting: number; summary: string };
+export type OutreachPlan = {
+  today: string;
+  follow_ups: FollowUp[];
+  reach_out: PlanItem[];
+  waiting: number;
+  /** Cards with a letter waiting for her approval or approved and not sent yet: never suggested as new. */
+  letters_waiting: number;
+  /** The kinds of provider the new people were picked from, when she asked for (or just searched) some. */
+  kinds: string[] | null;
+  summary: string;
+};
+
+/** A search in the chat this recent counts as "what she asked for" when the plan is asked right after it. */
+export const RECENT_SEARCH_MINUTES = 120;
+
+/** The kinds of provider her latest chat search asked for, if it was in the last two hours. */
+export async function recentSearchKinds(sql: postgres.Sql = db()): Promise<SpecialtyId[]> {
+  const [row] = await sql<{ specialties: unknown }[]>`
+    select details -> 'specialties' as specialties from practice_os.audit_log
+     where action = 'referral_sources_found' and at > now() - make_interval(mins => ${RECENT_SEARCH_MINUTES})
+     order by at desc limit 1`;
+  const list = Array.isArray(row?.specialties) ? row.specialties : [];
+  return list.filter((s): s is SpecialtyId => typeof s === "string" && SPECIALTY_BY_ID.has(s as SpecialtyId));
+}
+
+function kindOf(c: ReferralSource): SpecialtyId | null {
+  return c.taxonomy ? (specialtyForCode(c.taxonomy)?.id ?? null) : null;
+}
 
 function daysBetween(from: string, to: string): number {
   return Math.round((new Date(`${to}T12:00:00Z`).getTime() - new Date(`${from}T12:00:00Z`).getTime()) / 86_400_000);
@@ -65,16 +93,29 @@ export function tiersWithLog(
   );
 }
 
-export async function outreachPlan(sql: postgres.Sql = db(), max = NEW_PER_WEEK): Promise<OutreachPlan> {
+/**
+ * `specialties`: the kinds she asked about ("pediatricians and OB-GYNs"). Left
+ * out, the kinds of her chat search from the last two hours count; with
+ * neither, every kind on the board. New people who see the people she helps
+ * come before those who see everyone, then by score.
+ */
+export async function outreachPlan(sql: postgres.Sql = db(), max = NEW_PER_WEEK, opts: { specialties?: SpecialtyId[] } = {}): Promise<OutreachPlan> {
   const [cards, today, facts, blocked] = await Promise.all([listSources(sql), practiceToday(sql), practiceFacts(sql), suppressedNpis(sql)]);
+  const asked = opts.specialties?.length ? opts.specialties : await recentSearchKinds(sql).catch(() => [] as SpecialtyId[]);
   const contacts = await contactsFor(cards.map((c) => c.id), sql);
   const tiers = tiersWithLog(cards, contacts, { focus: facts.focus, clinicianState: facts.state });
   const follow_ups = followUpsFrom(cards, contacts, today);
   const due = new Set(follow_ups.map((f) => f.id));
 
+  const letters = await latestLetters(sql);
   let waiting = 0;
+  let letters_waiting = 0;
   const fresh = cards.filter((c) => {
     if (c.stage !== "found" || due.has(c.id) || (c.npi && blocked.has(c.npi))) return false;
+    if (letterWaiting(letters[c.id])) {
+      letters_waiting++;
+      return false;
+    }
     const last = relationshipFrom(contacts[c.id] ?? [], null).lastContactOn ?? c.last_contacted_at?.slice(0, 10) ?? null;
     if (last && daysBetween(last, today) < WAIT_DAYS) {
       waiting++;
@@ -82,10 +123,8 @@ export async function outreachPlan(sql: postgres.Sql = db(), max = NEW_PER_WEEK)
     }
     return tiers[c.id].tier !== "later";
   });
-  const reach_out = fresh
-    .sort((a, b) => tiers[b.id].score - tiers[a.id].score || (a.distance_miles ?? 99) - (b.distance_miles ?? 99))
-    .slice(0, max)
-    .map((c) => {
+  const { picked, kinds, missing } = pickNew(fresh, tiers, asked, max);
+  const reach_out = picked.map((c) => {
       const t = tiers[c.id];
       return {
         id: c.id,
@@ -100,11 +139,52 @@ export async function outreachPlan(sql: postgres.Sql = db(), max = NEW_PER_WEEK)
             : "Call the office, ask who handles referrals, then send a short letter.",
       };
     });
-  return { today, follow_ups, reach_out, waiting, summary: summarizePlan({ follow_ups, reach_out, waiting }) };
+  return {
+    today,
+    follow_ups,
+    reach_out,
+    waiting,
+    letters_waiting,
+    kinds,
+    summary: summarizePlan({ follow_ups, reach_out, waiting, kinds, missing, letters_waiting }),
+  };
 }
 
-export function summarizePlan(p: Pick<OutreachPlan, "follow_ups" | "reach_out" | "waiting">): string {
+/**
+ * The new people to suggest, from cards ready for a first letter: only the
+ * kinds she asked for (unless none of them is ready), those who see the
+ * people she helps before those who see everyone, then by score and distance.
+ */
+export function pickNew(
+  fresh: ReferralSource[],
+  tiers: Record<string, TierResult>,
+  asked: SpecialtyId[],
+  max: number,
+): { picked: ReferralSource[]; kinds: string[] | null; missing: string[] | null } {
+  const wanted = new Set(asked);
+  const ofKind = fresh.filter((c) => {
+    const k = kindOf(c);
+    return k !== null && wanted.has(k);
+  });
+  const useKinds = wanted.size > 0 && ofKind.length > 0;
+  const picked = [...(useKinds ? ofKind : fresh)]
+    .sort(
+      (a, b) =>
+        focusRank(tiers[a.id]) - focusRank(tiers[b.id]) ||
+        tiers[b.id].score - tiers[a.id].score ||
+        (a.distance_miles ?? 99) - (b.distance_miles ?? 99),
+    )
+    .slice(0, max);
+  const labels = asked.map((k) => SPECIALTY_BY_ID.get(k)!.label);
+  return { picked, kinds: useKinds ? labels : null, missing: wanted.size > 0 && !useKinds ? labels : null };
+}
+
+export function summarizePlan(
+  p: Pick<OutreachPlan, "follow_ups" | "reach_out" | "waiting"> & { kinds?: string[] | null; missing?: string[] | null; letters_waiting?: number },
+): string {
   const lines: string[] = [];
+  if (p.kinds?.length) lines.push(`Picked from the ${p.kinds.join(" and ")} on your board, as you asked.`);
+  if (p.missing?.length) lines.push(`None of the ${p.missing.join(" or ")} on your board is ready to reach out to yet, so these are the best of the rest.`);
   if (p.follow_ups.length) {
     lines.push(`Follow-ups (${p.follow_ups.length}):`);
     for (const f of p.follow_ups) {
@@ -117,9 +197,34 @@ export function summarizePlan(p: Pick<OutreachPlan, "follow_ups" | "reach_out" |
     for (const r of p.reach_out) lines.push(`- ${r.name} (${r.tier}): ${r.why}. ${r.next_step}`);
   }
   if (!p.follow_ups.length && !p.reach_out.length) lines.push("Nobody new to reach out to this week. Search the map for more, or check in with someone you know.");
+  if (p.letters_waiting) {
+    lines.push(`${p.letters_waiting} more already have a letter waiting for your approval or ready to send: finish those first.`);
+  }
   if (p.waiting) lines.push(`${p.waiting} more you reached out to in the last ${WAIT_DAYS} days: give them time.`);
   lines.push("Aeon never offers anything in return for a referral.");
   return lines.join("\n");
+}
+
+/** A letter waiting for her approval, or approved and not marked sent. */
+export function letterWaiting(l: LetterState | undefined): boolean {
+  return Boolean(l && (l.status === "pending" || l.status === "running" || (l.status === "done" && !l.sent)));
+}
+
+export const LETTER_READY_DAYS = 2;
+export type LetterReady = { id: string; name: string; approved_on: string; days: number };
+
+/** For the morning brief: approved letters she hasn't marked sent, 2 or more days after approving. */
+export async function lettersReady(sql: postgres.Sql = db(), days = LETTER_READY_DAYS): Promise<LetterReady[]> {
+  const [letters, cards, today] = await Promise.all([latestLetters(sql), listSources(sql), practiceToday(sql)]);
+  const out: LetterReady[] = [];
+  for (const c of cards) {
+    const l = letters[c.id];
+    if (!l || l.status !== "done" || l.sent || !l.decidedAt || c.stage === "not_a_fit") continue;
+    const on = l.decidedAt.slice(0, 10);
+    const age = daysBetween(on, today);
+    if (age >= days) out.push({ id: c.id, name: c.name, approved_on: on, days: age });
+  }
+  return out.sort((a, b) => b.days - a.days);
 }
 
 /** For the morning brief: follow-ups due in the next 7 days, overdue included. */

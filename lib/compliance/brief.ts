@@ -1,5 +1,5 @@
 import { listPayerApplications, payerDates, type PayerDate } from "../payers/store";
-import { referralFollowUps, type FollowUp } from "../referrals/plan";
+import { lettersReady, referralFollowUps, type FollowUp, type LetterReady } from "../referrals/plan";
 import { formatBriefDate } from "./format";
 import { deadlinesView, type ObligationView } from "./view";
 
@@ -32,6 +32,8 @@ export type MorningBrief = {
   payer_dates: PayerDate[];
   /** Referrals: follow-ups due in the next 7 days, overdue included (lib/referrals/plan.ts). */
   referral_follow_ups?: FollowUp[];
+  /** Referrals: letters she approved 2 or more days ago and hasn't marked sent. */
+  referral_letters_ready?: LetterReady[];
   is_sample: boolean;
   summary: string;
 };
@@ -91,6 +93,11 @@ export function summarize(b: Omit<MorningBrief, "summary">): string {
       lines.push(`- ${f.name} (${w}, ${formatBriefDate(f.on)})`);
     }
   }
+  const ready = b.referral_letters_ready ?? [];
+  if (ready.length) {
+    lines.push(`Referral letters ready, not sent yet (${ready.length}):`);
+    for (const r of ready) lines.push(`- ${r.name}: approved ${r.days} days ago. Send it from your email, then press I sent it on the card.`);
+  }
   lines.push("Details and sources are on the Deadlines page.");
   return lines.join("\n");
 }
@@ -117,6 +124,7 @@ export async function morningBrief(): Promise<MorningBrief> {
     needs_dates: view.needs_facts.map((n) => ({ title: n.title, question: DATE_QUESTION[n.fact] ?? n.fact })),
     payer_dates: payerDates(await listPayerApplications(), view.today, BRIEF_DAYS),
     referral_follow_ups: await referralFollowUps().catch(() => []),
+    referral_letters_ready: await lettersReady().catch(() => []),
     is_sample: view.is_sample,
   };
   return { ...base, summary: summarize(base) };

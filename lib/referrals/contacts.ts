@@ -43,6 +43,15 @@ export type LogInput = {
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+/** A real calendar day written YYYY-MM-DD: "2026-13-01" and "2026-02-31" are not. */
+export function isDay(v: string): boolean {
+  if (!DATE.test(v)) return false;
+  const d = new Date(`${v}T12:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
+}
+
+const notADay = (v: string, what: string) => new Error(`"${v.slice(0, 40)}" isn't a date I can read. Pick a real day for ${what}, written like 2026-11-09.`);
+
 /** A plain-words error for her, or null when the note may be saved. */
 export async function checkNote(note: string, check = (t: string) => guard(t, "message")): Promise<string | null> {
   const r = await check(note);
@@ -65,7 +74,8 @@ export async function logContact(
   if (!CONTACT_KINDS.includes(input.kind)) throw new Error("Unknown kind of contact.");
   const today = await practiceToday(sql);
   const happenedOn = input.happenedOn ?? today;
-  if (!DATE.test(happenedOn) || happenedOn > today) throw new Error("Pick a date that isn't in the future.");
+  if (!isDay(happenedOn)) throw notADay(happenedOn, "when it happened");
+  if (happenedOn > today) throw new Error("Pick a date that isn't in the future.");
   let note = input.note?.trim() || null;
   if (input.kind === "referred") note = null; // a date only, never who
   if (note) {
@@ -73,7 +83,8 @@ export async function logContact(
     const refused = await checkNote(note, check);
     if (refused) throw new Error(refused);
   }
-  if (input.followUpOn && (!DATE.test(input.followUpOn) || input.followUpOn < today)) throw new Error("Pick a follow-up date from today on.");
+  if (input.followUpOn && !isDay(input.followUpOn)) throw notADay(input.followUpOn, "the follow-up");
+  if (input.followUpOn && input.followUpOn < today) throw new Error("Pick a follow-up date from today on.");
 
   const [card] = await sql<{ stage: Stage; next_follow_up_on: string | null }[]>`
     select stage, next_follow_up_on::text as next_follow_up_on from practice_os.referral_sources where id = ${sourceId}`;
@@ -144,7 +155,8 @@ export async function setIntroducedBy(sourceId: string, who: string | null, sql:
 
 export async function setFollowUp(sourceId: string, on: string | null, sql: postgres.Sql = db()) {
   const today = await practiceToday(sql);
-  if (on && (!DATE.test(on) || on < today)) throw new Error("Pick a follow-up date from today on.");
+  if (on && !isDay(on)) throw notADay(on, "the follow-up");
+  if (on && on < today) throw new Error("Pick a follow-up date from today on.");
   await sql`update practice_os.referral_sources set next_follow_up_on = ${on}, updated_at = now() where id = ${sourceId}`;
 }
 
@@ -176,20 +188,46 @@ export function relationshipFrom(contacts: Pick<Contact, "kind" | "happened_on">
 
 export type SuppressReason = "asked_not_to" | "not_interested";
 
-/** Never suggest this NPI again, and move its card to Not a fit. */
-export async function suppress(sourceId: string, reason: SuppressReason, sql: postgres.Sql = db()) {
-  const [card] = await sql<{ npi: string | null }[]>`
-    update practice_os.referral_sources set stage = 'not_a_fit', next_follow_up_on = null, updated_at = now()
-     where id = ${sourceId} returning npi`;
-  if (!card) throw new Error("That referral source is no longer on the board.");
-  if (card.npi) await sql`insert into practice_os.referral_suppressions (npi, reason) values (${card.npi}, ${reason}) on conflict (npi) do update set reason = excluded.reason`;
-  await audit({ actor: "clinician", action: "referral_suppressed", subjectType: "referral_source", subjectId: sourceId, details: { reason } }, sql);
+/**
+ * Never suggest this NPI again, and move its card to Not a fit. The list is kept
+ * by NPI (so a new search skips them); a card with no NPI can't be listed, so it
+ * is refused in plain words and nothing changes.
+ */
+export async function suppress(sourceId: string, reason: SuppressReason, sql: postgres.Sql = db(), by: "clinician" | "aeon" = "clinician") {
+  const [found] = await sql<{ npi: string | null }[]>`select npi from practice_os.referral_sources where id = ${sourceId}`;
+  if (!found) throw new Error("That referral source is no longer on the board.");
+  if (!found.npi) {
+    throw new NoNpiToList(
+      "This card has no NPI, so I can't add it to your do-not-contact list. Move it to Not a fit yourself, or delete the card.",
+    );
+  }
+  await sql.begin(async (tx) => {
+    await tx`update practice_os.referral_sources set stage = 'not_a_fit', next_follow_up_on = null, updated_at = now() where id = ${sourceId}`;
+    await tx`insert into practice_os.referral_suppressions (npi, reason) values (${found.npi}, ${reason}) on conflict (npi) do update set reason = excluded.reason`;
+  });
+  await audit({ actor: by, action: "referral_suppressed", subjectType: "referral_source", subjectId: sourceId, details: { reason } }, sql);
 }
 
-export async function unsuppress(sourceId: string, sql: postgres.Sql = db()) {
+export class NoNpiToList extends Error {}
+
+/** Why this card is on her do-not-contact list, or null when it isn't. */
+export async function suppressionFor(sourceId: string, sql: postgres.Sql = db()): Promise<SuppressReason | null> {
+  const [row] = await sql<{ reason: SuppressReason }[]>`
+    select s.reason from practice_os.referral_suppressions s
+      join practice_os.referral_sources c on c.npi = s.npi where c.id = ${sourceId}`;
+  return row?.reason ?? null;
+}
+
+export async function unsuppress(sourceId: string, sql: postgres.Sql = db(), by: "clinician" | "aeon" = "clinician") {
   const [card] = await sql<{ npi: string | null }[]>`select npi from practice_os.referral_sources where id = ${sourceId}`;
   if (card?.npi) await sql`delete from practice_os.referral_suppressions where npi = ${card.npi}`;
-  await audit({ actor: "clinician", action: "referral_unsuppressed", subjectType: "referral_source", subjectId: sourceId }, sql);
+  await audit({ actor: by, action: "referral_unsuppressed", subjectType: "referral_source", subjectId: sourceId }, sql);
+}
+
+/** A note from her log, screened again with the chat's full privacy check before it reaches the model or a tool result. Null when held back. */
+export async function screenedNote(note: string | null, check?: (t: string) => ReturnType<typeof guard>): Promise<string | null> {
+  if (!note) return null;
+  return (await checkNote(note, check).catch(() => "unavailable")) === null ? note : null;
 }
 
 export async function suppressedNpis(sql: postgres.Sql = db()): Promise<Set<string>> {
