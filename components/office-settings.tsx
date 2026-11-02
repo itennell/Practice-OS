@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { DateField } from "./shared/date-field";
-import { TextField } from "./shared/settings-controls";
+import { SettingSwitch, TextField } from "./shared/settings-controls";
 import { Button, chipClass } from "./ui";
 
 // Her office hours (Good Faith Estimate due dates count only open days) and self-pay fees.
@@ -71,15 +71,11 @@ export function OfficeSettings({ initialHours, initialFees }: { initialHours: Ho
             Pick at least one day.
           </p>
         )}
-        <label className="flex min-h-touch items-center gap-3">
-          <input
-            type="checkbox"
-            className="size-5 accent-[var(--color-accent)]"
-            checked={hours.close_federal_holidays}
-            onChange={(e) => setHours((h) => ({ ...h, close_federal_holidays: e.target.checked }))}
-          />
-          Closed on federal holidays
-        </label>
+        <SettingSwitch
+          label="Closed on federal holidays"
+          checked={hours.close_federal_holidays}
+          onCheckedChange={(on) => setHours((h) => ({ ...h, close_federal_holidays: on }))}
+        />
         <div className="flex flex-wrap items-end gap-2">
           <DateField label="Another day you’re closed" value={closedDate} onChange={setClosedDate} />
           <Button
