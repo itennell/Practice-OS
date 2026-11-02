@@ -16,7 +16,7 @@ import { PromptBar } from "../shared/prompt-bar";
 import { ThoughtLine } from "../shared/thought-line";
 import type { ThoughtStep } from "../shared/thought-line-steps";
 import { Canvas, type CanvasActions } from "./canvas";
-import { FactsChanged } from "./facts-changed";
+import { FactsChanged, studioFlag } from "./facts-changed";
 import type { DrawAssets } from "./slide-draw";
 import { VideoEditor } from "./video-editor";
 
@@ -375,12 +375,12 @@ export function Studio({ profile, initial }: { profile: StudioProfile; initial: 
       </section>
 
       <div className="min-w-0">
-        {project && (project.factsChanged?.length ?? 0) > 0 && (
+        {project && studioFlag(project.doc.kind, project.factsChanged).show && (
           <div className="mb-4">
             <FactsChanged
               problems={project.factsChanged}
               busy={busy}
-              onRegenerate={project.doc.kind === "video" ? undefined : () => void regenerate(project)}
+              onRegenerate={studioFlag(project.doc.kind, project.factsChanged).regenerate ? () => void regenerate(project) : undefined}
             />
           </div>
         )}

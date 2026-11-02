@@ -55,3 +55,36 @@ describe("pt_profile_interview: only her own typed words are saved", () => {
     }
   });
 });
+
+describe("pt_profile_interview: confirm, info and one-choice steps aren't checked against her words", () => {
+  it("takes a confirm passed as the string \"true\" (the recorded chat does this) after she says yes", async () => {
+    saveStep.mockClear();
+    const out = await run({ step: "header", answer: "true" }, ["Yes, that's right"]);
+    expect(out.refused).toBeUndefined();
+    expect(saveStep).toHaveBeenCalledWith(DANA, "header", { value: "true" });
+  });
+
+  it("takes a listed one-choice value without it being in her message", async () => {
+    reached.any = true;
+    try {
+      saveStep.mockClear();
+      const out = await run({ step: "availability", answer: "accepting" }, ["Yep, I am"]);
+      expect(out.refused).toBeUndefined();
+      expect(saveStep).toHaveBeenCalledWith(DANA, "availability", { value: "accepting" });
+    } finally {
+      reached.any = false;
+    }
+  });
+
+  it("still refuses a number she didn't say", async () => {
+    reached.any = true;
+    try {
+      saveStep.mockClear();
+      const out = await run({ step: "yearsInPractice", answer: 12 }, ["about six years"]);
+      expect(out.refused).toMatch(/your own words/);
+      expect(saveStep).not.toHaveBeenCalled();
+    } finally {
+      reached.any = false;
+    }
+  });
+});

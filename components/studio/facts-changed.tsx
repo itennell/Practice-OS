@@ -9,6 +9,16 @@ import { Button } from "../ui";
 
 export const FACTS_CHANGED = "Facts changed: needs update";
 
+/**
+ * Whether the studio shows the flag for an open project, and whether it offers Regenerate.
+ * Every kind shows it (posts, carousels, reels and her own videos); a video from her own
+ * footage can't be made again by Aeon, so it gets the flag without Regenerate.
+ */
+export function studioFlag(kind: string, problems: string[] | undefined): { show: boolean; regenerate: boolean } {
+  const show = (problems?.length ?? 0) > 0;
+  return { show, regenerate: show && kind !== "video" };
+}
+
 /** onRegenerate missing (a video from her own footage): the flag shows, with no Regenerate. */
 export function FactsChanged({ problems, onRegenerate, busy = false }: { problems: string[]; onRegenerate?: () => void; busy?: boolean }) {
   if (!problems.length) return null;

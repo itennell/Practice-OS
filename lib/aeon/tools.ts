@@ -96,6 +96,9 @@ export function notInHerWords(answer: unknown, options: { value: string | number
   return "I can only save an answer in your own words. Please type it here exactly as it should read, or fill it in on the Media page.";
 }
 
+/** The Psychology Today steps whose answers she types: their words must be hers (notInHerWords). */
+export const TYPED_STEPS = new Set(["text", "number", "multi"]);
+
 /** aeon_action is queued only by runTool itself in Manual mode, never by an agent. */
 const QUEUEABLE_KINDS = APPROVAL_KINDS.filter((k) => k !== "aeon_action" && (FRONT_DESK_ENABLED || !FRONT_DESK_APPROVAL_KINDS.includes(k))) as [Exclude<ApprovalKind, "aeon_action">, ...Exclude<ApprovalKind, "aeon_action">[]];
 
@@ -1827,8 +1830,10 @@ export const TOOLS: AeonTool[] = [
         }
         // Her answers become the truth her profile is checked against, so the model can't write
         // one for her: typed words must be in her latest message (the Media page is the other way in).
+        // Only typed answers are checked: a confirm or info step (the model may pass true or "true")
+        // and a one-choice pick (a listed value) carry no words of hers to copy.
         const q = pt.interviewState(f, step).step;
-        const notHers = !input.skip && q ? notInHerWords(input.answer, q.options, ctx.said?.at(-1)) : null;
+        const notHers = !input.skip && q && TYPED_STEPS.has(q.kind) ? notInHerWords(input.answer, q.options, ctx.said?.at(-1)) : null;
         if (notHers) {
           const s = pt.interviewState(f, step);
           return text({ refused: notHers, progress: `${s.answered} of ${s.total} answered`, question: { step, ask: q!.ask } });

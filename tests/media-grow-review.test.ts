@@ -144,3 +144,30 @@ describe("10. with a post waiting, her words are an edit by default", () => {
     expect(looksLikeEditSignal("a new post about fewer forms")).toBe(false);
   });
 });
+
+describe("re-check before merge: the exact phrasings from the review", () => {
+  // In network with Aetna, no free consult.
+  it.each([
+    ["We're out of network with everyone", "insurance_claim"],
+    ["I'm out of network for Aetna", "insurance_claim"],
+    ["We're not in network with anyone", "insurance_claim"],
+    ["Private pay only, Aetna included", "insurance_claim"],
+    ["You get a superbill each session", "superbill"],
+    ["Superbills every session", "superbill"],
+    ["Book a free initial consult", "consult"],
+    ["free discovery call", "consult"],
+    ["In network with Cigna", "insurer"],
+  ])("blocks %s", (s, kind) => {
+    expect(kinds(s)).toContain(kind);
+  });
+  it("blocks a 30-minute discovery call when the consult is 15 minutes", () => {
+    const fifteen = truthOf({ ...FACTS, answers: { ...FACTS.answers, freeConsultMinutes: 15 } });
+    expect(factProblems("a 30-minute discovery call", fifteen).length).toBeGreaterThan(0);
+  });
+  it("never turns Cigna (not started) into 'Applying to…'", () => {
+    expect(fixInNetwork("In network with Cigna", T)).not.toMatch(/applying/i);
+  });
+  it.each(["Feel free to call", "a superbill is available on request", "out of network for plans other than Aetna"])("passes %s", (s) => {
+    expect(kinds(s)).toEqual([]);
+  });
+});
