@@ -338,6 +338,7 @@ export type PostRow = { id: string; headline: string | null; caption: string; st
 const POST_STATUS: Record<string, string> = {
   draft: "Draft",
   pending_approval: "Waiting for you",
+  ready: "Ready to post",
   scheduled: "Ready to post",
   publishing: "Ready to post",
   published: "Posted",

@@ -72,7 +72,7 @@ function FileRow({ entry }: { entry: FileEntry }) {
   );
 }
 
-export function FilesList({ entries }: { entries: FileEntry[] }) {
+export function FilesList({ entries, capped = {} }: { entries: FileEntry[]; capped?: Partial<Record<FileGroup, string>> }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
   const shown = entries.filter((e) => (filter === "all" || e.group === filter) && matchesSearch(e, query.trim(), KIND_LABEL[e.card.kind]));
@@ -121,6 +121,11 @@ export function FilesList({ entries }: { entries: FileEntry[] }) {
             {rows.map((e) => (
               <FileRow key={e.card.id} entry={e} />
             ))}
+            {capped[g] && (
+              <li className="border-t border-[var(--line)] px-4 py-3 text-small text-[var(--fg-muted)]">
+                {capped[g]} Ask Aeon in the chat to find an older one.
+              </li>
+            )}
           </ListCard>
         ))
       )}

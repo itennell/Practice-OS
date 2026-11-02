@@ -94,6 +94,7 @@ const toRow = (r: Record<string, unknown>): PayerApplication => ({
   approved_on: asDate(r.approved_on),
   effective_on: asDate(r.effective_on),
   recredential_on: asDate(r.recredential_on),
+  created_at: r.created_at instanceof Date ? r.created_at : r.created_at ? new Date(r.created_at as string) : undefined,
 });
 
 /** Fills in the dates she didn't give: applied today, follow up in 30 days, recredential in 36 months. Pure. */

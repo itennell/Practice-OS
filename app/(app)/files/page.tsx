@@ -32,7 +32,8 @@ export default function FilesPage({ searchParams }: PageProps<"/files">) {
 
 async function AllFiles() {
   await connection(); // read the database per request, never at build time
-  return <FilesList entries={await listFiles()} />;
+  const { entries, capped } = await listFiles();
+  return <FilesList entries={entries} capped={capped} />;
 }
 
 async function Panel({ searchParams }: { searchParams: PageProps<"/files">["searchParams"] }) {

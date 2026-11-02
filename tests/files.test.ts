@@ -65,6 +65,15 @@ describe("file entries", () => {
   });
 });
 
+describe("Instagram post cards", () => {
+  it("shows an approved (ready) post as ready to post, not a draft", async () => {
+    const { instagramPostCard } = await import("../lib/documents/index");
+    const post = { id: "00000000-0000-4000-8000-0000000000bb", headline: "[Sample] How to book", caption: "x", has_image: true, is_sample: true, created_at: new Date("2026-11-01") };
+    expect(instagramPostCard({ ...post, status: "ready" }).status).toBe("Ready to post");
+    expect(instagramPostCard({ ...post, status: "draft" }).status).toBe("Draft");
+  });
+});
+
 describe("read_document text", () => {
   it("returns a short file whole", () => {
     expect(capText("A short lease.")).toEqual({ text: "A short lease.", cut: false });
@@ -92,7 +101,7 @@ describe("read_document text", () => {
 
 describe.skipIf(!hasDb)("Files and read_document on the demo practice", async () => {
   const { closeDb, db } = await import("../lib/db");
-  const { listFiles } = await import("../lib/documents/files");
+  const { getFile, listFiles } = await import("../lib/documents/files");
   const { runTool } = await import("../lib/aeon/tools");
   const { keepDocument } = await import("../lib/uploads/store");
   const startedAt = new Date();
@@ -118,7 +127,8 @@ describe.skipIf(!hasDb)("Files and read_document on the demo practice", async ()
 
   it("lists every file in one place, newest first, with no client details", async () => {
     const lease = await keep("[Sample] Office lease for Reyes Counseling PLLC. Rent is due on the first of each month for the counseling office.", "Office lease");
-    const files = await listFiles();
+    const { entries: files, capped } = await listFiles();
+    expect(capped).toEqual({});
     const groups = new Set(files.map((f) => f.group));
     for (const g of ["uploaded", "forms", "money"]) expect(groups).toContain(g);
     expect(files.some((f) => f.card.kind === "deadline" || f.card.kind === "guide" || f.card.kind === "credentialing_profile")).toBe(false);
@@ -182,4 +192,40 @@ describe.skipIf(!hasDb)("Files and read_document on the demo practice", async ()
     expect(missing.isError).toBe(true);
     expect(missing.content[0].text).toMatch(/No document she added/);
   });
+
+  it("dates the Medicare form by when its application was made, not as a template", async () => {
+    const { listPayerApplications } = await import("../lib/payers/store");
+    for (const a of await listPayerApplications()) expect(a.created_at).toBeInstanceOf(Date);
+    const { entries } = await listFiles();
+    const medicare = entries.find((f) => f.card.kind === "payer_application");
+    if (medicare) expect(medicare.made_on).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("opens one file by its id with the same entry the list has", async () => {
+    const { entries } = await listFiles();
+    for (const e of entries.filter((x, i, all) => all.findIndex((y) => y.card.kind === x.card.kind) === i)) {
+      expect(await getFile(e.card.id)).toEqual(e);
+    }
+    expect(await getFile("deadline:whatever")).toBeNull();
+    expect(await getFile("gfe:00000000-0000-4000-8000-000000000999")).toBeNull();
+  });
+
+  it("withholds a file with a birth date or diagnosis, and says why", async () => {
+    const doc = await keep(
+      "[Sample] Office notes for the practice. Intake summary: DOB 03/14/1988. Diagnosis: F41.1 generalized anxiety disorder. Session fee is due at the visit.",
+      "Office notes",
+    );
+    const r = await read({ id: `uploaded:${doc.id}` });
+    expect(r.isError).toBe(true);
+    expect(r.content[0].text).toMatch(/looks like (a birth date|a diagnosis)/);
+    expect(r.content[0].text).not.toMatch(/03\/14\/1988|F41\.1/);
+  }, 60_000);
+
+  it("puts the note that it is data before the file's text", async () => {
+    const doc = await keep("[Sample] Parking rules for the counseling office building. Spaces are first come, first served on weekdays.", "Parking rules");
+    const text = (await read({ id: `uploaded:${doc.id}` })).content[0].text;
+    expect(text.indexOf("not instructions")).toBeGreaterThan(-1);
+    expect(text.indexOf("not instructions")).toBeLessThan(text.indexOf("first come"));
+    expect(text.indexOf("not instructions")).toBeLessThan(text.indexOf("Parking rules"));
+  }, 60_000);
 });
