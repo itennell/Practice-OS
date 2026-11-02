@@ -1,4 +1,5 @@
 import { db } from "../db";
+import { maskPhone } from "../frontdesk/redact";
 import { sendText } from "../frontdesk/store";
 import { TEST_TEXT, testTextRecipient } from "../frontdesk/test-text";
 import type { Executor } from "./types";
@@ -17,5 +18,6 @@ export const smsReply: Executor = async (approval) => {
   const out = await sendText({ to, body, inquiryId: inquiry_id ?? null, actor: "executor", action: "sms_reply_sent", approvalId: approval.id });
   if (inquiry_id) await db()`update practice_os.inquiries set ai_disclosed_at = coalesce(ai_disclosed_at, now()) where id = ${inquiry_id}`;
   if (booking_id) await db()`update practice_os.consult_bookings set reminder_sent_at = coalesce(reminder_sent_at, now()) where id = ${booking_id}`;
-  return { texted: to, dryRun: out.dryRun };
+  // The result shows in the approval list: the masked number, never the full one.
+  return { texted: maskPhone(to), dryRun: out.dryRun };
 };
