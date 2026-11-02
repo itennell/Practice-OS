@@ -48,6 +48,8 @@ import * as documents from "../documents";
 import { DOCUMENT_KINDS, forModel, type DocumentCard } from "../documents/card";
 import { guard, WITHHELD } from "./guard";
 import { forget, MEMORY_KINDS, MemoryRefused, recentChanges, remember } from "./memory";
+import { RULES_TOOLS } from "./tools-rules";
+import { SETTINGS_TOOLS, settingFor } from "./tools-settings";
 
 export type ToolContext = {
   /** Who is calling, for created_by and audit rows: "mcp:<client>" or "chat:<conversation id>". */
@@ -163,8 +165,10 @@ const releaseInput = {
   expires_on: isoDay.describe("The calendar date the consent ends. Required."),
 };
 
-// What a document tool hands back: what Muse reads (the cards in short, plus what to
-// tell her) and the full cards in structuredContent, which the chat draws.
+// What a document tool hands back: what Muse reads (the cards in short, plus plain
+// facts about them) and the full cards in structuredContent, which the chat draws.
+// Results are data only: how to talk about the cards lives in the tool descriptions
+// and SOUL.md, never in a result (Aeon treats results as data and would narrate it).
 function withCards(said: Record<string, unknown>, cards: DocumentCard[]): ToolResult {
   return {
     content: [{ type: "text", text: JSON.stringify({ ...said, documents: cards.map(forModel) }, null, 2) }],
@@ -172,18 +176,21 @@ function withCards(said: Record<string, unknown>, cards: DocumentCard[]): ToolRe
   };
 }
 
-const OPEN_CARD = "Her card in the chat opens it, already filled in; don't name a page.";
+/** Shared description text: how to talk about the cards a document tool returns. */
+const CARD_HINT = "Its card appears in the chat under your answer and opens the document already filled in: don't list it again or name a page.";
 
 /** A client form template from the library: saves nothing, holds no client details. */
 async function makeClientForm(form: FormId): Promise<ToolResult> {
   const def = getForm(form);
   const [made] = def ? await documents.clientFormCards(def) : [];
-  if (!def || !made) return { content: [{ type: "text", text: "Add the practice details on Admin › Credentialing first; client forms use them." }], isError: true };
+  if (!def || !made) return { content: [{ type: "text", text: "Not made: client forms need the practice details on Admin › Credentialing, and those aren't filled in yet." }], isError: true };
   // A form that can't download yet (policies never saved, a gap to fill, not Illinois) comes back without a PDF and says why.
-  const say = made.pdf
-    ? `${OPEN_CARD} It is a template: her practice is filled in and the client's boxes are blank. Recommend her own attorney reads it once.`
-    : `${OPEN_CARD} It can't be downloaded yet: ${made.needs_her} Tell her that plainly; her card opens the form so she can finish it.`;
-  return withCards({ made: def.title, say }, [made]);
+  return withCards(
+    made.pdf
+      ? { made: def.title, template: true, filled_in: "her practice details", left_blank: "the client's boxes", downloadable: true, attorney_review: "recommended once" }
+      : { made: def.title, template: true, downloadable: false, why_not: made.needs_her },
+    [made],
+  );
 }
 
 async function makeGfe(input: z.infer<z.ZodObject<typeof gfeInput>>, ctx: ToolContext): Promise<ToolResult> {
@@ -192,7 +199,7 @@ async function makeGfe(input: z.infer<z.ZodObject<typeof gfeInput>>, ctx: ToolCo
   const r = await gfe.draftEstimate(input, { createdBy: ctx.by });
   const [row, today] = await Promise.all([gfe.getEstimate(r.id), practiceToday()]);
   return withCards(
-    { reference: r.reference, due_on: r.dueOn, approval_id: r.approvalId, next: `She approves it in Approvals, then types the client's details to make the PDF. ${OPEN_CARD}` },
+    { reference: r.reference, due_on: r.dueOn, approval_id: r.approvalId, status: "waiting for her approval", after_approval: "she types the client's details to make the PDF" },
     row ? [documents.gfeCard(row, today)] : [],
   );
 }
@@ -206,7 +213,8 @@ async function makeSuperbill(input: z.infer<z.ZodObject<typeof superbillInput>>,
       total: money(sb.total_cents),
       paid: money(sb.paid_cents),
       balance: money(sb.total_cents - sb.paid_cents),
-      next: `Tell her: I filled in what I know. Download it from the card, type the client's name, birth date, address and diagnosis codes into the blank boxes, then give it to them your own way. ${OPEN_CARD}`,
+      left_blank_for_her: ["client name", "client birth date", "client address", "diagnosis codes"],
+      delivery: "she downloads it from the card and gives it to the client her own way; Aeon never sends it",
     },
     [documents.superbillCard(sb)],
   );
@@ -224,7 +232,7 @@ async function makeRelease(input: z.infer<z.ZodObject<typeof releaseInput>>): Pr
         open: `/admin?panel=release&draft=${draft}`,
         filled,
         left_for_her: ["client name", "client date of birth", ...["recipient", "purpose", "information"].filter((k) => !filled.includes(k)), "signatures"],
-        next: `Tell her: I filled in what I know. Download the PDF from the card, type the client's name and birth date, and have it signed. Keep a copy in the client's record. ${OPEN_CARD}`,
+        after: "she downloads the PDF from the card, types the client's name and birth date, has it signed and keeps a copy in the client's record",
       },
       [documents.releaseDraftCard(draft, fields, profile?.isSample ?? false)],
     );
@@ -235,7 +243,7 @@ async function makeRelease(input: z.infer<z.ZodObject<typeof releaseInput>>): Pr
 
 async function makeCms855i(ctx: ToolContext): Promise<ToolResult> {
   const profile = await cred.loadCredentialingProfile();
-  if (!profile) return text({ error: "Her credentialing profile isn't set up yet. Fill it in first (update_credentialing)." });
+  if (!profile) return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "Her credentialing profile isn't set up yet." }) }], isError: true };
   const r = await cms855i.fillCms855i(profile);
   const apps = await payers.listPayerApplications();
   if (!apps.some((a) => a.form === "cms855i")) await payers.savePayerApplication({ payer: "Medicare", form: "cms855i", status: "preparing" }, ctx.by);
@@ -247,7 +255,7 @@ async function makeCms855i(ctx: ToolContext): Promise<ToolResult> {
       // Kept for one release for outside MCP clients; the card has the same link.
       download: "/api/payers/cms855i",
       faster_route: "PECOS (pecos.cms.hhs.gov) lists MFT and MHC as specialties and is usually faster than paper.",
-      next: `She downloads it from the card, finishes what's left, signs and submits it herself. ${OPEN_CARD}`,
+      after: "she downloads it from the card, finishes what's left, signs and submits it herself",
       is_sample: profile.isSample,
     },
     [documents.cms855iCard(profile)],
@@ -358,7 +366,9 @@ export const TOOLS: AeonTool[] = [
       "deadlines with their official source, insurance applications (BCBSIL, Aetna, Medicare...), the prepared Medicare CMS-855I, the CAQH re-attestation checklist, " +
       "her credentialing profile and its documents (license, malpractice face sheet, diploma, CV, W-9: on file or missing), Good Faith Estimates, superbills, " +
       "release of information forms and how-do-I guides. Use it whenever she asks to see, show, pull up or find documents or forms, or 'what do I need for X'. " +
-      "Search by her words (query), a kind, a payer, or what is due within some days. Read-only.",
+      "Search by her words (query), a kind, a payer, or what is due within some days. " +
+      "Its cards appear in the chat under your answer: don't list them again or name a page; say in a few sentences what needs her first and what only she can do. " +
+      "found 0: nothing matched; say what you looked for and offer to make it if Practice-OS makes it. matched_her_words false: these are what's coming up soonest instead; say so. Read-only.",
     input: {
       query: z.string().trim().max(200).optional().describe("Her words, e.g. 'BCBS follow-up', 'CAQH', 'malpractice', 'release form'."),
       kind: z.enum(DOCUMENT_KINDS).optional().describe("Only this kind."),
@@ -371,13 +381,12 @@ export const TOOLS: AeonTool[] = [
     changesData: false,
     run: async (q) => {
       const { cards, matched } = await documents.findDocuments(q);
-      const show = "Her cards are in the chat under your answer, so don't list them again or name a page. Say in a few sentences what needs her first and what only she can do.";
       return withCards(
         !cards.length
-          ? { found: 0, next: "Nothing matched. Say what you looked for and offer to make it if it's something Practice-OS makes." }
+          ? { found: 0, looked_for: q }
           : matched
-            ? { found: cards.length, next: show }
-            : { found: cards.length, matched_her_words: false, next: `Nothing matched her words exactly, so these are what's coming up soonest. Say so. ${show}` },
+            ? { found: cards.length, cards_shown_in_chat: true }
+            : { found: cards.length, matched_her_words: false, showing: "what's coming up soonest", cards_shown_in_chat: true },
         cards,
       );
     },
@@ -388,15 +397,15 @@ export const TOOLS: AeonTool[] = [
     title: "Open one document",
     description:
       "Shows one document as a card (by its id from find_documents, e.g. 'superbill:<id>' or 'guide:caqh-reattestation'): " +
-      "its status, dates, what only she can do, and links to open it filled in and download the PDF. Read-only.",
+      "its status, dates, what only she can do, and links to open it filled in and download the PDF. " + CARD_HINT + " An unknown id: look it up with find_documents. Read-only.",
     input: { id: z.string().trim().min(3).max(120) },
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     label: "Opened a document",
     changesData: false,
     run: async ({ id }) => {
       const c = await documents.openDocument(id);
-      if (!c) return { content: [{ type: "text", text: `No document with id ${id}. Use find_documents to look it up.` }], isError: true };
-      return withCards({ next: "Her card is in the chat under your answer." }, [c]);
+      if (!c) return { content: [{ type: "text", text: `No document with id ${id}.` }], isError: true };
+      return withCards({ cards_shown_in_chat: true }, [c]);
     },
   }),
 
@@ -409,7 +418,9 @@ export const TOOLS: AeonTool[] = [
       "or a client form template (client_form: privacy notice, informed consent, telehealth consent, practice policies, intake, minor consent and the rest of the library, " +
       "filled with her practice and blank for the client; never fill in a client's answers). " +
       "Pass the fields for that kind only, the same as draft_gfe, draft_superbill and make_release_form take. Takes no client details. " +
-      "It prepares; it never signs, sends or submits anything: she does that herself.",
+      "It prepares; it never signs, sends or submits anything: she does that herself. " + CARD_HINT + " " +
+      "Tell her what the result says only she does (left_blank_for_her, after, after_approval). A client form with downloadable false can't be downloaded yet: say why_not plainly. " +
+      "A template that downloads: recommend her own attorney reads it once.",
     input: {
       kind: z.enum(["gfe", "superbill", "release_form", "payer_form", "client_form"]),
       gfe: z.object(gfeInput).optional().describe("For kind gfe."),
@@ -608,14 +619,15 @@ export const TOOLS: AeonTool[] = [
     title: "Read her credentialing profile",
     description:
       "Her credentialing profile in CAQH ProView order: identity, education, license (type, state, board; never a number), NPI, " +
-      "tax ID, malpractice, practice location, work history and documents with expiry dates, plus the last NPPES check. Read-only.",
+      "tax ID, malpractice, practice location, work history and documents with expiry dates, plus the last NPPES check. " +
+      "profile null: it isn't set up yet; ask her for her details and save them with update_credentialing. Read-only.",
     input: {},
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     label: "Read your credentialing profile",
     changesData: false,
     run: async () => {
       const profile = await cred.loadCredentialingProfile();
-      if (!profile) return text({ profile: null, next: "Ask her for her details and save them with update_credentialing." });
+      if (!profile) return text({ profile: null, set_up: false });
       const cards = documents.credentialingCards(profile, await practiceToday());
       return { ...text({ profile, sections: cred.sectionValues(profile) }), structuredContent: { documents: cards } };
     },
@@ -657,7 +669,7 @@ export const TOOLS: AeonTool[] = [
     changesData: false,
     run: async () => {
       const caqh = await credActions.currentCaqhPrep();
-      if (!caqh) return text({ prep: null, next: "Her credentialing profile isn't set up yet." });
+      if (!caqh) return text({ prep: null, reason: "Her credentialing profile isn't set up yet." });
       const [checklist, profile, today] = await Promise.all([documents.caqhCard(), cred.loadCredentialingProfile(), practiceToday()]);
       const files = profile ? documents.credentialingCards(profile, today).filter((c) => c.kind === "credential_doc" && c.status !== "On file") : [];
       return { ...text(caqh), structuredContent: { documents: [...(checklist ? [checklist] : []), ...files] } };
@@ -730,7 +742,7 @@ export const TOOLS: AeonTool[] = [
     changesData: true,
     run: async (input, ctx) => {
       // Belt and braces: even a status that slipped past the schema never records a sent application from chat or MCP.
-      if ((payers.WAITING as readonly string[]).includes(input.status)) return text({ not_changed: true, ask_her: payers.SENT_IS_HERS, link: "/admin?panel=insurance" });
+      if ((payers.WAITING as readonly string[]).includes(input.status)) return text({ not_changed: true, reason: "Only she can mark an application as sent, with Edit on that payer's row on the Insurance page.", link: "/admin?panel=insurance" });
       return text(await payers.savePayerApplication(input, ctx.by, undefined, { fromChat: true }));
     },
   }),
@@ -773,11 +785,11 @@ export const TOOLS: AeonTool[] = [
       }
       if (q) {
         const match = payerChecklist.matchPayer(list, q);
-        if (match.kind === "ambiguous") return text({ ask_her: `"${input.payer}" could mean more than one payer. Ask her which one.`, choices: match.choices });
+        if (match.kind === "ambiguous") return text({ ambiguous: true, her_words: input.payer, choices: match.choices });
         if (match.kind === "not_hers") return text({ error: `${match.name} doesn't fit a ${list.license} in ${list.state}.`, payers: list.payers.map((i) => i.fit.payer.name) });
         if (match.kind === "none") {
           return match.choices.length
-            ? text({ ask_her: `Ask her which payer she means by "${input.payer}".`, choices: match.choices })
+            ? text({ ambiguous: true, her_words: input.payer, choices: match.choices })
             : text({ error: `No payer called "${input.payer}" fits a ${list.license} in ${list.state}.`, payers: list.payers.map((i) => i.fit.payer.name) });
         }
         const found = match.item;
@@ -841,7 +853,7 @@ export const TOOLS: AeonTool[] = [
       const match = prereq ? null : payerChecklist.matchPayer(list, q);
       if (match && match.kind !== "found") {
         const choices = match.kind === "ambiguous" || match.kind === "none" ? match.choices : [];
-        return text({ error: `Not sure which payer "${input.payer}" means. Ask her which one; nothing was checked.`, ...(choices.length ? { choices } : {}) });
+        return text({ ok: false, error: `Not sure which payer "${input.payer}" means; nothing was checked.`, ...(choices.length ? { choices } : {}) });
       }
       const found = match?.item;
       const scope = prereq ? payerChecklist.PREREQ_SCOPE : found!.fit.payer.id;
@@ -851,7 +863,7 @@ export const TOOLS: AeonTool[] = [
       if ("submits" in target && target.submits) {
         return text({
           not_checked: input.step_id,
-          ask_her: `Only she can mark her ${found!.fit.payer.name} application as sent. Ask her to tick "${target.title}" herself on the Insurance page.`,
+          reason: `Only she can mark her ${found!.fit.payer.name} application as sent, by ticking "${target.title}" herself on the Insurance page.`,
           link: payerChecklist.INSURANCE_PAGE,
         });
       }
@@ -869,7 +881,9 @@ export const TOOLS: AeonTool[] = [
     title: "Remember something about the practice",
     description:
       "Saves one thing Aeon should remember about this practice for every future conversation: a preference ('prefers Tuesday consults'), " +
-      "a decision ('does not take Medicaid'), a fact ('fee for 90837 is $175') or what worked ('superbill posts got the most saves'). " +
+      "a decision ('does not take Medicaid'), a fact ('her office is on the second floor') or what worked ('superbill posts got the most saves'). " +
+      "Not for settings: fees go through set_fees, office days through set_office_days, license type through set_license_type and " +
+      "cancellation or late fees through set_practice_policies, so the app itself changes; remember refuses those. " +
       "One short sentence in plain words. Practice business only: never a client's name, birth date, contact detail, diagnosis or anything clinical " +
       "(those are refused). When it updates an older memory, pass that memory's id as replaces.",
     input: {
@@ -881,6 +895,14 @@ export const TOOLS: AeonTool[] = [
     label: "Saved to memory",
     changesData: true,
     run: async ({ kind, text: memoryText, replaces }, ctx) => {
+      // Plain code: a setting saved only as a memory would disagree with what the app uses (a GFE priced at the old fee).
+      const setting = settingFor(memoryText);
+      if (setting) {
+        return {
+          content: [{ type: "text", text: JSON.stringify({ ok: false, saved: false, error: `Not saved to memory: this is ${setting.what}, a setting.`, use_tool: setting.tool }) }],
+          isError: true,
+        };
+      }
       try {
         const { memory, created } = await remember({ kind, text: memoryText, replaces }, { actor: "aeon", source: ctx.by });
         return text({ saved: created, already_remembered: !created, id: memory.id, kind: memory.kind, text: memory.text });
@@ -1572,6 +1594,7 @@ export const TOOLS: AeonTool[] = [
       });
     },
   }),
+  ...SETTINGS_TOOLS, ...RULES_TOOLS,
 ];
 
 export const TOOLS_BY_NAME = new Map(TOOLS.map((t) => [t.name, t]));
@@ -1616,7 +1639,7 @@ export async function runTool(name: string, args: unknown, ctx: ToolContext): Pr
       payload: { tool: tool.name, args: parsed.data },
       createdBy: ctx.by,
     });
-    return text({ waiting_for_her: true, approval_id: approvalId, next: "You're in Manual mode: tell her it's waiting for her OK in the bar above the chat box." });
+    return text({ waiting_for_her: true, approval_id: approvalId, mode: "manual", where: "the bar above the chat box" });
   }
   const run = () => tool.run(parsed.data as never, ctx);
   return guardResult(await (mode ? withOrigin({ mode }, run) : run()));

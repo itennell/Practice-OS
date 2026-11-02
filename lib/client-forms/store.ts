@@ -73,13 +73,13 @@ async function refuseClientDetails(texts: string[]) {
   }
 }
 
-export async function savePolicies(input: unknown, sql: postgres.Sql = db()): Promise<Partial<Policies>> {
+export async function savePolicies(input: unknown, sql: postgres.Sql = db(), by = "clinician"): Promise<Partial<Policies>> {
   const next = policiesSchema.partial().parse(input);
   // Every free-text policy is checked. A colleague's name passes when written with a title ("Jordan Lee, LCSW") or from her Referrals list.
   await refuseClientDetails([next.records_fee_note ?? "", next.privacy_officer ?? "", next.backup_colleague ?? ""]);
   const merged = { ...(await loadPolicies(sql)).policies, ...next };
   await upsert("_practice", merged, sql);
-  await audit({ actor: "clinician", action: "client_form_policies_saved", subjectType: "client_form", subjectId: "_practice", details: { keys: Object.keys(next) } }, sql);
+  await audit({ actor: by === "clinician" ? "clinician" : "aeon", action: "client_form_policies_saved", subjectType: "client_form", subjectId: "_practice", details: { keys: Object.keys(next), by } }, sql);
   return merged;
 }
 

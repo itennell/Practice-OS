@@ -73,8 +73,9 @@ export async function savePracticeSettings(
        set office_hours = ${sql.json(hours as never)}, fee_schedule = ${sql.json(fees as never)}
     returning id`;
   if (!row) throw new Error("Finish onboarding first.");
+  // Aeon's writes (chat:..., mcp:...) are audited as Aeon's, saying who asked.
   await audit(
-    { actor: "clinician", action: "office_settings_saved", subjectType: "clinician_profile", details: { by, hours, fee_codes: codes } },
+    { actor: by === "clinician" ? "clinician" : "aeon", action: "office_settings_saved", subjectType: "clinician_profile", details: { by, hours, fee_codes: codes } },
     sql,
   );
 }

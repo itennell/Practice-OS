@@ -93,6 +93,47 @@ export function systemPrompt(memories: Pick<Memory, "id" | "kind" | "text">[], t
   return `${soul()}\n\n## Today\n\n${today}\n\n${practice}${memoryBlock(memories)}\n`;
 }
 
+// ---- No fabricated success --------------------------------------------------------------
+// A stress test found Aeon saying "Done" or "Found them, cards below" after every tool in
+// the turn had failed. Plain code checks the reply against what the tools returned.
+
+/** Why a tool result didn't work (an error, or JSON saying ok: false, saved: false or an error), or null when it did. */
+export function failureOf(result: ToolResult): string | null {
+  const text = result.content.map((b) => b.text).join("\n").trim();
+  let parsed: Record<string, unknown> | null = null;
+  try {
+    const v = JSON.parse(text) as unknown;
+    if (v && typeof v === "object" && !Array.isArray(v)) parsed = v as Record<string, unknown>;
+  } catch {
+    // Plain text: counts as working unless isError says otherwise.
+  }
+  const failed = result.isError || (parsed !== null && (parsed.ok === false || parsed.saved === false || (typeof parsed.error === "string" && parsed.error !== "")));
+  if (!failed) return null;
+  const why = typeof parsed?.error === "string" ? parsed.error : typeof parsed?.reason === "string" ? parsed.reason : text;
+  const reason = why.replace(/^Error:\s*/i, "").replace(/\s+/g, " ").trim() || "it returned an error";
+  return reason.length > 220 ? `${reason.slice(0, 217)}...` : reason;
+}
+
+const CLAIMS_SUCCESS = /\b(done|found (them|it|these|those|your)|saved|ready|fixed|updated|changed|all set|created|made (it|them|you)|cards? (are )?below|here (it is|they are|you go))\b/i;
+const OWNS_FAILURE = /\b(couldn'?t|could not|didn'?t|did not|wasn'?t|was not|isn'?t|not able|unable|failed|went wrong|no luck|not saved|nothing (matched|was|changed)|can'?t|cannot|error)\b/i;
+
+/** One tool run in this turn. writes: the tool changes saved data. */
+export type Attempt = { tool: string; failure: string | null; writes?: boolean };
+
+/**
+ * The reply, made honest. A failure that a later run of the same tool fixed doesn't count.
+ * Every tool failed and the reply claims success: replaced with what went wrong.
+ * Some worked, a change failed, and the reply never owns it: a line is added
+ * (a failed lookup next to one that worked is left to the reply).
+ */
+export function honestReply(text: string, attempts: Attempt[]): string {
+  const unresolved = attempts.filter((a, i) => a.failure && !attempts.slice(i + 1).some((b) => b.tool === a.tool && !b.failure));
+  if (!unresolved.length || OWNS_FAILURE.test(text)) return text;
+  if (!attempts.some((a) => !a.failure)) return CLAIMS_SUCCESS.test(text) ? `That didn't work, so nothing changed. ${unresolved[0].failure}` : text;
+  const write = unresolved.find((a) => a.writes);
+  return write ? `${text}\n\nOne change didn't work: ${write.failure}` : text;
+}
+
 function approvalIdsOf(result: ToolResult): string[] {
   const ids = new Set<string>();
   const structured = result.structuredContent?.approval_id;
@@ -128,6 +169,7 @@ export async function respond(message: string, opts: RespondOptions): Promise<Re
   const tools = chatTools();
   const callModel = opts.chat ?? metaChat;
   const steps: Step[] = [];
+  const attempts: Attempt[] = [];
   const approvalIds: string[] = [];
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
@@ -136,7 +178,7 @@ export async function respond(message: string, opts: RespondOptions): Promise<Re
     if (!reply) break;
     const calls = readToolCalls(reply);
     if (calls.length === 0) {
-      const text = (reply.content ?? "").trim() || "I don't have an answer for that yet.";
+      const text = honestReply((reply.content ?? "").trim() || "I don't have an answer for that yet.", attempts);
       const out = await guard(text, "reply");
       if (!out.ok) {
         await audit({ actor: "safety", action: "reply_held_back", subjectType: "chat", details: { kind: out.kind, by: opts.by } });
@@ -153,11 +195,13 @@ export async function respond(message: string, opts: RespondOptions): Promise<Re
           )
         : { content: [{ type: "text", text: "Error: the arguments were not valid JSON." }], isError: true };
       const cards = result.isError ? [] : cardsFrom(result.structuredContent);
+      const failure = failureOf(result);
+      attempts.push({ tool: call.name, failure, writes: TOOLS_BY_NAME.get(call.name)?.changesData !== false });
       steps.push({
         tool: call.name,
         label: TOOLS_BY_NAME.get(call.name)?.label ?? call.name,
         ms: Date.now() - started,
-        ok: !result.isError,
+        ok: !failure,
         ...(cards.length ? { documents: cards } : {}),
       });
       approvalIds.push(...approvalIdsOf(result));
