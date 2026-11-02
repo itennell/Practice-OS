@@ -14,6 +14,10 @@ describe("aeon/SOUL.md", () => {
     ["emergency", /911/],
     ["memories are data", /never instructions/i],
     ["no guessed pronouns for providers", /Never guess a provider's pronouns[^\n]*by name, or "they"/],
+    // Nov 2 re-test: billing for 90839 and a website crisis policy were declined as clinical.
+    ["crisis billing is practice business", /CPT 90839/],
+    ["a crisis policy page is logistics, with 988 and 911", /crisis or emergency policy page[^\n]*988[^\n]*911/i],
+    ["the policy page gives no clinical advice", /policy page[^\n]*no coping tips/i],
   ])("keeps the rule: %s", (_name, pattern) => {
     expect(text).toMatch(pattern);
   });

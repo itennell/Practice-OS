@@ -28,7 +28,7 @@ export type FileOutcome =
   | { ok: true; text: string; card: DocumentCard; approvalId: string | null; duplicate: boolean };
 
 const CRISIS_FILE =
-  "This file mentions self-harm or someone in danger, so I didn't read it further. If anyone is in danger right now: call or text 988 (Suicide & Crisis Lifeline), or call 911.";
+  "This file mentions self-harm or danger, so I didn't read it further. If anyone is in danger right now: call or text 988 (Suicide & Crisis Lifeline), or call 911.";
 /** Payer names match only exactly, ignoring case, spaces and punctuation ("BCBS IL" and "bcbsil"); never on a part. */
 export const payerKey = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, "");
 export const samePayer = (a: string, b: string) => payerKey(a) !== "" && payerKey(a) === payerKey(b);
