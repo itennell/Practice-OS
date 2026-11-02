@@ -13,7 +13,33 @@ export type SpecialtyId =
   | "pediatrics"
   | "psychiatry"
   | "oncology"
-  | "therapists";
+  | "therapists"
+  // Added with the referral source catalog (docs/research/referral-sources.json, checked live 2026-11-02).
+  | "midwives"
+  | "nurse_practitioners_pas"
+  | "urgent_care"
+  | "cardiology"
+  | "neurology"
+  | "gastroenterology"
+  | "endocrinology"
+  | "rheumatology"
+  | "pain_medicine"
+  | "sleep_medicine"
+  | "plastic_surgery"
+  | "dermatology"
+  | "genetic_counselors"
+  | "physiatry"
+  | "addiction_medicine"
+  | "mental_health_programs"
+  | "palliative_care"
+  | "hospice"
+  | "home_health"
+  | "lactation_consultants"
+  | "doulas"
+  | "rehab_therapists"
+  | "dietitians"
+  | "bodywork"
+  | "sports_medicine";
 
 type Specialty = {
   id: SpecialtyId;
@@ -44,7 +70,66 @@ export const SPECIALTIES: Specialty[] = [
     searches: ["Social Worker", "Psychologist", "Marriage & Family Therapist", "Counselor"],
     codes: ["1041C0700X", "103T*", "106H00000X", "101YP2500X", "101YM0800X"],
   },
+  // From the referral source catalog (docs/research/referral-sources.json). Every
+  // search below returned Illinois results on 2026-11-02 and every code was seen
+  // in those results and is in NUCC v26.1 (docs/research/referral-sources-verification.md).
+  // None of these codes falls under an id above (exact or by prefix), so cards
+  // already on the board keep their kind: geriatrics, fertility, child psychiatry,
+  // psychiatric NPs and psychologists stay inside the searches above.
+  { id: "midwives", label: "Midwives", searches: ["Midwife", "Advanced Practice Midwife"], codes: ["176B00000X", "367A00000X"] },
+  {
+    id: "nurse_practitioners_pas",
+    label: "Nurse practitioners and PAs",
+    searches: ["Nurse Practitioner", "Physician Assistant"],
+    codes: ["363L00000X", "363LP2300X", "363LG0600X", "363A00000X", "363AM0700X"],
+  },
+  { id: "urgent_care", label: "Urgent care", searches: ["Urgent Care"], codes: ["261QU0200X"] },
+  { id: "cardiology", label: "Cardiology", searches: ["Cardiovascular Disease"], codes: ["207RC0000X"] },
+  { id: "neurology", label: "Neurology", searches: ["Neurology"], codes: ["2084N0400X", "2084N0402X"] },
+  { id: "gastroenterology", label: "Gastroenterology", searches: ["Gastroenterology"], codes: ["207RG0100X"] },
+  { id: "endocrinology", label: "Endocrinology", searches: ["Endocrinology, Diabetes & Metabolism"], codes: ["207RE0101X"] },
+  { id: "rheumatology", label: "Rheumatology", searches: ["Rheumatology"], codes: ["207RR0500X"] },
+  {
+    id: "pain_medicine",
+    label: "Pain management",
+    searches: ["Pain Medicine", "Interventional Pain Medicine"],
+    codes: ["208VP0000X", "208VP0014X", "207LP2900X", "2081P2900X"],
+  },
+  { id: "sleep_medicine", label: "Sleep medicine", searches: ["Sleep Medicine"], codes: ["207RS0012X", "2084S0012X"] },
+  { id: "plastic_surgery", label: "Plastic surgery", searches: ["Plastic Surgery"], codes: ["208200000X", "2086S0122X"] },
+  { id: "dermatology", label: "Dermatology", searches: ["Dermatology"], codes: ["207N*"] },
+  { id: "genetic_counselors", label: "Genetic counselors", searches: ["Genetic Counselor"], codes: ["170300000X"] },
+  { id: "physiatry", label: "Physiatry (rehab medicine)", searches: ["Physical Medicine & Rehabilitation"], codes: ["208100000X"] },
+  { id: "addiction_medicine", label: "Addiction medicine", searches: ["Addiction Medicine"], codes: ["2084A0401X", "207RA0401X", "2083A0300X", "207LA0401X"] },
+  {
+    id: "mental_health_programs",
+    label: "Mental health programs (IOP, PHP, residential)",
+    searches: ["Mental Health", "Psychiatric Residential Treatment Facility", "Psychiatric Hospital", "Psychiatric Unit"],
+    codes: ["261QM0801X", "283Q00000X", "323P00000X", "273R00000X"],
+  },
+  { id: "palliative_care", label: "Palliative care", searches: ["Hospice and Palliative Medicine"], codes: ["207RH0002X", "207PH0002X", "207LH0002X"] },
+  { id: "hospice", label: "Hospice", searches: ["Hospice Care, Community Based", "Hospice, Inpatient"], codes: ["251G00000X", "315D00000X"] },
+  { id: "home_health", label: "Home health", searches: ["Home Health"], codes: ["251E00000X"] },
+  { id: "lactation_consultants", label: "Lactation consultants", searches: ["Lactation Consultant"], codes: ["163WL0100X", "174N00000X"] },
+  { id: "doulas", label: "Doulas", searches: ["Doula"], codes: ["374J00000X"] },
+  {
+    id: "rehab_therapists",
+    label: "Physical, occupational and speech therapists",
+    searches: ["Physical Therapist", "Occupational Therapist", "Speech-Language Pathologist"],
+    codes: ["2251*", "225X*", "235Z*"],
+  },
+  { id: "dietitians", label: "Dietitians", searches: ["Dietitian, Registered"], codes: ["133V*"] },
+  {
+    id: "bodywork",
+    label: "Chiropractors, acupuncturists and massage therapists",
+    searches: ["Chiropractor", "Acupuncturist", "Massage Therapist"],
+    codes: ["111N*", "171100000X", "225700000X"],
+  },
+  { id: "sports_medicine", label: "Sports medicine", searches: ["Sports Medicine"], codes: ["207XX0005X", "207RS0010X", "2081S0010X"] },
 ];
+
+/** The seven kinds Referrals had before the source catalog; their ids, searches and codes never change. */
+export const ORIGINAL_SPECIALTY_IDS = ["family_medicine", "internal_medicine", "ob_gyn", "pediatrics", "psychiatry", "oncology", "therapists"] as const satisfies readonly SpecialtyId[];
 
 export const SPECIALTY_BY_ID = new Map(SPECIALTIES.map((s) => [s.id, s]));
 

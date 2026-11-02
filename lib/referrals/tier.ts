@@ -14,6 +14,7 @@
 // they see the same people, and a provider who only sees people she doesn't
 // (a pediatrician for an adults-only practice) is always "Later".
 import research from "../../docs/research/referral-tiers.json" with { type: "json" };
+import { catalogPoints } from "./catalog";
 import { looksResidential, specialtyForCode, SPECIALTY_BY_ID, type Provider, type SpecialtyId } from "./nppes";
 
 export type Tier = "first" | "next" | "later";
@@ -22,7 +23,8 @@ export const TIERS: Tier[] = ["first", "next", "later"];
 export type Weights = {
   labels: Record<Tier, string>;
   min: { first: number; next: number };
-  specialty: Record<SpecialtyId, number>;
+  /** The seven original kinds; kinds added with the source catalog use its default_points (pointsForSpecialty). */
+  specialty: Partial<Record<SpecialtyId, number>>;
   distance: { max: number; perMile: number; unknown: number };
   reachable: { individual: number; namedOfficial: number; groupOnly: number };
   contact: { phone: number; fax: number };
@@ -70,7 +72,7 @@ export function readWeights(json: unknown): Weights {
     min: { first: num(tier("A").min, "tier A min"), next: num(tier("B").min, "tier B min") },
     specialty: Object.fromEntries(
       (Object.keys(BUILT_IN_WEIGHTS.specialty) as SpecialtyId[]).map((id) => [id, num(specialtyPoints[id], `specialty ${id}`)]),
-    ) as Record<SpecialtyId, number>,
+    ) as Partial<Record<SpecialtyId, number>>,
     distance: { max: num(distance.max, "distance max"), perMile: num(distance.per_mile, "distance per_mile"), unknown: num(distance.unknown_distance_points, "distance unknown") },
     reachable: {
       individual: num(reach.individual, "reachable individual"),
@@ -115,7 +117,8 @@ export const FOCUS_WORDS: Record<Focus, string> = {
 };
 
 /** Who each kind of provider sees. "all" means every age. */
-const SEES: Record<SpecialtyId, Focus[] | "all"> = {
+// Kinds added with the source catalog have no entry yet, so no focus reason either way.
+const SEES: Partial<Record<SpecialtyId, Focus[] | "all">> = {
   family_medicine: "all",
   psychiatry: "all",
   therapists: "all",
@@ -143,7 +146,7 @@ const GENERAL_OB = new Set(["207V00000X", "207VX0000X", "363LX0001X"]);
 /** Starts the reason for a general OB/GYN on a perinatal practice's card (focusRank reads it). */
 export const GENERAL_OB_REASON = "general obstetrics sees most new and expecting parents";
 
-function seesFor(specialty: SpecialtyId, taxonomy: string | null): Focus[] | "all" {
+function seesFor(specialty: SpecialtyId, taxonomy: string | null): Focus[] | "all" | undefined {
   if (specialty === "ob_gyn" && taxonomy && GYN_ONLY.has(taxonomy)) return ["adults", "older_adults"];
   return SEES[specialty];
 }
@@ -198,13 +201,18 @@ export function milesLabel(miles: number, approximate = false): string {
 
 const MANUAL_SOURCE_POINTS = 18; // research: sources not in NPPES default to 18
 
+/** referral-tiers.json points for the seven original kinds; the source catalog's default_points for the rest. */
+export function pointsForSpecialty(id: SpecialtyId): number {
+  return SPECIALTY_POINTS[id] ?? catalogPoints(id) ?? MANUAL_SOURCE_POINTS;
+}
+
 export function tierFor(p: TierInput, ctx: TierContext): TierResult {
   const specialty = p.taxonomy ? (specialtyForCode(p.taxonomy)?.id ?? null) : null;
   const reasons: string[] = [];
   let score = 0;
 
   // Specialty.
-  score += specialty ? SPECIALTY_POINTS[specialty] : MANUAL_SOURCE_POINTS;
+  score += specialty ? pointsForSpecialty(specialty) : MANUAL_SOURCE_POINTS;
   reasons.push(
     specialty
       ? `${SPECIALTY_BY_ID.get(specialty)!.label} offices see people who need talk therapy and often have no one to send them to`
@@ -213,8 +221,8 @@ export function tierFor(p: TierInput, ctx: TierContext): TierResult {
 
   // Who she helps: a reason, or "Later" when they only see people she doesn't.
   let mismatch = false;
-  if (ctx.focus.length > 0 && specialty) {
-    const sees = seesFor(specialty, p.taxonomy);
+  const sees = specialty ? seesFor(specialty, p.taxonomy) : undefined;
+  if (ctx.focus.length > 0 && sees) {
     const shared = sees === "all" ? [] : ctx.focus.filter((f) => sees.includes(f));
     if (sees === "all") reasons.push("sees all ages, so your clients too");
     else if (shared.length > 0) {
