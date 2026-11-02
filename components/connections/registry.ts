@@ -32,11 +32,8 @@ export const CONNECTION_CARDS: ConnectionCard[] = [
   // Instagram: publishing is cut for now (Isaiah, 2026-10-29). The card only says there is
   // nothing to connect (Aeon writes, she posts); relay/ stays in the repo for later.
   { id: "instagram", order: 30, Card: InstagramCard },
-  // Front Desk (paused: lib/features.ts)
-  ...(FRONT_DESK_ENABLED
-    ? [
-        { id: "phone", order: 40, Card: PhoneConnectionCard },
-        { id: "calcom", order: 50, Card: CalcomConnectionCard },
-      ]
-    : []),
+  // Her phone: Front Desk's line, or while Front Desk is paused only "Urgent alerts to your phone"
+  // (the crisis text to her own cell needs a connected line). Cal.com is Front Desk only.
+  { id: "phone", order: 40, Card: PhoneConnectionCard },
+  ...(FRONT_DESK_ENABLED ? [{ id: "calcom", order: 50, Card: CalcomConnectionCard }] : []),
 ];

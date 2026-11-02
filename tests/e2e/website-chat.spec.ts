@@ -1,8 +1,9 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { execSync } from "node:child_process";
+import { FRONT_DESK_ENABLED } from "../../lib/features";
 
-test.skip(true, "Front Desk is paused (lib/features.ts FRONT_DESK_ENABLED = false); turn these back on with it.");
+test.skip(!FRONT_DESK_ENABLED, "Front Desk is paused (lib/features.ts); these run when FRONT_DESK_ENABLED is true.");
 
 // The practice website chat: AI disclosure before anything is typed, typing
 // only, consult times shown only after she approves them, crisis reply fixed.

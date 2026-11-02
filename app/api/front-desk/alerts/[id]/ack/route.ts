@@ -1,9 +1,11 @@
+import { FRONT_DESK_ENABLED } from "@/lib/features";
 import { canDecide } from "@/lib/admin-guard";
 import { audit } from "@/lib/audit";
 import { acknowledgeAlert } from "@/lib/frontdesk/view";
 
 // "I've seen this" on a Front Desk alert (crisis alerts stay pinned until then).
 export async function POST(request: Request, ctx: RouteContext<"/api/front-desk/alerts/[id]/ack">) {
+  if (!FRONT_DESK_ENABLED) return Response.json({ error: "Not found." }, { status: 404 }); // paused (lib/features.ts)
   if (!canDecide(request)) return Response.json({ error: "Not allowed here." }, { status: 403 });
   const { id } = await ctx.params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) return Response.json({ error: "Unknown alert." }, { status: 404 });

@@ -14,6 +14,8 @@
 // signatures), and its webhook routes are posted to by other sites, so none of
 // this applies there.
 
+import { FRONT_DESK_ENABLED } from "./features";
+
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
@@ -44,7 +46,8 @@ export const isLocalAppRequest = (request: Incoming) => isLocalRequest(request) 
 
 // Pages and routes that exist only on her own computer. On the Vercel copy they
 // are a plain 404: the public website chat has no visitor gate there (yet).
-const LOCAL_ONLY_PATHS = ["/website-chat", "/api/website-chat"];
+// While Front Desk is paused (lib/features.ts) its pages and routes are hidden here too.
+const LOCAL_ONLY_PATHS = ["/website-chat", "/api/website-chat", ...(FRONT_DESK_ENABLED ? [] : ["/front-desk", "/api/front-desk"])];
 
 /** True when this path must 404 here (the Vercel copy) because it answers only on her computer. */
 export function hiddenOnThisCopy(pathname: string): boolean {

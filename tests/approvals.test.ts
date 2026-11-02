@@ -1,7 +1,9 @@
 // Approve flow against the live database. Runs only when DATABASE_URL is set.
 // Each test creates its own approval (created_by 'test') and deletes it after.
 // The audit rows it writes stay, because audit_log is append-only.
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
+// These test Front Desk itself, so they run with it switched on (lib/features.ts).
+vi.mock("../lib/features", async (orig) => ({ ...(await orig<typeof import("../lib/features")>()), FRONT_DESK_ENABLED: true }));
 import { loadEnv } from "../lib/env";
 
 loadEnv();

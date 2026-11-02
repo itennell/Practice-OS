@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import { FRONT_DESK_ENABLED } from "../../lib/features";
 import { execSync } from "node:child_process";
 
 // The dark chat menu (UI-005): the same menu on desktop (left column) and phones (slides in).
@@ -42,8 +43,8 @@ test("Menu: Aeon, New chat, search, practice links with counts, recent chats and
   for (const name of [/^Admin/, /^Approvals/, "Referrals", "Media"]) {
     await expect(main.getByRole("link", { name })).toBeVisible();
   }
-  // Front Desk is paused (lib/features.ts): three helpers in the menu.
-  await expect(main.getByRole("link", { name: "Front Desk" })).toHaveCount(0);
+  // Front Desk is in the menu only while it is on (lib/features.ts); paused it is three helpers.
+  await expect(main.getByRole("link", { name: "Front Desk" })).toHaveCount(FRONT_DESK_ENABLED ? 1 : 0);
   // The seeded practice has approvals waiting; the count is part of the link's name.
   await expect(main.getByRole("link", { name: /^Approvals \d+ waiting$/ })).toHaveAttribute("aria-current", "page");
   await expect(menu.getByRole("link", { name: /Dana Reyes, LCPC/ })).toBeVisible();

@@ -1,7 +1,8 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { FRONT_DESK_ENABLED } from "../../lib/features";
 
-test.skip(true, "Front Desk is paused (lib/features.ts FRONT_DESK_ENABLED = false); turn these back on with it.");
+test.skip(!FRONT_DESK_ENABLED, "Front Desk is paused (lib/features.ts); these run when FRONT_DESK_ENABLED is true.");
 
 // The shared Connect card (components/connections/card-frame.tsx) on a narrow card:
 // the status never sits on top of the title or description, and the description

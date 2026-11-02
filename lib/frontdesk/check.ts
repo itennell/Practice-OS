@@ -1,5 +1,6 @@
 import { audit } from "../audit";
 import { db } from "../db";
+import { FRONT_DESK_ENABLED } from "../features";
 import { deps } from "./deps";
 import { processCall, processText, processVoicemail } from "./ingest";
 import { PhoneError } from "./phone/types";
@@ -14,7 +15,7 @@ const OVERLAP_MS = 5 * 60_000; // re-read the last 5 minutes; duplicates are ski
 const FIRST_LOOKBACK_MS = 24 * 3_600_000;
 
 export type CheckSummary =
-  | { ran: false; reason: "locked" | "no_phone" }
+  | { ran: false; reason: "locked" | "no_phone" | "paused" }
   | { ran: true; calls: number; voicemails: number; texts: number; crises: number; reminders: number; checkedAt: string; error?: string };
 
 type Stream = "call" | "voicemail" | "sms";
@@ -44,6 +45,7 @@ async function saveCursor(vendor: string, stream: Stream, seen: Date | null, err
  * the check's own reads and writes run outside it, so nothing it does is rolled back.
  */
 export async function checkFrontDesk(): Promise<CheckSummary> {
+  if (!FRONT_DESK_ENABLED) return { ran: false, reason: "paused" }; // lib/features.ts
   return (await db().begin(async (tx) => {
     const [{ locked }] = await tx`select pg_try_advisory_xact_lock(${LOCK_KEY}) as locked`;
     if (!locked) return { ran: false, reason: "locked" } satisfies CheckSummary;
