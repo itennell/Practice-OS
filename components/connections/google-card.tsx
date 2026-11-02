@@ -15,7 +15,7 @@ import { ConnectButton } from "./connect-button";
 
 const PARTS = [
   { label: "Gmail drafts", scopes: [GOOGLE_SCOPES.gmailCompose], why: "approved referral letters become drafts; you press send" },
-  { label: "Google Calendar", scopes: [GOOGLE_SCOPES.calendarEvents, GOOGLE_SCOPES.calendarFreebusy], why: "consult times come from your calendar" },
+  { label: "Google Calendar", scopes: [GOOGLE_SCOPES.calendarEvents, GOOGLE_SCOPES.calendarFreebusy], why: "lets Aeon see your calendar" },
 ];
 
 export function GoogleCard({ status }: { status: ConnectionStatus }) {

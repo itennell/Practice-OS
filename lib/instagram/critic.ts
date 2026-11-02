@@ -6,6 +6,7 @@
 // guidance (no method details; suicide or self-harm topics are not posted).
 import { chat as metaChat, type ChatParams } from "../meta";
 import { checkCrisis } from "../safety";
+import { factProblems, OUTCOME_PROMISE, priceProblems, type TruthFacts } from "../media/truth";
 import { captionProblems } from "./graph";
 
 export type CriticRule =
@@ -18,7 +19,8 @@ export type CriticRule =
   | "license_line"
   | "invented_fee"
   | "caption_limits"
-  | "never_show";
+  | "never_show"
+  | "wrong_fact";
 
 export type Finding = { rule: CriticRule; by: "code" | "muse"; message: string };
 
@@ -29,7 +31,8 @@ export type CriticResult = {
   findings: Finding[];
 };
 
-export type CriticContext = { licenseLine: string; feesCents: number[] };
+/** truth: her saved practice facts (lib/media/truth.ts); with it, claims they contradict are blocked too. */
+export type CriticContext = { licenseLine: string; feesCents: number[]; truth?: TruthFacts };
 
 /** Her words, shown on the blocked card. */
 export const RULE_TEXT: Record<CriticRule, string> = {
@@ -43,6 +46,7 @@ export const RULE_TEXT: Record<CriticRule, string> = {
   invented_fee: "A price in the post doesn't match your fee list.",
   caption_limits: "The caption is over one of Instagram's limits.",
   never_show: "It shows something you said posts never show.",
+  wrong_fact: "It says something about your practice that your saved details don't.",
 };
 
 const b = (s: string) => new RegExp(`\\b(?:${s})\\b`, "i");
@@ -66,12 +70,8 @@ const PATTERNS: Partial<Record<CriticRule, RegExp[]>> = {
     b("(leave|write|share) (us |me )?(a )?(review|testimonial|kind words)"),
     /[“"][^”"]{10,}[”"]\s*[-—–]\s*[A-Z]/,
   ],
-  outcome_promise: [
-    b("guarantee[ds]?|cured?|cures|fix (your|you)|100% (better|success)|proven to|results in \\d+|in just \\d+ (sessions|weeks|days)"),
-    b("you('ll| will) (feel|be|get) (better|happier|healed|calmer|less anxious|fixed)"),
-    b("(get rid of|eliminate|end) (your )?(anxiety|depression|trauma|panic|stress)"),
-    b("(life[- ]changing|transform your life|never feel)"),
-  ],
+  // One list with the profiles' guarantee rule (lib/media/truth.ts).
+  outcome_promise: OUTCOME_PROMISE,
   method_detail: [
     b("(tip|technique|exercise|worksheet|homework|protocol) ?(#|no\\.? ?)?\\d"),
     b("(try|practice) (this|these) (exercise|technique|breathing|grounding)"),
@@ -89,11 +89,6 @@ const PATTERNS: Partial<Record<CriticRule, RegExp[]>> = {
 
 const straighten = (s: string) => s.replace(/[’‘]/g, "'").replace(/[“”]/g, '"');
 
-/** Dollar amounts in the text, in cents. */
-function dollarAmounts(text: string): number[] {
-  return [...text.matchAll(/\$\s?(\d{1,4}(?:,\d{3})*)(?:\.(\d{2}))?/g)].map((m) => Number(m[1].replace(/,/g, "")) * 100 + Number(m[2] ?? 0));
-}
-
 /** Plain code: every rule that can be checked without a model. */
 export function codeCritic(text: string, ctx: CriticContext): CriticResult {
   const findings: Finding[] = [];
@@ -103,8 +98,10 @@ export function codeCritic(text: string, ctx: CriticContext): CriticResult {
     if (patterns.some((p) => p.test(clean))) findings.push({ rule, by: "code", message: RULE_TEXT[rule] });
   }
   if (!text.includes(ctx.licenseLine)) findings.push({ rule: "license_line", by: "code", message: RULE_TEXT.license_line });
-  const invented = dollarAmounts(clean).filter((c) => !ctx.feesCents.includes(c));
-  if (invented.length) findings.push({ rule: "invented_fee", by: "code", message: RULE_TEXT.invented_fee });
+  // The one shared fee, insurer and claim check (lib/media/truth.ts), the same as profiles and the website.
+  const facts = ctx.truth ? factProblems(clean, { ...ctx.truth, fees: ctx.feesCents.map((cents) => ({ label: "", cents })) }) : priceProblems(clean, ctx.feesCents);
+  if (facts.some((p) => p.kind === "fee")) findings.push({ rule: "invented_fee", by: "code", message: RULE_TEXT.invented_fee });
+  for (const p of facts) if (p.kind !== "fee") findings.push({ rule: "wrong_fact", by: "code", message: `${RULE_TEXT.wrong_fact} It ${p.message}.` });
   for (const p of captionProblems(text)) findings.push({ rule: "caption_limits", by: "code", message: p });
   return finish(findings);
 }

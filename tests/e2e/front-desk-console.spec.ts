@@ -1,6 +1,9 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { execSync } from "node:child_process";
+import { FRONT_DESK_ENABLED } from "../../lib/features";
+
+test.skip(!FRONT_DESK_ENABLED, "Front Desk is paused (lib/features.ts); these run when FRONT_DESK_ENABLED is true.");
 
 // "Test your Front Desk": a [Sample] voicemail goes through the real pipeline,
 // shows in the Inbox with masked number, transcript and safety check, and its

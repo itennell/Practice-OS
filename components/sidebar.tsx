@@ -7,11 +7,12 @@
 // left; phones open the same menu as a panel that slides in from the left.
 
 import { Dialog } from "@base-ui/react/dialog";
-import { Brain, Camera, ClipboardList, Inbox, Menu, Phone, Plus, Search, Settings, Users, X, type LucideIcon } from "lucide-react";
+import { Brain, Camera, ClipboardList, FolderOpen, Inbox, Menu, Phone, Plus, Search, Settings, Users, X, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Avatar } from "@/components/shared/avatar";
+import { FRONT_DESK_ENABLED } from "@/lib/features";
 import { EMPTY_MENU, type MenuData } from "@/lib/ui/menu-types";
 import { cn } from "@/lib/utils";
 import { Orb } from "./ui";
@@ -26,12 +27,13 @@ const FOCUS = "outline-none focus-visible:outline-2 focus-visible:-outline-offse
 
 type PracticeLink = { href: string; label: string; icon: LucideIcon; count?: keyof MenuData["counts"]; countWord?: string };
 
-const PRACTICE: PracticeLink[] = [
+export const PRACTICE: PracticeLink[] = [
   { href: "/admin", label: "Admin", icon: ClipboardList, count: "admin", countWord: "need you" },
+  { href: "/files", label: "Files", icon: FolderOpen },
   { href: "/approvals", label: "Approvals", icon: Inbox, count: "approvals", countWord: "waiting" },
   { href: "/referrals", label: "Referrals", icon: Users },
   { href: "/media", label: "Media", icon: Camera },
-  { href: "/front-desk", label: "Front Desk", icon: Phone },
+  ...(FRONT_DESK_ENABLED ? [{ href: "/front-desk", label: "Front Desk", icon: Phone }] : []), // paused: lib/features.ts
 ];
 
 const isAt = (pathname: string, href: string) => pathname === href || pathname.startsWith(`${href}/`);

@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import { FRONT_DESK_ENABLED } from "../../lib/features";
 import { execSync } from "node:child_process";
 
 // Manual, Auto and Bypass: the pill under the chat box, the ask bar above it,
@@ -11,13 +12,13 @@ test.beforeEach(async ({ request, baseURL }) => {
   execSync("npm run db:reset", { stdio: "ignore" });
   const headers = { origin: new URL(baseURL!).origin };
   expect((await request.put("/api/settings/approval-mode", { data: { mode: "auto" }, headers })).ok()).toBe(true);
-  expect((await request.put("/api/settings/front-desk", { data: { text_missed_callers: true }, headers })).ok()).toBe(true);
+  if (FRONT_DESK_ENABLED) expect((await request.put("/api/settings/front-desk", { data: { text_missed_callers: true }, headers })).ok()).toBe(true);
 });
 
 test.afterAll(async ({ request, baseURL }) => {
   const headers = { origin: new URL(baseURL!).origin };
   await request.put("/api/settings/approval-mode", { data: { mode: "auto" }, headers });
-  await request.put("/api/settings/front-desk", { data: { text_missed_callers: true }, headers });
+  if (FRONT_DESK_ENABLED) await request.put("/api/settings/front-desk", { data: { text_missed_callers: true }, headers });
 });
 
 async function seriousViolations(page: Page) {
@@ -82,7 +83,7 @@ test("The ask bar fits the chat column beside the sidebar: its words never squee
   await page.screenshot({ path: `test/screens/modes-chat-narrow-${test.info().project.name}.png`, fullPage: true });
 });
 
-test("Settings: default mode and Front Desk's own rule", async ({ page }) => {
+test("Settings: default mode and Front Desk's own rule (when it is on)", async ({ page }) => {
   await page.goto("/settings");
   await expect(page.getByRole("heading", { name: "How Aeon works in chat" })).toBeVisible();
   const group = page.getByRole("radiogroup", { name: "Default mode for new chats" });
@@ -96,10 +97,16 @@ test("Settings: default mode and Front Desk's own rule", async ({ page }) => {
   await expect(page.getByRole("button", { name: /^Mode: / })).toHaveAccessibleName(/Mode: Manual/);
 
   await page.goto("/settings");
+  // Front Desk's own rule shows only while Front Desk is on (lib/features.ts).
   const sw = page.getByRole("switch", { name: "Text callers I miss" });
-  await expect(sw).toBeChecked();
-  await sw.click();
-  await expect(sw).not.toBeChecked();
+  if (FRONT_DESK_ENABLED) {
+    await expect(sw).toBeChecked();
+    await sw.click();
+    await expect(sw).not.toBeChecked();
+  } else {
+    await expect(page.getByRole("heading", { name: "Front Desk" })).toHaveCount(0);
+    await expect(sw).toHaveCount(0);
+  }
   expect(await seriousViolations(page)).toEqual([]);
   await page.screenshot({ path: `test/screens/modes-settings-${test.info().project.name}.png`, fullPage: true });
 });
