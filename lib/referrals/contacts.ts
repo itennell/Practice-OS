@@ -43,6 +43,15 @@ export type LogInput = {
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+/** A real calendar day written YYYY-MM-DD: "2026-13-01" and "2026-02-31" are not. */
+export function isDay(v: string): boolean {
+  if (!DATE.test(v)) return false;
+  const d = new Date(`${v}T12:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
+}
+
+const notADay = (v: string, what: string) => new Error(`"${v.slice(0, 40)}" isn't a date I can read. Pick a real day for ${what}, written like 2026-11-09.`);
+
 /** A plain-words error for her, or null when the note may be saved. */
 export async function checkNote(note: string, check = (t: string) => guard(t, "message")): Promise<string | null> {
   const r = await check(note);
@@ -65,7 +74,8 @@ export async function logContact(
   if (!CONTACT_KINDS.includes(input.kind)) throw new Error("Unknown kind of contact.");
   const today = await practiceToday(sql);
   const happenedOn = input.happenedOn ?? today;
-  if (!DATE.test(happenedOn) || happenedOn > today) throw new Error("Pick a date that isn't in the future.");
+  if (!isDay(happenedOn)) throw notADay(happenedOn, "when it happened");
+  if (happenedOn > today) throw new Error("Pick a date that isn't in the future.");
   let note = input.note?.trim() || null;
   if (input.kind === "referred") note = null; // a date only, never who
   if (note) {
@@ -73,7 +83,8 @@ export async function logContact(
     const refused = await checkNote(note, check);
     if (refused) throw new Error(refused);
   }
-  if (input.followUpOn && (!DATE.test(input.followUpOn) || input.followUpOn < today)) throw new Error("Pick a follow-up date from today on.");
+  if (input.followUpOn && !isDay(input.followUpOn)) throw notADay(input.followUpOn, "the follow-up");
+  if (input.followUpOn && input.followUpOn < today) throw new Error("Pick a follow-up date from today on.");
 
   const [card] = await sql<{ stage: Stage; next_follow_up_on: string | null }[]>`
     select stage, next_follow_up_on::text as next_follow_up_on from practice_os.referral_sources where id = ${sourceId}`;
@@ -144,7 +155,8 @@ export async function setIntroducedBy(sourceId: string, who: string | null, sql:
 
 export async function setFollowUp(sourceId: string, on: string | null, sql: postgres.Sql = db()) {
   const today = await practiceToday(sql);
-  if (on && (!DATE.test(on) || on < today)) throw new Error("Pick a follow-up date from today on.");
+  if (on && !isDay(on)) throw notADay(on, "the follow-up");
+  if (on && on < today) throw new Error("Pick a follow-up date from today on.");
   await sql`update practice_os.referral_sources set next_follow_up_on = ${on}, updated_at = now() where id = ${sourceId}`;
 }
 
@@ -177,13 +189,13 @@ export function relationshipFrom(contacts: Pick<Contact, "kind" | "happened_on">
 export type SuppressReason = "asked_not_to" | "not_interested";
 
 /** Never suggest this NPI again, and move its card to Not a fit. */
-export async function suppress(sourceId: string, reason: SuppressReason, sql: postgres.Sql = db()) {
+export async function suppress(sourceId: string, reason: SuppressReason, sql: postgres.Sql = db(), by: "clinician" | "aeon" = "clinician") {
   const [card] = await sql<{ npi: string | null }[]>`
     update practice_os.referral_sources set stage = 'not_a_fit', next_follow_up_on = null, updated_at = now()
      where id = ${sourceId} returning npi`;
   if (!card) throw new Error("That referral source is no longer on the board.");
   if (card.npi) await sql`insert into practice_os.referral_suppressions (npi, reason) values (${card.npi}, ${reason}) on conflict (npi) do update set reason = excluded.reason`;
-  await audit({ actor: "clinician", action: "referral_suppressed", subjectType: "referral_source", subjectId: sourceId, details: { reason } }, sql);
+  await audit({ actor: by, action: "referral_suppressed", subjectType: "referral_source", subjectId: sourceId, details: { reason } }, sql);
 }
 
 export async function unsuppress(sourceId: string, sql: postgres.Sql = db()) {

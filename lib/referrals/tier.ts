@@ -119,7 +119,8 @@ const SEES: Record<SpecialtyId, Focus[] | "all"> = {
   family_medicine: "all",
   psychiatry: "all",
   therapists: "all",
-  pediatrics: ["children", "teens", "families"],
+  // Pediatricians see new mothers at every newborn visit and screen them for postpartum depression (AAP).
+  pediatrics: ["children", "teens", "families", "perinatal"],
   internal_medicine: ["adults", "older_adults"],
   ob_gyn: ["adults", "perinatal", "couples"],
   oncology: ["adults", "older_adults"],
@@ -134,6 +135,31 @@ const FOCUS_PATTERNS: [Focus, RegExp][] = [
   ["families", /\b(famil(y|ies)|parents?|parenting)\b/i],
   ["perinatal", /\b(perinatal|postpartum|pregnan\w*|new (?:moms?|mothers?|parents?)|maternal|fertility)\b/i],
 ];
+
+// OB/GYN subspecialties that don't care for pregnancy (NUCC 207V*): no new or expecting parents there.
+const GYN_ONLY = new Set(["207VF0040X", "207VG0400X", "207VC0200X", "207VH0002X", "207VB0002X", "207VC0300X"]);
+// General OB/GYN, obstetrics and the women's health NP: where most new and expecting parents are seen.
+const GENERAL_OB = new Set(["207V00000X", "207VX0000X", "363LX0001X"]);
+/** Starts the reason for a general OB/GYN on a perinatal practice's card (focusRank reads it). */
+export const GENERAL_OB_REASON = "general obstetrics sees most new and expecting parents";
+
+function seesFor(specialty: SpecialtyId, taxonomy: string | null): Focus[] | "all" {
+  if (specialty === "ob_gyn" && taxonomy && GYN_ONLY.has(taxonomy)) return ["adults", "older_adults"];
+  return SEES[specialty];
+}
+
+/**
+ * How closely a card's people match who she helps, for ordering inside a tier
+ * (no points: the research has none for this). 0: a general OB/GYN for a
+ * perinatal practice; 1: matches her focus; 2: sees all ages; 3: no focus known; 4: not who she helps.
+ */
+export function focusRank(r: Pick<TierResult, "reasons">): number {
+  if (r.reasons.some((x) => x.startsWith(GENERAL_OB_REASON))) return 0;
+  if (r.reasons.some((x) => x.startsWith("matches your"))) return 1;
+  if (r.reasons.some((x) => x.startsWith("sees all ages"))) return 2;
+  if (r.reasons.some((x) => x.startsWith("mostly sees"))) return 4;
+  return 3;
+}
 
 /** Her "Who you help" answer (chips and her own words) to the groups we can match. */
 export function focusFrom(text: string | null | undefined): Focus[] {
@@ -188,10 +214,13 @@ export function tierFor(p: TierInput, ctx: TierContext): TierResult {
   // Who she helps: a reason, or "Later" when they only see people she doesn't.
   let mismatch = false;
   if (ctx.focus.length > 0 && specialty) {
-    const sees = SEES[specialty];
+    const sees = seesFor(specialty, p.taxonomy);
     const shared = sees === "all" ? [] : ctx.focus.filter((f) => sees.includes(f));
     if (sees === "all") reasons.push("sees all ages, so your clients too");
-    else if (shared.length > 0) reasons.push(`matches your ${shared.map((f) => FOCUS_WORDS[f]).join(" and ")} focus`);
+    else if (shared.length > 0) {
+      reasons.push(`matches your ${shared.map((f) => FOCUS_WORDS[f]).join(" and ")} focus`);
+      if (shared.includes("perinatal") && p.taxonomy && GENERAL_OB.has(p.taxonomy)) reasons.push(GENERAL_OB_REASON);
+    }
     else {
       mismatch = true;
       reasons.push(`mostly sees ${sees.map((f) => FOCUS_WORDS[f]).join(" and ")}, not who you help`);

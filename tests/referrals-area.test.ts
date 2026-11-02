@@ -174,7 +174,7 @@ describe("tiers (plain code, with reasons)", () => {
   it("puts a pediatrician Later for an adults-only practice, and says why", () => {
     const r = tierFor(ped, { ...ctx, focus: ["adults"] });
     expect(r.tier).toBe("later");
-    expect(r.reasons).toContain("mostly sees children and teens and families, not who you help");
+    expect(r.reasons).toContain("mostly sees children and teens and families and new and expecting parents, not who you help");
   });
 
   it("weighs distance, a named contact at a group, contact details, record age and state", () => {

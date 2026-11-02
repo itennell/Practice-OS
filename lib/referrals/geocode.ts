@@ -7,6 +7,8 @@
 // Only provider addresses from NPPES and the place she typed are sent. Never
 // anything about a client. Answers are kept in memory so each address is asked once.
 
+import { splitState, stateCode, stateName } from "./states";
+
 export type Point = [lat: number, lon: number];
 
 const CENSUS_BATCH = "https://geocoding.geo.census.gov/geocoder/locations/addressbatch";
@@ -111,9 +113,10 @@ export async function geocodeAddresses(
   return out;
 }
 
-const places = new Map<string, { point: Point; label: string } | null>();
+const places = new Map<string, { point: Point; label: string; state: string | null } | null>();
 
-type Get = (url: string) => Promise<{ lat: string; lon: string; display_name: string }[]>;
+type NominatimHit = { lat: string; lon: string; display_name: string; category?: string; type?: string; address?: { state?: string } };
+type Get = (url: string) => Promise<NominatimHit[]>;
 
 // Nominatim allows one question a second from the whole app: each call waits
 // for the one before it, then 1.1 seconds, so two searches at once still queue.
@@ -139,15 +142,33 @@ const nominatimGet: Get = (url) =>
     return res.json();
   });
 
-/** A typed city or neighborhood, in her state, to its center. Null when OpenStreetMap doesn't know it. */
-export async function geocodePlace(place: string, state: string, get: Get = nominatimGet): Promise<{ point: Point; label: string } | null> {
-  const q = `${place.trim()}, ${state}`;
+/**
+ * A typed city or neighborhood to its center. A state she typed ("Naperville IL")
+ * wins over hers; a town, city or neighborhood wins over a road or a building
+ * with the same name ("Illinois Route 59"). Null when OpenStreetMap doesn't know it.
+ */
+export async function geocodePlace(
+  place: string,
+  state: string,
+  get: Get = nominatimGet,
+): Promise<{ point: Point; label: string; state: string | null } | null> {
+  const typed = splitState(place);
+  const where = stateName(typed.state ?? stateCode(state) ?? state);
+  const q = `${typed.place}, ${where}`;
   const key = q.toLowerCase();
   const known = recall(places, key);
   if (known !== undefined) return known;
-  const url = `${NOMINATIM}?${new URLSearchParams({ q, countrycodes: "us", format: "jsonv2", limit: "1" })}`;
-  const [hit] = await get(url);
-  const found = hit ? { point: [Number(hit.lat), Number(hit.lon)] as Point, label: hit.display_name.split(",").slice(0, 2).join(",").trim() } : null;
+  const url = `${NOMINATIM}?${new URLSearchParams({ q, countrycodes: "us", format: "jsonv2", addressdetails: "1", limit: "5" })}`;
+  const hits = await get(url);
+  // A place (city, town, neighborhood) or an administrative boundary; never a road, shop or building.
+  const hit = hits.find((h) => h.category === "place" || h.category === "boundary") ?? hits.find((h) => !h.category) ?? null;
+  const found = hit
+    ? {
+        point: [Number(hit.lat), Number(hit.lon)] as Point,
+        label: hit.display_name.split(",").slice(0, 2).join(",").trim(),
+        state: stateCode(hit.address?.state) ?? typed.state,
+      }
+    : null;
   remember(places, key, found, PLACES_MAX);
   return found;
 }
