@@ -82,6 +82,8 @@ export type PayerApplication = {
   reference: string | null;
   notes: string | null;
   is_sample: boolean;
+  /** When the row was made (the table's created_at; the Files page sorts by it). */
+  created_at?: Date;
 };
 
 const asDate = (v: unknown): ISODate | null => (v instanceof Date ? v.toISOString().slice(0, 10) : ((v as string | null) ?? null));

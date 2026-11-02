@@ -7,7 +7,7 @@
 // left; phones open the same menu as a panel that slides in from the left.
 
 import { Dialog } from "@base-ui/react/dialog";
-import { Brain, Camera, ClipboardList, Inbox, Menu, Phone, Plus, Search, Settings, Users, X, type LucideIcon } from "lucide-react";
+import { Brain, Camera, ClipboardList, FolderOpen, Inbox, Menu, Phone, Plus, Search, Settings, Users, X, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
@@ -28,6 +28,7 @@ type PracticeLink = { href: string; label: string; icon: LucideIcon; count?: key
 
 const PRACTICE: PracticeLink[] = [
   { href: "/admin", label: "Admin", icon: ClipboardList, count: "admin", countWord: "need you" },
+  { href: "/files", label: "Files", icon: FolderOpen },
   { href: "/approvals", label: "Approvals", icon: Inbox, count: "approvals", countWord: "waiting" },
   { href: "/referrals", label: "Referrals", icon: Users },
   { href: "/media", label: "Media", icon: Camera },

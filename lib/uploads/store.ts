@@ -95,5 +95,5 @@ export async function setApproval(id: string, approvalId: string, sql: postgres.
 /** The kept file's bytes, or null when it is missing on this computer (the Vercel copy has none). */
 export async function readStoredFile(doc: Pick<StoredDocument, "stored_as">): Promise<Buffer | null> {
   if (!/^documents\/[0-9a-f-]{36}\.(pdf|docx|txt)$/.test(doc.stored_as)) return null;
-  return readFile(path.join(dataDir(), doc.stored_as)).catch(() => null);
+  return readFile(/*turbopackIgnore: true*/ path.join(/*turbopackIgnore: true*/ dataDir(), doc.stored_as)).catch(() => null);
 }
