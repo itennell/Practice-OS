@@ -81,7 +81,9 @@ function refusePaused(kind: string): void {
 
 export type ApproveResult =
   | { ok: true; approval: ApprovalView }
-  | { ok: false; reason: "not_pending" | "not_found" | "not_editable" | "bad_edit"; approval?: ApprovalView };
+  | { ok: false; reason: "not_pending" | "not_found" | "not_editable" | "bad_edit"; approval?: ApprovalView }
+  /** An Instagram post whose words her saved details now contradict: it can't be approved until it is regenerated or changed. */
+  | { ok: false; reason: "facts_changed"; why: string; approval?: ApprovalView };
 
 async function getRow(id: string) {
   const [row] = await db()<ApprovalRow[]>`select * from practice_os.approvals where id = ${id}`;
@@ -95,6 +97,14 @@ async function getRow(id: string) {
 export async function approve(id: string, opts: { by: string; edit?: string; auto?: boolean }): Promise<ApproveResult> {
   const before = await getRow(id);
   if (!before || pausedKind(before.kind)) return { ok: false, reason: "not_found" };
+  if (before.kind === "instagram_post" && before.status === "pending") {
+    const postId = (before.payload as { post_id?: unknown }).post_id;
+    if (typeof postId === "string") {
+      const { postFactsChanged, FACTS_CHANGED } = await import("./studio/stale");
+      const problems = await postFactsChanged(postId);
+      if (problems.length) return { ok: false, reason: "facts_changed", why: `${FACTS_CHANGED}. ${problems.join(" ")} Regenerate it on the Instagram page, or change it, then approve.`, approval: toView(before) };
+    }
+  }
 
   let editedPayload: Record<string, unknown> | null = null;
   if (opts.edit !== undefined) {

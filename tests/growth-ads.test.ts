@@ -191,10 +191,26 @@ describe("fee wording in ads (her real session fees, sample-labelled)", () => {
   it("puts both prices in a Google headline and the Meta fee ad", () => {
     const g = draftGoogleAds(real, S);
     expect(g.check.ok).toBe(true);
-    expect(g.ad.headlines).toContain("Private Pay $150 / $175");
+    // Dana is in network with BCBSIL, so "Private Pay $150 / $175" (private pay only) is never offered.
+    expect(g.ad.headlines).toContain("Sessions $150 / $175");
+    expect(g.ad.headlines.some((h) => /^Private Pay \$/.test(h))).toBe(false);
     expect(g.ad.descriptions.join(" ")).toContain("$150 (45 min) / $175 (53+ min)");
     const m = draftMetaAds(real, S);
-    expect(m.ads.map((a) => a.primaryText).join(" ")).toContain("Private-pay sessions are $150 (45 min) / $175 (53+ min).");
+    expect(m.check.ok).toBe(true);
+    expect(m.ads.map((a) => a.primaryText).join(" ")).toContain("Private pay or Blue Cross Blue Shield of Illinois. Sessions are $150 (45 min) / $175 (53+ min).");
+    // Out of network everywhere, "Private Pay $150 / $175" is true and kept.
+    const out = { ...real, inNetwork: [], insurers: [] };
+    expect(draftGoogleAds(out, S).ad.headlines).toContain("Private Pay $150 / $175");
+    expect(draftMetaAds(out, S).ads.map((a) => a.primaryText).join(" ")).toContain("Private-pay sessions are $150 (45 min) / $175 (53+ min).");
+  });
+
+  it("the ad check runs the shared fact check: 'Private pay only' while in network is blocked", () => {
+    const blocked = (t: string) => checkText(t, "headline", null, real).some((x) => x.rule === "wrong_fact" && x.severity === "block");
+    expect(blocked("Private pay only")).toBe(true);
+    expect(blocked("Private pay only, Aetna included.")).toBe(true);
+    expect(blocked("Private pay or Blue Cross Blue Shield of Illinois.")).toBe(false);
+    expect(blocked("Book a free discovery call.")).toBe(false); // Dana offers a free 15-minute consult
+    expect(blocked("Superbills every session.")).toBe(true);
   });
 
   it("never exports a [Sample] fee without the label", () => {

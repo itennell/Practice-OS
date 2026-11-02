@@ -148,12 +148,16 @@ export const NEGATIVE_KEYWORDS = [
   "ceu", "internship", "how to become", "psychiatrist", "medication", "rehab", "detox", "hotline", "crisis line", "reddit",
 ];
 
-/** Fee headlines (30 characters at most) naming every session price: "Private Pay $150 / $175". */
+/**
+ * Fee headlines (30 characters at most) naming every session price: "Sessions $150 / $175".
+ * "Private Pay $150" only when no plan approved her; in network it is "Private Pay or Aetna".
+ */
 function feeHeadlines(f: MediaFacts): string[] {
   const fees = sessionFees(f);
   if (!fees.length) return [];
   const amounts = fees.map((x) => usd(x.cents)).join(" / ");
-  return [`${sampleMark(f)}Private Pay ${amounts}${fees.length === 1 ? " a Session" : ""}`, `${sampleMark(f)}Sessions ${amounts}`];
+  const pay = f.inNetwork.length ? `${sampleMark(f)}Private Pay or ${f.inNetwork[0]}` : `${sampleMark(f)}Private Pay ${amounts}${fees.length === 1 ? " a Session" : ""}`;
+  return [pay, `${sampleMark(f)}Sessions ${amounts}`];
 }
 
 export function googleHeadlines(f: MediaFacts): string[] {
@@ -188,7 +192,7 @@ export function googleDescriptions(f: MediaFacts): string[] {
     fee ? `Sessions are ${fee}. Ask for a superbill to send to your insurance.` : null,
     fee ? `Sessions are ${fee}. Superbills on request.` : null,
     f.telehealth ? `In person in ${where} and by video anywhere in ${stateName(f)}. Book online.` : `In person in ${where}. Book a consult online.`,
-    f.inNetwork.length ? `In network with ${f.inNetwork.join(" and ")}. Private pay welcome.` : null,
+    f.inNetwork.length ? `Private pay or ${f.inNetwork.join(" or ")}: in network with ${f.inNetwork.join(" and ")}.` : null,
   ].filter((d): d is string => Boolean(d));
   return uniq(candidates).filter((d) => !checkText(d, "description", LIMITS.googleDescription, f).some((x) => x.severity === "block")).slice(0, LIMITS.googleDescriptionsMax);
 }
@@ -342,7 +346,7 @@ export function metaAds(f: MediaFacts, s: GrowthSettings): MetaAd[] {
   const second: MetaAd | null = fee
     ? {
         name: "Fees",
-        primaryText: `Private-pay sessions are ${fee}. ${f.name}, ${f.credential}, gives superbills you can send to your insurance for out-of-network claims.`,
+        primaryText: `${f.inNetwork.length ? `Private pay or ${f.inNetwork.join(" or ")}. Sessions are` : "Private-pay sessions are"} ${fee}. ${f.name}, ${f.credential}, gives superbills you can send to your insurance for out-of-network claims.`,
         headline: `Therapy in ${where}`,
         description: "Fees and how to book",
         cta: "LEARN_MORE",

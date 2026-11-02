@@ -254,7 +254,7 @@ export function Studio({ profile, initial }: { profile: StudioProfile; initial: 
   const act: CanvasActions = useMemo(() => ({ apply, undo: () => move("undo"), redo: () => move("redo"), goTo: (seq) => move("step", { seq }), refresh }), [apply, move, refresh]);
 
   /** Something new: the answer streams one event per line, and the canvas fills in. */
-  async function make(text: string) {
+  async function make(text: string, regenerate?: string) {
     // The canvas clears for the new one; if nothing new is made (a redirect, a stop), the old one comes back.
     const before = project;
     let made = false;
@@ -271,7 +271,7 @@ export function Studio({ profile, initial }: { profile: StudioProfile; initial: 
         return list;
       });
     try {
-      const res = await fetch("/api/studio", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ request: text }) });
+      const res = await fetch("/api/studio", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ request: text, ...(regenerate ? { regenerate } : {}) }) });
       if (!res.ok || !res.body) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
         say({ who: "aeon", text: data.error ?? "Aeon couldn't start that. Try again.", tone: "problem" });
@@ -308,6 +308,19 @@ export function Studio({ profile, initial }: { profile: StudioProfile; initial: 
       if (!made) setProject(before);
       setSteps(null);
       setWords(null);
+    }
+  }
+
+  /** Regenerate on a "Facts changed" flag: the server makes it again from her current facts and retires the old post. */
+  async function regenerate(p: Project) {
+    if (busy) return;
+    const text = regenerateRequest(p.doc);
+    say({ who: "me", text });
+    setBusy(true);
+    try {
+      await make(text, p.id);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -362,9 +375,13 @@ export function Studio({ profile, initial }: { profile: StudioProfile; initial: 
       </section>
 
       <div className="min-w-0">
-        {project && project.doc.kind !== "video" && (project.factsChanged?.length ?? 0) > 0 && (
+        {project && (project.factsChanged?.length ?? 0) > 0 && (
           <div className="mb-4">
-            <FactsChanged problems={project.factsChanged} busy={busy} onRegenerate={() => void send(regenerateRequest(project.doc))} />
+            <FactsChanged
+              problems={project.factsChanged}
+              busy={busy}
+              onRegenerate={project.doc.kind === "video" ? undefined : () => void regenerate(project)}
+            />
           </div>
         )}
         {project ? (

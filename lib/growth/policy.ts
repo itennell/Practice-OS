@@ -21,6 +21,7 @@
 // - Ethics codes: no testimonials, no guaranteed outcomes, no rankings
 //   (docs/research.md > Growth agent, section 6). Never "HIPAA compliant".
 import { lintText, type Finding } from "../media/lint";
+import { factProblems, truthOf } from "../media/truth";
 import type { MediaFacts } from "../media/facts";
 
 /** The smallest monthly cap Aeon drafts for. */
@@ -50,7 +51,8 @@ export type PolicyRule =
   | "certification_keyword"
   | "audience_targeting"
   | "no_budget_cap"
-  | "lint";
+  | "lint"
+  | "wrong_fact";
 
 export type PolicyFinding = { rule: PolicyRule; severity: "block" | "warn"; where: string; message: string };
 export type PolicyCheck = { ok: boolean; findings: PolicyFinding[]; checkedAt: string };
@@ -121,6 +123,12 @@ export function checkText(text: string, where: string, limit: number | null, f: 
   if (f) {
     for (const x of lintText(text, f) as Finding[]) {
       if (x.severity === "block" && LINT_RULES.has(x.rule)) out.push({ rule: "lint", severity: "block", where, message: x.message });
+    }
+    // The one fee, insurer and claim check, the same as posts and profiles: "Private pay only"
+    // while a plan approved her, a superbill schedule, a free consult she doesn't offer.
+    for (const p of factProblems(text, truthOf(f))) {
+      const message = `It ${p.message}.`;
+      if (!out.some((x) => x.message === message)) out.push({ rule: "wrong_fact", severity: "block", where, message });
     }
   }
   return out;

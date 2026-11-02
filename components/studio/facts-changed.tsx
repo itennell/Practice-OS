@@ -9,7 +9,8 @@ import { Button } from "../ui";
 
 export const FACTS_CHANGED = "Facts changed: needs update";
 
-export function FactsChanged({ problems, onRegenerate, busy = false }: { problems: string[]; onRegenerate: () => void; busy?: boolean }) {
+/** onRegenerate missing (a video from her own footage): the flag shows, with no Regenerate. */
+export function FactsChanged({ problems, onRegenerate, busy = false }: { problems: string[]; onRegenerate?: () => void; busy?: boolean }) {
   if (!problems.length) return null;
   return (
     <div
@@ -25,9 +26,11 @@ export function FactsChanged({ problems, onRegenerate, busy = false }: { problem
           <li key={p}>{p}</li>
         ))}
       </ul>
-      <Button variant="quiet" className="w-full sm:w-fit" disabled={busy} onClick={onRegenerate}>
-        <RefreshCw size={16} aria-hidden /> Regenerate
-      </Button>
+      {onRegenerate && (
+        <Button variant="quiet" className="w-full sm:w-fit" disabled={busy} onClick={onRegenerate}>
+          <RefreshCw size={16} aria-hidden /> Regenerate
+        </Button>
+      )}
     </div>
   );
 }

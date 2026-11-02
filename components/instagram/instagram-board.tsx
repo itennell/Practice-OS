@@ -165,11 +165,6 @@ function Retry({ post, onDone, draft = false }: { post: PostView; onDone: () => 
   );
 }
 
-/** Regenerate on a "Facts changed" flag: the same topic, written again from her current facts. */
-export function regeneratePostRequest(post: Pick<PostView, "headline" | "pillar">): { request: string; pillar: PostView["pillar"] | null } {
-  const about = post.headline?.replace(/^\[Sample\]\s*/i, "").trim() || PILLAR_LABEL[post.pillar];
-  return { request: `A new post about ${about}`.slice(0, 600), pillar: post.pillar === "other" ? null : post.pillar };
-}
 
 function PostCard({
   post,
@@ -367,6 +362,24 @@ export function InstagramBoard({ initialPosts, profile }: { initialPosts: PostVi
     }
   }
 
+  /** Regenerate on a "Facts changed" flag: written again from her current facts; the old post and its approval are retired. */
+  async function regenerate(postId: string) {
+    setMessage(null);
+    setOffer(null);
+    setWorking("write");
+    try {
+      const res = await fetch(`/api/instagram/posts/${postId}/regenerate`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) setMessage({ tone: "problem", text: data.error ?? "Something went wrong. Try again." });
+      else setMessage(say("write", data).message);
+    } catch {
+      setMessage({ tone: "problem", text: "Couldn't reach Practice-OS. Check that the app is running, then try again." });
+    } finally {
+      setWorking(null);
+      refresh();
+    }
+  }
+
   async function run(kind: "write" | "plan", request = ask, pillar: string | null = null, pick?: { id: string; angle: number }) {
     setMessage(null);
     setOffer(null);
@@ -519,10 +532,7 @@ export function InstagramBoard({ initialPosts, profile }: { initialPosts: PostVi
                 profile={profile}
                 onChange={refresh}
                 busy={working !== null}
-                onRegenerate={(old) => {
-                  const r = regeneratePostRequest(old);
-                  void run("write", r.request, r.pillar);
-                }}
+                onRegenerate={(old) => void regenerate(old.id)}
               />
             ))}
           </ul>

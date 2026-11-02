@@ -5,10 +5,10 @@
 // topic gate, facts lint, critic) and nothing is posted: she approves, downloads
 // and posts it herself.
 import { z } from "zod";
-import { db } from "../db";
-import { looksLikeNewTopic, revisePost } from "../instagram/revise";
+import { looksLikeNewTopic, revisePost, waitingPost } from "../instagram/revise";
 import { requestPost } from "../instagram/store";
 import { makeProject, type MakeEvent } from "../studio/store";
+import { CAP_REACHED, madeToday, STUDIO_DAILY_CAP } from "../studio/regenerate";
 import type { AeonTool, ToolContext, ToolResult } from "./tools";
 
 const text = (value: unknown): ToolResult => ({ content: [{ type: "text", text: JSON.stringify(value, null, 2) }] });
@@ -16,14 +16,8 @@ const text = (value: unknown): ToolResult => ({ content: [{ type: "text", text: 
 /** Where the studio lives; it opens on her newest project, the one just made. */
 export const STUDIO_PAGE = "/media/instagram";
 
-/** Each studio make spends web research and a picture: at most this many a day from chat or MCP. */
-export const STUDIO_DAILY_CAP = 8;
-export const CAP_REACHED = `I've made ${STUDIO_DAILY_CAP} studio posts today, which is the daily limit. You can change the ones you have, or ask again tomorrow.`;
-
-async function madeToday(): Promise<number> {
-  const [row] = await db()<{ n: number }[]>`select count(*)::int as n from practice_os.studio_projects where created_at >= date_trunc('day', now())`;
-  return row?.n ?? 0;
-}
+// Each studio make spends web research and a picture: one daily cap, shared with Regenerate.
+export { CAP_REACHED, STUDIO_DAILY_CAP } from "../studio/regenerate";
 
 function tool<I extends z.ZodRawShape>(
   def: Omit<AeonTool, "run" | "input"> & { input: I; run: (input: z.infer<z.ZodObject<I>>, ctx: ToolContext) => Promise<ToolResult> },
@@ -94,9 +88,9 @@ export const MEDIA_TOOLS: AeonTool[] = [
     changesData: true,
     run: async ({ change, post_id }, ctx) => {
       // "Drop-in hours on Fridays" sent here is a new post, never questions about the old one.
-      if (!post_id && looksLikeNewTopic(change)) {
+      if (!post_id && looksLikeNewTopic(change, await waitingPost())) {
         const n = await requestPost(ctx.by, change, null, { chat: ctx.chat });
-        if (n.outcome === "blocked" || n.outcome === "declined") return text({ written: false, why: n.why });
+        if (n.outcome === "blocked" || n.outcome === "declined") return text({ written: false, refused: true, why: n.why });
         if (n.outcome === "off_topic") return text({ written: false, why: n.why, offer_instead: n.angle.label });
         return text({ new_post: true, written: n.outcome !== "blocked_after_rewrite", headline: n.headline, approval_id: n.post.approvalId, why: n.why, see: "/media/instagram" });
       }

@@ -42,10 +42,45 @@ export function looksLikeEdit(request: string): boolean {
  * Her words name a new topic, not a change: no edit verb, nothing pointing at the post, and
  * not a question ("Drop-in hours on Fridays"). Sent to the edit tool by mistake, it is drafted as a new post.
  */
-export function looksLikeNewTopic(request: string): boolean {
+/** She asked for a new one in so many words: "a new post about…", "another reel", "a post about parking". */
+const EXPLICIT_NEW = /\b(?:new|another|second|different|separate) (?:post|reel|carousel)\b|\b(?:post|reel|carousel) (?:about|on)\b/i;
+
+/**
+ * Words that change what's there: "fewer words", "use Wednesday", "Wednesday instead",
+ * "the fee is $175, not $150", "shorter". With a post waiting, these are always edits.
+ */
+const EDIT_SIGNAL =
+  /\b(?:instead|rather than|fewer|more|less|shorter|longer|warmer|friendlier|simpler|plainer|use|should be|too|again|undo|swap|switch|replace)\b|, not\b|\$\s?\d|\b(?:the|my) (?:fee|price|day|time|date|hours?|headline|caption|title|wording|words|tone|picture|photo|image) (?:is|are|was|should)\b/i;
+
+export function looksLikeEditSignal(request: string): boolean {
   const t = request.trim();
-  if (!t || t.length > 160 || /\?\s*$/.test(t)) return false;
-  return !EDIT_VERB.test(t) && !POST_REF.test(t) && !/^(?:shorter|longer|warmer|friendlier|simpler|more|less|too|again|undo|no|yes|ok(?:ay)?)\b/i.test(t);
+  return (EDIT_VERB.test(t) && POST_REF.test(t)) || (!EXPLICIT_NEW.test(t) && EDIT_SIGNAL.test(t));
+}
+
+const STOP = new Set(["about", "after", "before", "with", "from", "that", "this", "your", "have", "will", "what", "when", "where", "which", "they", "them", "there", "here", "into", "just", "only", "also", "than", "then", "some", "make", "post", "posts"]);
+const words = (s: string) => new Set((s.toLowerCase().match(/[a-z][a-z'-]{3,}/g) ?? []).map((w) => w.replace(/(?:'s|s)$/, "")).filter((w) => !STOP.has(w)));
+
+/**
+ * With a post waiting for her, her words are an EDIT by default. A new post only when she
+ * says so ("a new post about…") or names a clearly different topic: no edit words, not a
+ * question, and no topic word shared with the waiting post ("Drop-in hours on Fridays"
+ * while a booking post waits). With nothing to compare to, it stays an edit.
+ */
+export function looksLikeNewTopic(request: string, waiting?: { headline: string | null; caption: string } | null): boolean {
+  const t = request.trim();
+  if (!t || t.length > 160) return false;
+  if (EXPLICIT_NEW.test(t) && !POST_REF.test(t.replace(EXPLICIT_NEW, ""))) return true;
+  if (/\?\s*$/.test(t) || EDIT_VERB.test(t) || POST_REF.test(t) || EDIT_SIGNAL.test(t) || !waiting) return false;
+  const mine = words(t);
+  if (!mine.size) return false;
+  const theirs = words(`${waiting.headline ?? ""} ${waiting.caption}`);
+  return ![...mine].some((w) => theirs.has(w));
+}
+
+/** Her newest post waiting for approval (or the one she named): what an edit would change. */
+export async function waitingPost(postId?: string): Promise<{ id: string; headline: string | null; caption: string } | null> {
+  const t = await target(postId);
+  return t ? { id: t.id, headline: t.headline, caption: t.caption } : null;
 }
 
 type Target = { id: string; topic: PillarId | "other"; headline: string | null; caption: string; alt_text: string | null; approval_id: string; project_id: string | null };

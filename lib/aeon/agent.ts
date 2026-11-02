@@ -132,7 +132,7 @@ export function outcomeOf(result: ToolResult): Outcome {
   if (!failed) return { state: "ok" };
   // Her reply never shows raw JSON: a JSON result with no message of its own gets a plain line.
   const why =
-    typeof p?.error === "string" ? p.error : typeof p?.reason === "string" ? p.reason : typeof p?.why === "string" ? p.why : p !== null ? "it didn't go through" : text;
+    typeof p?.error === "string" ? p.error : typeof p?.reason === "string" ? p.reason : typeof p?.why === "string" ? p.why : p !== null ? "It didn't go through." : text;
   const reason = why.replace(/^Error:\s*/i, "").replace(/\s+/g, " ").trim() || "it returned an error";
   return { state: "failed", why: reason.length > 220 ? `${reason.slice(0, 217)}...` : reason };
 }
@@ -150,8 +150,11 @@ export function refusalOf(result: ToolResult): string | null {
     return null;
   }
   if (!p || typeof p !== "object" || typeof p.why !== "string" || !(p.refused === true || "offer_instead" in p)) return null;
-  const offer = Array.isArray(p.offer_instead) ? p.offer_instead.filter((x) => typeof x === "string") : typeof p.offer_instead === "string" ? [p.offer_instead] : [];
-  const why = p.why.replace(/\s+/g, " ").trim();
+  // The guard's markers ("[name withheld]") are for the model, never for her reply.
+  const clean = (s: string) => s.replace(GUARD_MARKER, "").replace(/\s+([,.;:!?])/g, "$1").replace(/\s+/g, " ").trim();
+  const offer = (Array.isArray(p.offer_instead) ? p.offer_instead : [p.offer_instead]).filter((x): x is string => typeof x === "string").map(clean).filter(Boolean);
+  const why = clean(p.why);
+  if (!why) return null;
   return offer.length ? `${why} I can write one about ${offer.map((o) => o.toLowerCase()).join(" or ")} instead.` : why;
 }
 
@@ -183,6 +186,8 @@ const POINTS_TO_CARDS = /\bcards? (are |is )?(below|under)\b/i;
 export type Attempt = { tool: string; failure: string | null; writes?: boolean; waiting?: string; cards?: number; refusal?: string };
 
 const owns = (text: string) => text.split(/(?<=[.!?])\s+/).some((sentence) => OWNS_FAILURE.test(sentence));
+/** What lib/aeon/guard.ts puts in place of a name or a withheld result. */
+const GUARD_MARKER = /\[(?:name withheld|withheld[^\]]*)\]/gi;
 /** A reply that pasted a tool's JSON instead of saying it in words. */
 const RAW_JSON = /[{[]\s*"[a-z_]+"\s*:/i;
 
@@ -200,14 +205,23 @@ export function honestReply(text: string, attempts: Attempt[]): string {
   const okWrites = attempts.filter((a) => a.writes && !a.failure && !a.waiting);
   const waiting = attempts.find((a) => a.waiting);
   let out = text;
-  // A refusal is said as the plain sentence the tool gave, never as "that didn't work" or its JSON.
-  const refusal = failedWrites.find((a) => a.refusal)?.refusal;
-  if (refusal && failedWrites.every((a) => a.refusal) && !okWrites.length && !waiting)
-    return RAW_JSON.test(out) || !/\b(?:can'?t|cannot|won'?t|never)\b/i.test(out) ? refusal : out;
-  if (failedWrites.length && !owns(out)) {
-    if (!okWrites.length && !waiting) return `That didn't work, so nothing changed. ${failedWrites[0].failure}`;
-    out = `${out}\n\nOne change didn't work: ${failedWrites[0].failure}`;
+  // The fixed crisis reply is said exactly as written, never with anything in front of it.
+  // (A failure line is shortened to 220 characters, so match the reply's opening.)
+  const crisis = (s: string | null | undefined) => Boolean(s && s.includes(CRISIS_REPLY.slice(0, 60)));
+  if (failedWrites.some((a) => crisis(a.failure) || crisis(a.refusal))) return CRISIS_REPLY;
+  // A refusal is said as the plain sentence the tool gave (and what it can do instead),
+  // never as "that didn't work" or its JSON, alone or beside other outcomes.
+  const refusals = failedWrites.filter((a) => a.refusal);
+  const failures = failedWrites.filter((a) => !a.refusal);
+  const refusal = refusals[0]?.refusal;
+  const saysNo = !RAW_JSON.test(out) && /\b(?:can'?t|cannot|won'?t|never)\b/i.test(out);
+  if (refusal && !failures.length && !okWrites.length && !waiting) return saysNo ? out : refusal;
+  if (refusal && RAW_JSON.test(out)) out = "";
+  if (failures.length && !owns(out)) {
+    if (!okWrites.length && !waiting && !refusal) return `That didn't work, so nothing changed. ${failures[0].failure}`;
+    out = `${out}\n\nOne change didn't work: ${failures[0].failure}`.trim();
   }
+  if (refusal && !saysNo) out = `${out}\n\n${refusal}`.trim();
   if (waiting && !SAYS_WAITING.test(out)) {
     if (!okWrites.length && !failedWrites.length) return `That's waiting for your OK in ${waiting.waiting}; nothing has changed yet.`;
     out = `${out}\n\nOne change is waiting for your OK in ${waiting.waiting}.`;

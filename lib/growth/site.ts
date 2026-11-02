@@ -148,7 +148,7 @@ export function draftSite(f: MediaFacts, s: GrowthSettings, savedLicenseLine: st
       id: "fees",
       title: "Fees and insurance",
       paragraphs: [
-        ...(fee ? [`Private-pay sessions are ${fee}.`] : []),
+        ...(fee ? [`${f.inNetwork.length ? "Sessions" : "Private-pay sessions"} are ${fee}.`] : []),
         ...f.fees
           .filter((x) => /\b(intake|first session)\b/i.test(x.label))
           .map((x) => `${sampleMark(f)}${x.label.replace(/\[sample\]\s*/gi, "").replace(/^\d{5}\s+/, "").replace(/\s*\(.*\)$/, "").trim()}: ${usd(x.cents)}.`),
@@ -178,7 +178,7 @@ export function draftSite(f: MediaFacts, s: GrowthSettings, savedLicenseLine: st
   ];
   const faq = [
     { q: "How do I start?", a: c ? `Book a free ${c}-minute consult call. If it's a fit, we set up a first session.` : "Book a consult call. If it's a fit, we set up a first session." },
-    ...(fee ? [{ q: "How much does it cost?", a: `Private-pay sessions are ${fee}. You'll get a Good Faith Estimate first.` }] : []),
+    ...(fee ? [{ q: "How much does it cost?", a: `${f.inNetwork.length ? "Sessions" : "Private-pay sessions"} are ${fee}. You'll get a Good Faith Estimate first.` }] : []),
     { q: "Do you take insurance?", a: f.inNetwork.length ? `I'm in network with ${f.inNetwork.join(" and ")}. For other plans I give superbills for out-of-network claims.` : "I give superbills you can send to your insurance for out-of-network claims." },
     ...(f.telehealth ? [{ q: "Can we meet by video?", a: `Yes, anywhere in ${stateName(f)}.` }] : []),
     { q: "Is this for emergencies?", a: "No. If you are in danger, call or text 988, or call 911." },

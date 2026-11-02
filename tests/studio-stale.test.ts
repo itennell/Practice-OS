@@ -3,7 +3,6 @@
 // contradict is flagged "Facts changed" (no data migration). Model calls are stubbed.
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { regeneratePostRequest } from "../components/instagram/instagram-board";
 import { regenerateRequest } from "../components/studio/studio";
 import { closeDb, db } from "../lib/db";
 import type { ChatFn } from "../lib/instagram/critic";
@@ -11,7 +10,7 @@ import type { SearchFn } from "../lib/instagram/research";
 import { listPosts, practiceFacts } from "../lib/instagram/store";
 import { truthOf } from "../lib/media/truth";
 import { SHORT_CAPTION, shortenCaption, wantsWholeShorter } from "../lib/studio/edit";
-import { factsChanged } from "../lib/studio/stale";
+import { COULDNT_CHECK, factsChanged } from "../lib/studio/stale";
 import { chatEdit, getProject, makeProject, type MakeEvent } from "../lib/studio/store";
 import { DANA } from "./media-fixtures";
 
@@ -60,12 +59,13 @@ describe("facts changed flag", () => {
   it("flags nothing for words that still agree, or when her facts can't be read", () => {
     expect(factsChanged([`A therapy session is $150.\n\n${LINE}`], truth)).toEqual([]);
     expect(factsChanged(["Private pay, no insurance"], null)).toEqual([]);
+    // Her facts failed to load: a "couldn't check" flag, never no flag.
+    expect(factsChanged(["Private pay, no insurance"], "error")).toEqual([COULDNT_CHECK]);
   });
 
   it("Regenerate asks for the same kind on the same topic", () => {
     expect(regenerateRequest({ kind: "carousel", topic: "fees and how superbills work", title: "Fees" })).toBe("Make a new carousel about fees and how superbills work");
     expect(regenerateRequest({ kind: "reel", topic: "Make a reel about how booking works", title: "" })).toBe("Make a new reel about how booking works");
-    expect(regeneratePostRequest({ headline: "[Sample] Private pay, no insurance", pillar: "fees_superbills" })).toEqual({ request: "A new post about Private pay, no insurance", pillar: "fees_superbills" });
   });
 });
 
@@ -138,5 +138,73 @@ describe.skipIf(!hasDb)("stored projects and posts", { timeout: 120_000 }, () =>
     await db()`update practice_os.posts set caption = ${"I send monthly superbills."} where id = ${p.postId}`;
     const post = (await listPosts()).find((x) => x.id === p.postId)!;
     expect(post.factsChanged.some((f) => /superbill/i.test(f))).toBe(true);
+  });
+});
+
+describe.skipIf(!hasDb)("review fixes: a flagged post can't be approved; Regenerate retires it and counts toward the cap", { timeout: 120_000 }, () => {
+  async function flaggedPost() {
+    const events: MakeEvent[] = [];
+    const p = await makeProject("test", "make a carousel about my fees and how superbills work", (e) => events.push(e), { chat: stub({ reply: "", ops: [] }), search, graphic });
+    expect(p, JSON.stringify(events.filter((e) => e.type === "stop"))).not.toBeNull();
+    await db()`update practice_os.posts set caption = ${"I send monthly superbills."} where id = ${p!.postId}`;
+    const [row] = await db()<{ approval_id: string }[]>`select approval_id from practice_os.posts where id = ${p!.postId}`;
+    return { postId: p!.postId!, approvalId: row.approval_id };
+  }
+
+  it("approving a flagged post is refused with the flag in plain words", async () => {
+    const { approve } = await import("../lib/approvals");
+    const { postId, approvalId } = await flaggedPost();
+    const r = await approve(approvalId, { by: "test" });
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.reason).toBe("facts_changed");
+    expect(r.ok === false && r.reason === "facts_changed" && r.why).toMatch(/^Facts changed: needs update\. It says when superbills go out; you give them on request\./);
+    const [a] = await db()<{ status: string }[]>`select status from practice_os.approvals where id = ${approvalId}`;
+    expect(a.status).toBe("pending");
+    const [p] = await db()<{ status: string }[]>`select status from practice_os.posts where id = ${postId}`;
+    expect(p.status).toBe("pending_approval");
+  });
+
+  it("Regenerate writes a new post told what to avoid, retires the old post and its approval, and counts toward the cap", async () => {
+    const { regeneratePost, madeToday, REPLACED } = await import("../lib/studio/regenerate");
+    const { postId, approvalId } = await flaggedPost();
+    const asked: string[] = [];
+    const base = stub({ reply: "", ops: [] });
+    const chat = (async (feature: string, params: { messages: { content: string }[] }) => {
+      if (feature === "instagram.write") asked.push(params.messages.at(-1)!.content);
+      return base(feature, params as never);
+    }) as unknown as ChatFn;
+    const before = await madeToday();
+    const r = await regeneratePost("test", postId, { chat, graphic });
+    expect(r.ok).toBe(true);
+    expect(asked.join("\n")).toContain("avoid: says when superbills go out; you give them on request");
+    expect(asked.join("\n")).not.toContain("I send monthly superbills");
+    const [old] = await db()<{ status: string; failed_reason: string }[]>`select status, failed_reason from practice_os.posts where id = ${postId}`;
+    expect(old).toEqual({ status: "failed", failed_reason: REPLACED });
+    const [a] = await db()<{ status: string }[]>`select status from practice_os.approvals where id = ${approvalId}`;
+    expect(a.status).toBe("rejected");
+    expect((await listPosts()).some((x) => x.id === postId)).toBe(false);
+    expect(await madeToday()).toBe(before + 1);
+  });
+
+  it("stops at the shared daily cap", async () => {
+    const { regeneratePost, madeToday, STUDIO_DAILY_CAP, CAP_REACHED } = await import("../lib/studio/regenerate");
+    const { postId } = await flaggedPost();
+    const doc = { kind: "post", topic: "cap", title: "", caption: "", slides: [], overlays: [], captions: { on: false, cues: [] } };
+    for (let n = await madeToday(); n < STUDIO_DAILY_CAP; n++) await db()`insert into practice_os.studio_projects (doc, base_doc) values (${db().json(doc as never)}, ${db().json(doc as never)})`;
+    expect(await regeneratePost("test", postId, { chat: stub({ reply: "", ops: [] }), graphic })).toEqual({ ok: false, status: 429, why: CAP_REACHED });
+  });
+
+  it("a plan she hasn't applied to (not_started, preparing) never reaches her facts", async () => {
+    const { loadMediaFacts } = await import("../lib/media/facts");
+    const ids = await db()<{ id: string }[]>`
+      insert into practice_os.payer_applications (payer, status, applied_on) values ('Cigna', 'not_started', null), ('Humana', 'preparing', null), ('Oscar', 'follow_up', '2026-10-01') returning id`;
+    try {
+      const f = await loadMediaFacts();
+      expect(f.insurers).not.toContain("Cigna");
+      expect(f.insurers).not.toContain("Humana");
+      expect(f.insurers).toContain("Oscar");
+    } finally {
+      await db()`delete from practice_os.payer_applications where id = any(${ids.map((x) => x.id)}::uuid[])`;
+    }
   });
 });

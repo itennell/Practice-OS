@@ -97,7 +97,7 @@ describe("#2 private_pay_plan: needs-your-numbers is not a failure", () => {
 
   it("a failure never shows raw JSON", () => {
     const o = outcomeOf(json({ saved: false, headline: "x", panels: [{ payer: "BCBSIL" }] }));
-    expect(o).toEqual({ state: "failed", why: "it didn't go through" });
+    expect(o).toEqual({ state: "failed", why: "It didn't go through." });
   });
 });
 
@@ -117,8 +117,9 @@ describe("#3 post ideas get the same fact check", () => {
 
 describe("#7 a new topic is a new post", () => {
   it("'Drop-in hours on Fridays' is a new topic; explicit edits stay edits", () => {
-    expect(looksLikeNewTopic("Drop-in hours on Fridays")).toBe(true);
-    expect(looksLikeNewTopic("Parking near the office")).toBe(true);
+    const waiting = { headline: "How booking works", caption: "Pick a time on my booking page. I see clients on Tuesdays." };
+    expect(looksLikeNewTopic("Drop-in hours on Fridays", waiting)).toBe(true);
+    expect(looksLikeNewTopic("Parking near the office", waiting)).toBe(true);
     for (const t of ["make it shorter", "change slide 2", "shorter", "warmer please", "what about Fridays?"]) expect(looksLikeNewTopic(t), t).toBe(false);
     expect(looksLikeEdit("make it shorter")).toBe(true);
   });

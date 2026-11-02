@@ -14,7 +14,7 @@ import type { MediaFacts } from "./facts";
 
 export type TruthFacts = {
   fees: { label: string; cents: number }[];
-  /** Plans she's in network with or applying to: the only ones copy may name. */
+  /** Plans she's in network with (approved) or applied to and waiting on (applied, pending, follow_up): the only ones copy may name. Never not_started or preparing. */
   insurers: string[];
   /** Plans that approved her: only these are "in network". */
   inNetwork: string[];
@@ -75,7 +75,7 @@ export function insuranceLine(t: Pick<TruthFacts, "inNetwork">): string {
 export function factSheet(t: TruthFacts): string[] {
   return [
     `- Prices (the only ones that exist): ${t.fees.length ? t.fees.map(feeText).join("; ") : "none listed: do not mention any price"}. Write a price inside a sentence ("A first session is $200."), never as "Label: $200" after a verb, never as a range.`,
-    `- Insurance: ${insuranceLine(t)} ${t.inNetwork.length ? "Never say she is private pay, out of network only, or doesn't take insurance." : "Never say she is in network or takes insurance."} Never say "most insurance" or "most plans"; name no other plan.${t.insurers.length > t.inNetwork.length ? ` Applying to ${list(t.insurers.filter((x) => !t.inNetwork.includes(x)))}: not in network yet.` : ""}`,
+    `- Insurance: ${insuranceLine(t)} ${t.inNetwork.length ? "Never say she is private pay, out of network only, or doesn't take insurance." : "Never say she is in network or takes insurance."} Never say "most insurance" or "most plans"; name no other plan.${t.insurers.length > t.inNetwork.length ? ` Applied to ${list(t.insurers.filter((x) => !t.inNetwork.includes(x)))} and waiting: not in network yet.` : ""} Never name a plan she is only preparing to apply to.`,
     "- Superbills: given on request. Never say how often (monthly, weekly, after each session) or that they are automatic.",
     `- Sliding scale or reduced fees: ${t.slidingScale ? "she offers a sliding scale" : "not offered: never mention one"}.`,
     `- Free consult: ${t.freeConsultMinutes ? `a free ${t.freeConsultMinutes}-minute call` : t.consultKnown ? "none: do not offer one" : "not set: say 'book a consult' without a length or price"}.`,
@@ -212,8 +212,8 @@ const NO_INSURANCE = [
   /\b(?:out[- ]of[- ]network only|only out[- ]of[- ]network)\b/i,
   /\bno insurance (?:is )?(?:accepted|taken)\b/i,
   /\binsurance (?:is )?not accepted\b/i,
-  /\b(?:i'?m|i am|we'?re|we are) (?:an? )?out[- ]of[- ]network(?! (?:for|with|on)\b)/i,
-  /\b(?:i'?m|i am|we'?re|we are) not in[- ]network\b(?! (?:with|for|on)\b)/i,
+  /\b(?:i'?m|i am|we'?re|we are) (?:an? )?out[- ]of[- ]network\b/i,
+  /\b(?:i'?m|i am|we'?re|we are) not in[- ]network\b/i,
 ];
 const TAKES_INSURANCE = [/\b(?:i'?m|i am|we'?re|we are) in[- ]network\b/i, /\b(?:i|we) (?:take|accept|bill) (?:\w+ )?insurance\b/i, /\binsurance (?:is )?accepted\b/i];
 /** Vague claims no fact can back, whatever her plans: always flagged. */
@@ -223,13 +223,20 @@ const MOST_INSURANCE = [
   /\bmost insurance\b/i,
 ];
 
-// When superbills go out. "A superbill lists the date and fee for each session" says what
-// one holds, not how often it comes, so "each session" counts only after a giving verb or "after".
+// When superbills go out. She gives them on request, so "a superbill each session" is a schedule
+// she never set. The one exemption is what a superbill holds: "a superbill lists (shows, has,
+// includes) ... each session".
+const PER_SESSION = /\bsuperbills?\b([^.!?\n]{0,60}?)\b(?:each|every|per|with every|after each|after every) (?:session|visit)\b/gi;
+const HOLDS = /\b(?:lists?|listing|shows?|showing|has|have|includes?|including)\b/i;
+function perSessionCadence(s: string): boolean {
+  for (const m of s.matchAll(PER_SESSION)) if (!HOLDS.test(m[1])) return true;
+  return false;
+}
+/** Says when superbills go out. */
+export const saysCadence = (s: string) => perSessionCadence(s) || CADENCE.some((p) => p.test(s));
 const GIVE = String.raw`(?:sent|send|sends|given|give|gives|get|gets|receive|receives|emailed|email|issued|issue|provided|provide|go(?:es)? out|come[s]?|arrive[s]?|mailed|handed)`;
 const CADENCE = [
   /\bsuperbills?\b[^.!?\n]{0,60}?\b(?:each|every|per|once a) (?:month|week)\b/i,
-  /\bsuperbills?\b[^.!?\n]{0,60}?\bafter (?:each|every) (?:session|visit)\b/i,
-  new RegExp(String.raw`\bsuperbills?\b[^.!?\n]{0,40}?\b${GIVE}\b[^.!?\n]{0,20}?\b(?:each|every|per) (?:session|visit)\b`, "i"),
   new RegExp(String.raw`\b${GIVE}\b[^.!?\n]{0,20}?\bsuperbills?\b[^.!?\n]{0,20}?\b(?:for|after|with) (?:each|every) (?:session|visit)\b`, "i"),
   /\b(?:each|every|once a) (?:month|week)\b[^.!?\n]{0,40}?\bsuperbills?\b/i,
   /\b(?:monthly|weekly|automatic(?:ally)?)\s+superbills?\b/i,
@@ -264,20 +271,26 @@ export const OUTCOME_PROMISE: RegExp[] = [
 ];
 
 /** A free consult offered: "a free 15-minute call", "consults are free". Not "feel free to call". */
-const FREE_CONSULT = /\b(?<!feel )(?<!feels )free\s+(?:\d{1,2}[- ]min(?:ute)?s?\s+)?(?:intro(?:ductory)?\s+|phone\s+|video\s+)?(?:consult\w*|call|session)\b|\b(?:consult\w*|(?:first|intro) call)\b[^.!?]{0,15}\b(?:is|are) free\b/i;
+const FREE_CONSULT = /(?<!\bfeel )(?<!\bfeels )\bfree\b[^.!?]{0,30}\b(?:consult\w*|call|session)\b|\b(?:consult\w*|(?:first|intro) call)\b[^.!?]{0,15}\b(?:is|are) free\b/i;
 
 /**
  * "I don't take insurance" when she's in network with a plan. A sentence that scopes it
  * ("For plans other than Aetna, I'm out of network", "Not with BCBS yet") is true, so it stays.
  */
+const SCOPED = /\b(?:for plans other than|other (?:plans?|insurers?|insurance|carriers?|panels?)|except(?: for)?|besides)\b/i;
 function noInsuranceClaim(text: string, t: Pick<TruthFacts, "inNetwork">): boolean {
+  if (!t.inNetwork.length) return false;
+  // The one exact true phrasing that names a plan: "Private pay or Aetna" (a choice of both).
   const approved = familiesOf(t.inNetwork);
+  const names = PAYERS.filter((p) => approved.has(p.family)).map((p) => p.re.source.replace(/^\\b|\\b$/g, ""));
+  const either = new RegExp(String.raw`\bprivate[- ]pay (?:or|and) (?:${names.join("|")})\b(?! only)`, "gi");
   return text
     .split(/(?<=[.!?])\s+|\n+/)
-    .some((s) => {
+    .some((s0) => {
+      const s = s0.replace(either, "");
       if (!NO_INSURANCE.some((p) => p.test(s))) return false;
-      if (/\b(?:other|except|besides|outside|beyond|aside from|if your plan isn'?t|plans? I'?m not)\b/i.test(s)) return false;
-      return ![...familiesOf([s])].some((f) => approved.has(f));
+      // Only scoped wording is exempt; naming an approved plan never is ("Private pay only, Aetna included").
+      return !SCOPED.test(s);
     });
 }
 
@@ -295,11 +308,11 @@ export function factProblems(text: string, t: TruthFacts): FactProblem[] {
     out.push({ kind: "insurance_claim", message: "says you take insurance, but no plan has approved you yet" });
   if (most)
     out.push({ kind: "insurance_claim", message: `says you take most insurance; name only your plans${t.inNetwork.length ? ` (${list(t.inNetwork)})` : ""}` });
-  if (CADENCE.some((p) => p.test(clean))) out.push({ kind: "superbill", message: "says when superbills go out; you give them on request" });
+  if (saysCadence(clean)) out.push({ kind: "superbill", message: "says when superbills go out; you give them on request" });
   if (SLIDING.test(clean) && !NO_SLIDING.test(clean) && t.slidingScale !== true) out.push({ kind: "sliding_scale", message: "offers a sliding scale or reduced fee you haven't said you offer" });
   // Only once she answered: 0 can also mean she hasn't been asked yet.
   if (t.consultKnown && FREE_CONSULT.test(clean) && !t.freeConsultMinutes) out.push({ kind: "consult", message: "offers a free consult you don't offer" });
-  for (const m of clean.matchAll(/\b(\d{2})[- ]min(?:ute)?s?\b(?: free)?(?: (?:phone|video|intro(?:ductory)?))?(?: consult\w*| call)\b/gi)) {
+  for (const m of clean.matchAll(/\b(\d{2})[- ]min(?:ute)?s?\b[^.]{0,20}\b(?:consult\w*|call)\b/gi)) {
     if (t.consultKnown && Number(m[1]) !== t.freeConsultMinutes) out.push({ kind: "consult", message: `offers a ${m[1]}-minute consult` });
   }
   const langs = t.languages.toLowerCase();
@@ -481,7 +494,7 @@ export function fixCadence(text: string): string {
   return text
     .split(/(?<=[.!?])(\s+)/)
     .map((s) => {
-      if (!CADENCE.some((p) => p.test(s))) return s;
+      if (!saysCadence(s)) return s;
       const onlySuperbill = !/[$\d]/.test(s) && !/[,;:]/.test(s.trim().slice(0, -1)) && !/\b(?:and|but|also|plus)\b/i.test(s) && s.trim().length <= 100;
       return onlySuperbill ? SUPERBILL_SENTENCE : s;
     })

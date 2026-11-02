@@ -138,7 +138,9 @@ describe("website copy tidy-up", () => {
   });
 
   it("lists her real session fees and a price range", () => {
-    expect(all).toContain("Private-pay sessions are $150 (45 min) / $175 (53+ min).");
+    // In network with BCBSIL, so never "private pay" on its own.
+    expect(all).toContain("Sessions are $150 (45 min) / $175 (53+ min).");
+    expect(all).not.toMatch(/private[- ]pay/i);
     expect(all).toContain("First session: $200.");
     expect(site.jsonLd.priceRange).toBe("$150–$200");
     expect(site.check.ok).toBe(true);
