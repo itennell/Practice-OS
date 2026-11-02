@@ -2,6 +2,8 @@
 // model, consult times only after her approval, fixed wording throughout.
 // Writes inquiries, messages and approvals, so it runs only on a local throwaway database.
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+// These test Front Desk itself, so they run with it switched on (lib/features.ts).
+vi.mock("../lib/features", async (orig) => ({ ...(await orig<typeof import("../lib/features")>()), FRONT_DESK_ENABLED: true }));
 import { loadEnv } from "../lib/env";
 
 loadEnv();

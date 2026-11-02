@@ -6,6 +6,7 @@
 // Never asked, anywhere: a license number, SSN, date of birth, bank details or
 // anything about a client.
 
+import { FRONT_DESK_ENABLED } from "../features";
 import type { HelperQuestion } from "./helper-questions";
 
 export const CHAPTERS = [
@@ -211,7 +212,7 @@ export const QUESTIONS: Question[] = [
     chapter: "you",
     kind: "phone",
     ask: "What's your own cell phone number?",
-    help: "Only for urgent alerts, like when a caller says they're in danger. It's never shared.",
+    help: "Only for urgent alerts, like when someone writes to me that they're in danger. It's never shared.",
     aeonSays: "If something urgent comes in, I text you right away.",
     blocks: "Urgent alerts need your cell number.",
   },
@@ -530,6 +531,9 @@ export const QUESTIONS: Question[] = [
   },
 ];
 
+/** Questions that only set up Front Desk; left out while it is paused. */
+const FRONT_DESK_QUESTIONS = new Set(["text_missed_callers"]);
+
 /** A question as the screen gets it: no functions, words filled in. */
 export type Screen = {
   id: string;
@@ -581,6 +585,7 @@ export function flatten(
   const out: Screen[] = [];
   for (const q of QUESTIONS) {
     if (q.appliesWhen && !q.appliesWhen(c)) continue;
+    if (!FRONT_DESK_ENABLED && FRONT_DESK_QUESTIONS.has(q.id)) continue; // paused: lib/features.ts; saved answers stay
     out.push({
       id: q.id,
       chapter: q.chapter,
@@ -642,14 +647,25 @@ export function progressFor(screens: Screen[], index: number): { chapter: Chapte
 
 /** Which helpers start first for her stage (AGENTS.md > How the clinician uses it). */
 export type HelperId = "admin" | "referrals" | "instagram" | "front_desk";
-export const HELPERS: { id: HelperId; name: string; does: string }[] = [
+export const HELPERS: { id: HelperId; name: string; does: string }[] = ([
   { id: "admin", name: "Admin", does: "Keeps your deadlines, forms and insurance sign-ups on track" },
   { id: "referrals", name: "Referrals", does: "Finds local referral sources and drafts letters for you to send" },
   { id: "instagram", name: "Instagram", does: "Plans and drafts posts about booking, fees and your first session" },
   { id: "front_desk", name: "Front Desk", does: "Answers missed calls and texts with consult times" },
-];
+] as { id: HelperId; name: string; does: string }[]).filter((h) => FRONT_DESK_ENABLED || h.id !== "front_desk");
 
 export function firstFor(stage: Stage | null): { helpers: HelperId[]; focus: string } {
+  if (!FRONT_DESK_ENABLED) {
+    // Three helpers while Front Desk is paused (lib/features.ts).
+    switch (stage) {
+      case "middle":
+        return { helpers: ["referrals", "instagram"], focus: "You're building your caseload, so I'll start with referrals and getting you in front of people." };
+      case "late":
+        return { helpers: ["admin"], focus: "Your practice is established, so I'll start with your deadlines, forms and insurance dates." };
+      default:
+        return { helpers: ["admin", "referrals"], focus: "You're just opening, so I'll start with setup, credentialing prep and finding referral sources." };
+    }
+  }
   switch (stage) {
     case "middle":
       return { helpers: ["referrals", "instagram", "front_desk"], focus: "You're building your caseload, so I'll start with referrals, Instagram and your Front Desk." };

@@ -2,7 +2,9 @@
 // check adds nothing), a call that left a voicemail shows as one row, the
 // safety result is kept, and caller numbers reach the page masked.
 // Writes inquiries and messages, so it runs only on a local throwaway database.
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+// These test Front Desk itself, so they run with it switched on (lib/features.ts).
+vi.mock("../lib/features", async (orig) => ({ ...(await orig<typeof import("../lib/features")>()), FRONT_DESK_ENABLED: true }));
 import { loadEnv } from "../lib/env";
 
 loadEnv();

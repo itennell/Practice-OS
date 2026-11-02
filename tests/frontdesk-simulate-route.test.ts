@@ -1,6 +1,8 @@
 // "Simulate a voicemail" accepts only the sample kinds the test console defines:
 // an inherited name like "constructor" or any unknown kind is refused with 400.
 import { beforeEach, describe, expect, it, vi } from "vitest";
+// These test Front Desk itself, so they run with it switched on (lib/features.ts).
+vi.mock("../lib/features", async (orig) => ({ ...(await orig<typeof import("../lib/features")>()), FRONT_DESK_ENABLED: true }));
 
 const simulateVoicemail = vi.fn(async (kind: string) => ({ inquiryId: "x", outcome: kind, usedSampleCalendar: true }));
 vi.mock("../lib/frontdesk/test-console", () => ({

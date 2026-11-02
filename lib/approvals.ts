@@ -1,6 +1,7 @@
 import { audit } from "./audit";
 import { db } from "./db";
 import { isDryRun } from "./env";
+import { FRONT_DESK_APPROVAL_KINDS, FRONT_DESK_ENABLED } from "./features";
 import { editableField, executors } from "./executors";
 import type { ApprovalKind } from "./approval-kinds";
 import { currentOrigin, shouldAutoRun } from "./approval-policy";
@@ -43,7 +44,8 @@ export function toView(row: ApprovalRow): ApprovalView {
  */
 export const visibleKind = () =>
   db()`not (kind = 'instagram_post' and exists (
-         select 1 from practice_os.clinician_profile where onboarding_answers -> 'instagram' ->> 'account' = 'no'))`;
+         select 1 from practice_os.clinician_profile where onboarding_answers -> 'instagram' ->> 'account' = 'no'))
+       and (${FRONT_DESK_ENABLED} or kind <> all(${db().array([...FRONT_DESK_APPROVAL_KINDS])}))`;
 
 /** Pending first, then the most recent decisions. */
 export async function listApprovals(opts: { includeDecided?: boolean; limit?: number } = {}) {
@@ -66,8 +68,15 @@ export async function listApprovals(opts: { includeDecided?: boolean; limit?: nu
 export async function listApprovalsById(ids: string[]) {
   if (ids.length === 0) return [];
   const rows = await db()<ApprovalRow[]>`select * from practice_os.approvals where id in ${db()(ids)}`;
-  const byId = new Map(rows.map((r) => [r.id, toView(r)]));
+  const byId = new Map(rows.filter((r) => !pausedKind(r.kind)).map((r) => [r.id, toView(r)]));
   return ids.flatMap((id) => byId.get(id) ?? []);
+}
+
+/** A Front Desk kind while Front Desk is paused (lib/features.ts): never listed, queued, approved or declined. */
+const pausedKind = (kind: string) => !FRONT_DESK_ENABLED && FRONT_DESK_APPROVAL_KINDS.includes(kind);
+
+function refusePaused(kind: string): void {
+  if (pausedKind(kind)) throw new Error(`Front Desk is paused, so a ${kind} approval can't be queued.`);
 }
 
 export type ApproveResult =
@@ -85,7 +94,7 @@ async function getRow(id: string) {
  */
 export async function approve(id: string, opts: { by: string; edit?: string; auto?: boolean }): Promise<ApproveResult> {
   const before = await getRow(id);
-  if (!before) return { ok: false, reason: "not_found" };
+  if (!before || pausedKind(before.kind)) return { ok: false, reason: "not_found" };
 
   let editedPayload: Record<string, unknown> | null = null;
   if (opts.edit !== undefined) {
@@ -133,6 +142,10 @@ export async function approve(id: string, opts: { by: string; edit?: string; aut
 }
 
 export async function decline(id: string, opts: { by: string }): Promise<ApproveResult> {
+  if (!FRONT_DESK_ENABLED) {
+    const current = await getRow(id);
+    if (current && pausedKind(current.kind)) return { ok: false, reason: "not_found" };
+  }
   const [row] = await db()<ApprovalRow[]>`
     update practice_os.approvals
        set status = 'rejected', decided_at = now(), decided_by = ${opts.by}
@@ -159,6 +172,7 @@ export async function queueApproval(input: {
   payload?: Record<string, unknown>;
   createdBy: string;
 }): Promise<string> {
+  refusePaused(input.kind);
   const [row] = await db()<{ id: string }[]>`
     insert into practice_os.approvals (kind, title, preview, payload, status, created_by)
     values (${input.kind}, ${input.title}, ${db().json((input.preview ?? {}) as never)},
@@ -200,6 +214,7 @@ export async function queueApprovalOnce(
   },
   dedupe: { payloadField: string; value: string },
 ): Promise<{ id: string; created: boolean }> {
+  refusePaused(input.kind);
   const result = (await db().begin(async (sql) => {
     await sql`select pg_advisory_xact_lock(hashtext(${`${input.kind}:${dedupe.payloadField}:${dedupe.value}`}))`;
     const [existing] = await sql<{ id: string }[]>`

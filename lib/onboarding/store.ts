@@ -17,7 +17,6 @@ import {
   FIND_OPTIONS,
   flatten,
   checkEin,
-  HELPERS,
   normalizeUsPhone,
   QUESTIONS,
   TAXONOMY,
@@ -675,7 +674,7 @@ async function saveOne(id: string, value: unknown, all: Record<string, unknown>,
       await saveFrontDeskRules({ text_missed_callers: yesNo.parse(value) }, BY, sql);
       return null;
     case "team": {
-      const ids = HELPERS.map((h) => h.id);
+      const ids: HelperId[] = ["admin", "referrals", "instagram", "front_desk"]; // saved maps may still name a paused helper
       const v = z.record(z.enum(ids as [HelperId, ...HelperId[]]), z.boolean()).parse(value);
       // "Not for me" wins over a team map saved before it (going Back to this screen).
       if (all["instagram:account"] === "no") v.instagram = false;

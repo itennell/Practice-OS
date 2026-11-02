@@ -8,6 +8,7 @@ import type { ApprovalKind } from "./approval-kinds";
 
 export { APPROVAL_MODES, MODE_INFO, isApprovalMode, type ApprovalMode } from "./approval-modes";
 import { type ApprovalMode } from "./approval-modes";
+import { FRONT_DESK_APPROVAL_KINDS, FRONT_DESK_ENABLED } from "./features";
 
 /** No business associate agreement yet: nothing for a client ever runs on its own. */
 export const BAA_IN_PLACE = false as const;
@@ -55,6 +56,7 @@ export type Origin = { mode: ApprovalMode } | { rule: "front_desk"; rules: Front
 export function shouldAutoRun(kind: ApprovalKind, origin: Origin | null | undefined): boolean {
   const policy = KIND_POLICY[kind];
   if (!policy || !origin) return false;
+  if (!FRONT_DESK_ENABLED && FRONT_DESK_APPROVAL_KINDS.includes(kind)) return false; // Front Desk is paused (lib/features.ts)
   if (policy.tier === "clinician_only" && !BAA_IN_PLACE) return false;
   if ("rule" in origin) {
     const rule = FRONT_DESK_RULE_FOR[kind];

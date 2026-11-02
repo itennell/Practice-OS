@@ -1,3 +1,4 @@
+import { FRONT_DESK_ENABLED } from "@/lib/features";
 import { deps } from "@/lib/frontdesk/deps";
 import { voicemailRecording } from "@/lib/frontdesk/inbox";
 import { PhoneError } from "@/lib/frontdesk/phone/types";
@@ -7,6 +8,7 @@ import { isLocalRequest } from "@/lib/request-guard";
 // company each time (nothing is kept on disk) and only on her own computer:
 // the browser never sees the phone company's keys, and the Vercel copy says no.
 export async function GET(request: Request, ctx: RouteContext<"/api/front-desk/recordings/[id]">) {
+  if (!FRONT_DESK_ENABLED) return Response.json({ error: "Not found." }, { status: 404 }); // paused (lib/features.ts)
   if (!isLocalRequest(request)) return Response.json({ error: "Voicemails play only on your own computer." }, { status: 404 });
   const { id } = await ctx.params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) return Response.json({ error: "Unknown voicemail." }, { status: 404 });
