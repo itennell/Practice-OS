@@ -1,6 +1,11 @@
 import { after, connection } from "next/server";
 import { Suspense } from "react";
+import { AddYourself } from "@/components/referrals/add-yourself";
 import { AreaExplorer } from "@/components/referrals/area-explorer";
+import { PlaceFinder } from "@/components/referrals/place-finder";
+import { SOURCE_TYPES, CATEGORIES } from "@/lib/referrals/catalog";
+import { discoverableTypes, discoveryTypes } from "@/lib/referrals/orgs";
+import { db } from "@/lib/db";
 import { ReferralBoard } from "@/components/referrals/board";
 import { PageHeader } from "@/components/ui";
 import { DEFAULT_SPECIALTIES, getReferralSettings } from "@/lib/referrals/settings";
@@ -11,7 +16,8 @@ import { recheckIfDue, recheckDeps } from "@/lib/referrals/sources/recheck";
 import { latestLetters, listSources, moveDueFollowUps, practiceFacts, rescoreOldCards, tierContext } from "@/lib/referrals/store";
 import { contactsFor } from "@/lib/referrals/contacts";
 import { referOutNotesFor } from "@/lib/referrals/refer-out";
-import { practiceToday } from "@/lib/compliance/store";
+import { practiceTimeZone } from "@/lib/compliance/store";
+import { todayIn } from "@/lib/compliance/dates";
 import { rankCards, tiersWithLog } from "@/lib/referrals/plan";
 import { scoreVersionFor, type TierResult } from "@/lib/referrals/tier";
 
@@ -54,9 +60,16 @@ async function Referrals({ searchParams }: { searchParams: PageProps<"/referrals
     after(() => recheckIfDue(recheckDeps()).catch((err) => console.error(`[referrals] recheck: ${err instanceof Error ? err.message : String(err)}`)));
   }
   const evidence = await evidenceFor(sources);
+  const [nicheRow] = await db()<{ niche_preset: string | null }[]>`select niche_preset from practice_os.referral_settings where id`.catch(() => []);
+  const placeKinds = discoverableTypes();
+  const category = new Map(CATEGORIES.map((c) => [c.id, c.label]));
+  const typeOptions = [...SOURCE_TYPES]
+    .sort((a, b) => a.category - b.category || a.label.localeCompare(b.label))
+    .map((t) => ({ value: t.id, label: `${t.label} (${category.get(t.category) ?? "Other"})`, sensitive: t.sensitive }));
   const board = Object.fromEntries(sources.filter((s) => s.npi).map((s) => [s.npi!, { stage: STAGE_LABEL[s.stage] }]));
   // Tiers with her contact log on top (a prior referral, a warm intro, a meeting, a reply).
-  const [contacts, referOut, today] = await Promise.all([contactsFor(sources.map((s) => s.id)), referOutNotesFor(sources.map((s) => s.id)), practiceToday()]);
+  const [contacts, referOut, timeZone] = await Promise.all([contactsFor(sources.map((s) => s.id)), referOutNotesFor(sources.map((s) => s.id)), practiceTimeZone()]);
+  const today = todayIn(timeZone);
   const tiers: Record<string, TierResult> = tiersWithLog(sources, contacts, tierContext(facts));
   // Each column in the one order (tier, niche weight, fit, score, distance).
   const ranked = rankCards(sources, tiers);
@@ -67,11 +80,13 @@ async function Referrals({ searchParams }: { searchParams: PageProps<"/referrals
         specialties={setup.specialties.length ? setup.specialties : DEFAULT_SPECIALTIES}
         board={board}
       />
+      <PlaceFinder defaultArea={setup.searchZip ?? ""} kinds={placeKinds} defaultKinds={discoveryTypes(null, nicheRow?.niche_preset ?? null)} />
+      <AddYourself types={typeOptions} />
       <section aria-labelledby="board-heading" className="flex flex-col gap-3">
         <h2 id="board-heading" className="text-body font-semibold">
           Your board
         </h2>
-        <ReferralBoard initial={ranked} letters={letters} tiers={tiers} evidence={evidence} contacts={contacts} referOut={referOut} today={today} demo={profile?.is_sample ?? true} openDebrief={openDebrief} />
+        <ReferralBoard initial={ranked} letters={letters} tiers={tiers} evidence={evidence} contacts={contacts} referOut={referOut} today={today} timeZone={timeZone} demo={profile?.is_sample ?? true} openDebrief={openDebrief} />
       </section>
     </div>
   );

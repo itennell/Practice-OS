@@ -72,6 +72,8 @@ export const ALL_TABLES = [
   "referral_fetch_cache",
   // Referrals v2 (025): do-not-contact NPIs; never reset.
   "referral_suppressions",
+  // Referrals discovery (045): do-not-contact organisations (no NPI); never reset.
+  "referral_suppressions_org",
   // Her own choices, seeded only when missing (014, 034); never reset.
   "referral_settings",
   "client_form_templates",

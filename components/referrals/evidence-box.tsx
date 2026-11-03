@@ -4,7 +4,7 @@ import { notify } from "@/components/shared/toaster";
 import { TextField } from "@/components/shared/settings-controls";
 import { StatusPill, type Status } from "@/components/shared/status-mark";
 import { Button } from "@/components/ui";
-import { CONFIDENCE_LABEL, ORIGIN_LABEL, type CardConfidence, type Evidence, type FieldView } from "@/lib/referrals/evidence/merge";
+import { CONFIDENCE_LABEL, ORIGIN_LABEL, OSM_ATTRIBUTION, OSM_COPYRIGHT_URL, type CardConfidence, type Evidence, type FieldView } from "@/lib/referrals/evidence/merge";
 import type { ReferralSource } from "@/lib/referrals/store";
 
 // What each source said about a card (lib/referrals/evidence), inside the
@@ -98,6 +98,15 @@ export function EvidenceBox({
         <span className="text-[var(--fg-muted)]">Confirmed by: </span>
         <span className="font-medium">{ev?.confirmedBy.length ? ev.confirmedBy.join(" · ") : "nothing yet"}</span>
       </p>
+      {ev && Object.values(ev.fields).some((v) => v?.origins.includes("osm")) && (
+        <p className="text-small text-[var(--fg-muted)]">
+          Some details from OpenStreetMap,{" "}
+          <a href={OSM_COPYRIGHT_URL} target="_blank" rel="noreferrer" className="underline">
+            {OSM_ATTRIBUTION}
+          </a>
+          .
+        </p>
+      )}
       {ev?.flags.map((f) => (
         <p key={f} className="text-small font-medium text-[var(--danger-fg)]">
           {f}
@@ -181,7 +190,7 @@ export function EvidenceBox({
           </dl>
         )}
         <p className="pb-2 text-[var(--fg-muted)]">
-          Sources: the NPI Registry, the CMS Medicare files, the state license list, OpenStreetMap (© OpenStreetMap contributors) and their own website. Never Psychology Today or other directories.
+          Sources: the NPI Registry, the CMS Medicare files, the CMS Provider Data Catalog, the state license list, OpenStreetMap (© OpenStreetMap contributors, ODbL) and their own website. Never Psychology Today or other directories.
         </p>
       </details>
       <Button variant="quiet" onClick={checkAgain} disabled={checking} aria-describedby={detailsId}>

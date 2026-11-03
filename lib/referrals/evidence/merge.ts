@@ -7,7 +7,7 @@
 import type { MatchMethod } from "./match";
 import { formatPhone, normalizeName, normalizeOrg, normalizeStreet, phoneDigits, zip5 } from "./normalize";
 
-export const ORIGINS = ["nppes", "cms_dac", "cms_order_referring", "cms_opt_out", "state_license", "osm", "website", "clinician"] as const;
+export const ORIGINS = ["nppes", "cms_dac", "cms_order_referring", "cms_opt_out", "state_license", "osm", "website", "clinician", "cms_pdc"] as const;
 export type Origin = (typeof ORIGINS)[number];
 
 export const FIELDS = [
@@ -62,7 +62,12 @@ export const ORIGIN_LABEL: Record<Origin, string> = {
   osm: "OpenStreetMap",
   website: "their website",
   clinician: "you",
+  cms_pdc: "CMS Provider Data Catalog",
 };
+
+/** OpenStreetMap's licence asks for this wherever its data shows (ODbL 1.0). */
+export const OSM_ATTRIBUTION = "© OpenStreetMap contributors (ODbL)";
+export const OSM_COPYRIGHT_URL = "https://www.openstreetmap.org/copyright";
 
 const FIELD_LABEL: Record<Field, string> = {
   name: "Name", credential: "Credential", organization: "Group", address: "Address", phone: "Phone", fax: "Fax",
@@ -71,11 +76,11 @@ const FIELD_LABEL: Record<Field, string> = {
 
 // Most trusted first, per field. An origin not listed never decides that field.
 const TRUST: Record<Field, Origin[]> = {
-  name: ["clinician", "nppes", "state_license", "cms_dac", "cms_order_referring", "cms_opt_out", "website", "osm"],
+  name: ["clinician", "nppes", "cms_pdc", "state_license", "cms_dac", "cms_order_referring", "cms_opt_out", "website", "osm"],
   credential: ["clinician", "state_license", "nppes", "cms_dac"],
-  organization: ["clinician", "nppes", "cms_dac", "website", "osm"],
-  address: ["clinician", "nppes", "cms_dac", "website", "osm", "cms_opt_out"],
-  phone: ["clinician", "website", "osm", "cms_dac", "nppes"],
+  organization: ["clinician", "nppes", "cms_pdc", "cms_dac", "website", "osm"],
+  address: ["clinician", "nppes", "cms_pdc", "cms_dac", "website", "osm", "cms_opt_out"],
+  phone: ["clinician", "website", "cms_pdc", "osm", "cms_dac", "nppes"],
   fax: ["clinician", "website", "nppes", "osm"],
   email: ["clinician", "website", "osm"],
   website: ["clinician", "website", "osm"],
@@ -99,7 +104,7 @@ const CONFLICT_FIELDS: Field[] = ["name", "address", "phone", "fax", "email", "w
 /** Sources that copy from each other count once toward "confirmed". */
 const FAMILY: Record<Origin, string> = {
   nppes: "nppes", cms_dac: "cms", cms_order_referring: "cms", cms_opt_out: "cms",
-  state_license: "state", osm: "osm", website: "website", clinician: "clinician",
+  state_license: "state", osm: "osm", website: "website", clinician: "clinician", cms_pdc: "cms",
 };
 
 export const STALE_DAYS = 30;
@@ -170,6 +175,11 @@ function listWords(parts: string[]): string {
   return parts.length <= 1 ? (parts[0] ?? "") : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
 }
 
+function shortDay(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso.slice(0, 10) : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+}
+
 function sentenceCase(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
@@ -209,6 +219,7 @@ export function mergeEvidence(facts: Fact[], opts: { isOrg?: boolean; now?: Date
     if (!agreed) continue;
     if (origin === "state_license" && license) add(`State license: ${license.toLowerCase()}`);
     else if (origin === "cms_dac" || origin === "cms_order_referring") add("Medicare file");
+    else if (origin === "cms_pdc") add(`CMS Provider Data Catalog (${shortDay(facts.find((f) => f.origin === "cms_pdc")!.checkedAt)})`);
     else add(sentenceCase(ORIGIN_LABEL[origin]));
   }
   if (facts.some((f) => f.origin === "clinician")) add("You");

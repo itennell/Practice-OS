@@ -6,7 +6,8 @@
 import type postgres from "postgres";
 import { guard } from "../aeon/guard";
 import { db } from "../db";
-import { suppressedNpis } from "./contacts";
+import { suppressedList } from "./contacts";
+import { isSuppressed, providerKeyCard, type Suppressed } from "./dnc-key";
 import { geocodeAddresses, geocodePlace, addressKey, type Point } from "./geocode";
 import { haversineMiles, zipCenters } from "./geo";
 import { isKnownPlace } from "./places";
@@ -15,6 +16,8 @@ import { getReferralSettings } from "./settings";
 import { outOfStateWarning, stateCode, stateName } from "./states";
 import { capFirst, compareTiers, focusFrom, providerTier, type Focus, type TierResult } from "./tier";
 import { practiceFacts } from "./store";
+import { isSensitiveSource, siteHashes, withoutDistance } from "./sensitive";
+import { knownSensitiveSites } from "./sensitive-sites";
 
 type Centers = Record<string, Point>;
 
@@ -65,8 +68,11 @@ export const RADII = [1, 3, 5, 10] as const;
 export type Precision = "address" | "zip";
 
 export type AreaProvider = Provider & {
-  lat: number;
-  lon: number;
+  /** Null for a sensitive provider (DV/SA agency, shelter): never on the map. */
+  lat: number | null;
+  lon: number | null;
+  /** A DV/SA agency or shelter: no street, ZIP, pin or distance; contact through their public line only. */
+  sensitive?: boolean;
   /** "address": the Census geocoder found the building. "zip": placed at the ZIP's center. */
   precision: Precision;
   distanceMiles: number | null;
@@ -85,8 +91,10 @@ export type AreaResult = {
   notes: string[];
 };
 
-/** `suppressed`: NPIs on her do-not-contact list, left out of every search. */
-export type PracticeContext = { office: Point | null; officeZip: string | null; state: string; focus: Focus[]; suppressed?: Set<string>; niche?: string | null; selfPay?: boolean };
+/** `suppressed`: NPIs on her do-not-contact list, left out of every search; `blocked`: the whole list, with org keys (045). */
+export type PracticeContext = { office: Point | null; officeZip: string | null; state: string; focus: Focus[]; suppressed?: Set<string>; blocked?: Suppressed; niche?: string | null; selfPay?: boolean; /** One-way hashes of sensitive sites on her board (lib/referrals/sensitive-sites.ts). */ sensitiveSites?: Set<string> };
+
+export { providerKeyCard };
 
 type Deps = {
   search?: typeof searchProviders;
@@ -211,7 +219,7 @@ export async function searchArea(
   }
   const inArea = new Set(zips);
   // Someone on her do-not-contact list never shows again (lib/referrals/contacts.ts).
-  const providers = found.providers.filter((p) => inArea.has(p.zip) && !ctx.suppressed?.has(p.npi));
+  const providers = found.providers.filter((p) => inArea.has(p.zip) && !ctx.suppressed?.has(p.npi) && !(ctx.blocked && isSuppressed(providerKeyCard(p), ctx.blocked)));
   if (found.budgetCut && found.skipped?.length) {
     // Each kind is its own set of questions, so fewer kinds is what makes room.
     notes.push(
@@ -226,6 +234,10 @@ export async function searchArea(
   }
 
   const works = linkGroups(providers);
+  // Sensitive by kind or name, or at the street of a sensitive site (on her board, or a sensitive group in these results).
+  const sites = new Set(ctx.sensitiveSites ?? []);
+  for (const p of providers) if (isSensitiveSource(p)) for (const h of siteHashes(p.address, p.zip)) sites.add(h);
+  const hidden = new Set(providers.filter((p) => isSensitiveSource(p) || siteHashes(p.address, p.zip).some((h) => sites.has(h))).map((p) => p.npi));
   // The geocoder takes a few hundred addresses at a time, so the likely best go first.
   const rough = (p: Provider) => {
     const c = centers[p.zip];
@@ -235,12 +247,30 @@ export async function searchArea(
   const byPromise = [...providers].sort((a, b) => rough(b) - rough(a));
   const located = await (deps.geocode ?? geocodeAddresses)(
     // A home-looking address is never placed at street level: it stays at the ZIP center.
-    byPromise.filter((p) => !p.homeAddress).map((p) => ({ street: p.address, city: p.city, state: p.state, zip: p.zip })),
+    byPromise.filter((p) => !p.homeAddress && !hidden.has(p.npi)).map((p) => ({ street: p.address, city: p.city, state: p.state, zip: p.zip })),
     { timeoutMs: deadline + 25_000 - now() },
   );
 
   const out: AreaProvider[] = [];
   for (const p of providers) {
+    // A DV/SA agency or shelter: city only. No street, ZIP, map point or distance leaves the server.
+    if (hidden.has(p.npi)) {
+      const tier = providerTier(p, { miles: null, focus: ctx.focus, approximate: true, clinicianState: ctx.state, niche: ctx.niche, selfPay: ctx.selfPay });
+      out.push({
+        ...p,
+        address: "",
+        zip: "",
+        homeAddress: false,
+        lat: null,
+        lon: null,
+        precision: "zip",
+        distanceMiles: null,
+        worksAt: null,
+        sensitive: true,
+        tier: { ...tier, reasons: [tier.reasons[0], ...withoutDistance(tier.reasons.slice(1))] },
+      });
+      continue;
+    }
     const exact = p.homeAddress ? null : (located.get(addressKey({ street: p.address, city: p.city, state: p.state, zip: p.zip })) ?? null);
     const point = exact ?? centers[p.zip];
     if (!point) continue;
@@ -280,13 +310,16 @@ export async function practiceContext(sql: postgres.Sql = db()): Promise<Practic
     const key = { street: loc.street, city: loc.city, state: loc.state ?? profile?.state ?? "", zip: loc.zip.slice(0, 5) };
     office = (await geocodeAddresses([key])).get(addressKey(key)) ?? null;
   }
-  const suppressed = await suppressedNpis(sql).catch(() => new Set<string>());
+  // Fail closed: if her do-not-contact list can't be read, the search doesn't run.
+  const blocked = await suppressedList(sql);
   return {
     office,
     officeZip: settings.searchZip,
     state: profile?.state ?? "IL",
     focus: focusFrom(profile?.who),
-    suppressed,
+    suppressed: blocked.npis,
+    blocked,
+    sensitiveSites: await knownSensitiveSites(sql),
     niche,
     selfPay,
   };

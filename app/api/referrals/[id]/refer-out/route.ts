@@ -1,6 +1,6 @@
 import { canChange } from "@/lib/referrals/http";
 import { cardView } from "@/lib/referrals/plan";
-import { logReferralOut, saveReferOutNotes } from "@/lib/referrals/refer-out";
+import { logReferralOut, readCount, saveReferOutNotes } from "@/lib/referrals/refer-out";
 import { isUuid } from "../../../approvals/responses";
 
 // Referring out from a card. POST: "I referred someone to them", a date and how
@@ -12,9 +12,12 @@ export async function POST(request: Request, ctx: RouteContext<"/api/referrals/[
   const { id } = await ctx.params;
   if (!isUuid(id)) return Response.json({ error: "Unknown card." }, { status: 404 });
   const body = (await request.json().catch(() => ({}))) as { count?: unknown; happened_on?: unknown };
+  // How many people: a whole number from 1 to 20, said by her. No default.
+  const count = readCount(body.count);
+  if (count === null) return Response.json({ error: "Say how many people, from 1 to 20." }, { status: 400 });
   try {
     await logReferralOut(id, {
-      count: typeof body.count === "number" ? body.count : 1,
+      count,
       happenedOn: typeof body.happened_on === "string" && body.happened_on ? body.happened_on : null,
       by: "clinician",
     });

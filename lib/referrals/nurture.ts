@@ -5,7 +5,7 @@
 // referred M", from dates and counts only) and who is on her "People I refer
 // to" list. Days are counted between practice-time-zone dates (todayIn).
 import research from "../../docs/research/referral-tiers.json" with { type: "json" };
-import { daysBetween } from "../compliance/dates";
+import { daysBetween, todayIn } from "../compliance/dates";
 import type { Contact } from "./contacts";
 import type { ReferralSource } from "./store";
 import type { Tier, TierResult } from "./tier";
@@ -62,12 +62,22 @@ export function coldAfterDays(tier: Tier): number {
 type CardBits = Pick<ReferralSource, "stage" | "last_contacted_at"> & { suggested_from?: string | null };
 type LogBits = Pick<Contact, "kind" | "happened_on">;
 
-/** The latest day anything happened with them: any kind on the log, or the card's last-contacted date. */
-export function lastContactOn(card: Pick<ReferralSource, "last_contacted_at">, contacts: LogBits[]): string | null {
+/**
+ * Two "last contact" days exist, on purpose:
+ * - Relationship.lastContactOn (contacts.ts relationshipFrom): the latest call, email, letter or
+ *   meeting. It drives the tiers and the plan's 30-day wait before suggesting someone again.
+ * - lastTouchOn (here): the latest day ANYTHING happened with them, any kind on the log
+ *   (a note, a referral either way) or the card's last_contacted_at. It drives "going cold".
+ * last_contacted_at is a timestamptz, read as its day in the practice's time zone.
+ */
+export function lastTouchOn(card: Pick<ReferralSource, "last_contacted_at">, contacts: LogBits[], timeZone: string): string | null {
   const days = contacts.map((c) => c.happened_on);
-  // The driver hands back a Date for this timestamptz (typed as a string elsewhere); either way, its day.
+  // The driver hands back a Date (typed as a string elsewhere; the page gets either).
   const at = card.last_contacted_at as string | Date | null;
-  if (at) days.push(at instanceof Date ? at.toISOString().slice(0, 10) : String(at).slice(0, 10));
+  if (at) {
+    const d = at instanceof Date ? at : new Date(at);
+    if (!Number.isNaN(d.getTime())) days.push(todayIn(timeZone, d));
+  }
   return days.filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort().at(-1) ?? null;
 }
 
@@ -85,9 +95,9 @@ export function coldLabel(days: number): string {
  * card she never contacted, or one with no tier yet. `today` is the practice's
  * date (todayIn(practiceTimeZone)).
  */
-export function goingCold(card: CardBits, contacts: LogBits[], tier: Tier | undefined, today: string): GoingCold | null {
+export function goingCold(card: CardBits, contacts: LogBits[], tier: Tier | undefined, today: string, timeZone: string): GoingCold | null {
   if (!tier || card.stage === "not_a_fit") return null;
-  const lastOn = lastContactOn(card, contacts);
+  const lastOn = lastTouchOn(card, contacts, timeZone);
   if (!lastOn) return null;
   const days = daysBetween(lastOn, today);
   if (days <= coldAfterDays(tier)) return null;
@@ -100,10 +110,11 @@ export function coldCards(
   contacts: Record<string, LogBits[]>,
   tiers: Record<string, Pick<TierResult, "tier">>,
   today: string,
+  timeZone: string,
 ): Record<string, GoingCold> {
   const out: Record<string, GoingCold> = {};
   for (const c of cards) {
-    const cold = goingCold(c, contacts[c.id] ?? [], tiers[c.id]?.tier, today);
+    const cold = goingCold(c, contacts[c.id] ?? [], tiers[c.id]?.tier, today, timeZone);
     if (cold) out[c.id] = cold;
   }
   return out;
@@ -121,7 +132,7 @@ const TIER_ORDER: Record<Tier, number> = { first: 0, next: 1, later: 2 };
 /**
  * Up to `max` going-cold nudges for the weekly plan: the top tier first, then
  * the longest without contact. `skip` holds cards already in the plan (a due
- * follow-up) or on her do-not-contact list. A card with an email gets the
+ * follow-up), on her do-not-contact list, or with a letter waiting or ready. A card with an email gets the
  * note; one without gets the one-pager.
  */
 export function coldNudges(
@@ -129,10 +140,11 @@ export function coldNudges(
   contacts: Record<string, LogBits[]>,
   tiers: Record<string, Pick<TierResult, "tier">>,
   today: string,
+  timeZone: string,
   opts: { skip?: Set<string>; max?: number; tierLabel?: Record<Tier, string> } = {},
 ): ColdNudge[] {
   const max = opts.max ?? COLD_NUDGES_PER_WEEK;
-  const cold = coldCards(cards, contacts, tiers, today);
+  const cold = coldCards(cards, contacts, tiers, today, timeZone);
   return cards
     .filter((c) => cold[c.id] && !opts.skip?.has(c.id))
     .sort((a, b) => TIER_ORDER[tiers[a.id].tier] - TIER_ORDER[tiers[b.id].tier] || cold[b.id].days - cold[a.id].days || a.name.localeCompare(b.name))
@@ -159,7 +171,8 @@ export type Reciprocity = { theyReferred: number; youReferred: number; line: str
  */
 export function reciprocity(contacts: Pick<Contact, "kind" | "people_count">[]): Reciprocity {
   const theyReferred = contacts.filter((c) => c.kind === "referred").length;
-  const youReferred = contacts.filter((c) => c.kind === "referred_out").reduce((n, c) => n + (c.people_count ?? 1), 0);
+  // The database requires a count on every referred_out row (migration 045).
+  const youReferred = contacts.filter((c) => c.kind === "referred_out").reduce((n, c) => n + (c.people_count ?? 0), 0);
   return { theyReferred, youReferred, line: `They've referred ${theyReferred} · You've referred ${youReferred}` };
 }
 

@@ -1,0 +1,5 @@
+{"count":3,"results":[
+ {"cms_certification_number_ccn":"141599","facility_name":"[SAMPLE] LAKEVIEW HOSPICE AND PALLIATIVE CARE, LLC","address_line_1":"2500 NORTH CLARK STREET","address_line_2":"SUITE 300","citytown":"CHICAGO","state":"IL","zip_code":"60614","countyparish":"COOK","telephone_number":"(312) 555-0161","cms_region":"5","ownership_type":"Non-Profit","certification_date":"03/01/2009"},
+ {"cms_certification_number_ccn":"14159A","facility_name":"[SAMPLE] NORTH SHORE HOSPICE","address_line_1":"900 WEST BELMONT AVENUE","address_line_2":"-","citytown":"CHICAGO","state":"IL","zip_code":"60657","telephone_number":"(773) 555-0172"},
+ {"cms_certification_number_ccn":"","facility_name":"[SAMPLE] NO NUMBER HOSPICE","address_line_1":"1 MAIN ST","citytown":"CHICAGO","state":"IL","zip_code":"60614"}
+]}

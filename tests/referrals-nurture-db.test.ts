@@ -23,15 +23,20 @@ const { logReferralOut, referOutNotesFor, saveReferOutNotes } = await import("..
 const { outreachPlan, cardView } = await import("../lib/referrals/plan");
 const { reciprocity, coldCards } = await import("../lib/referrals/nurture");
 const { runTool } = await import("../lib/aeon/tools");
+const { nudgeRefusal } = await import("../lib/referrals/refer-out");
+const { suppress } = await import("../lib/referrals/contacts");
+const { queueApproval } = await import("../lib/approvals");
+const { POST: referOutPost } = await import("../app/api/referrals/[id]/refer-out/route");
 
 const made: string[] = [];
 const approvals: string[] = [];
 let hasColumns = false;
+const DNC_NPI = `1977${String(Date.now()).slice(-6)}`;
 
-async function makeCard(name: string, stage = "connected", email: string | null = null) {
+async function makeCard(name: string, stage = "connected", email: string | null = null, npi: string | null = null, npiType = "individual") {
   const [row] = await db()<{ id: string }[]>`
-    insert into practice_os.referral_sources (name, taxonomy, specialty, npi_type, city, state, zip, stage, email, distance_miles, is_sample)
-    values (${name}, '207Q00000X', 'Family medicine', 'individual', 'Chicago', 'IL', '60614', ${stage}, ${email}, 0.3, true)
+    insert into practice_os.referral_sources (npi, name, organization, taxonomy, specialty, npi_type, address, city, state, zip, stage, email, distance_miles, is_sample)
+    values (${npi}, ${name}, ${npiType === "organization" ? name : null}, '207Q00000X', 'Family medicine', ${npiType}, '100 W Nurture St', 'Chicago', 'IL', '60614', ${stage}, ${email}, 0.3, true)
     returning id`;
   made.push(row.id);
   return row.id;
@@ -47,6 +52,8 @@ describe.skipIf(!local)("referral nurture (built-in database only)", () => {
   });
 
   afterAll(async () => {
+    await db()`delete from practice_os.referral_suppressions where npi = ${DNC_NPI}`;
+    await db()`delete from practice_os.referral_suppressions_org where name_key like '%nurture%'`;
     if (made.length) await db()`delete from practice_os.referral_sources where id in ${db()(made)}`;
     if (approvals.length) await db()`delete from practice_os.approvals where id in ${db()(approvals)}`;
     await closeDb();
@@ -77,6 +84,11 @@ describe.skipIf(!local)("referral nurture (built-in database only)", () => {
       db()`insert into practice_os.referral_contacts (source_id, kind, happened_on, note, created_by, people_count) values (${id}, ${kind}, current_date, ${note}, 'clinician', ${count})`;
     await expect(insert("referred_out", "[Sample] who it was", 1)).rejects.toThrow(/referred_out_date_and_count/);
     await expect(insert("referred_out", null, 21)).rejects.toThrow(/referred_out_date_and_count/);
+    // After 045 then 046 a referred_out row still needs a count: 045's strict check stands.
+    await expect(insert("referred_out", null, null)).rejects.toThrow(/referred_out_date_and_count/);
+    const [applied] = await db()<{ n: number }[]>`
+      select count(*)::int as n from practice_os.schema_migrations where name in ('045_referral_dnc_org.sql', '046_referral_nurture.sql')`;
+    expect(applied.n).toBe(2);
     await expect(insert("called", null, 2)).rejects.toThrow(/count_only_referred_out/);
     await expect(logReferralOut(id, { count: 0, by: "clinician" })).rejects.toThrow(/from 1 to 20/);
     await expect(logReferralOut(id, { count: 21, by: "clinician" })).rejects.toThrow(/from 1 to 20/);
@@ -125,7 +137,7 @@ describe.skipIf(!local)("referral nurture (built-in database only)", () => {
     expect(plan.going_cold.length).toBeLessThanOrEqual(2);
     const ids = plan.going_cold.map((g) => g.id);
     const views = await Promise.all(ids.map((id) => cardView(id)));
-    const cold = coldCards(views.map((v) => v!.card), Object.fromEntries(views.map((v) => [v!.card.id, v!.contacts])), Object.fromEntries(views.map((v) => [v!.card.id, v!.tier])), plan.today);
+    const cold = coldCards(views.map((v) => v!.card), Object.fromEntries(views.map((v) => [v!.card.id, v!.contacts])), Object.fromEntries(views.map((v) => [v!.card.id, v!.tier])), plan.today, "America/Chicago");
     expect(Object.keys(cold).sort()).toEqual([...ids].sort());
     expect(plan.summary).toMatch(/Going cold \([12]\):/);
     for (const g of plan.going_cold) expect(g.label).toMatch(/^Going cold: last contact \d+ weeks ago$/);
@@ -150,5 +162,102 @@ describe.skipIf(!local)("referral nurture (built-in database only)", () => {
     const body = JSON.parse(r.content.at(-1)!.text) as Record<string, unknown>;
     expect(body).toMatchObject({ logged: true, people: 3, on: "2026-10-30", reciprocity: "They've referred 0 · You've referred 3" });
     expect(JSON.stringify(body)).not.toMatch(/client name|initials/i);
+  });
+
+  async function met(id: string, daysAgo: number) {
+    const on = new Date(Date.now() - daysAgo * 86_400_000).toISOString().slice(0, 10);
+    await db()`insert into practice_os.referral_contacts (source_id, kind, happened_on, created_by, is_sample) values (${id}, 'met', ${on}, 'clinician', true)`;
+  }
+
+  it("the weekly plan runs with NPI and org-key do-not-contact cards and leaves both out", async (ctx) => {
+    if (!hasColumns) ctx.skip(); // needs migration 046
+    const byNpi = await makeCard("[Sample] Nurture Dnc Npi, MD", "connected", "dnc1@example.com", DNC_NPI);
+    const byOrg = await makeCard("[Sample] Nurture Dnc Org Clinic", "connected", "dnc2@example.com", null, "organization");
+    const fresh = await makeCard("[Sample] Nurture Dnc Found Clinic", "found", null, null, "organization");
+    for (const id of [byNpi, byOrg]) await met(id, 400);
+    await suppress(byNpi, "asked_not_to");
+    await suppress(byOrg, "not_interested");
+    await suppress(fresh, "asked_not_to");
+    // suppress moves them to Not a fit; put them back so only the list keeps them out.
+    await db()`update practice_os.referral_sources set stage = 'connected' where id in ${db()([byNpi, byOrg])}`;
+    await db()`update practice_os.referral_sources set stage = 'found' where id = ${fresh}`;
+    const plan = await outreachPlan();
+    const ids = [...plan.going_cold.map((g) => g.id), ...plan.reach_out.map((r) => r.id), ...plan.follow_ups.map((f) => f.id)];
+    expect(ids).not.toContain(byNpi);
+    expect(ids).not.toContain(byOrg);
+    expect(ids).not.toContain(fresh);
+  });
+
+  it("plan nudges and the nudge draft skip a card with a letter waiting, and never overwrite it", async (ctx) => {
+    if (!hasColumns) ctx.skip(); // needs migration 046
+    const warm = await makeCard("[Sample] Nurture Warm, MD", "connected", "warm@example.com");
+    await met(warm, 5);
+    expect(await nudgeRefusal(warm)).toMatch(/isn't going cold/);
+    const cold = await makeCard("[Sample] Nurture Waiting, MD", "connected", "wait@example.com");
+    await met(cold, 300);
+    expect(await nudgeRefusal(cold)).toBeNull();
+    const letter = await queueApproval({
+      kind: "referral_letter",
+      title: "[Sample] letter",
+      preview: { body: "[Sample]" },
+      payload: { referral_source_id: cold, subject: "[Sample] Hello", letter: "[Sample] Dear colleague" },
+      createdBy: "test",
+    });
+    approvals.push(letter);
+    expect(await nudgeRefusal(cold)).toMatch(/already waiting in Approvals/);
+    const plan = await outreachPlan(undefined, 3);
+    expect(plan.going_cold.map((g) => g.id)).not.toContain(cold);
+    const [row] = await db()<{ letter: string }[]>`select payload ->> 'letter' as letter from practice_os.approvals where id = ${letter}`;
+    expect(row.letter).toBe("[Sample] Dear colleague");
+  });
+
+  it("the refer-out route refuses a missing, non-number or out-of-range count with 400", async (ctx) => {
+    if (!hasColumns) ctx.skip(); // needs migration 046
+    const id = await makeCard("[Sample] Nurture Route, MD");
+    const call = (body: unknown) =>
+      referOutPost(
+        new Request(`http://localhost:3000/api/referrals/${id}/refer-out`, {
+          method: "POST",
+          headers: { "content-type": "application/json", host: "localhost:3000", origin: "http://localhost:3000", "sec-fetch-site": "same-origin" },
+          body: JSON.stringify(body),
+        }),
+        { params: Promise.resolve({ id }) } as never,
+      );
+    for (const bad of [{}, { count: "2" }, { count: 0 }, { count: 21 }, { count: 1.5 }]) expect((await call(bad)).status).toBe(400);
+    expect((await contactsFor([id]))[id] ?? []).toEqual([]);
+    const ok = await call({ count: 2 });
+    expect(ok.status).toBe(200);
+    expect(((await contactsFor([id]))[id] ?? []).map((c) => c.people_count)).toEqual([2]);
+  });
+
+  it("a queued log_referral_out shows the card, count and resolved date, and the approved run logs that date", async (ctx) => {
+    if (!hasColumns) ctx.skip(); // needs migration 046
+    const id = await makeCard("[Sample] Nurture Queued, MD");
+    const iso = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago" }).format(new Date(Date.now() - 86_400_000));
+    const r = await runTool("log_referral_out", { source: id, count: 2, date_words: "yesterday" }, { by: "mcp:vitest", said: ["I referred two people to them yesterday"] });
+    const body = JSON.parse(r.content[0].text) as { approval_id: string };
+    approvals.push(body.approval_id);
+    const [ap] = await db()<{ preview: { body: string }; payload: { tool: string; args: Record<string, unknown> } }[]>`
+      select preview, payload from practice_os.approvals where id = ${body.approval_id}`;
+    expect(ap.preview.body).toContain("[Sample] Nurture Queued, MD");
+    expect(ap.preview.body).toContain("2 people");
+    expect(ap.preview.body).toContain(`(${iso})`);
+    expect(ap.payload.args).toMatchObject({ source: id, count: 2, happened_on: iso, date_confirmed: true });
+    // Approved later: the queued day is what gets logged, not the day she approves.
+    await runTool(ap.payload.tool, ap.payload.args, { by: "clinician", approved: true, mode: "bypass" });
+    expect(((await contactsFor([id]))[id] ?? []).map((c) => [c.happened_on, c.people_count])).toEqual([[iso, 2]]);
+  });
+
+  it("a queued log_referral_contact keeps its resolved date and names the card", async (ctx) => {
+    if (!hasColumns) ctx.skip(); // needs migration 046
+    const id = await makeCard("[Sample] Nurture Called, MD");
+    const r = await runTool("log_referral_contact", { source: id, kind: "called", happened_on: "2026-10-28", date_confirmed: true }, { by: "mcp:vitest" });
+    const body = JSON.parse(r.content[0].text) as { approval_id: string };
+    approvals.push(body.approval_id);
+    const [ap] = await db()<{ preview: { body: string }; payload: { args: Record<string, unknown> } }[]>`
+      select preview, payload from practice_os.approvals where id = ${body.approval_id}`;
+    expect(ap.preview.body).toContain('Log "Called" for [Sample] Nurture Called, MD on');
+    expect(ap.preview.body).toContain("(2026-10-28)");
+    expect(ap.payload.args).toMatchObject({ source: id, happened_on: "2026-10-28" });
   });
 });

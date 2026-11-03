@@ -80,6 +80,8 @@ export const REFERRAL_DEMO_TOOLS: readonly string[] = [
   "find_referral_cards",
   "set_do_not_contact",
   "revise_referral_letter",
+  // discovery: organisations she adds by hand (find_referral_sources also finds CMS and OpenStreetMap places)
+  "add_referral_source",
   "set_referral_niche",
   // coming: the debrief PR adds this tool; listed now so it works once merged
   "debrief_meeting",

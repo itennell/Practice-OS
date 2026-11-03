@@ -15,7 +15,7 @@ import {
   coldNudges,
   GRACE_DAYS,
   goingCold,
-  lastContactOn,
+  lastTouchOn,
   NOTE_ACTION,
   ONE_PAGER_ACTION,
   readCadence,
@@ -28,6 +28,7 @@ import { TIER_LABEL } from "../lib/referrals/tier";
 import { REFERRAL_DEMO_TOOLS } from "../lib/features";
 
 const TODAY = "2026-11-02";
+const TZ = "America/Chicago";
 
 const card = (over: Partial<ReferralSource>): ReferralSource => ({
   id: "c1", npi: null, name: "[Sample] Maria Rivera, MD", organization: null, taxonomy: "207Q00000X", specialty: "Family medicine",
@@ -67,25 +68,31 @@ describe("touch cadence by tier", () => {
 
 describe("going cold", () => {
   it("flags a top-tier card one day past cadence plus grace, not on the day", () => {
-    expect(goingCold(card({}), [log("met", daysAgo(63))], "first", TODAY)).toBeNull();
-    const cold = goingCold(card({}), [log("met", daysAgo(64))], "first", TODAY);
+    expect(goingCold(card({}), [log("met", daysAgo(63))], "first", TODAY, TZ)).toBeNull();
+    const cold = goingCold(card({}), [log("met", daysAgo(64))], "first", TODAY, TZ);
     expect(cold).toMatchObject({ days: 64, weeks: 9, label: "Going cold: last contact 9 weeks ago", cadence: "every 6 to 8 weeks" });
   });
   it("uses the tier's cadence: 70 days is cold for Reach out first, not for Warm up next", () => {
     const c = [log("called", daysAgo(70))];
-    expect(goingCold(card({}), c, "first", TODAY)?.label).toBe("Going cold: last contact 10 weeks ago");
-    expect(goingCold(card({}), c, "next", TODAY)).toBeNull();
-    expect(goingCold(card({}), [log("called", daysAgo(99))], "later", TODAY)).not.toBeNull();
+    expect(goingCold(card({}), c, "first", TODAY, TZ)?.label).toBe("Going cold: last contact 10 weeks ago");
+    expect(goingCold(card({}), c, "next", TODAY, TZ)).toBeNull();
+    expect(goingCold(card({}), [log("called", daysAgo(99))], "later", TODAY, TZ)).not.toBeNull();
   });
   it("any kind counts as contact, and so does the card's last-contacted date", () => {
-    expect(goingCold(card({}), [log("met", daysAgo(120)), log("note", daysAgo(10))], "first", TODAY)).toBeNull();
-    expect(goingCold(card({}), [log("met", daysAgo(120)), log("referred_out", daysAgo(5), 1)], "first", TODAY)).toBeNull();
-    expect(lastContactOn(card({ last_contacted_at: `${daysAgo(3)}T15:00:00.000Z` }), [log("met", daysAgo(120))])).toBe(daysAgo(3));
+    expect(goingCold(card({}), [log("met", daysAgo(120)), log("note", daysAgo(10))], "first", TODAY, TZ)).toBeNull();
+    expect(goingCold(card({}), [log("met", daysAgo(120)), log("referred_out", daysAgo(5), 1)], "first", TODAY, TZ)).toBeNull();
+    expect(lastTouchOn(card({ last_contacted_at: `${daysAgo(3)}T15:00:00.000Z` }), [log("met", daysAgo(120))], TZ)).toBe(daysAgo(3));
+  });
+  it("reads last_contacted_at as the practice's day, not the UTC day", () => {
+    // 9pm Nov 1 in Chicago is 02:00 Nov 2 UTC: the practice's day is Nov 1.
+    expect(lastTouchOn(card({ last_contacted_at: "2026-11-02T02:00:00.000Z" }), [], TZ)).toBe("2026-11-01");
+    expect(lastTouchOn(card({ last_contacted_at: new Date("2026-11-02T02:00:00.000Z") as unknown as string }), [], TZ)).toBe("2026-11-01");
+    expect(lastTouchOn(card({ last_contacted_at: "2026-11-02T02:00:00.000Z" }), [], "UTC")).toBe("2026-11-02");
   });
   it("never for Not a fit, a card never contacted, or no tier", () => {
-    expect(goingCold(card({ stage: "not_a_fit" }), [log("met", daysAgo(200))], "first", TODAY)).toBeNull();
-    expect(goingCold(card({ stage: "found" }), [], "first", TODAY)).toBeNull();
-    expect(goingCold(card({}), [log("met", daysAgo(200))], undefined, TODAY)).toBeNull();
+    expect(goingCold(card({ stage: "not_a_fit" }), [log("met", daysAgo(200))], "first", TODAY, TZ)).toBeNull();
+    expect(goingCold(card({ stage: "found" }), [], "first", TODAY, TZ)).toBeNull();
+    expect(goingCold(card({}), [log("met", daysAgo(200))], undefined, TODAY, TZ)).toBeNull();
   });
   it("counts days in the practice's time zone, not UTC", () => {
     // 9pm in Chicago on Nov 2 is already Nov 3 in UTC.
@@ -93,12 +100,12 @@ describe("going cold", () => {
     expect(todayIn("America/Chicago", evening)).toBe("2026-11-02");
     expect(todayIn("UTC", evening)).toBe("2026-11-03");
     const c = [log("met", "2026-08-31")]; // 63 days before Nov 2
-    expect(goingCold(card({}), c, "first", todayIn("America/Chicago", evening))).toBeNull();
-    expect(goingCold(card({}), c, "first", todayIn("UTC", evening))).not.toBeNull();
+    expect(goingCold(card({}), c, "first", todayIn("America/Chicago", evening), TZ)).toBeNull();
+    expect(goingCold(card({}), c, "first", todayIn("UTC", evening), TZ)).not.toBeNull();
   });
   it("coldCards maps every cold card by id", () => {
     const cards = [card({ id: "a" }), card({ id: "b" }), card({ id: "c", stage: "not_a_fit" })];
-    const out = coldCards(cards, { a: [log("met", daysAgo(80))], b: [log("met", daysAgo(10))], c: [log("met", daysAgo(200))] }, { a: { tier: "first" }, b: { tier: "first" }, c: { tier: "first" } }, TODAY);
+    const out = coldCards(cards, { a: [log("met", daysAgo(80))], b: [log("met", daysAgo(10))], c: [log("met", daysAgo(200))] }, { a: { tier: "first" }, b: { tier: "first" }, c: { tier: "first" } }, TODAY, TZ);
     expect(Object.keys(out)).toEqual(["a"]);
   });
 });
@@ -121,20 +128,20 @@ describe("the weekly plan's going-cold nudges", () => {
   const tiers = { "later-old": { tier: "later" as const }, "first-70": { tier: "first" as const }, "first-90": { tier: "first" as const }, "next-100": { tier: "next" as const }, due: { tier: "first" as const } };
 
   it("caps at 2, top tier first then longest without contact, skipping cards already in the plan", () => {
-    const n = coldNudges(cards, contacts, tiers, TODAY, { skip: new Set(["due"]), tierLabel: TIER_LABEL });
+    const n = coldNudges(cards, contacts, tiers, TODAY, TZ, { skip: new Set(["due"]), tierLabel: TIER_LABEL });
     expect(n.map((x) => x.id)).toEqual(["first-90", "first-70"]);
     expect(n[0]).toMatchObject({ tier: "Reach out first", weeks: 12, label: "Going cold: last contact 12 weeks ago", action: NOTE_ACTION });
   });
   it("never more than 2, even when asked for more", () => {
-    expect(coldNudges(cards, contacts, tiers, TODAY, { max: 10 })).toHaveLength(2);
-    expect(coldNudges(cards, contacts, tiers, TODAY, { max: 0 })).toHaveLength(0);
+    expect(coldNudges(cards, contacts, tiers, TODAY, TZ, { max: 10 })).toHaveLength(2);
+    expect(coldNudges(cards, contacts, tiers, TODAY, TZ, { max: 0 })).toHaveLength(0);
   });
   it("no email means the one-pager, not a note", () => {
-    const n = coldNudges([cards[3]], contacts, tiers, TODAY);
+    const n = coldNudges([cards[3]], contacts, tiers, TODAY, TZ);
     expect(n[0].action).toBe(ONE_PAGER_ACTION);
   });
   it("the summary lists them with the cadence and the action, never anything in return", () => {
-    const going_cold = coldNudges(cards, contacts, tiers, TODAY, { tierLabel: TIER_LABEL });
+    const going_cold = coldNudges(cards, contacts, tiers, TODAY, TZ, { tierLabel: TIER_LABEL });
     const s = summarizePlan({ follow_ups: [], reach_out: [], waiting: 0, going_cold });
     expect(s).toContain("Going cold (2):");
     expect(s).toContain("- [Sample] C (Reach out first): last contact 12 weeks ago; aim for every 6 to 8 weeks.");
@@ -149,8 +156,6 @@ describe("reciprocity and the people she refers to", () => {
     const r = reciprocity([log("referred", "2026-10-01"), log("referred", "2026-10-20"), log("referred_out", "2026-10-05", 2), log("referred_out", "2026-10-25", 1), log("met", "2026-09-01")]);
     expect(r).toEqual({ theyReferred: 2, youReferred: 3, line: "They've referred 2 · You've referred 3" });
     expect(reciprocity([]).line).toBe("They've referred 0 · You've referred 0");
-    // An older row with no count still counts as one person.
-    expect(reciprocity([log("referred_out", "2026-10-05", null)]).youReferred).toBe(1);
   });
   it("is on the list when she referred to them or saved notes about them", () => {
     expect(refersTo([log("referred_out", "2026-10-05", 1)], null)).toBe(true);

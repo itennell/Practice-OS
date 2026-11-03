@@ -1,5 +1,6 @@
 import { canChange } from "@/lib/referrals/http";
 import { draftOutreach } from "@/lib/referrals/outreach";
+import { nudgeRefusal } from "@/lib/referrals/refer-out";
 import { isUuid } from "../../../approvals/responses";
 
 /** A going-cold card's "Draft a follow-up note": the same letter path, as a short hello. */
@@ -12,6 +13,12 @@ export async function POST(request: Request, ctx: RouteContext<"/api/referrals/[
   const { id } = await ctx.params;
   if (!isUuid(id)) return Response.json({ error: "Unknown card." }, { status: 404 });
   const body = (await request.json().catch(() => ({}))) as { nudge?: unknown };
+  if (body.nudge === true) {
+    // The server decides, not the page: only a card that is really going cold, with no letter
+    // waiting for approval or ready to send (a waiting letter is never overwritten).
+    const refused = await nudgeRefusal(id);
+    if (refused) return Response.json({ error: refused }, { status: 409 });
+  }
   try {
     const { approvalId, subject, letter } = await draftOutreach(id, { by: "aeon:referrals", ...(body.nudge === true ? { note: KEEP_IN_TOUCH } : {}) });
     return Response.json({ approval_id: approvalId, subject, letter });

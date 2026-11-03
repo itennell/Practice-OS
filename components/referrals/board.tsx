@@ -259,8 +259,14 @@ function Card({
           Suggested from your debrief{card.introduced_by ? ` with ${card.introduced_by}` : ""}. Not contacted.
         </p>
       )}
+      {card.found_via === "manual" && <p className="text-small font-medium">Added by you</p>}
+      {card.sensitive && (
+        <p className="text-small font-medium" data-testid="public-line-only">
+          Contact through their public line only.{card.city ? ` ${card.city}${card.state ? `, ${card.state}` : ""}.` : ""}
+        </p>
+      )}
       {tier && <p className="text-small text-[var(--fg-muted)]">Why: {tier.reasons.slice(1).join("; ")}.</p>}
-      {card.address && (
+      {card.address && !card.sensitive && (
         <p className="flex items-start gap-1.5 text-small text-[var(--fg-muted)]">
           <MapPin aria-hidden size={14} className="mt-0.5 shrink-0" />
           <span>
@@ -383,6 +389,7 @@ export function ReferralBoard({
   contacts: initialContacts,
   referOut: initialReferOut = {},
   today,
+  timeZone,
   demo,
   openDebrief = null,
 }: {
@@ -397,6 +404,8 @@ export function ReferralBoard({
   referOut?: Record<string, ReferOutNotes>;
   /** The practice's today (its time zone), for "going cold". */
   today: string;
+  /** The practice's time zone, to read a card's last-contacted time as a day. */
+  timeZone: string;
   /** The fictional demo practice: letters must never reach a real provider. */
   demo: boolean;
   /** A card id from /referrals?debrief=<id> (the chat's debrief_meeting card): its recorder opens. */
@@ -427,7 +436,7 @@ export function ReferralBoard({
     setTierById(tiers);
     setReferOut(initialReferOut);
   }
-  const cold = coldCards(cards, contacts, tierById, today);
+  const cold = coldCards(cards, contacts, tierById, today, timeZone);
   const referringTo = cards.filter((c) => refersTo(contacts[c.id] ?? [], referOut[c.id]));
   const inView = (c: ReferralSource) => view !== "cold" || Boolean(cold[c.id]);
 
