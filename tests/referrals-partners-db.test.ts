@@ -68,4 +68,12 @@ describe.skipIf(!local)("referrals partners (built-in database only)", () => {
       select count(*)::int as n from practice_os.audit_log where action = 'referral_recheck_started' and subject_id in ${db()([dv, aside])}`;
     expect(n.n).toBe(0);
   });
+
+  it("a partner checked a moment ago answers 423 card_cooldown, not the busy 429", async () => {
+    const id = await makeCard("[Sample] Cooldown Clinic");
+    await db()`insert into practice_os.audit_log (actor, action, subject_type, subject_id) values ('aeon', 'referral_recheck_started', 'referral_source', ${id})`;
+    const r = await post(id);
+    expect(r.status).toBe(423);
+    expect((await r.json()).code).toBe("card_cooldown");
+  });
 });
