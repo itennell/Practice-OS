@@ -14,6 +14,23 @@ async function call<T>(url: string, init?: RequestInit): Promise<T> {
   return data;
 }
 
+/** A card on her board, as GET /api/referrals/meetings/partners gives it. */
+export type CalendarPartner = {
+  id: string;
+  name: string;
+  organization: string | null;
+  phone: string | null;
+  /** Why no meeting can be planned with this card, in plain words, or null. */
+  blocked: string | null;
+};
+
+export async function fetchPartners(): Promise<{ partners: CalendarPartner[]; timeZone: string }> {
+  const res = await fetch("/api/referrals/meetings/partners", { cache: "no-store" });
+  const data = (await res.json().catch(() => ({}))) as { partners?: CalendarPartner[]; timeZone?: string; error?: string };
+  if (!res.ok || !data.partners || !data.timeZone) throw new Error(data.error ?? "Couldn't load your calendar. Reload the page to try again.");
+  return { partners: data.partners, timeZone: data.timeZone };
+}
+
 export async function fetchMeetings(range: Range): Promise<Meeting[]> {
   const q = new URLSearchParams({ from: range.from.toISOString(), to: range.to.toISOString() });
   const res = await fetch(`/api/referrals/meetings?${q}`, { cache: "no-store" });

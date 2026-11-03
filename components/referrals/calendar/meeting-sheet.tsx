@@ -16,7 +16,7 @@ import { notify } from "@/components/shared/toaster";
 import { Button, buttonClass } from "@/components/ui";
 import { cancelMeeting, changeMeeting, type Meeting } from "./api";
 import { dayKey, KIND_LABEL, timeOptions, wallInstant, wallTime, whenLabel, type Kind } from "./layout";
-import type { CalendarPartner } from "./partners";
+import type { CalendarPartner } from "./api";
 
 const TIMES = timeOptions();
 

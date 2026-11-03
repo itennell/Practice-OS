@@ -17,11 +17,11 @@ import { IconButton, IconButtonGroup } from "@/components/shared/icon-button";
 import { Tab, TabList, TabPanel, Tabs } from "@/components/shared/tabs";
 import { Button } from "@/components/ui";
 import { Agenda } from "../calendar/agenda";
-import { fetchMeetings, type Meeting } from "../calendar/api";
+import { fetchMeetings, fetchPartners, type CalendarPartner, type Meeting } from "../calendar/api";
 import { dayKey, rangeLabel, stepAnchor, viewDays, viewRange, visibleWeekDays, type CalendarView } from "../calendar/layout";
 import { MeetingSheet } from "../calendar/meeting-sheet";
 import { MonthGrid } from "../calendar/month-grid";
-import { calendarPartners, type CalendarPartner } from "../calendar/partners";
+
 import { PlanSheet, type PlanStart } from "../calendar/plan-sheet";
 import { TimeGrid } from "../calendar/time-grid";
 
@@ -43,10 +43,10 @@ export function CalendarTab({ partnerId }: { /** Picked from a partner's "Plan a
   const [now, setNow] = useState(() => new Date());
   const [handledPartner, setHandledPartner] = useState<string | null>(null);
 
-  // Her board and time zone, read on the server once.
+  // Her board and time zone (GET /api/referrals/meetings/partners), read once.
   useEffect(() => {
     let live = true;
-    calendarPartners()
+    fetchPartners()
       .then((s) => {
         if (!live) return;
         setSetup(s);

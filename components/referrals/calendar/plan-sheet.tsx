@@ -15,7 +15,7 @@ import { notify } from "@/components/shared/toaster";
 import { Button } from "@/components/ui";
 import { planMeeting, type Meeting } from "./api";
 import { DURATIONS, durationLabel, KIND_LABEL, KIND_MINUTES, KINDS, nextFreeStart, timeOptions, wallInstant, type Kind } from "./layout";
-import type { CalendarPartner } from "./partners";
+import type { CalendarPartner } from "./api";
 
 const TIMES = timeOptions();
 const KIND_OPTIONS = KINDS.filter((k) => k !== "other")

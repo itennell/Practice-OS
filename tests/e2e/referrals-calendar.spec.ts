@@ -113,3 +113,13 @@ test("Partners' Plan a meeting opens the form with that partner", async ({ page 
   await expect(form).toBeVisible();
   await expect(form.getByRole("combobox", { name: "With" })).toHaveText(new RegExp(JUNIPER.replace(/[[\]]/g, "\\$&")));
 });
+
+test("the calendar's partner list: board cards, why some are blocked, no addresses", async ({ request }) => {
+  const res = await request.get("/api/referrals/meetings/partners");
+  expect(res.ok()).toBe(true);
+  expect(res.headers()["cache-control"]).toContain("no-store");
+  const { partners, timeZone } = (await res.json()) as { partners: Record<string, unknown>[]; timeZone: string };
+  expect(timeZone).toBeTruthy();
+  expect(partners.find((p) => p.id === JUNIPER_ID)).toMatchObject({ name: JUNIPER, blocked: null });
+  for (const p of partners) expect(Object.keys(p).sort()).toEqual(["blocked", "id", "name", "organization", "phone"]);
+});
