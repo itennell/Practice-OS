@@ -40,7 +40,7 @@ test("Referrals CRM: header, numbers, tabs in the URL, the partners table, and M
   }
   const row = partnerRow(page, "[Sample] Juniper Row Family Medicine");
   await expect(row).toContainText("0.6 mi");
-  await expect(row).toContainText("Primary care");
+  await expect(row).toContainText("Family medicine");
   await expect(row).toContainText("Found");
 
   // Keyboard and screen-reader way: More › Move stage.

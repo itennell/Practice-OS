@@ -76,6 +76,8 @@ test("Log referral on a row keeps only the date, and the number goes up", async 
   const before = Number((await numbers.locator("p.text-title").nth(3).textContent()) ?? "0");
   const saved = page.waitForResponse((r) => r.url().endsWith("/contacts") && r.request().method() === "POST");
   await partnerRow(page, "[Sample] Fernhollow Pediatrics").getByRole("button", { name: "Log a referral from [Sample] Fernhollow Pediatrics" }).click();
+  // It asks first, the same as dropping a card on the Board's Referring column.
+  await page.getByRole("alertdialog").filter({ hasText: "Log a referral from [Sample] Fernhollow Pediatrics?" }).getByRole("button", { name: "Log the referral" }).click();
   const post = await saved;
   expect(post.ok()).toBe(true);
   expect(Object.keys(post.request().postDataJSON() as object).sort()).toEqual(["happened_on", "kind"]);

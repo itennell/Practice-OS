@@ -57,7 +57,9 @@ export function DateField({
   const [seen, setSeen] = useState(value);
   if (seen !== value) {
     setSeen(value);
-    if ((parseTyped(text) ?? "") !== value) setText(formatTyped(value));
+    // Our own "" for a date with a problem keeps what she typed (and its error) on screen.
+    const typedValue = dateFieldError(text, { min, max }) ? "" : (parseTyped(text) ?? "");
+    if (typedValue !== value) setText(formatTyped(value));
   }
 
   const check = (next: string) => dateFieldError(next, { min, max, required });
