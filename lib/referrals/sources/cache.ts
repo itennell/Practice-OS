@@ -50,7 +50,7 @@ export function coolingUntil(host: string): number {
 export async function cachedJson(
   key: string,
   load: () => Promise<unknown>,
-  opts: { ttlMs?: number; sql?: postgres.Sql | null; now?: () => number; /** Backs off this host after a 429 or 503. */ host?: string; source?: string } = {},
+  opts: { ttlMs?: number; sql?: postgres.Sql | null; now?: () => number; /** Backs off this host after a 429 or 503. */ host?: string; source?: string; /** Told when the answer couldn't be kept in the database (it is still returned). */ onStoreError?: (err: unknown) => void } = {},
 ): Promise<unknown> {
   const ttl = opts.ttlMs ?? DAY_MS;
   const now = opts.now ?? Date.now;
@@ -88,8 +88,10 @@ export async function cachedJson(
       await sql`
         insert into practice_os.referral_fetch_cache (url, status, body, fetched_at)
         values (${key}, 200, ${body}, ${new Date(now())})
-        on conflict (url) do update set status = 200, etag = null, last_modified = null, body = excluded.body, fetched_at = excluded.fetched_at`.catch(() => {});
+        on conflict (url) do update set status = 200, etag = null, last_modified = null, body = excluded.body, fetched_at = excluded.fetched_at`.catch((err) => opts.onStoreError?.(err));
     }
+  } else if (sql) {
+    opts.onStoreError?.(new Error(`The answer for ${key.slice(0, 120)} is too large to keep (${body.length} characters).`));
   }
   return value;
 }

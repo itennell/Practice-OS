@@ -3,9 +3,15 @@
 // app already ran answers from the database, even after a restart, and
 // `npm run demo:warm` can ask once before a recording:
 //   - the NPI Registry: each search page (one URL) for a day, slimmed to the
-//     fields lib/referrals/nppes.ts parseResult reads, so a 200-result page fits;
+//     fields lib/referrals/nppes.ts parseResult reads, so a 200-result page fits.
+//     Before anything is kept, every sensitive result (a DV/SA agency or shelter,
+//     by NUCC code or name, lib/referrals/sensitive.ts) and anyone NPPES lists at
+//     the same street on that page is taken out, the way Overpass answers are
+//     (osm-orgs.ts dropSensitive): no shelter's name or street is ever stored;
 //   - the Census geocoder: each provider address's point (or "no match") for 30
 //     days, keyed by a hash of the address. Offices don't move often.
+// These rows have their own prune (past their lifetime, on each write); the
+// website-page prune (lib/referrals/email/fetch.ts) skips them by key prefix.
 // Server only: lib/referrals/nppes.ts is also read in the browser, so the
 // database stays out of it. Only public directory answers are stored, never
 // anything about a client.
@@ -13,11 +19,15 @@ import { createHash } from "node:crypto";
 import type postgres from "postgres";
 import { cachedFetch, fetchNppes, type Fetcher, type NppesResponse, type NppesResult } from "../nppes";
 import { addressKey, geocodeAddresses, type Address, type Point } from "../geocode";
+import { isSensitiveSource, siteHashes } from "../sensitive";
 import { cachedJson, DAY_MS } from "./cache";
+import { CENSUS_KEY_PREFIX, NPPES_KEY_PREFIX } from "./stored-keys";
 
 export const NPPES_STORE_MS = DAY_MS;
 export const GEOCODE_STORE_MS = 30 * DAY_MS;
-const CENSUS_KEY = "https://geocoding.geo.census.gov/geocoder/locations/addressbatch#address=";
+
+/** Told when an answer couldn't be kept (the search still gets it); demo:warm lists these. */
+export type StoreErrorSink = (what: string) => void;
 
 type Address0 = NonNullable<NppesResult["addresses"]>[number];
 
@@ -32,13 +42,36 @@ const slimAddress = (a: Address0): Address0 => ({
   fax_number: a.fax_number,
 });
 
-/** Only what parseResult reads: a full NPPES page is about 1 MB, this is a fraction. */
+const resultNames = (r: NppesResult) => [
+  r.basic?.organization_name,
+  [r.basic?.first_name, r.basic?.last_name].filter(Boolean).join(" ") || null,
+  ...(r.other_names ?? []).map((o) => o.organization_name),
+];
+
+/** A DV/SA agency or shelter by any of its NUCC codes or names (its legal name or a DBA). */
+export function sensitiveResult(r: NppesResult): boolean {
+  const names = resultNames(r);
+  return (
+    (r.taxonomies ?? []).some((t) => isSensitiveSource({ taxonomy: t.code })) ||
+    names.some((n) => isSensitiveSource({ name: n ?? null }))
+  );
+}
+
+const siteKeys = (r: NppesResult) => [...(r.addresses ?? []), ...(r.practiceLocations ?? [])].flatMap((a) => siteHashes([a.address_1, a.address_2].filter(Boolean).join(" "), a.postal_code));
+
+/**
+ * Only what parseResult reads (a full NPPES page is about 1 MB, this is a
+ * fraction), and never a sensitive result or anyone at its street on the page.
+ */
 export function slimNppes(res: NppesResponse): NppesResponse {
   const out: NppesResponse = {};
   if (res.result_count !== undefined) out.result_count = res.result_count;
   if (res.Errors) out.Errors = res.Errors.map((e) => ({ description: e.description }));
   if (res.results) {
-    out.results = res.results.map((r) => ({
+    const hidden = res.results.filter(sensitiveResult);
+    const sites = new Set(hidden.flatMap(siteKeys));
+    const kept = res.results.filter((r) => !hidden.includes(r) && !siteKeys(r).some((h) => sites.has(h)));
+    out.results = kept.map((r) => ({
       number: r.number,
       enumeration_type: r.enumeration_type,
       basic: {
@@ -60,27 +93,61 @@ export function slimNppes(res: NppesResponse): NppesResponse {
   return out;
 }
 
+const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
+
+/** Removes this prefix's rows past their lifetime. Run on each write; a failure is reported, never thrown. */
+async function prune(sql: postgres.Sql, prefix: string, ttlMs: number, now: number, onError?: StoreErrorSink) {
+  await sql`
+    delete from practice_os.referral_fetch_cache
+     where left(url, ${prefix.length}) = ${prefix} and fetched_at < ${new Date(now - ttlMs)}`.catch((err) =>
+    onError?.(`Couldn't clear old saved answers: ${message(err)}`),
+  );
+}
+
 /** NPPES search pages from the database when asked within a day, else from the registry (and kept). */
-export function storedNppesFetcher(sql: postgres.Sql | null, fetcher: Fetcher = fetchNppes): Fetcher {
+export function storedNppesFetcher(sql: postgres.Sql | null, fetcher: Fetcher = fetchNppes, onError?: StoreErrorSink, now: () => number = Date.now): Fetcher {
   return cachedFetch(
     (url) =>
-      cachedJson(url, async () => slimNppes(await fetcher(url)), { sql, ttlMs: NPPES_STORE_MS, source: "The NPI Registry" }) as Promise<NppesResponse>,
+      cachedJson(
+        url,
+        async () => {
+          const page = slimNppes(await fetcher(url));
+          // A fresh answer is about to be written: drop this kind's rows past their day first.
+          if (sql) await prune(sql, NPPES_KEY_PREFIX, NPPES_STORE_MS, now(), onError);
+          return page;
+        },
+        {
+          sql,
+          now,
+          ttlMs: NPPES_STORE_MS,
+          source: "The NPI Registry",
+          onStoreError: (err) => onError?.(`Couldn't keep an NPI Registry page: ${message(err)}`),
+        },
+      ) as Promise<NppesResponse>,
   );
 }
 
 export function geocodeKey(a: Address): string {
-  return `${CENSUS_KEY}${createHash("sha256").update(addressKey(a)).digest("hex")}`;
+  return `${CENSUS_KEY_PREFIX}${createHash("sha256").update(addressKey(a)).digest("hex")}`;
 }
 
 /** geocodeAddresses, with each address's answer kept in the database for 30 days. */
-export function storedGeocoder(sql: postgres.Sql | null, geocode: typeof geocodeAddresses = geocodeAddresses, now: () => number = Date.now): typeof geocodeAddresses {
+export function storedGeocoder(
+  sql: postgres.Sql | null,
+  geocode: typeof geocodeAddresses = geocodeAddresses,
+  now: () => number = Date.now,
+  onError?: StoreErrorSink,
+): typeof geocodeAddresses {
   return async (addresses, opts) => {
     if (!sql || addresses.length === 0) return geocode(addresses, opts);
     const out = new Map<string, Point | null>();
     const keyOf = new Map(addresses.map((a) => [addressKey(a), geocodeKey(a)]));
     const rows = await sql<{ url: string; body: string | null; fetched_at: Date }[]>`
       select url, body, fetched_at from practice_os.referral_fetch_cache
-       where url = any(${[...new Set(keyOf.values())]}) and status = 200`.catch(() => []);
+       where url = any(${[...new Set(keyOf.values())]}) and status = 200`.catch((err) => {
+      onError?.(`Couldn't read saved map points: ${message(err)}`);
+      return [];
+    });
     const stored = new Map<string, Point | null>();
     for (const r of rows) {
       if (now() - new Date(r.fetched_at).getTime() >= GEOCODE_STORE_MS || r.body === null) continue;
@@ -111,10 +178,13 @@ export function storedGeocoder(sql: postgres.Sql | null, geocode: typeof geocode
       seen.add(url);
       save.push({ url, status: 200, body: JSON.stringify(found.get(k) ?? null), fetched_at: new Date(now()) });
     }
+    if (save.length) await prune(sql, CENSUS_KEY_PREFIX, GEOCODE_STORE_MS, now(), onError);
     for (let i = 0; i < save.length; i += 500) {
       await sql`
         insert into practice_os.referral_fetch_cache ${sql(save.slice(i, i + 500))}
-        on conflict (url) do update set status = 200, etag = null, last_modified = null, body = excluded.body, fetched_at = excluded.fetched_at`.catch(() => {});
+        on conflict (url) do update set status = 200, etag = null, last_modified = null, body = excluded.body, fetched_at = excluded.fetched_at`.catch((err) =>
+        onError?.(`Couldn't keep ${save.slice(i, i + 500).length} map points: ${message(err)}`),
+      );
     }
     return out;
   };

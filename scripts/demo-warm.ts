@@ -20,12 +20,18 @@ const cacheOnly = process.argv.includes("--cache-only");
 console.log(`Warming the Referrals demo around ${DEMO_ZIP}. This asks each public source once and can take a few minutes.`);
 const report = await warmDemo({ url, deps: { addToBoard: !cacheOnly }, log: (line) => console.log(`  ${line}`) });
 
-console.log(`\nAt 5 miles: ${report.providers} providers from the NPI Registry (${report.atAddress} placed at their building), ${report.places} places from CMS and OpenStreetMap.`);
+const miles = (m: number | null) => (m === null ? "no radius answered" : `${m} miles`);
+console.log(`\nMap (${miles(report.mapMiles)}): ${report.providers} providers from the NPI Registry (${report.atAddress} placed at their building).`);
+console.log(`Places near you (${miles(report.placesMiles)}): ${report.places} places from CMS and OpenStreetMap.`);
 console.log("By category:");
 for (const c of report.categories) console.log(`  ${c.label.padEnd(44)} ${c.count}`);
 if (!cacheOnly) console.log(`Added to the board: ${report.added.nppes} from the NPI Registry, ${report.added.cms} from CMS, ${report.added.osm} from OpenStreetMap.`);
-if (report.failed.length) {
-  console.log("\nThese didn't answer. Run npm run demo:warm again in a few minutes:");
+if (report.notKept.length) {
+  console.log("\nThese answers couldn't be saved, so the recording would ask again:");
+  for (const f of report.notKept) console.log(`  - ${f}`);
+}
+if (report.failed.length || report.notKept.length) {
+  if (report.failed.length) console.log("\nThese didn't answer. Run npm run demo:warm again in a few minutes:");
   for (const f of report.failed) console.log(`  - ${f}`);
   process.exit(2);
 }

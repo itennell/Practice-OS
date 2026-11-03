@@ -333,7 +333,7 @@ export function npiUrl(npi: string): string {
 
 export type Fetcher = (url: string) => Promise<NppesResponse>;
 
-/** One question to the NPI Registry, no cache (lib/referrals/sources/nppes-cache.ts keeps answers in the database). */
+/** One question to the NPI Registry, no cache (lib/referrals/sources/stored-cache.ts keeps search pages in the database). */
 export const fetchNppes: Fetcher = async (url) => {
   const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
   if (!res.ok) throw new Error(`The NPI Registry answered ${res.status}.`);

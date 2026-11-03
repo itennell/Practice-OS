@@ -37,7 +37,7 @@ insert into practice_os.referral_sources
   (id, name, organization, taxonomy, specialty, npi_type, city, state, email, stage, last_contacted_at, next_follow_up_on, distance_miles, fit_score, score_version, notes, is_sample) values
   ('00000000-0000-4000-8000-000000000201', '[Sample] Lakeview Family Medicine', '[Sample] Lakeview Family Medicine',
    '207Q00000X', 'Family medicine', 'organization', 'Chicago', 'IL', 'frontdesk@example.com', 'found', null, null, 0.6, null, 0, '[Sample] Near the office.', true),
-  ('00000000-0000-4000-8000-000000000202', '[Sample] Dr. Alex Example', '[Sample] North Side Internal Medicine',
+  ('00000000-0000-4000-8000-000000000202', '[Sample] Dr. Alex Example', '[Sample] Orrindale Internal Medicine',
    '207R00000X', 'Internal medicine', 'individual', 'Chicago', 'IL', 'alex@example.com', 'contacted', now() - interval '8 days', current_date + 6, 1.4, null, 0,
    '[Sample] Sent intro letter.', true),
   ('00000000-0000-4000-8000-000000000203', '[Sample] Old Town OB-GYN', '[Sample] Old Town OB-GYN',
@@ -47,10 +47,10 @@ insert into practice_os.referral_sources
    '208000000X', 'Pediatrics', 'organization', 'Chicago', 'IL', 'hello@example.com', 'connected', now() - interval '35 days', null, 0.3, null, 0,
    '[Sample] Happy to share referrals for parents.', true),
   -- Dana's niche is oncology / serious illness / end of life: two kinds it ranks first.
-  ('00000000-0000-4000-8000-000000000205', '[Sample] Lakeshore Oncology Group', '[Sample] Lakeshore Oncology Group',
+  ('00000000-0000-4000-8000-000000000205', '[Sample] Quillmere Oncology Group', '[Sample] Quillmere Oncology Group',
    '207RX0202X', 'Oncology', 'organization', 'Chicago', 'IL', 'intake@example.com', 'found', null, null, 0.9, null, 0,
    '[Sample] Cancer center near the office.', true),
-  ('00000000-0000-4000-8000-000000000206', '[Sample] North Side Hospice', '[Sample] North Side Hospice',
+  ('00000000-0000-4000-8000-000000000206', '[Sample] Orrindale Hospice', '[Sample] Orrindale Hospice',
    '251G00000X', 'Hospice', 'organization', 'Chicago', 'IL', 'care@example.com', 'found', null, null, 1.8, null, 0,
    '[Sample] Bereavement coordinator on staff.', true);
 
@@ -279,41 +279,41 @@ insert into practice_os.referral_contacts (source_id, kind, happened_on, note, c
 -- example.com emails, city-level addresses only (no street, no ZIP). Three have a contact history so
 -- "Who should I reach out to this week?" and the board look lived-in: a call five weeks ago that went
 -- cold (207), a letter approved and marked sent two weeks ago (208), a coffee and a referral (209).
--- The debrief target is 205 ([Sample] Lakeshore Oncology Group): coffee booked, profile left empty
+-- The debrief target is 205 ([Sample] Quillmere Oncology Group): coffee booked, profile left empty
 -- so the debrief visibly fills it. 204 stays the e2e debrief stand-in's card.
 insert into practice_os.referral_sources
   (id, name, organization, specialty, npi_type, city, state, phone, email, stage, last_contacted_at, next_follow_up_on,
    distance_miles, fit_score, score_version, source_type, found_via, notes, is_sample) values
-  ('00000000-0000-4000-8000-000000000207', '[Sample] Lakefront Cancer Support Community', '[Sample] Lakefront Cancer Support Community',
-   'Disease organizations (cancer, MS, Alzheimer''s, diabetes)', 'organization', 'Chicago', 'IL', '(312) 555-0161', 'programs@lakefront-cancer.example.com',
+  ('00000000-0000-4000-8000-000000000207', '[Sample] Wovenlight Cancer Support Circle', '[Sample] Wovenlight Cancer Support Circle',
+   'Disease organizations (cancer, MS, Alzheimer''s, diabetes)', 'organization', 'Chicago', 'IL', '(312) 555-0161', 'programs@wovenlight-support.example.com',
    'contacted', now() - interval '35 days', null, 1.2, null, 0, 'disease_orgs', 'manual',
    '[Sample] Free support groups and a caregiver night on Thursdays.', true),
-  ('00000000-0000-4000-8000-000000000208', '[Sample] Brightwater Grief Center', '[Sample] Brightwater Grief Center',
-   'Grief centers and child bereavement programs', 'organization', 'Chicago', 'IL', '(312) 555-0162', 'hello@brightwater-grief.example.com',
+  ('00000000-0000-4000-8000-000000000208', '[Sample] Marrowpine Grief Center', '[Sample] Marrowpine Grief Center',
+   'Grief centers and child bereavement programs', 'organization', 'Chicago', 'IL', '(312) 555-0162', 'hello@marrowpine-grief.example.com',
    'contacted', now() - interval '14 days', current_date + 2, 0.8, null, 0, 'grief_centers', 'manual',
    '[Sample] Peer grief groups; they keep a list of counselors for one-on-one care.', true),
-  ('00000000-0000-4000-8000-000000000209', '[Sample] Hollis Vance', '[Sample] Evening Star Hospice',
-   'Hospice agencies and bereavement coordinators', 'individual', 'Chicago', 'IL', '(312) 555-0163', 'hvance@eveningstar-hospice.example.com',
+  ('00000000-0000-4000-8000-000000000209', '[Sample] Hollis Vance', '[Sample] Glimmerfen Hospice',
+   'Hospice agencies and bereavement coordinators', 'individual', 'Chicago', 'IL', '(312) 555-0163', 'hvance@glimmerfen-hospice.example.com',
    'connected', now() - interval '20 days', null, 2.1, null, 0, 'hospice', 'manual',
    '[Sample] Bereavement coordinator. Families get 13 months of bereavement support after a death.', true),
-  ('00000000-0000-4000-8000-000000000210', '[Sample] Renata Ostrowski, RN', '[Sample] Harborview Medical Center Cancer Center',
-   'Nurse navigators (cancer, cardiac, transplant)', 'individual', 'Chicago', 'IL', '(312) 555-0164', 'navigation@harborview-medical.example.com',
+  ('00000000-0000-4000-8000-000000000210', '[Sample] Renata Ostrowski, RN', '[Sample] Quellbrook Teaching Hospital Cancer Center',
+   'Nurse navigators (cancer, cardiac, transplant)', 'individual', 'Chicago', 'IL', '(312) 555-0164', 'navigation@quellbrook-hospital.example.com',
    'found', null, null, 1.6, null, 0, 'nurse_navigators', 'manual',
    '[Sample] Oncology nurse navigator for newly diagnosed patients.', true),
-  ('00000000-0000-4000-8000-000000000211', '[Sample] Rev. Tobias Wren', '[Sample] Harborview Medical Center',
-   'Chaplains and spiritual care', 'individual', 'Chicago', 'IL', '(312) 555-0165', 'spiritualcare@harborview-medical.example.com',
+  ('00000000-0000-4000-8000-000000000211', '[Sample] Rev. Tobias Wren', '[Sample] Quellbrook Teaching Hospital',
+   'Chaplains and spiritual care', 'individual', 'Chicago', 'IL', '(312) 555-0165', 'spiritualcare@quellbrook-hospital.example.com',
    'found', null, null, 1.6, null, 0, 'chaplains', 'manual',
    '[Sample] Staff chaplain on the oncology and palliative floors.', true),
-  ('00000000-0000-4000-8000-000000000212', '[Sample] Delia Marchetti, LCSW', '[Sample] Harborview Medical Center Cancer Center',
-   'Hospital social workers and case managers', 'individual', 'Chicago', 'IL', '(312) 555-0166', 'socialwork@harborview-medical.example.com',
+  ('00000000-0000-4000-8000-000000000212', '[Sample] Delia Marchetti, LCSW', '[Sample] Quellbrook Teaching Hospital Cancer Center',
+   'Hospital social workers and case managers', 'individual', 'Chicago', 'IL', '(312) 555-0166', 'socialwork@quellbrook-hospital.example.com',
    'found', null, null, 1.6, null, 0, 'hospital_social_workers', 'manual',
    '[Sample] Oncology social worker; refers out for longer-term counseling.', true),
-  ('00000000-0000-4000-8000-000000000213', '[Sample] Bellweather Elder Law', '[Sample] Bellweather Elder Law',
-   'Elder law and estate attorneys', 'organization', 'Chicago', 'IL', '(312) 555-0167', 'office@bellweather-law.example.com',
+  ('00000000-0000-4000-8000-000000000213', '[Sample] Tessaly & Quorne Elder Law', '[Sample] Tessaly & Quorne Elder Law',
+   'Elder law and estate attorneys', 'organization', 'Chicago', 'IL', '(312) 555-0167', 'office@tessaly-quorne.example.com',
    'found', null, null, 0.7, null, 0, 'elder_law_attorneys', 'manual',
    '[Sample] Advance directives and estate planning for families facing serious illness.', true),
-  ('00000000-0000-4000-8000-000000000214', '[Sample] Caregivers Circle', '[Sample] Caregivers Circle',
-   'Support group leaders', 'organization', 'Chicago', 'IL', '(312) 555-0168', 'circle@caregivers-circle.example.com',
+  ('00000000-0000-4000-8000-000000000214', '[Sample] Thistlemoor Caregiver Group', '[Sample] Thistlemoor Caregiver Group',
+   'Support group leaders', 'organization', 'Chicago', 'IL', '(312) 555-0168', 'group@thistlemoor-caregivers.example.com',
    'found', null, null, 1.0, null, 0, 'support_group_leaders', 'manual',
    '[Sample] Monthly group for people caring for a parent or partner with cancer.', true);
 
@@ -327,12 +327,12 @@ update practice_os.referral_sources set source_type = 'hospice', found_via = 'ma
 -- 208's letter: approved two weeks ago and marked sent (a sent_letter after the approval; lib/referrals/store.ts latestLetters).
 insert into practice_os.approvals (id, kind, title, preview, payload, status, created_by, created_at, decided_at, decided_by, result, is_sample) values
   ('00000000-0000-4000-8000-000000000910', 'referral_letter',
-   '[Sample] Intro letter to Brightwater Grief Center',
-   '{"subject": "[Sample] A counselor for one-on-one grief care in Lincoln Park", "provider": "[Sample] Brightwater Grief Center", "specialty": "Grief centers and child bereavement programs",
-     "body": "[Sample] Dear Brightwater Grief Center team,\n\nI''m Dana Reyes, a licensed clinical professional counselor in Lincoln Park. I work with adults living with serious illness and with families after a loss, in person and by video.\n\nWhen someone in one of your groups asks about one-on-one counseling, I''d be glad to be one of the names you share. Would you be open to a short call to introduce ourselves?\n\nDana Reyes, LCPC (fictional demo practice)\nReyes Counseling PLLC",
+   '[Sample] Intro letter to Marrowpine Grief Center',
+   '{"subject": "[Sample] A counselor for one-on-one grief care in Lincoln Park", "provider": "[Sample] Marrowpine Grief Center", "specialty": "Grief centers and child bereavement programs",
+     "body": "[Sample] Dear Marrowpine Grief Center team,\n\nI''m Dana Reyes, a licensed clinical professional counselor in Lincoln Park. I work with adults living with serious illness and with families after a loss, in person and by video.\n\nWhen someone in one of your groups asks about one-on-one counseling, I''d be glad to be one of the names you share. Would you be open to a short call to introduce ourselves?\n\nDana Reyes, LCPC (fictional demo practice)\nReyes Counseling PLLC",
      "delivery": "Copy it from the Referrals board and send it from your own email. Aeon sends nothing."}'::jsonb,
    '{"referral_source_id": "00000000-0000-4000-8000-000000000208", "subject": "[Sample] A counselor for one-on-one grief care in Lincoln Park",
-     "letter": "[Sample] Dear Brightwater Grief Center team,\n\nI''m Dana Reyes, a licensed clinical professional counselor in Lincoln Park. I work with adults living with serious illness and with families after a loss, in person and by video.\n\nWhen someone in one of your groups asks about one-on-one counseling, I''d be glad to be one of the names you share. Would you be open to a short call to introduce ourselves?\n\nDana Reyes, LCPC (fictional demo practice)\nReyes Counseling PLLC"}'::jsonb,
+     "letter": "[Sample] Dear Marrowpine Grief Center team,\n\nI''m Dana Reyes, a licensed clinical professional counselor in Lincoln Park. I work with adults living with serious illness and with families after a loss, in person and by video.\n\nWhen someone in one of your groups asks about one-on-one counseling, I''d be glad to be one of the names you share. Would you be open to a short call to introduce ourselves?\n\nDana Reyes, LCPC (fictional demo practice)\nReyes Counseling PLLC"}'::jsonb,
    'done', 'aeon:referrals', now() - interval '15 days', now() - interval '14 days', 'clinician',
    '{"dry_run": true, "letter_ready": true, "moved_to": null, "letter": {"subject": "[Sample] A counselor for one-on-one grief care in Lincoln Park"}}'::jsonb, true);
 

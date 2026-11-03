@@ -18,7 +18,7 @@ import { capFirst, compareTiers, focusFrom, providerTier, type Focus, type TierR
 import { practiceFacts } from "./store";
 import { isSensitiveSource, siteHashes, withoutDistance } from "./sensitive";
 import { knownSensitiveSites } from "./sensitive-sites";
-import { storedGeocoder, storedNppesFetcher } from "./sources/stored-cache";
+import { storedGeocoder, storedNppesFetcher, type StoreErrorSink } from "./sources/stored-cache";
 
 type Centers = Record<string, Point>;
 
@@ -107,6 +107,8 @@ type Deps = {
   now?: () => number;
   /** Keep NPPES pages and geocoded points in referral_fetch_cache (lib/referrals/sources/stored-cache.ts). */
   sql?: postgres.Sql | null;
+  /** Told when an answer couldn't be kept in the database (demo:warm lists these). */
+  onStoreError?: StoreErrorSink;
 };
 
 /** How long a search may take before it answers with what it has (the route allows 120 s). */
@@ -220,7 +222,7 @@ export async function searchArea(
     maxRequests,
     deadline,
     now,
-    ...(deps.sql ? { fetcher: storedNppesFetcher(deps.sql) } : {}),
+    ...(deps.sql ? { fetcher: storedNppesFetcher(deps.sql, undefined, deps.onStoreError) } : {}),
   });
   if (found.timedOut) {
     notes.push(`The NPI Registry was slow, so this is showing the first ${found.timedOut.done} of ${found.timedOut.of} areas. Search again in a minute for the rest.`);
@@ -253,7 +255,7 @@ export async function searchArea(
     return providerTier(p, { miles, focus: ctx.focus, clinicianState: ctx.state, niche: ctx.niche, selfPay: ctx.selfPay }).score;
   };
   const byPromise = [...providers].sort((a, b) => rough(b) - rough(a));
-  const located = await (deps.geocode ?? (deps.sql ? storedGeocoder(deps.sql) : geocodeAddresses))(
+  const located = await (deps.geocode ?? (deps.sql ? storedGeocoder(deps.sql, undefined, undefined, deps.onStoreError) : geocodeAddresses))(
     // A home-looking address is never placed at street level: it stays at the ZIP center.
     byPromise.filter((p) => !p.homeAddress && !hidden.has(p.npi)).map((p) => ({ street: p.address, city: p.city, state: p.state, zip: p.zip })),
     { timeoutMs: deadline + 25_000 - now() },

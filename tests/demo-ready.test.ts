@@ -13,6 +13,7 @@ import { DEMO_NICHE, projectRefOf, resetDemoData } from "../lib/demo-reset";
 import { categoryCounts, pickForBoard, warmDemo, warmRefusal } from "../lib/demo-warm";
 import { parseResponses, clearNppesCache, type NppesResponse } from "../lib/referrals/nppes";
 import { clearSourceCache } from "../lib/referrals/sources/cache";
+import { pruneFetchCache } from "../lib/referrals/email/fetch";
 import { geocodeKey, slimNppes, storedGeocoder, storedNppesFetcher } from "../lib/referrals/sources/stored-cache";
 import type { AreaProvider, AreaResult } from "../lib/referrals/area";
 import type { DiscoveredOrg, DiscoveryResult } from "../lib/referrals/orgs";
@@ -27,8 +28,14 @@ const { latestLetters } = await import("../lib/referrals/store");
 const dirs: string[] = [];
 afterAll(async () => {
   for (const d of dirs) await rm(d, { recursive: true, force: true });
-  if (local) await closeDb();
+  if (local) {
+    // The cache rows these tests wrote (all "Sample" searches and addresses).
+    await db()`delete from practice_os.referral_fetch_cache where url like 'https://npiregistry.cms.hhs.gov/api/?%Sample%' or url like 'https://npiregistry.cms.hhs.gov/api/?%taxonomy_description=New%' or url like 'https://sample-site.example.com/%'`;
+    await db()`delete from practice_os.referral_fetch_cache where url = any(${testGeoKeys})`;
+    await closeDb();
+  }
 });
+const testGeoKeys: string[] = [];
 
 const SUPABASE = "postgresql://postgres.abcdefghij:pw@aws-0-us-east-1.pooler.supabase.com:6543/postgres";
 const BUILT_IN = "postgres://postgres:pw@127.0.0.1:54329/postgres";
@@ -57,15 +64,20 @@ const card = (over: Partial<DemoCard> = {}): DemoCard => ({
   sensitive: false,
   looksSensitive: false,
   hasAddress: false,
+  doNotContact: false,
   ...over,
 });
 
 /** A ready demo: 24 cards near 60614 in 6 categories, from all four kinds of source. */
+const NOW = new Date("2026-11-03T15:00:00Z");
 const ready = (over: Partial<DemoSnapshot> = {}): DemoSnapshot => ({
-  referralsOnly: true,
-  dryRun: true,
+  now: NOW,
+  dryRunFiles: [{ file: ".env", value: "true" }],
   niche: DEMO_NICHE,
   approvalMode: "manual",
+  latestChat: null,
+  nppesPagesLastDay: 40,
+  lastWarm: new Date("2026-11-03T13:00:00Z"),
   cards: [
     ...Array.from({ length: 6 }, (_, i) => card({ kind: "nppes", category: 2, miles: i * 0.5, hasAddress: true })),
     ...Array.from({ length: 6 }, () => card({ kind: "cms", category: 5, hasAddress: true })),
@@ -89,11 +101,19 @@ describe("demo:check's lines", () => {
     expect(status(lines, /24 cards within 5 miles of 60614, across 6 categories/)).toBe("PASS");
   });
 
-  it("FAILs a demo flag, niche, DRY_RUN or missing reset, in plain words", () => {
-    expect(status(evaluateDemo(ready({ referralsOnly: false })), /REFERRALS_ONLY_DEMO is off/)).toBe("FAIL");
+  it("FAILs a niche, DRY_RUN, missing reset or stale warm, in plain words", () => {
+    expect(evaluateDemo(ready()).some((l) => /REFERRALS_ONLY_DEMO/.test(l.text))).toBe(false);
     expect(status(evaluateDemo(ready({ niche: "grief_loss" })), /niche is "grief_loss"/)).toBe("FAIL");
     expect(status(evaluateDemo(ready({ niche: null })), /niche is not set/)).toBe("FAIL");
-    expect(status(evaluateDemo(ready({ dryRun: false })), /DRY_RUN is false/)).toBe("FAIL");
+    expect(status(evaluateDemo(ready({ dryRunFiles: [{ file: ".env", value: "false" }] })), /DRY_RUN is "false" in \.env/)).toBe("FAIL");
+    // .env.local wins over .env in Next.js: anything but true there FAILs, even with .env right.
+    const local = evaluateDemo(ready({ dryRunFiles: [{ file: ".env.local", value: "0" }, { file: ".env", value: "true" }] }));
+    expect(status(local, /DRY_RUN is "0" in \.env\.local\..*env files only/)).toBe("FAIL");
+    expect(status(evaluateDemo(ready({ dryRunFiles: [] })), /DRY_RUN isn't set/)).toBe("WARN");
+    expect(status(evaluateDemo(ready()), /DRY_RUN=true in \.env: .*env files only/)).toBe("PASS");
+    expect(status(evaluateDemo(ready({ nppesPagesLastDay: 0 })), /No NPI Registry pages saved in the last 24 hours/)).toBe("FAIL");
+    expect(status(evaluateDemo(ready({ lastWarm: null })), /demo:warm hasn't run/)).toBe("FAIL");
+    expect(status(evaluateDemo(ready({ lastWarm: new Date("2026-11-02T10:00:00Z") })), /demo:warm last ran 29 hours ago/)).toBe("FAIL");
     expect(status(evaluateDemo(ready({ lastReset: null })), /No demo reset found/)).toBe("FAIL");
   });
 
@@ -102,13 +122,16 @@ describe("demo:check's lines", () => {
     far.cards = far.cards.map((c, i) => (i < 6 ? { ...c, miles: 7 } : c));
     expect(status(evaluateDemo(far), /Only 18 cards within 5 miles/)).toBe("FAIL");
     const narrow = ready({ cards: ready().cards.map((c) => ({ ...c, category: c.kind === "manual_sample" ? 11 : 2 })) });
-    expect(status(evaluateDemo(narrow), /across 2 categories \(need 20 across 5\)/)).toBe("FAIL");
+    expect(status(evaluateDemo(narrow), /across 2 categories \(need 20 across 5;/)).toBe("FAIL");
     const noOsm = ready({ cards: [...ready().cards.filter((c) => c.kind !== "osm"), ...Array.from({ length: 8 }, () => card({ kind: "nppes", category: 1 }))] });
     const lines = evaluateDemo(noOsm);
     expect(status(lines, /No card from OpenStreetMap/)).toBe("FAIL");
     expect(status(lines, /from the NPI Registry/)).toBe("PASS");
     const unknownMiles = ready({ cards: ready().cards.map((c) => ({ ...c, miles: null })) });
     expect(status(evaluateDemo(unknownMiles), /Only 0 cards/)).toBe("FAIL");
+    // Do-not-contact cards don't count toward the 20.
+    const dnc = ready({ cards: ready().cards.map((c, i) => (i < 5 ? { ...c, doNotContact: true } : c)) });
+    expect(status(evaluateDemo(dnc), /Only 19 cards within 5 miles.*do-not-contact cards left out/)).toBe("FAIL");
   });
 
   it("FAILs a sensitive card with an address, marked or only named like one", () => {
@@ -120,9 +143,14 @@ describe("demo:check's lines", () => {
     expect(status(evaluateDemo(cityOnly), /No domestic violence/)).toBe("PASS");
   });
 
-  it("WARNs (never FAILs) on Bypass and on chats since the reset; FAILs chats from before it", () => {
-    expect(status(evaluateDemo(ready({ approvalMode: "bypass" })), /Bypass/)).toBe("WARN");
-    expect(status(evaluateDemo(ready({ approvalMode: "auto" })), /Approvals ask first/)).toBe("PASS");
+  it("PASSes only Ask; WARNs (never FAILs) on Auto, Bypass and chats since the reset; FAILs chats from before it", () => {
+    expect(status(evaluateDemo(ready()), /New chats start in Ask/)).toBe("PASS");
+    expect(status(evaluateDemo(ready({ approvalMode: "bypass" })), /start in Bypass, not Ask/)).toBe("WARN");
+    expect(status(evaluateDemo(ready({ approvalMode: "auto" })), /start in Auto, not Ask/)).toBe("WARN");
+    expect(status(evaluateDemo(ready({ approvalMode: null })), /start in Auto, not Ask/)).toBe("WARN");
+    expect(status(evaluateDemo(ready({ latestChat: { mode: "bypass" } })), /latest chat is in Bypass/)).toBe("WARN");
+    expect(status(evaluateDemo(ready({ latestChat: { mode: null } })), /latest chat is in Ask/)).toBe("PASS");
+    expect(status(evaluateDemo(ready({ approvalMode: "auto", latestChat: { mode: null } })), /latest chat is in Auto/)).toBe("WARN");
     expect(status(evaluateDemo(ready({ sinceReset: { conversations: 2, approvals: 1 } })), /2 chats and 1 approval since the reset/)).toBe("WARN");
     expect(status(evaluateDemo(ready({ beforeReset: { conversations: 1, approvals: 0 } })), /from before the last reset are still there/)).toBe("FAIL");
   });
@@ -157,6 +185,14 @@ describe("demo:warm's plain parts", () => {
       { k: "c", distanceMiles: 4.9 },
     ];
     expect(pickForBoard(items, (i) => i.k).map((i) => `${i.k}${i.distanceMiles}`)).toEqual(["a0.5", "a1", "a2", "c4.9"]);
+    // In tier order (the map's), the nearest still win.
+    const tierOrder = [
+      { k: "a", distanceMiles: 4 },
+      { k: "a", distanceMiles: 3.5 },
+      { k: "a", distanceMiles: 2 },
+      { k: "a", distanceMiles: 0.2 },
+    ];
+    expect(pickForBoard(tierOrder, (i) => i.k).map((i) => i.distanceMiles)).toEqual([0.2, 2, 3.5]);
   });
 
   it("slims an NPPES page without changing what the map reads from it", () => {
@@ -287,8 +323,68 @@ describe.skipIf(!local)("the demo on the built-in database", () => {
     const [target] = await sql`
       select name, refers_via, referral_contact, populations, needs_from_therapist, waitlist, payer_mix, best_time, last_meeting_summary, connection_points, profile_updated_at
         from practice_os.referral_sources where id = '00000000-0000-4000-8000-000000000205'`;
-    expect(target.name).toBe("[Sample] Lakeshore Oncology Group");
+    expect(target.name).toBe("[Sample] Quillmere Oncology Group");
     expect(Object.entries(target).filter(([k, v]) => k !== "name" && v !== null)).toEqual([]);
+  });
+
+  it("never keeps a DV shelter (or anyone at its street) from an NPPES page in referral_fetch_cache", async () => {
+    const sql = db();
+    const url = `https://npiregistry.cms.hhs.gov/api/?version=2.1&taxonomy_description=Sample+Shelter&postal_code=60614&limit=200&skip=${Date.now()}`;
+    const page = async (): Promise<NppesResponse> => ({
+      result_count: 3,
+      results: [
+        {
+          number: "1999999981",
+          enumeration_type: "NPI-2",
+          basic: { status: "A", organization_name: "SAMPLE HOPE DOMESTIC VIOLENCE SHELTER" },
+          addresses: [{ address_purpose: "LOCATION", address_1: "77 HIDDEN SAMPLE CT", city: "CHICAGO", state: "IL", postal_code: "60614" }],
+          taxonomies: [{ code: "207RX0202X", primary: true }],
+        },
+        {
+          number: "1999999982",
+          enumeration_type: "NPI-1",
+          basic: { status: "A", first_name: "SAMPLE", last_name: "COLOCATED" },
+          addresses: [{ address_purpose: "LOCATION", address_1: "77 Hidden Sample Ct", city: "CHICAGO", state: "IL", postal_code: "60614" }],
+          taxonomies: [{ code: "207RX0202X", primary: true }],
+        },
+        {
+          number: "1999999983",
+          enumeration_type: "NPI-2",
+          basic: { status: "A", organization_name: "SAMPLE ONCOLOGY PARTNERS" },
+          // Its DBA reads as a shelter: dropped too.
+          other_names: [{ organization_name: "SAMPLE SAFE HOUSE", code: "3" }],
+          addresses: [{ address_purpose: "LOCATION", address_1: "5 OTHER SAMPLE AVE", city: "CHICAGO", state: "IL", postal_code: "60614" }],
+          taxonomies: [{ code: "207RX0202X", primary: true }],
+        },
+      ],
+    });
+    clearNppesCache();
+    clearSourceCache();
+    const got = await storedNppesFetcher(sql, page)(url);
+    expect(got.results).toEqual([]);
+    const [row] = await sql`select body from practice_os.referral_fetch_cache where url = ${url}`;
+    expect(row.body).not.toMatch(/SHELTER|HIDDEN|Hidden|COLOCATED|SAFE HOUSE|1999999981/i);
+    expect(JSON.parse(row.body)).toEqual({ result_count: 3, results: [] });
+  });
+
+  it("the website-page prune leaves stored NPPES and map-point rows alone; their own prune drops rows past their lifetime", async () => {
+    const sql = db();
+    const old = new Date(Date.now() - 10 * 24 * 3600 * 1000);
+    const nppesOld = `https://npiregistry.cms.hhs.gov/api/?version=2.1&taxonomy_description=Old&skip=${Date.now()}`;
+    const censusRecent = geocodeKey({ street: `${Date.now()} Old Sample St`, city: "Chicago", state: "IL", zip: "60614" });
+    testGeoKeys.push(censusRecent);
+    const pageOld = `https://sample-site.example.com/contact?${Date.now()}`;
+    await sql`insert into practice_os.referral_fetch_cache (url, status, body, fetched_at) values
+      (${nppesOld}, 200, '{}', ${old}), (${censusRecent}, 200, '[41.9,-87.6]', ${old}), (${pageOld}, 200, 'x', ${old})`;
+    // The website-page prune lib/referrals/email/fetch.ts runs after it keeps a page.
+    await pruneFetchCache(sql, Date.now());
+    const left = async () => (await sql<{ url: string }[]>`select url from practice_os.referral_fetch_cache where url = any(${[nppesOld, censusRecent, pageOld]})`).map((r) => r.url).sort();
+    expect(await left()).toEqual([censusRecent, nppesOld].sort());
+    // A fresh NPPES write prunes NPPES rows past their day; map points (30 days) stay.
+    clearNppesCache();
+    clearSourceCache();
+    await storedNppesFetcher(sql, async () => ({ result_count: 0, results: [] }))(`https://npiregistry.cms.hhs.gov/api/?version=2.1&taxonomy_description=New&skip=${Date.now()}`);
+    expect(await left()).toEqual([censusRecent]);
   });
 
   it("demo:warm keeps NPPES pages and geocoded points in referral_fetch_cache across restarts", async () => {
@@ -306,6 +402,7 @@ describe.skipIf(!local)("the demo on the built-in database", () => {
     expect(asked).toBe(1);
 
     const addr = { street: `${Date.now()} Sample St`, city: "Chicago", state: "IL", zip: "60614" };
+    testGeoKeys.push(geocodeKey(addr));
     let geocoded = 0;
     const fake = async (list: (typeof addr)[]) => {
       geocoded += list.length;
@@ -348,14 +445,32 @@ describe.skipIf(!local)("the demo on the built-in database", () => {
     expect(report.added).toEqual({ nppes: 4, cms: 2, osm: 2 });
     expect(report.failed.some((f) => /didn't answer/.test(f))).toBe(true);
     expect(report.categories[0]).toEqual({ label: "Medical specialists", count: 4 });
+    expect({ map: report.mapMiles, places: report.placesMiles }).toEqual({ map: 5, places: 5 });
+    expect(report.notKept).toEqual([]);
 
-    const snap = await loadDemoSnapshot(db(), { dryRun: true, referralsOnly: true });
-    const lines = evaluateDemo(snap);
-    expect(lines.filter((l) => l.status === "FAIL")).toEqual([]);
-    expect(snap.cards.filter((c) => c.kind === "nppes")).toHaveLength(4);
-    expect(snap.lastReset).not.toBeNull();
-    // Warming twice adds nothing new.
+    // The fake search kept nothing, so one NPI Registry page stands in for the warm's.
+    await db()`insert into practice_os.referral_fetch_cache (url, status, body, fetched_at)
+      values (${`https://npiregistry.cms.hhs.gov/api/?version=2.1&taxonomy_description=Sample&skip=${Date.now()}`}, 200, '{}', now())`;
+    const [{ approval_mode: savedMode }] = await db()`select approval_mode from practice_os.settings limit 1`;
+    await db()`update practice_os.settings set approval_mode = 'manual'`;
+    try {
+      const snap = await loadDemoSnapshot(db(), { dryRunFiles: [{ file: ".env", value: "true" }] });
+      const lines = evaluateDemo(snap);
+      expect(lines.filter((l) => l.status !== "PASS")).toEqual([]);
+      expect(snap.cards.filter((c) => c.kind === "nppes")).toHaveLength(4);
+      expect(snap.lastReset).not.toBeNull();
+      expect(snap.lastWarm).not.toBeNull();
+
+      // A do-not-contact NPI is read from the 025 list and left out of the count.
+      await db()`insert into practice_os.referral_suppressions (npi, reason) values ('1999999901', 'asked_not_to') on conflict do nothing`;
+      const blocked = await loadDemoSnapshot(db(), { dryRunFiles: [{ file: ".env", value: "true" }] });
+      expect(blocked.cards.filter((c) => c.doNotContact).map((c) => c.name)).toEqual(["[Sample] Test Provider 1, MD"]);
+    } finally {
+      await db()`delete from practice_os.referral_suppressions where npi = '1999999901'`;
+      await db()`update practice_os.settings set approval_mode = ${savedMode}`;
+    }
+    // Warming twice adds nothing new (refreshed cards aren't counted).
     const again = await warmDemo({ url: process.env.DATABASE_URL!, expectedRef: "local", deps });
-    expect(again.added.cms + again.added.osm).toBe(0);
+    expect(again.added).toEqual({ nppes: 0, cms: 0, osm: 0 });
   });
 });

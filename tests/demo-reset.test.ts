@@ -53,6 +53,27 @@ describe("which database a reset may run on", () => {
     expect(resetRefusal("not a url", "local")).toMatch(/Refusing to reset/);
   });
 
+  it("calls a database local only on 127.0.0.1 or localhost", () => {
+    expect(projectRefOf("postgres://postgres.local:pw@127.0.0.1:54329/postgres")).toBe("local");
+    expect(projectRefOf("postgres://postgres:pw@localhost:5432/postgres")).toBe("local");
+    expect(projectRefOf("postgres://postgres:pw@[::1]:5432/postgres")).toBe("local");
+    // A "local" user on another host, or a project user tunnelled to localhost, is neither.
+    expect(projectRefOf("postgres://postgres.local:pw@db.example.com:5432/postgres")).toBeNull();
+    expect(projectRefOf("postgres://postgres:pw@10.0.0.5:5432/postgres")).toBeNull();
+    expect(projectRefOf("postgres://postgres.abcdefghij:pw@127.0.0.1:6543/postgres")).toBeNull();
+    expect(resetRefusal("postgres://postgres.local:pw@db.example.com:5432/postgres", "local")).toMatch(/Refusing to reset/);
+  });
+
+  it("takes a Supabase project ref only from a *.supabase.co or *.pooler.supabase.com host", () => {
+    expect(projectRefOf(SUPABASE)).toBe("abcdefghij");
+    expect(projectRefOf("postgresql://postgres:pw@db.abcdefghij.supabase.co:5432/postgres")).toBe("abcdefghij");
+    expect(projectRefOf("postgresql://postgres.abcdefghij:pw@pooler.example.com:6543/postgres")).toBeNull();
+    expect(projectRefOf("postgresql://postgres.abcdefghij:pw@evilsupabase.co:6543/postgres")).toBeNull();
+    expect(projectRefOf("postgresql://postgres.abcdefghij:pw@supabase.co.example.com:6543/postgres")).toBeNull();
+    expect(projectRefOf("postgresql://postgres.local:pw@aws-0-us-east-1.pooler.supabase.com:6543/postgres")).toBeNull();
+    expect(resetRefusal("postgresql://postgres.abcdefghij:pw@pooler.example.com:6543/postgres", "abcdefghij")).toMatch(/Refusing to reset/);
+  });
+
   it("resetDemoData refuses before opening any connection", async () => {
     await expect(resetDemoData({ url: SUPABASE, expectedRef: "local" })).rejects.toThrow(/Refusing to reset/);
     await expect(resetDemoData({ url: BUILT_IN, expectedRef: "abcdefghij" })).rejects.toThrow(/Refusing to reset/);
