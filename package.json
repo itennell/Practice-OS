@@ -17,6 +17,8 @@
     "prepare": "git config core.hooksPath .githooks || true",
     "smoke": "tsx scripts/smoke.ts",
     "db:reset": "tsx scripts/db-reset.ts",
+    "demo:warm": "tsx scripts/demo-warm.ts",
+    "demo:check": "tsx scripts/demo-check.ts",
     "research": "tsx scripts/research.ts",
     "models:download": "tsx scripts/download-models.ts",
     "aeon:record": "tsx scripts/record-aeon-fixture.ts",

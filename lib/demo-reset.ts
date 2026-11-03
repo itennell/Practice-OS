@@ -10,6 +10,8 @@ import { specialtiesForNiche } from "./referrals/settings";
 
 /** The fictional demo practice's niche: oncology / serious illness / end of life, and that niche's kinds. */
 export const DEMO_NICHE = "oncology_serious_illness";
+/** Her office ZIP (Lincoln Park, Chicago): the demo searches around it. */
+export const DEMO_ZIP = "60614";
 export const DEMO_REFERRAL_KINDS: string[] = specialtiesForNiche(DEMO_NICHE);
 
 // What `npm run db:reset` (scripts/db-reset.ts) does once it has checked which
@@ -145,7 +147,7 @@ async function reset(sql: postgres.Sql, dir: string): Promise<ResetResult> {
     // reset, but on the fictional demo practice these two are demo data: the demo leads with them.
     await tx`
       insert into practice_os.referral_settings (id, home_zip, specialties, niche_preset)
-      values (true, '60614', ${DEMO_REFERRAL_KINDS}, ${DEMO_NICHE})
+      values (true, ${DEMO_ZIP}, ${DEMO_REFERRAL_KINDS}, ${DEMO_NICHE})
       on conflict (id) do update set niche_preset = excluded.niche_preset, specialties = excluded.specialties, updated_at = now()`;
     // The [Sample] posts' finished pictures, so the demo post can be approved.
     for (const post of SEED_POSTS) {

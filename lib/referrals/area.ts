@@ -18,6 +18,7 @@ import { capFirst, compareTiers, focusFrom, providerTier, type Focus, type TierR
 import { practiceFacts } from "./store";
 import { isSensitiveSource, siteHashes, withoutDistance } from "./sensitive";
 import { knownSensitiveSites } from "./sensitive-sites";
+import { storedGeocoder, storedNppesFetcher } from "./sources/stored-cache";
 
 type Centers = Record<string, Point>;
 
@@ -104,6 +105,8 @@ type Deps = {
   check?: (text: string) => Promise<boolean>;
   centers?: Centers;
   now?: () => number;
+  /** Keep NPPES pages and geocoded points in referral_fetch_cache (lib/referrals/sources/stored-cache.ts). */
+  sql?: postgres.Sql | null;
 };
 
 /** How long a search may take before it answers with what it has (the route allows 120 s). */
@@ -213,7 +216,12 @@ export async function searchArea(
     if (away && !notes.some((n) => n.includes(" where you practice"))) notes.push(away);
   }
 
-  const found = await (deps.search ?? searchProviders)(req.specialties, postals, { maxRequests, deadline, now });
+  const found = await (deps.search ?? searchProviders)(req.specialties, postals, {
+    maxRequests,
+    deadline,
+    now,
+    ...(deps.sql ? { fetcher: storedNppesFetcher(deps.sql) } : {}),
+  });
   if (found.timedOut) {
     notes.push(`The NPI Registry was slow, so this is showing the first ${found.timedOut.done} of ${found.timedOut.of} areas. Search again in a minute for the rest.`);
   }
@@ -245,7 +253,7 @@ export async function searchArea(
     return providerTier(p, { miles, focus: ctx.focus, clinicianState: ctx.state, niche: ctx.niche, selfPay: ctx.selfPay }).score;
   };
   const byPromise = [...providers].sort((a, b) => rough(b) - rough(a));
-  const located = await (deps.geocode ?? geocodeAddresses)(
+  const located = await (deps.geocode ?? (deps.sql ? storedGeocoder(deps.sql) : geocodeAddresses))(
     // A home-looking address is never placed at street level: it stays at the ZIP center.
     byPromise.filter((p) => !p.homeAddress && !hidden.has(p.npi)).map((p) => ({ street: p.address, city: p.city, state: p.state, zip: p.zip })),
     { timeoutMs: deadline + 25_000 - now() },
