@@ -1,11 +1,13 @@
 -- 043: the referral source catalog (docs/research/referral-sources.json).
 --
 -- referral_settings.specialties was limited (014) to six ids, so newer kinds
--- (psychiatry, and the 25 kinds the catalog adds) could not be saved. The
--- catalog now checks ids in code (lib/referrals/settings.ts and catalog.ts);
--- the database only checks their shape: lowercase letters and underscores.
+-- (psychiatry, and the 25 kinds the catalog adds) could not be saved. Ids are
+-- now validated in code against the catalog (lib/referrals/catalog.ts, checked
+-- where settings are saved in lib/referrals/settings.ts saveReferralSettings);
+-- the database only checks their shape: lowercase letters and underscores, no nulls.
 -- niche_preset is the niche she picks (oncology_serious_illness, grief_loss, ...),
--- null until she picks one. Safe to run twice.
+-- null until she picks one; its id is checked against the catalog the same way.
+-- Safe to run twice.
 
 create or replace function practice_os.ids_look_valid(ids text[]) returns boolean
 language sql immutable set search_path = '' as $$

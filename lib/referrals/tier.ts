@@ -14,8 +14,8 @@
 // they see the same people, and a provider who only sees people she doesn't
 // (a pediatrician for an adults-only practice) is always "Later".
 import research from "../../docs/research/referral-tiers.json" with { type: "json" };
-import { catalogPoints } from "./catalog";
-import { looksResidential, specialtyForCode, SPECIALTY_BY_ID, type Provider, type SpecialtyId } from "./nppes";
+import { catalogPoints, catalogSees, typeForCode, SOURCE_TYPE_BY_ID } from "./catalog";
+import { looksResidential, specialtyForCode, type Provider, type SpecialtyId } from "./nppes";
 
 export type Tier = "first" | "next" | "later";
 export const TIERS: Tier[] = ["first", "next", "later"];
@@ -116,8 +116,12 @@ export const FOCUS_WORDS: Record<Focus, string> = {
   perinatal: "new and expecting parents",
 };
 
-/** Who each kind of provider sees. "all" means every age. */
-// Kinds added with the source catalog have no entry yet, so no focus reason either way.
+/**
+ * Who each of the seven original kinds sees. "all" means every age. Kinds added
+ * with the source catalog read `sees` from docs/research/referral-sources.json
+ * (catalogSees); a kind with neither is treated as "not who you help" when she
+ * has a focus (fail closed), so it can never rank first by accident.
+ */
 const SEES: Partial<Record<SpecialtyId, Focus[] | "all">> = {
   family_medicine: "all",
   psychiatry: "all",
@@ -148,7 +152,15 @@ export const GENERAL_OB_REASON = "general obstetrics sees most new and expecting
 
 function seesFor(specialty: SpecialtyId, taxonomy: string | null): Focus[] | "all" | undefined {
   if (specialty === "ob_gyn" && taxonomy && GYN_ONLY.has(taxonomy)) return ["adults", "older_adults"];
-  return SEES[specialty];
+  return SEES[specialty] ?? (catalogSees(specialty) as Focus[] | "all" | null) ?? undefined;
+}
+
+/** The reason on a card whose kind has no "who they see" yet. Starts like the other mismatch reason. */
+export const UNKNOWN_SEES_REASON = "mostly sees people Aeon can't match to who you help yet, so it stays Later";
+
+/** True when a card's reasons say it doesn't see who she helps (or that's unknown). */
+export function isMismatch(reasons: string[]): boolean {
+  return reasons.some((x) => x.startsWith("mostly sees"));
 }
 
 /**
@@ -160,7 +172,7 @@ export function focusRank(r: Pick<TierResult, "reasons">): number {
   if (r.reasons.some((x) => x.startsWith(GENERAL_OB_REASON))) return 0;
   if (r.reasons.some((x) => x.startsWith("matches your"))) return 1;
   if (r.reasons.some((x) => x.startsWith("sees all ages"))) return 2;
-  if (r.reasons.some((x) => x.startsWith("mostly sees"))) return 4;
+  if (isMismatch(r.reasons)) return 4;
   return 3;
 }
 
@@ -206,6 +218,19 @@ export function pointsForSpecialty(id: SpecialtyId): number {
   return SPECIALTY_POINTS[id] ?? catalogPoints(id) ?? MANUAL_SOURCE_POINTS;
 }
 
+/**
+ * Why this kind refers, from the source catalog's `why_they_refer`: the type
+ * that owns the exact code first (a geriatric family doctor gets geriatrics'
+ * reason), else the type named like the specialty. A card reason: no final period.
+ */
+export function whyTheyRefer(taxonomy: string | null, specialty: SpecialtyId): string | null {
+  const why = (taxonomy ? typeForCode(taxonomy) : undefined)?.why_they_refer ?? SOURCE_TYPE_BY_ID.get(specialty)?.why_they_refer;
+  if (!why) return null;
+  const text = why.trim().replace(/\.$/, "");
+  // "Often the first stop…" reads as "often the first stop…"; "IBS and…" keeps its capitals.
+  return /^[A-Z][a-z]/.test(text) ? text[0].toLowerCase() + text.slice(1) : text;
+}
+
 export function tierFor(p: TierInput, ctx: TierContext): TierResult {
   const specialty = p.taxonomy ? (specialtyForCode(p.taxonomy)?.id ?? null) : null;
   const reasons: string[] = [];
@@ -213,16 +238,16 @@ export function tierFor(p: TierInput, ctx: TierContext): TierResult {
 
   // Specialty.
   score += specialty ? pointsForSpecialty(specialty) : MANUAL_SOURCE_POINTS;
-  reasons.push(
-    specialty
-      ? `${SPECIALTY_BY_ID.get(specialty)!.label} offices see people who need talk therapy and often have no one to send them to`
-      : "a kind of provider Aeon doesn't rank yet",
-  );
+  reasons.push((specialty && whyTheyRefer(p.taxonomy, specialty)) || "a kind of provider Aeon doesn't rank yet");
 
   // Who she helps: a reason, or "Later" when they only see people she doesn't.
   let mismatch = false;
   const sees = specialty ? seesFor(specialty, p.taxonomy) : undefined;
-  if (ctx.focus.length > 0 && sees) {
+  if (ctx.focus.length > 0 && specialty && !sees) {
+    // Fail closed: a kind with no "who they see" can't be ranked against her focus.
+    mismatch = true;
+    reasons.push(UNKNOWN_SEES_REASON);
+  } else if (ctx.focus.length > 0 && sees) {
     const shared = sees === "all" ? [] : ctx.focus.filter((f) => sees.includes(f));
     if (sees === "all") reasons.push("sees all ages, so your clients too");
     else if (shared.length > 0) {
@@ -324,7 +349,7 @@ export function boardTier(
     { taxonomy: card.taxonomy, npiType: card.npi_type, phone: card.phone, state: card.state, homeAddress },
     { ...ctx, miles: card.distance_miles },
   );
-  const mismatch = r.reasons.some((x) => x.startsWith("mostly sees"));
+  const mismatch = isMismatch(r.reasons);
   if (card.fit_score === null || card.score_version !== SCORE_VERSION || mismatch) return r;
   return { ...r, score: card.fit_score, tier: tierOf(card.fit_score) };
 }
@@ -393,7 +418,7 @@ export function withRelationship(r: TierResult, rel: RelationshipInput): TierRes
   if (on.length === 0) return r;
   const score = Math.min(100, r.score + on.reduce((n, k) => n + MODIFIERS[k].points, 0));
   // "Not who you help" stays Later unless they have already referred to her.
-  const mismatch = r.reasons.some((x) => x.startsWith("mostly sees"));
+  const mismatch = isMismatch(r.reasons);
   const tier: Tier = mismatch && !rel.referredBefore ? "later" : tierOf(score);
   return { ...r, score, tier, reasons: [r.reasons[0], ...on.map((k) => MODIFIERS[k].reason.replace(/\.$/, "")), ...r.reasons.slice(1)] };
 }

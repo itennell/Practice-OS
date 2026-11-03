@@ -2,25 +2,30 @@
 // the NPPES codes and searches checked live on 2026-11-02, the niche presets,
 // sensitive types, and that the seven original specialties didn't move.
 // No network: the verification lives in the file itself.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import research from "../docs/research/referral-sources.json" with { type: "json" };
 import {
   CATALOG,
   CATEGORIES,
   categoryOf,
   catalogPoints,
+  FOCUS_IDS,
   isSensitive,
   isSessionCapped,
+  JUDGMENT_POINTS_MAX,
   NICHE_PRESETS,
+  POINTS_MAX,
   readCatalog,
   SESSION_CAPPED_BOOST,
   SOURCE_TYPE_BY_ID,
   SOURCE_TYPES,
   specialtiesFor,
+  typeForCode,
   typesForNiche,
 } from "../lib/referrals/catalog";
+import { CATEGORY_LABELS, groupByCategory, SPECIALTY_CATEGORY } from "../lib/referrals/categories";
 import { ORIGINAL_SPECIALTY_IDS, SPECIALTIES, SPECIALTY_BY_ID, specialtyForCode, TAXONOMY_CODE } from "../lib/referrals/nppes";
-import { pointsForSpecialty, SPECIALTY_POINTS, tierFor } from "../lib/referrals/tier";
+import { FOCUS_WORDS, isMismatch, pointsForSpecialty, SPECIALTY_POINTS, tierFor, whyTheyRefer } from "../lib/referrals/tier";
 
 const clone = () => JSON.parse(JSON.stringify(research));
 
@@ -55,30 +60,84 @@ describe("catalog file", () => {
       expect(t.talk_track.they_need.length).toBeGreaterThan(10);
       expect(t.talk_track.you_offer.length).toBeGreaterThan(10);
       expect(`${t.talk_track.they_need} ${t.talk_track.you_offer}`).not.toMatch(/\b(gift|commission|kickback|per referral|referral fee|discount|gift card)\b/i);
+      // Anything offered for free (a talk, a workshop) says it is never tied to referrals.
+      if (/\b(free|talk|workshop)\b/i.test(t.talk_track.you_offer)) expect(t.talk_track.you_offer, t.id).toMatch(/never tied to referrals/);
     }
+  });
+
+  it("the urgent care talk track names 988 for a crisis and 911 for emergencies", () => {
+    expect(SOURCE_TYPE_BY_ID.get("urgent_care")!.talk_track.you_offer).toMatch(/988 for a mental health crisis, 911 for emergencies/);
+  });
+
+  it("no unsourced absolutes in the public reasons", () => {
+    for (const t of SOURCE_TYPES) expect(t.why_they_refer, t.id).not.toMatch(/fastest-growing|constantly|first-line|3 to 8/i);
+    // A reason backed by a source names its URL.
+    expect(SOURCE_TYPE_BY_ID.get("transplant_programs")!.why_basis).toMatch(/482\.90/);
+    expect(SOURCE_TYPE_BY_ID.get("hospice")!.why_basis).toMatch(/418\.64/);
+  });
+
+  it("points: the originals keep their research points; every other type is judgment, 20 at most", () => {
+    const original = new Set<string>(ORIGINAL_SPECIALTY_IDS);
+    for (const t of SOURCE_TYPES) {
+      expect(t.points_basis, t.id).toBe(original.has(t.id) ? "research" : "judgment");
+      if (!original.has(t.id)) expect(t.default_points, t.id).toBeLessThanOrEqual(JUDGMENT_POINTS_MAX);
+    }
+    const bad = clone();
+    bad.types.find((t: { id: string }) => t.id === "hospice").default_points = 30;
+    expect(() => readCatalog(bad)).toThrow(/judgment points are at most 20/);
   });
 });
 
 describe("NPPES types", () => {
   const nppesTypes = SOURCE_TYPES.filter((t) => [t.findable_via, ...(t.also_findable_via ?? [])].includes("nppes"));
 
-  it("each has NUCC codes, a verified Illinois search and specialties that exist", () => {
+  it("each has NUCC codes (or shares another type's), a verified Illinois search and specialties that exist", () => {
     expect(nppesTypes.length).toBeGreaterThan(30);
     for (const t of nppesTypes) {
-      expect(t.nucc_codes!.length, t.id).toBeGreaterThan(0);
-      for (const c of t.nucc_codes!) expect(TAXONOMY_CODE.test(c), `${t.id} ${c}`).toBe(true);
+      if (t.shared_with) expect(SOURCE_TYPE_BY_ID.get(t.shared_with)!.nucc_codes!.length, t.id).toBeGreaterThan(0);
+      else expect(t.nucc_codes!.length, t.id).toBeGreaterThan(0);
+      for (const c of t.nucc_codes ?? []) expect(TAXONOMY_CODE.test(c), `${t.id} ${c}`).toBe(true);
       for (const s of t.nppes_searches!) {
         const v = CATALOG!.nppes_verification[s];
         expect(v, `${t.id}: "${s}"`).toBeDefined();
         expect(v.il_results).toBeGreaterThan(0);
         expect(v.checked).toMatch(/^2026-/);
       }
+      // Every kept code came back on one of the type's own searches.
+      for (const c of t.nucc_codes ?? []) expect(t.nppes_searches!.some((s) => CATALOG!.nppes_verification[s].codes_returned.includes(c)), `${t.id} ${c}`).toBe(true);
       expect(specialtiesFor(t.id).length, t.id).toBe(t.nppes_specialties!.length);
     }
+    expect(SOURCE_TYPE_BY_ID.get("group_practices")!.shared_with).toBe("therapists");
   });
 
-  it("each code is found by one of the type's specialties", () => {
-    for (const t of nppesTypes) for (const c of t.nucc_codes!) expect(t.nppes_specialties, `${t.id} ${c}`).toContain(specialtyForCode(c)?.id);
+  it("each code is found by one of the type's specialties, and belongs to exactly one type", () => {
+    const seen = new Map<string, string>();
+    for (const t of nppesTypes) {
+      for (const c of t.nucc_codes ?? []) {
+        expect(t.nppes_specialties, `${t.id} ${c}`).toContain(specialtyForCode(c)?.id);
+        expect(seen.get(c), `${c} in ${t.id} and ${seen.get(c)}`).toBeUndefined();
+        seen.set(c, t.id);
+        expect(typeForCode(c)!.id).toBe(t.id);
+      }
+    }
+    const dup = clone();
+    dup.types.find((t: { id: string }) => t.id === "pmhnp").nucc_codes.push("2084P0800X");
+    expect(() => readCatalog(dup)).toThrow(/already psychiatry's/);
+  });
+
+  it("dermatology lists exact codes and leaves out the laboratory ones", () => {
+    expect(SPECIALTY_BY_ID.get("dermatology")!.codes.every((c) => !c.endsWith("*"))).toBe(true);
+    expect(specialtyForCode("207ND0900X")).toBeNull(); // dermatopathology
+    expect(specialtyForCode("207NI0002X")).toBeNull();
+    expect(specialtyForCode("207N00000X")?.id).toBe("dermatology");
+  });
+
+  it("verifies only searches a type uses", () => {
+    expect(CATALOG!.nppes_verification["Hospice"]).toBeUndefined();
+    expect(CATALOG!.nppes_verification["Dietitian"]).toBeUndefined();
+    const bad = clone();
+    bad.nppes_verification.Hospice = { il_results: 5, of: 5, limit: 200, checked: "2026-11-02", codes_returned: [] };
+    expect(() => readCatalog(bad)).toThrow(/"Hospice" is not used/);
   });
 
   it("every SPECIALTIES search was verified live, and every specialty is a catalog type", () => {
@@ -120,14 +179,71 @@ describe("the seven original specialties", () => {
     ]) expect(specialtyForCode(code)?.id).toBe(id);
   });
 
-  it("keep their tier points; new kinds score with the catalog's default points", () => {
+  it("keep their tier points; new kinds score with the catalog's default points, never above the therapists'", () => {
     expect(SPECIALTY_POINTS).toMatchObject({ family_medicine: 35, pediatrics: 33, ob_gyn: 32, psychiatry: 30, internal_medicine: 30, oncology: 22, therapists: 20 });
     for (const id of ORIGINAL_SPECIALTY_IDS) expect(catalogPoints(id)).toBe(SPECIALTY_POINTS[id]);
     expect(pointsForSpecialty("hospice")).toBe(SOURCE_TYPE_BY_ID.get("hospice")!.default_points);
-    const r = tierFor({ taxonomy: "251G00000X", npiType: "organization" }, { miles: 1, focus: ["adults"] });
-    expect(r.specialty).toBe("hospice");
-    expect(Number.isFinite(r.score)).toBe(true);
-    expect(r.reasons.some((x) => x.startsWith("mostly sees"))).toBe(false);
+    const original = new Set<string>(ORIGINAL_SPECIALTY_IDS);
+    for (const s of SPECIALTIES.filter((x) => !original.has(x.id))) expect(pointsForSpecialty(s.id), s.id).toBeLessThanOrEqual(SPECIALTY_POINTS.therapists!);
+  });
+});
+
+describe("who each kind sees", () => {
+  it("every NPI Registry kind has a 'sees' (tier.ts for the originals, the catalog for the rest)", () => {
+    for (const s of SPECIALTIES) {
+      const sees = SOURCE_TYPE_BY_ID.get(s.id)!.sees;
+      expect(sees, s.id).toBeDefined();
+      if (sees !== "all") for (const f of sees!) expect(Object.keys(FOCUS_WORDS)).toContain(f);
+    }
+    expect([...FOCUS_IDS].sort()).toEqual(Object.keys(FOCUS_WORDS).sort());
+  });
+
+  it("a hospice matches an adults practice and is Later for a children-only one", () => {
+    const hospice = { taxonomy: "251G00000X", npiType: "organization" as const, official: "Ann Lee", phone: "312-555-0100", state: "IL" };
+    const adults = tierFor(hospice, { miles: 0.2, focus: ["adults"], clinicianState: "IL" });
+    expect(adults.specialty).toBe("hospice");
+    expect(adults.reasons).toContain("matches your adults focus");
+    expect(adults.reasons[0]).toBe(whyTheyRefer("251G00000X", "hospice"));
+    const kids = tierFor(hospice, { miles: 0.2, focus: ["children"], clinicianState: "IL" });
+    expect(kids.tier).toBe("later");
+    expect(isMismatch(kids.reasons)).toBe(true);
+    // A doula, for a children-only practice, too.
+    expect(tierFor({ taxonomy: "374J00000X", npiType: "individual", phone: "312-555-0101", fax: "312-555-0102", state: "IL" }, { miles: 0, focus: ["children"], clinicianState: "IL" }).tier).toBe("later");
+  });
+
+  it("fails closed: a kind with no 'sees' is Later when she has a focus", async () => {
+    vi.resetModules();
+    vi.doMock("../lib/referrals/catalog", async (orig) => ({ ...(await orig<typeof import("../lib/referrals/catalog")>()), catalogSees: () => null }));
+    const tier = await import("../lib/referrals/tier");
+    const r = tier.tierFor({ taxonomy: "374J00000X", npiType: "individual", phone: "312-555-0101", fax: "312-555-0102", state: "IL" }, { miles: 0, focus: ["perinatal"], clinicianState: "IL" });
+    expect(r.tier).toBe("later");
+    expect(r.reasons).toContain(tier.UNKNOWN_SEES_REASON);
+    // With no focus there is nothing to match, so it ranks on points alone.
+    expect(tier.tierFor({ taxonomy: "374J00000X", npiType: "individual" }, { miles: 0, focus: [] }).reasons).not.toContain(tier.UNKNOWN_SEES_REASON);
+    vi.doUnmock("../lib/referrals/catalog");
+    vi.resetModules();
+  });
+
+  it("the first reason is the catalog's why_they_refer, not a generic line", () => {
+    const r = tierFor({ taxonomy: "207QG0300X", npiType: "individual" }, { miles: 1, focus: [] });
+    expect(r.specialty).toBe("family_medicine"); // the code stays with family medicine…
+    expect(r.reasons[0]).toBe(whyTheyRefer("207QG0300X", "family_medicine")); // …and the reason is geriatrics'
+    expect(r.reasons[0]).toMatch(/^grief, adjustment to aging/);
+    for (const s of SPECIALTIES) expect(whyTheyRefer(null, s.id), s.id).not.toMatch(/talk therapy and often have no one/);
+  });
+});
+
+describe("categories for the area explorer", () => {
+  it("match the catalog", () => {
+    for (const c of CATEGORIES) expect(CATEGORY_LABELS[c.id]).toBe(c.label);
+    for (const s of SPECIALTIES) expect(SPECIALTY_CATEGORY[s.id], s.id).toBe(categoryOf(s.id));
+    const groups = groupByCategory(SPECIALTIES);
+    expect(groups.map((g) => g.category)).toEqual([...groups.map((g) => g.category)].sort((a, b) => a - b));
+    expect(groups.flatMap((g) => g.items).length).toBe(SPECIALTIES.length);
+  });
+
+  it("chip labels fit a 390px phone", () => {
+    for (const s of SPECIALTIES) expect(s.label.length, s.label).toBeLessThanOrEqual(34);
   });
 });
 
@@ -170,6 +286,17 @@ describe("niche presets", () => {
     expect(typesForNiche("no_such_preset")).toEqual([]);
   });
 
+  it("niche-weighted points stay on the 0-35 scale", () => {
+    for (const p of NICHE_PRESETS) {
+      for (const x of typesForNiche(p.id)) {
+        expect(x.points, `${p.id} ${x.type.id}`).toBeLessThanOrEqual(POINTS_MAX);
+        expect(x.points).toBeGreaterThanOrEqual(0);
+      }
+    }
+    // Oncology 22 x 1.5 x 1.5 would be 49.5 unclamped.
+    expect(typesForNiche("oncology_serious_illness").find((x) => x.type.id === "oncology")!.points).toBe(35);
+  });
+
   it("the session-capped boost is set, and EAPs, college counseling and hospice are capped", () => {
     expect(CATALOG!.session_capped_boost.judgment).toBe(true);
     expect(SESSION_CAPPED_BOOST).toBeGreaterThan(0);
@@ -186,9 +313,10 @@ describe("helpers", () => {
     expect(isSensitive("dv_sa_agencies")).toBe(true);
     expect(isSensitive("family_medicine")).toBe(false);
     expect(isSensitive("nope")).toBe(false);
-    // Only the DV/SA agencies are sensitive, and they never come from a map dataset.
+    expect(isSensitive("shelters")).toBe(true);
+    // Only DV/SA agencies and shelters are sensitive, and they never come from a map dataset.
     const sensitive = SOURCE_TYPES.filter((t) => t.sensitive);
-    expect(sensitive.map((t) => t.id)).toEqual(["dv_sa_agencies"]);
+    expect(sensitive.map((t) => t.id)).toEqual(["dv_sa_agencies", "shelters"]);
     for (const t of sensitive) {
       expect(["osm_tags", "nppes", "cms_dataset"]).not.toContain(t.findable_via);
       expect(t.note).toMatch(/street address/);

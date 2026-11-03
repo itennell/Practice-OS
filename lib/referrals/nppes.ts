@@ -97,13 +97,13 @@ export const SPECIALTIES: Specialty[] = [
   },
   { id: "sleep_medicine", label: "Sleep medicine", searches: ["Sleep Medicine"], codes: ["207RS0012X", "2084S0012X"] },
   { id: "plastic_surgery", label: "Plastic surgery", searches: ["Plastic Surgery"], codes: ["208200000X", "2086S0122X"] },
-  { id: "dermatology", label: "Dermatology", searches: ["Dermatology"], codes: ["207N*"] },
+  { id: "dermatology", label: "Dermatology", searches: ["Dermatology"], codes: ["207N00000X", "207ND0101X", "207NP0225X", "207NS0135X"] },
   { id: "genetic_counselors", label: "Genetic counselors", searches: ["Genetic Counselor"], codes: ["170300000X"] },
   { id: "physiatry", label: "Physiatry (rehab medicine)", searches: ["Physical Medicine & Rehabilitation"], codes: ["208100000X"] },
   { id: "addiction_medicine", label: "Addiction medicine", searches: ["Addiction Medicine"], codes: ["2084A0401X", "207RA0401X", "2083A0300X", "207LA0401X"] },
   {
     id: "mental_health_programs",
-    label: "Mental health programs (IOP, PHP, residential)",
+    label: "IOP, PHP and residential programs",
     searches: ["Mental Health", "Psychiatric Residential Treatment Facility", "Psychiatric Hospital", "Psychiatric Unit"],
     codes: ["261QM0801X", "283Q00000X", "323P00000X", "273R00000X"],
   },
@@ -114,14 +114,14 @@ export const SPECIALTIES: Specialty[] = [
   { id: "doulas", label: "Doulas", searches: ["Doula"], codes: ["374J00000X"] },
   {
     id: "rehab_therapists",
-    label: "Physical, occupational and speech therapists",
+    label: "PT, OT and speech therapy",
     searches: ["Physical Therapist", "Occupational Therapist", "Speech-Language Pathologist"],
     codes: ["2251*", "225X*", "235Z*"],
   },
   { id: "dietitians", label: "Dietitians", searches: ["Dietitian, Registered"], codes: ["133V*"] },
   {
     id: "bodywork",
-    label: "Chiropractors, acupuncturists and massage therapists",
+    label: "Chiropractic, acupuncture, massage",
     searches: ["Chiropractor", "Acupuncturist", "Massage Therapist"],
     codes: ["111N*", "171100000X", "225700000X"],
   },
@@ -376,6 +376,10 @@ export type SearchResult = {
   requests: number;
   /** True when a search hit NPPES's 1,200-a-search ceiling or our request budget, so the list is partial. */
   truncated: boolean;
+  /** True when our request budget (not NPPES's ceiling) ran out first. */
+  budgetCut?: boolean;
+  /** The kinds whose searches the request budget cut short or never started, in the order asked. */
+  skipped?: SpecialtyId[];
   /** Set when the deadline came first: how many of the areas were searched in full. */
   timedOut: { done: number; of: number } | null;
 };
@@ -393,12 +397,15 @@ export async function searchProviders(
   const late = () => opts.deadline !== undefined && now() >= opts.deadline;
   const fetcher = opts.fetcher ?? cachedFetch();
   const budget = opts.maxRequests ?? 150;
-  const jobs = specialties.flatMap((id) => SPECIALTY_BY_ID.get(id)!.searches).flatMap((d) => postals.map((z) => [d, z] as const));
+  const jobs = specialties.flatMap((id) => SPECIALTY_BY_ID.get(id)!.searches.map((d) => [d, id] as const)).flatMap(([d, id]) => postals.map((z) => [d, z, id] as const));
   const responses: NppesResponse[] = [];
   const queue = [...jobs];
   let requests = 0;
   let truncated = false;
   let timedOut = false;
+  let budgetCut = false;
+  // Kinds with a search the request budget cut short or never started.
+  const cut = new Set<SpecialtyId>();
   // An area counts as done when every one of its searches finished.
   const left = new Map(postals.map((z) => [z, jobs.filter((j) => j[1] === z).length]));
   async function worker() {
@@ -410,6 +417,9 @@ export async function searchProviders(
         }
         if (requests >= budget) {
           truncated = true;
+          budgetCut = true;
+          cut.add(job[2]);
+          for (const j of queue) cut.add(j[2]);
           return;
         }
         requests++;
@@ -428,6 +438,8 @@ export async function searchProviders(
     providers: parseResponses(responses, new Set(specialties)),
     requests,
     truncated,
+    budgetCut,
+    skipped: specialties.filter((id) => cut.has(id)),
     timedOut: timedOut ? { done, of: postals.length } : null,
   };
 }
