@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { practiceTimeZone } from "@/lib/compliance/store";
 import { isSensitive } from "@/lib/referrals/catalog";
 import { isSuppressed, suppressedList } from "@/lib/referrals/contacts";
@@ -10,6 +11,7 @@ import { listSources } from "@/lib/referrals/store";
 // GET /api/referrals/meetings: proxy.ts guards it the same way. No street address
 // leaves the server here.
 export async function GET() {
+  await connection(); // read the database per request, never at build time
   const [sources, suppressed, timeZone] = await Promise.all([listSources(), suppressedList(), practiceTimeZone()]);
   const partners = sources.map((s) => {
     const blocked = isSuppressed(s, suppressed)
