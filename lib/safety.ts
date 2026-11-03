@@ -25,7 +25,7 @@ const reflexive = SELF_VERBS.flatMap((v) => SELVES.map((p) => `${v}${p}`));
 // "end her own life", "took his life", "ending their own lives".
 const LIFE_VERBS = ["end", "ends", "ended", "ending", "take", "takes", "took", "taken", "taking"];
 const POSSESSIVES = ["my", "her", "his", "their", "your", "our"];
-const ownLife = LIFE_VERBS.flatMap((v) => POSSESSIVES.flatMap((p) => [`${v}${p}life`, `${v}${p}ownlife`, `${v}${p}lives`, `${v}${p}ownlives`]));
+const ownLife = LIFE_VERBS.flatMap((v) => POSSESSIVES.flatMap((p) => ["life", "lyfe", "lives"].flatMap((l) => [`${v}${p}${l}`, `${v}${p}own${l}`])));
 
 // Matched against the message with every space and symbol removed, so
 // "kill my self", "k i l l myself" and "self-harm" all match. Includes basic
@@ -45,18 +45,24 @@ const SQUASHED: Record<CrisisCategory, string[]> = {
     "dontwanttobehereanymore", "dontwanttoliveanymore", "dontwanttolive", "dontwanttowakeup",
     "doesntwanttobehereanymore", "doesntwanttoliveanymore", "doesntwanttolive", "doesntwanttowakeup",
     "dontwannabehereanymore", "dontwannalive", "dontwannabealive", "dontwanttoexist", "dontwannaexist",
-    "cantgoonliving", "wantittobeover",
+    "cantgoonliving", "wantittobeover", "wantsittobeover", "wantitalltobeover", "wantsitalltobeover",
+    "wantittostop", "wantsittostop", "wantitalltostop", "wantsitalltostop", "wanteditalltostop", "wanteditalltobeover",
+    "ratherbedead", "stopexisting", "doesntwanttoexist", "doesnotwanttoexist", "donotwanttoexist",
+    "betteroffwithouther", "betteroffwithouthim", "betteroffwithoutthem",
+    "noreasonforhertolive", "noreasonforhimtolive", "noreasonforthemtolive", "noreasonformetolive",
     // Spanish
     "quieromorir", "deseomorir", "ganasdemorir", "noquierovivir", "noquieroseguirviviendo",
     "mevoyamatar", "voyamatarme", "quieromatarme", "matarme", "quitarmelavida", "mequitolavida",
     "lastimarme", "hacermedano", "autolesion",
+    // Spanish, third person ("quiere matarse", "se va a matar", "ella quiere morir")
+    "quierematarse", "sequierematar", "quierequitarselavida", "sevaamatar", "vaamatarse", "noquierevivir", "quieremorir",
     // Portuguese
-    "queromorrer", "naoqueroviver", "voumematar", "queromematar", "tirarminhavida", "automutila",
+    "queromorrer", "naoqueroviver", "voumematar", "queromematar", "tirarminhavida", "automutila", "quersematar", "vaisematar",
     // French
-    "veuxmourir", "enviedemourir", "jevaismetuer", "veuxmetuer", "veuxenfinir", "mefairedumal",
+    "veuxmourir", "enviedemourir", "jevaismetuer", "veuxmetuer", "veuxenfinir", "mefairedumal", "veutsetuer", "vasetuer", "veutmourir",
     // German
     "willsterben", "mochtesterben", "willnichtmehrleben", "bringmichum", "bringemichum", "michumbringen",
-    "michumzubringen", "michtoten", "selbstmord", "selbstverletz",
+    "michumzubringen", "michtoten", "selbstmord", "selbstverletz", "sichumbringen", "sichumzubringen", "willsterben",
   ],
   // Harm to others is matched as words (WORDS below): squashed, "kill the music" read as "kill them".
   harm_to_others: ["matarte", "matarlo", "matarla"],
@@ -68,7 +74,10 @@ const SELF = "(my|him|her|them|your|our)sel(f|ves)";
 const DRUGS =
   "(pills?|tablets?|meds|medications?|xanax|tylenol|advil|aspirin|ibuprofen|acetaminophen|paracetamol|oxy|oxys|oxycodone|oxycontin|percocets?|vicodin|norco|fentanyl|heroin|opioids?|opiates?|painkillers?|pain killers?|ambien|klonopin|valium|ativan|adderall|benadryl|benzos?|sleeping pills|sleep aids?|insulin|lithium|seroquel|trazodone|zoloft|prozac|lexapro|wellbutrin|antidepressants?|morphine|methadone|codeine|tramadol|gabapentin|lorazepam|alprazolam|diazepam|clonazepam)";
 // Phrasal verbs where "off myself" is not slang: "sign off myself", "drop it off myself".
-const OFF_OK = "sign|signed|signing|log|logged|logging|drop|dropped|dropping|show|showed|showing|kick|kicked|pay|paid|send|sent|cool|cooled|sort|sorted|turn|turned|head|headed|start|started|tip|tipped|write|wrote|call|called|finish|finished|top|topped|round|rounded|lay|laid|spin|ward|tell|brush|brushed|shake|switch|switched|shut|clock|clocked|tick|ticked|check|checked|knock|knocked|clear|cleared|wipe|wiped|ease|hold|level|pull|pulled|ring|seal|sealed|close|closed|ship|shipped|run|ran|cut|take|took|put|set|get|got|go|went|back|pick|picked|tear|tore|peel|peeled|print|printed|hand|handed|mark|marked|cross|crossed|tee|teed|kick it|it|them|this|that|these|those";
+// Up to 3 words may sit between ("drop the forms off myself", "mail the forms off myself").
+const OFF_OK = "sign|signed|signing|log|logged|logging|drop|dropped|dropping|show|showed|showing|kick|kicked|pay|paid|send|sent|sending|mail|mailed|mailing|fax|faxed|bring|brought|file|filed|cool|cooled|sort|sorted|turn|turned|head|headed|start|started|tip|tipped|write|wrote|call|called|finish|finished|top|topped|round|rounded|lay|laid|spin|ward|tell|brush|brushed|shake|switch|switched|shut|clock|clocked|tick|ticked|check|checked|knock|knocked|clear|cleared|wipe|wiped|ease|hold|level|pull|pulled|ring|seal|sealed|close|closed|ship|shipped|cut|take|took|back|pick|picked|tear|tore|peel|peeled|print|printed|hand|handed|mark|marked|cross|crossed|tee|teed";
+// Short verbs only right before "off" ("go off myself"? no: "set off", "put off myself"), no words between.
+const OFF_OK_NEXT = "run|ran|put|set|get|got|go|went|it|them|this|that|these|those";
 
 // Matched as whole words on the spaced-out message.
 // Matched as whole words on the spaced-out message.
@@ -78,7 +87,7 @@ const WORDS: Record<CrisisCategory, RegExp[]> = {
     // Method: in front of a vehicle ("jump in front of a train"); "jump in front of the camera" passes.
     /\b(jump|jumps|jumping|jumped|step|steps|stepping|stepped|walk|walks|walking|walked|lie|lay|lying|throw (my|him|her|them)sel(f|ves)|throwing (my|him|her|them)sel(f|ves)) in front of (a |an |the |that |this |some |oncoming |moving |speeding )?(train|bus|car|truck|traffic|subway|semi|el train|cta train|metra)s?\b/,
     // Slang "off myself" / "offing herself": not after a phrasal verb ("sign off myself", "drop it off myself").
-    new RegExp(`(?<!\\b(${OFF_OK}) )\\boff(ing|ed|s)? ${SELF}\\b`),
+    new RegExp(`(?<!\\b(${OFF_OK})( \\w+){0,3} )(?<!\\b(${OFF_OK_NEXT}) )\\boff(ing|ed|s)? ${SELF}\\b`),
     /\bslit(s|ting)?( (my|her|his|their|your|both))? (wrists?|throats?)\b/,
     /\b(slash|slashed|slashing|cut|cuts|cutting|slice|sliced|slicing)( (my|her|his|their|your|both|open))? wrists?\b/,
     new RegExp(`\\bdrown(s|ed|ing)? ${SELF}\\b(?! in (work|paperwork|emails?|admin|tasks|coffee|projects|notes|charts|billing|forms)\\b)`),
@@ -86,8 +95,13 @@ const WORDS: Record<CrisisCategory, RegExp[]> = {
     /\bunaliv(e|es|ed|ing)\b/,
     /\bself ?delet(e|ed|es|ing)\b/,
     // Overdose with a drug name or a bottle: "a bottle of xanax", "took all her tylenol", "OD'd on her meds".
-    new RegExp(`(?<!\\b(buy|order|ordering|pick up|picking up|restock|stock|refill|get|bring|need|keep) (a |an |another |some |one )?(new |fresh |spare )?)\\b(whole |entire |full )?bottles? of (\\w+ )?${DRUGS}\\b`),
+    // A bottle counts only with a taking verb: "swallowed a bottle of advil"; "a bottle of advil for the office" passes.
+    new RegExp(`\\b(took|taken|take|taking|swallowed|swallow|swallowing|downed|down|ate|eat|chugged|chug|emptied|empty|finished|popped)( (her|his|my|their|the|a|an|that|this|those|these))?( (whole|entire|full))? bottles? of (\\w+ )?${DRUGS}\\b`),
     new RegExp(`\\b(took|taken|swallowed|downed|ate|chugged|popped)( (her|his|my|their|the|a|an|those|these))?( \\w+)? (whole|entire|full|handful|fistful|bunch|lot|ton|all|every one|too many|too much)( (of|of her|of his|of my|of their|of the))?( \\w+)? ${DRUGS}\\b`),
+    // Stockpiling and researching doses.
+    new RegExp(`\\b(stockpil|hoard|sav)\\w* (up )?(all )?(her|his|my|their) ${DRUGS}\\b`),
+    new RegExp(`\\b(research\\w*|look\\w* up|googl\\w*|search\\w*|find\\w* out|wonder\\w*|ask\\w*)( \\w+)? (how many|how much) (of (her|his|my|their|the) )?${DRUGS}\\b`),
+    /\b(lethal|fatal|deadly) (doses?|dosages?|amounts?)\b/,
     // Present tense needs an amount ("take all my meds off the list" passes; "take all her pills at once" is above).
     new RegExp(`\\b(take|taking|swallow|swallowing|eat|eating|pop|popping)( (her|his|my|their|the|a|an|those|these))?( \\w+)? (whole|entire|handful|fistful|bunch|ton|too many|too much)( (of|of her|of his|of my|of their|of the))?( \\w+)? ${DRUGS}\\b`),
     new RegExp(`\\b(od|odd|oded|oding|odeing)( ed)? on (my |her |his |their |the |those |some )?(\\w+ )?${DRUGS}\\b`),
@@ -95,12 +109,13 @@ const WORDS: Record<CrisisCategory, RegExp[]> = {
     /\b(about|of|on|considering|want|wants|wanting|wish|wishes|wished|hope|hopes|hoping|prefer|prefers|rather|like|fantasiz\w*|dream\w*|planning|plan|plans)( \w+)? (not|never) (wake|waking|wakes) up\b/,
     /\b(sleep|bed) and (not|never) wak(e|ing)( up)?\b/,
     /\b(wish|wishes|wished|hope|hopes|hoping|pray|prays|praying)( that)? (i|she|he|they) (dont|doesnt|wont|wouldnt|didnt|never|do not|does not|will not|would not) wake up\b/,
-    /\b(gave|giving|give|gives|given) away (all |most |everything )?(of )?(my|her|his|their) (things|stuff|belongings|possessions|pets?|dog|cat|savings|money)\b/,
-    /\b(goodbye|good bye|farewell) (letters?|notes?|messages?|videos?|texts?|posts?)\b/,
-    /\b(said|saying|says|say) (goodbye|good bye|bye) to (everyone|everybody|all of us|her family|his family|their family|the family)\b/,
-    /\bwish (i|she|he|they) (was|were) dead\b/,
+    /\bwish(es|ed)? (i|she|he|they) (was|were) dead\b/,
+    /\b(nobody|no one|noone) (would|will|wouldnt|is going to|gonna)( even)? (notice|care|miss) (me|her|him|them|if)\b/,
+    /\b(dont|do not|doesnt|does not) want to exist\b/,
+    /\b(want|wants|wanna|wanted) to dye\b(?! (my|her|his|their|the|it|them|this|that|a|an|some|our|your)\b)/,
     /\bwanna die\b/,
-    /\bkms\b/,
+    // Not a distance: "kms away from the office".
+    /\bkms\b(?! (away|from|of|to|north|south|east|west|outside|drive|walk|radius|out)\b)/,
     /\bkys\b/,
     // Spaced, so "I wish I was deadline-free" passes.
     /\bwish i (was|were) dead\b/,
@@ -123,9 +138,11 @@ const WORDS: Record<CrisisCategory, RegExp[]> = {
     /\b(cant|cannot|can not) (go on|keep going)\b(?! (on )?(vacation|leave|holiday|a trip|trips|retreat|break|maternity|the call|a call|calls|the portal|the website|the site|the app|the system|the panel|the schedule|the calendar|camera|air|record|stage|instagram|social|live|monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow|this week|next week|with (this|the|that|our) (vendor|portal|plan|ehr|system|company|software|biller|contract|process|tool|tools))\b)/,
   ],
   harm_to_others: [
-    /\b(kill|kills|killing|stab|stabbing) (him|her|them|you|someone|somebody|everyone|everybody|me|us)\b(?! ?sel)/,
-    // Not "shoot me a reminder" or "shoot you an email".
-    /\b(shoot|shooting) (him|her|them|someone|somebody|everyone|everybody)\b(?! ?sel)/,
+    // "this list is killing me" and "kill them with kindness" pass.
+    /\b(kill|kills|killed|killing|stab|stabbing) (him|her|them|you|someone|somebody|everyone|everybody)\b(?! ?sel)(?! with kindness\b)/,
+    /\b(kill|kills|stab) (me|us)\b(?! with kindness\b)/,
+    // Not "shoot me a reminder", "shoot him an email" or "shoot them a text".
+    /\b(shoot|shooting) (him|her|them|someone|somebody|everyone|everybody)\b(?! ?sel)(?! (a|an|the|over|some)( quick)? (email|emails|text|texts|message|messages|fax|note|line|follow up|reminder|invite|call|dm|link|update)\b)/,
     /\b(hurt|hurting) (someone|somebody|me|my kids|the kids|my child|my children|my baby)\b/,
   ],
   danger: [
@@ -213,28 +230,42 @@ const words = (text: string) => text.replace(/[^a-z0-9]+/g, " ").trim();
 /** The message folded to plain ASCII words, without and with leetspeak read as letters. */
 function normalize(text: string): string[] {
   // A number then "km"/"kms" is a distance ("5 kms away"), never the slang "kms".
-  const folded = fold(text).replace(/\b\d+(?:\.\d+)?\s*kms?\b/g, " ");
+  const distance = (t: string) => t.replace(/\b\d+(?:\.\d+)?\s*kms?\b/g, " ");
+  const folded = distance(fold(text));
+  // A capital I after a lower-case letter read as l ("kiII myself").
+  const capitalI = words(distance(fold(text.replace(/(?<=[a-z]I*)I/g, "l"))));
   const plain = words(folded);
   // "!" and "|" inside a word read as i ("k!ll", "su!cide"), and "|" as l too ("ki|l").
   const leet = words(folded.replace(/[013457@$]/g, (ch) => LEET[ch]).replace(/(?<=[a-z])[!|]+(?=[a-z])/g, (m) => "i".repeat(m.length)));
   const leetL = words(folded.replace(/[013457@$]/g, (ch) => LEET[ch]).replace(/(?<=[a-z])\|+(?=[a-z])/g, (m) => "l".repeat(m.length)));
-  // Letters spaced out ("k i l l him") joined back up, for the word patterns.
-  const joined = [plain, leet].map((t) => t.replace(/\b(?:[a-z] ){2,}[a-z]\b/g, (m) => m.replace(/ /g, "")));
-  return [...new Set([plain, leet, leetL, ...joined])];
+  // Letters spaced out ("k i l l him") joined back up, for the word patterns. Four or
+  // more only, so initials ("K.M.S. Oncology", "Dr. K M S Patel") never make "kms".
+  const joined = [plain, leet].map((t) => t.replace(/\b(?:[a-z] ){3,}[a-z]\b/g, (m) => m.replace(/ /g, "")));
+  return [...new Set([plain, leet, leetL, capitalI, ...joined])];
 }
 
+/** Edit distance counting a swap of two neighbours as one ("myslef" is one from "myself"). */
 function editDistance(a: string, b: string): number {
-  const row = Array.from({ length: b.length + 1 }, (_, i) => i);
+  const d = Array.from({ length: a.length + 1 }, (_, i) => Array.from({ length: b.length + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0)));
   for (let i = 1; i <= a.length; i++) {
-    let prev = row[0];
-    row[0] = i;
     for (let j = 1; j <= b.length; j++) {
-      const temp = row[j];
-      row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
-      prev = temp;
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
     }
   }
-  return row[b.length];
+  return d[a.length][b.length];
+}
+
+// "kill myslef", "kil myself": one typo in "kill" (it must still start with k) or in the reflexive word.
+const REFLEXIVES = ["myself", "himself", "herself", "themselves", "themself", "yourself"];
+function nearMissKillSelf(spaced: string): boolean {
+  const w = spaced.split(" ");
+  for (let i = 0; i + 1 < w.length; i++) {
+    if (!w[i].startsWith("k") || w[i].length < 3 || w[i].length > 6 || editDistance(w[i], "kill") > 1) continue;
+    if (REFLEXIVES.some((r) => editDistance(w[i + 1], r) <= 1)) return true;
+  }
+  return false;
 }
 
 function nearMissSuicide(spaced: string): boolean {
@@ -242,6 +273,19 @@ function nearMissSuicide(spaced: string): boolean {
     .split(" ")
     .some((word) => word.length >= 6 && word.startsWith("s") && FUZZY_TARGETS.some((t) => editDistance(word, t) <= 1));
 }
+
+// Warning signs that also happen at the end of a natural life ("the dying patient
+// gave away her things", "hospice helps patients say goodbye to the family"). One
+// alone never routes; it routes with another sign, a will, a finality cue or a
+// suicide word, and not in plain end-of-life context.
+const WARNING_SIGNS: RegExp[] = [
+  /\b(gave|giving|give|gives|given) away (all |most |everything )?(of )?(my|her|his|their) (things|stuff|belongings|possessions|pets?|dog|cat|savings|money)\b/,
+  /\b(goodbye|good bye|farewell) (letters?|notes?|messages?|videos?|texts?|posts?)\b/,
+  /\b(said|saying|says|say) (goodbye|good bye|bye) to (everyone|everybody|all of us|her family|his family|their family|the family)\b/,
+  /\b(wont|will not|isnt going to|is not going to|not going to) be (around|here)( for)?( much)? longer\b/,
+  /\b(wrote|writing|written|made|making|updated|updating|finished) (a |her |his |my |their )?(will|wills)\b/,
+];
+const END_OF_LIFE = /\b(hospice|dying|terminal|terminally|palliative|end of life|comfort care|prognosis|passed away|bereavement|grandkids|grandchildren)\b/;
 
 // Benign idioms removed before matching, unless a finality cue is present: "I wanted to die laughing", "quiero morir de risa", "ending it all at 5pm".
 const IDIOMS = [
@@ -260,6 +304,12 @@ function checkOne(text: string): CrisisResult {
     if (SQUASHED[category].some((s) => squashed.includes(s))) return { crisis: true, category };
     if (WORDS[category].some((re) => re.test(spaced))) return { crisis: true, category };
   }
+  // Two warning signs, or one with a finality cue or a suicide word; plain end-of-life talk passes.
+  const signs = WARNING_SIGNS.filter((re) => re.test(spaced)).length;
+  if (signs > 0 && (FINALITY.test(spaced) || /suicid/.test(squashed) || (signs > 1 && !END_OF_LIFE.test(spaced)))) {
+    return { crisis: true, category: "self_harm" };
+  }
+  if (nearMissKillSelf(spaced)) return { crisis: true, category: "self_harm" };
   // The book exemption on "want to disappear" holds only with no personal cue.
   if (personal && /\b(want to|wanna) disappear\b/.test(spaced)) return { crisis: true, category: "self_harm" };
   // 2. "Suicide": its topic phrases are dropped only in a practice context with no personal cue.

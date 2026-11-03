@@ -227,29 +227,51 @@ describe.skipIf(!local)("migration 045 and discovery cards (built-in database on
     for (const n of ["Lakeview Family Medicine", "Gilda's Club Chicago", "Fullerton Funeral Home"]) expect(looksSensitive(n), n).toBe(false);
   });
 
-  it("re-flags an old card the new cues catch, and a person at its street, on the next discovery (no migration)", async () => {
-    const insert = async (name: string, npiType: string, address: string) => {
+  it("re-flags old cards the new cues catch, spreads only from a sensitive kind, and audits each one (no migration)", async () => {
+    const insert = async (name: string, npiType: string, address: string, type: string | null = null) => {
       const [row] = await db()<{ id: string }[]>`
-        insert into practice_os.referral_sources (name, npi_type, address, city, state, zip, distance_miles)
-        values (${name}, ${npiType}, ${address}, 'Chicago', 'IL', '60614', 0.3) returning id`;
+        insert into practice_os.referral_sources (name, npi_type, address, city, state, zip, distance_miles, source_type)
+        values (${name}, ${npiType}, ${address}, 'Chicago', 'IL', '60614', 0.3, ${type}) returning id`;
       return track(row.id);
     };
     const org = await insert("[Test045] Survivors Healing Center", "organization", "1200 W Fullerton Ave");
     const hope = await insert("[Test045] Hope House Chicago", "organization", "9 Elm St");
-    const person = await insert("[Test045] Robin Nearby", "individual", "1200 West Fullerton Avenue");
+    // A name cue doesn't spread: someone else at the Survivors street keeps theirs.
+    const nextDoor = await insert("[Test045] Robin Nearby", "individual", "1200 West Fullerton Avenue");
+    const agency = await insert("[Test045] Quiet Street Agency", "organization", "44 Birch St", "dv_sa_agencies");
+    const atAgency = await insert("[Test045] Sam Example", "individual", "44 Birch Street");
     const plain = await insert("[Test045] Fullerton Family Dental", "organization", "500 W Fullerton Ave");
+    const oncology = await insert("[Test045] Cancer Survivors Network", "organization", "7 Pine St");
     await db()`insert into practice_os.referral_facts (source_id, field, value, origin, match_method) values (${org}, 'address', '1200 W Fullerton Ave, Chicago, IL 60614', 'osm', 'name_address')`;
-    const { knownSensitiveSites } = await import("../lib/referrals/sensitive-sites");
-    const sites = await knownSensitiveSites(db());
-    const rows = await db()<{ id: string; sensitive: boolean; address: string | null; zip: string | null; distance_miles: number | null }[]>`
-      select id, sensitive, address, zip, distance_miles from practice_os.referral_sources where id in ${db()([org, hope, person, plain])}`;
+    const { reflagSensitive, knownSensitiveSites } = await import("../lib/referrals/sensitive-sites");
+    expect(await reflagSensitive(db())).toBeGreaterThanOrEqual(4);
+    const rows = await db()<{ id: string; sensitive: boolean; address: string | null; zip: string | null; distance_miles: number | null; site_hashes: string[] | null }[]>`
+      select id, sensitive, address, zip, distance_miles, site_hashes from practice_os.referral_sources where id in ${db()([org, hope, nextDoor, agency, atAgency, plain, oncology])}`;
     const by = new Map(rows.map((r) => [r.id, r]));
-    for (const id of [org, hope, person]) expect(by.get(id)).toMatchObject({ sensitive: true, address: null, zip: null, distance_miles: null });
+    for (const id of [org, hope, agency, atAgency]) expect(by.get(id)).toMatchObject({ sensitive: true, address: null, zip: null, distance_miles: null });
+    expect(by.get(org)!.site_hashes).toBeNull();
+    expect(by.get(agency)!.site_hashes?.length).toBeGreaterThan(0);
+    expect(by.get(nextDoor)).toMatchObject({ sensitive: false, address: "1200 West Fullerton Avenue" });
     expect(by.get(plain)).toMatchObject({ sensitive: false, address: "500 W Fullerton Ave" });
-    const { siteHashes } = await import("../lib/referrals/sensitive");
-    expect(siteHashes("1200 W Fullerton Ave", "60614").some((h) => sites.has(h))).toBe(true);
+    expect(by.get(oncology)).toMatchObject({ sensitive: false, address: "7 Pine St" });
     const facts = await db()<{ field: string }[]>`select field from practice_os.referral_facts where source_id = ${org}`;
     expect(facts).toEqual([]);
+    const audits = await db()<{ subject_id: string; reason: string }[]>`
+      select subject_id::text, details ->> 'reason' as reason from practice_os.audit_log
+       where action = 'referral_reflagged_sensitive' and subject_id::text in ${db()([org, hope, agency, atAgency])}`;
+    expect(Object.fromEntries(audits.map((a) => [a.subject_id, a.reason]))).toEqual({ [org]: "name", [hope]: "name", [agency]: "kind", [atAgency]: "site" });
+    // Nothing left to change; the sites list now has the agency's street.
+    expect(await reflagSensitive(db())).toBe(0);
+    const { siteHashes } = await import("../lib/referrals/sensitive");
+    const known = await knownSensitiveSites(db());
+    expect(siteHashes("44 Birch St", "60614").some((h) => known.has(h))).toBe(true);
+    expect(siteHashes("1200 W Fullerton Ave", "60614").some((h) => known.has(h))).toBe(false);
+    // Once per cue version and 10 minutes, not on every read: a card added the old way waits for the next run.
+    const late = await insert("[Test045] Sarah's Inn", "organization", "3 Ash St");
+    await knownSensitiveSites(db());
+    const [before] = await db()<{ sensitive: boolean }[]>`select sensitive from practice_os.referral_sources where id = ${late}`;
+    expect(before.sensitive).toBe(false);
+    expect(await reflagSensitive(db())).toBe(1);
   });
 
   it("an NPPES person at a known sensitive site is saved sensitive, with no street", async () => {
