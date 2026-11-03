@@ -351,7 +351,9 @@ describe.skipIf(!hasDb)("referrals against the database", () => {
     const id = await makeCard("[Sample] Pia Fernwhistle, MD");
     const before = await aeonActions();
     const r = await runTool("log_referral_contact", { source: id, kind: "called", happened_on: "2026-11-01", date_words: "yesterday-ish" }, { by: BY, mode: "manual", said: ["called her yesterday-ish"] });
-    expect(body(r)).toMatchObject({ logged: false, needs_confirmation: expect.stringMatching(/2026-11-01/) });
+    // "yesterday-ish" is read from today's date in the practice's time zone, so the expected day moves with the clock.
+    const yesterday = new Date(Date.now() - 86_400_000).toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+    expect(body(r)).toMatchObject({ logged: false, needs_confirmation: expect.stringContaining(yesterday) });
     expect(await aeonActions()).toBe(before);
   });
 
