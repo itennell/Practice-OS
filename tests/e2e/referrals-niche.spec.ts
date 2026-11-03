@@ -1,12 +1,13 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { execSync } from "node:child_process";
+import { closePanel, openPartner } from "../helpers/partners";
 import { REFERRALS_ONLY_DEMO } from "../../lib/features";
 import { pick } from "../helpers/controls";
 
 // Her niche at phone width (390px), on the fictional demo practice: the onboarding
 // niche screen pre-selects that niche's kinds, Settings › Referrals saves a niche,
-// and the board's category chips show one kind at a time. axe-clean, nothing
+// and the Partners Kind filter shows one kind at a time. axe-clean, nothing
 // wider than the phone. No model call, no internet.
 
 test.use({ viewport: { width: 390, height: 844 } });
@@ -74,19 +75,24 @@ test("Settings › Referrals: the niche picker saves", async ({ page }) => {
   expect(body.specialties).toContain("oncology");
 });
 
-test("board: category chips show one kind at a time, and cards name the niche", async ({ page }) => {
-  // The map searches the live NPI Registry; the board is what this checks.
+test("partners: the Kind filter shows one kind at a time, and the panel names the niche", async ({ page }) => {
+  // The map searches the live NPI Registry; the partners are what this checks.
   await page.route("**/api/referrals/area", (route) => route.fulfill({ status: 503, json: { error: "[Sample] offline in this test" } }));
   await page.goto("/referrals");
-  const filter = page.getByRole("group", { name: "Show cards by kind" });
-  await expect(filter.getByRole("button", { name: /^All/ })).toHaveAttribute("aria-pressed", "true");
-  const oncology = page.getByRole("listitem", { name: "[Sample] Quillmere Oncology Group" });
-  await expect(oncology).toContainText("Fits your oncology & end-of-life focus (Medical specialists)");
-  await filter.getByRole("button", { name: /^Medical specialists/ }).click();
-  await expect(filter.getByRole("button", { name: /^Medical specialists/ })).toHaveAttribute("aria-pressed", "true");
+  const oncology = page.getByRole("listitem", { name: "[Sample] Quillmere Oncology Group", exact: true });
+  const juniper = page.getByRole("listitem", { name: "[Sample] Juniper Row Family Medicine", exact: true });
+  await expect(juniper).toBeVisible();
+  await page.getByRole("button", { name: "Kind", exact: true }).click();
+  await page.getByRole("menuitemcheckbox", { name: /^Medical specialists/ }).click();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", { name: "Kind: Medical specialists" })).toBeVisible();
   await expect(oncology).toBeVisible();
-  await expect(page.getByRole("listitem", { name: "[Sample] Juniper Row Family Medicine" })).toHaveCount(0);
+  await expect(juniper).toHaveCount(0);
   await axeClean(page);
-  await filter.getByRole("button", { name: /^All/ }).click();
-  await expect(page.getByRole("listitem", { name: "[Sample] Juniper Row Family Medicine" })).toBeVisible();
+  const panel = await openPartner(page, "[Sample] Quillmere Oncology Group");
+  await expect(panel).toContainText("Fits your oncology & end-of-life focus (Medical specialists)");
+  await closePanel(page);
+  await page.getByRole("button", { name: "Kind: Medical specialists" }).click();
+  await page.getByRole("menuitem", { name: "Clear" }).click();
+  await expect(juniper).toBeVisible();
 });

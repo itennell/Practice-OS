@@ -9,8 +9,8 @@ import { Orb } from "@/components/ui";
 // the wide Referrals board, it is just the orb (48px), so it covers as little as
 // possible of the text scrolling under it (wave 4 UI test).
 
-// Hidden where the page is the chat (/), has its own message box (the Instagram studio) or is the interview.
-const HIDDEN = ["/", "/onboarding", "/instagram", "/media/instagram"];
+// Hidden where the page is the chat (/), has its own message box (the Instagram studio, Referrals) or is the interview.
+const HIDDEN = ["/", "/onboarding", "/instagram", "/media/instagram", "/referrals"];
 // Pages whose content reaches the right edge on a wide screen: the orb alone there too.
 const ORB_ONLY = ["/referrals"];
 

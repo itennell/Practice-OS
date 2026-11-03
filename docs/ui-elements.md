@@ -31,7 +31,7 @@ Every UI piece Isaiah picked for Practice-OS, where it goes, and how to build it
 | CHT | Chat with Aeon | Message input, bubbles, Aeon thinking, approval cards inside the chat. | UI-005, UI-006, UI-011, UI-014, UI-015, UI-027 |
 | APR | Approvals | The approvals inbox. Uses the global Status Mark (UI-010); no screen-only elements yet. | none yet |
 | DLN | Deadlines | Compliance calendar and its month view. | UI-030 |
-| REF | Referrals | Referral pipeline. No screen-only elements yet; uses the global pieces (the coffee Debrief on a card, components/referrals/debrief.tsx, is the Voice Pill UI-015 plus Thought Line UI-014). | none yet |
+| REF | Referrals | Referral CRM: tabs over a partners table, quick actions, partner and call-script side panels. Uses the global pieces plus Tabs (UI-038), Filter menu (UI-039), Side sheet (UI-040) and Icon button (UI-041); the coffee Debrief on a partner (components/referrals/debrief.tsx) is the Voice Pill UI-015 plus Thought Line UI-014. | UI-038, UI-039, UI-040, UI-041 |
 | IGM | Instagram | Post composer and content calendar. | UI-023 |
 | FDK | Front Desk | Inquiries queue and consult schedule. | UI-025 |
 | SET | Settings | Auto-approve, connections, practice details. | UI-007, UI-032 |
@@ -81,6 +81,10 @@ Every UI piece Isaiah picked for Practice-OS, where it goes, and how to build it
 | UI-035 | Ask Aeon button (Aeon one tap away) | SHL | Every page but the chat | must | built | Calm redesign (own build) | `components/shared/ask-aeon-button.tsx` (`AskAeonButton`) |
 | UI-036 | Page header | GLB | Top of every page | must | built | Calm redesign (own build) | `components/ui.tsx` (`PageHeader`) |
 | UI-037 | Slider (pick a number) | GLB | Forms | must | built | shadcn/ui (MIT) on Base UI | `components/shared/slider.tsx` (`Slider`) |
+| UI-038 | Tabs (page tabs and segmented switch) | GLB | Tabs | must | built | Referrals CRM (own build on Base UI Tabs) | `components/shared/tabs.tsx` (`Tabs`, `TabList`, `Tab`, `TabPanel`; look `line` or `segmented`) |
+| UI-039 | Filter menu (square dropdown filter) | GLB | Filter and sort bars | must | built | Referrals CRM (own build on Base UI Menu) | `components/shared/filter-menu.tsx` (`FilterMenu`, `filterButtonClass`) |
+| UI-040 | Side sheet (panel from the right) | GLB | Details and forms | must | built | Calm redesign (own build on Base UI Dialog) | `components/shared/side-sheet.tsx` (`SideSheet`); Admin's URL panel `components/admin/side-panel.tsx` wraps it |
+| UI-041 | Icon button with tooltip | GLB | Quick actions | must | built | Referrals CRM (own build on Base UI Tooltip) | `components/shared/icon-button.tsx` (`IconButton`, `IconButtonGroup`, `iconButtonClass`) |
 
 ## Build notes
 
@@ -301,3 +305,27 @@ One title (28px, 650), one plain line under it, and at most one action on the ri
 **SET · Auto-approve kinds** · must · approved · shadcn/ui (MIT) · added at review · [link](https://ui.shadcn.com/docs/components/switch)
 
 The standard controls for Settings and forms: on/off switches (e.g. auto-approve "Text callers their consult options"), dropdown selects, radio choices and text inputs as 48px pills. Turning ON an auto-approve switch asks first with the Confirm dialog (UI-028) because it lets Aeon act without asking. Labels in plain words with a one-line explanation under each. Caseload look: switch track border #D4CDF0, on = accent #5B47C9 (dark #8E7CF8), 44px touch targets, visible focus ring. Install: npx shadcn@latest add switch select radio-group input (shadcn/ui, MIT, Base UI). Added at the review because every screen needs it.
+
+### UI-038 Tabs
+
+**GLB · Tabs** · must · built · Referrals CRM (2026-11-03)
+
+One row of tabs over panels, on Base UI Tabs: arrow keys move between tabs, Home and End jump, each panel is named by its tab. Two looks. `line` (default) for page tabs: 44px tall, muted text, the current tab in ink with a 2px ink underline on a hairline; on a phone the row scrolls sideways. `segmented` for a small switch inside a panel (the call script's Front desk / Provider / Voicemail): a hairline box, the current segment filled with the card colour and a soft shadow, 44px. The caller owns the value, so a page can keep it in the URL (Referrals keeps `?tab=`). `keepMounted` on a panel keeps its state (search, filters) when she looks at another tab.
+
+### UI-039 Filter menu
+
+**GLB · Filter and sort bars** · must · built · Referrals CRM (2026-11-03)
+
+A square block button (12px radius, hairline border, card colour, 44px tall) with the filter's name, what is picked in bold, and a chevron. It opens a Base UI Menu: radio items for one choice (Email, Distance, Sort), checkbox items with counts and a Clear row for several (Kind, Stage). An active filter gets an ink border. Square on purpose: round pills are buttons and chips. `filterButtonClass` gives a plain toggle (aria-pressed) the same look, like "Show not a fit". On a phone the bar scrolls sideways.
+
+### UI-040 Side sheet
+
+**GLB · Details and forms** · must · built · Calm redesign (2026-11-03, from Admin's panel)
+
+A panel that slides in from the right over a dimmed page (Base UI Dialog: focus stays inside, Escape closes, focus returns). Title, an optional muted line, a close button, a scrolling body and an optional footer for the panel's buttons. Full width on a phone, up to 640px (or a wider `width`) on a computer. Controlled by the caller; Admin's `SidePanel` wraps it and keeps the panel in the URL.
+
+### UI-041 Icon button with tooltip
+
+**GLB · Quick actions** · must · built · Referrals CRM (2026-11-03)
+
+A 44px button holding one 16px lucide icon in muted ink, with a hover tint. Its `label` is both the accessible name and a small dark tooltip (Base UI Tooltip) on hover or keyboard focus. Disabled buttons fade. Put a row of them in one `IconButtonGroup` so the tooltips share a delay. `iconButtonClass` styles another trigger (a Menu trigger for "More") the same way.

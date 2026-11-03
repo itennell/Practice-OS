@@ -44,7 +44,7 @@ function dateLabel(iso: string): string {
  * The drafted email on the card: subject and letter, a Copy button, and plain
  * steps. Aeon never sends; she pastes it into her own email.
  */
-function LetterBox({
+export function LetterBox({
   letter,
   cardId,
   name,
