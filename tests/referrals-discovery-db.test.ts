@@ -214,15 +214,64 @@ describe.skipIf(!local)("migration 045 and discovery cards (built-in database on
     expect(other).toEqual({ sensitive: false, address: "1 Main St" });
   });
 
-  it("the SQL cue list agrees with lib/referrals/sensitive.ts", async () => {
+  it("the app's cue list catches every name the SQL one does, and more (Nov 3)", async () => {
     const { looksSensitive } = await import("../lib/referrals/sensitive");
     const names = ["Harbor Shelters Inc", "Ruth’s House", "Safe Harbor Center", "The Safehouse Project", "House of Hope Chicago", "Northside Sexual Abuse Program",
       "Family Violence Coalition", "Battered Women's Network", "Lakeview Women's Center", "Haven House Services", "Refuge Ministries", "Rape Crisis Line",
-      "Juniper Row Family Medicine", "Gilda's Club Chicago", "Fullerton Funeral Home", "Haven", "Shelter", "House of Ruth"];
+      "Juniper Row Family Medicine", "Gilda's Club Chicago", "Fullerton Funeral Home", "Haven", "Shelter", "House of Ruth",
+      "[Test] Survivors Healing Center", "[Test] Hope House Chicago", "Lakeview Safe Place"];
     for (const n of names) {
       const [r] = await db()<{ v: boolean }[]>`select practice_os.name_looks_sensitive(${n}) as v`;
-      expect(r.v, n).toBe(looksSensitive(n));
+      if (r.v) expect(looksSensitive(n), n).toBe(true);
     }
+    for (const n of ["Juniper Row Family Medicine", "Gilda's Club Chicago", "Fullerton Funeral Home"]) expect(looksSensitive(n), n).toBe(false);
+  });
+
+  it("re-flags old cards the new cues catch, spreads only from a sensitive kind, and audits each one (no migration)", async () => {
+    const insert = async (name: string, npiType: string, address: string, type: string | null = null) => {
+      const [row] = await db()<{ id: string }[]>`
+        insert into practice_os.referral_sources (name, npi_type, address, city, state, zip, distance_miles, source_type)
+        values (${name}, ${npiType}, ${address}, 'Chicago', 'IL', '60614', 0.3, ${type}) returning id`;
+      return track(row.id);
+    };
+    const org = await insert("[Test045] Survivors Healing Center", "organization", "1200 W Fullerton Ave");
+    const hope = await insert("[Test045] Hope House Chicago", "organization", "9 Elm St");
+    // A name cue doesn't spread: someone else at the Survivors street keeps theirs.
+    const nextDoor = await insert("[Test045] Robin Nearby", "individual", "1200 West Fullerton Avenue");
+    const agency = await insert("[Test045] Quiet Street Agency", "organization", "44 Birch St", "dv_sa_agencies");
+    const atAgency = await insert("[Test045] Sam Example", "individual", "44 Birch Street");
+    const plain = await insert("[Test045] Fullerton Family Dental", "organization", "500 W Fullerton Ave");
+    const oncology = await insert("[Test045] Cancer Survivors Network", "organization", "7 Pine St");
+    await db()`insert into practice_os.referral_facts (source_id, field, value, origin, match_method) values (${org}, 'address', '1200 W Fullerton Ave, Chicago, IL 60614', 'osm', 'name_address')`;
+    const { reflagSensitive, knownSensitiveSites } = await import("../lib/referrals/sensitive-sites");
+    expect(await reflagSensitive(db())).toBeGreaterThanOrEqual(4);
+    const rows = await db()<{ id: string; sensitive: boolean; address: string | null; zip: string | null; distance_miles: number | null; site_hashes: string[] | null }[]>`
+      select id, sensitive, address, zip, distance_miles, site_hashes from practice_os.referral_sources where id in ${db()([org, hope, nextDoor, agency, atAgency, plain, oncology])}`;
+    const by = new Map(rows.map((r) => [r.id, r]));
+    for (const id of [org, hope, agency, atAgency]) expect(by.get(id)).toMatchObject({ sensitive: true, address: null, zip: null, distance_miles: null });
+    expect(by.get(org)!.site_hashes).toBeNull();
+    expect(by.get(agency)!.site_hashes?.length).toBeGreaterThan(0);
+    expect(by.get(nextDoor)).toMatchObject({ sensitive: false, address: "1200 West Fullerton Avenue" });
+    expect(by.get(plain)).toMatchObject({ sensitive: false, address: "500 W Fullerton Ave" });
+    expect(by.get(oncology)).toMatchObject({ sensitive: false, address: "7 Pine St" });
+    const facts = await db()<{ field: string }[]>`select field from practice_os.referral_facts where source_id = ${org}`;
+    expect(facts).toEqual([]);
+    const audits = await db()<{ subject_id: string; reason: string }[]>`
+      select subject_id::text, details ->> 'reason' as reason from practice_os.audit_log
+       where action = 'referral_reflagged_sensitive' and subject_id::text in ${db()([org, hope, agency, atAgency])}`;
+    expect(Object.fromEntries(audits.map((a) => [a.subject_id, a.reason]))).toEqual({ [org]: "name", [hope]: "name", [agency]: "kind", [atAgency]: "site" });
+    // Nothing left to change; the sites list now has the agency's street.
+    expect(await reflagSensitive(db())).toBe(0);
+    const { siteHashes } = await import("../lib/referrals/sensitive");
+    const known = await knownSensitiveSites(db());
+    expect(siteHashes("44 Birch St", "60614").some((h) => known.has(h))).toBe(true);
+    expect(siteHashes("1200 W Fullerton Ave", "60614").some((h) => known.has(h))).toBe(false);
+    // Once per cue version and 10 minutes, not on every read: a card added the old way waits for the next run.
+    const late = await insert("[Test045] Sarah's Inn", "organization", "3 Ash St");
+    await knownSensitiveSites(db());
+    const [before] = await db()<{ sensitive: boolean }[]>`select sensitive from practice_os.referral_sources where id = ${late}`;
+    expect(before.sensitive).toBe(false);
+    expect(await reflagSensitive(db())).toBe(1);
   });
 
   it("an NPPES person at a known sensitive site is saved sensitive, with no street", async () => {
@@ -231,12 +280,24 @@ describe.skipIf(!local)("migration 045 and discovery cards (built-in database on
       organization: null, practiceName: null, credential: "LCSW", taxonomy: "1041C0700X", taxonomyLabel: "Social Worker, Clinical", specialty: "therapists" as const,
       specialtyLabel: "Therapists", city: "Chicago", state: "IL", zip: "60614", phone: null, homeAddress: false, fax: null, distanceMiles: 0.2, fitScore: 50,
     };
-    await saveSources([{ ...base, npi: "1999999970", name: "[Test045] Bayview Safe House", npiType: "organization", address: "88 Harbor Rd" } as never]);
+    // A shelter by kind marks people NPPES lists at its street.
+    const { siteHashes } = await import("../lib/referrals/sensitive");
+    const [shelter] = await db()<{ id: string }[]>`
+      insert into practice_os.referral_sources (name, npi_type, city, state, source_type, sensitive, site_hashes)
+      values ('[Test045] Quiet Harbor Shelter', 'organization', 'Chicago', 'IL', 'shelters', true, ${siteHashes("88 Harbor Rd", "60614")}) returning id`;
+    track(shelter.id);
     await saveSources([{ ...base, npi: "1999999971", name: "[Test045] Robin Example", npiType: "individual", address: "88 HARBOR ROAD" } as never]);
-    const rows = await db()<{ npi: string; id: string; sensitive: boolean; address: string | null; distance_miles: number | null }[]>`
-      select npi, id, sensitive, address, distance_miles from practice_os.referral_sources where npi in ('1999999970', '1999999971') order by npi`;
+    // A name cue (round 2 review) is sensitive itself, but neither keeps hashes nor marks its neighbours.
+    await saveSources([{ ...base, npi: "1999999970", name: "[Test045] Bayview Safe House", npiType: "organization", address: "12 Bay Rd" } as never]);
+    await saveSources([{ ...base, npi: "1999999972", name: "[Test045] Sam Neighbour", npiType: "individual", address: "12 BAY ROAD" } as never]);
+    const rows = await db()<{ npi: string; id: string; sensitive: boolean; address: string | null; distance_miles: number | null; site_hashes: string[] | null }[]>`
+      select npi, id, sensitive, address, distance_miles, site_hashes from practice_os.referral_sources where npi in ('1999999970', '1999999971', '1999999972') order by npi`;
     rows.forEach((r) => track(r.id));
-    expect(rows.map((r) => [r.sensitive, r.address, r.distance_miles])).toEqual([[true, null, null], [true, null, null]]);
+    expect(rows.map((r) => [r.npi, r.sensitive, r.address, r.distance_miles, r.site_hashes])).toEqual([
+      ["1999999970", true, null, null, null],
+      ["1999999971", true, null, null, null],
+      ["1999999972", false, "12 BAY ROAD", "0.2", null],
+    ]);
   });
 
   it("summarize leaves a sensitive card's address evidence out, so recheck and email answers never carry it", async () => {
