@@ -60,9 +60,12 @@ test("debrief a coffee meeting: record, review, save", async ({ page }) => {
 
   // She edits one answer, then saves.
   await review.getByRole("textbox", { name: "Best time to reach them" }).fill("Tuesday mornings before 10");
+  // Jenna Cho becomes a card only once she ticks her as a referral contact.
+  await review.getByRole("switch", { name: "Add Jenna Cho as a referral contact" }).click();
   const saved = page.waitForResponse((r) => r.url().endsWith("/debrief/save"));
   await review.getByRole("button", { name: "Save to card" }).click();
-  expect((await saved).ok()).toBe(true);
+  const res = await saved;
+  expect(res.ok(), await res.text()).toBe(true);
 
   const after = page.getByRole("region", { name: "Connected" }).getByRole("listitem", { name: PARTNER });
   const profile = after.getByTestId("partner-profile");

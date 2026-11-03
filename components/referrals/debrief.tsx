@@ -216,7 +216,7 @@ function Review({ card, draft, onDone, onDiscard }: { card: ReferralSource; draf
       const res = await fetch(`/api/referrals/${card.id}/debrief/save`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ fields, follow_up: followUp, remember: keepMemory }),
+        body: JSON.stringify({ fields, follow_up: followUp, remember: keepMemory, professionals: draft.professionals }),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string; follow_up_approval?: string | null; suggested?: unknown[]; memories?: number; notes?: string[] };
       if (!res.ok) throw new Error(data.error ?? "Couldn't save the debrief.");
@@ -281,14 +281,19 @@ function Review({ card, draft, onDone, onDiscard }: { card: ReferralSource; draf
       {f.who_else.length > 0 && (
         <div className="flex flex-col gap-2">
           <p className="font-medium">{FIELD_LABEL.who_else}</p>
-          <p className="text-[var(--fg-muted)]">Each one becomes a card in Found, marked &ldquo;Suggested from your debrief&rdquo;. Aeon never contacts them on its own.</p>
+          <p className="text-[var(--fg-muted)]">
+            Turn on the ones who are professionals you want to meet. Each becomes a card in Found, marked &ldquo;Suggested from your debrief&rdquo;. Aeon never
+            contacts them on its own.
+          </p>
           <ul className="flex flex-col gap-2">
             {f.who_else.map((w, i) => (
-              <li key={i} className="flex flex-wrap items-center justify-between gap-2 rounded-[12px] border border-[var(--hairline)] px-3 py-1">
-                <span>{[w.name, w.role, w.organization].filter(Boolean).join(", ")}</span>
-                <Button type="button" variant="quiet" onClick={() => set("who_else", f.who_else.filter((_, j) => j !== i))}>
-                  Remove
-                </Button>
+              <li key={i} className="rounded-[12px] border border-[var(--hairline)] px-3 py-1">
+                <p className="pt-2">{[w.name, w.role, w.organization].filter(Boolean).join(", ")}</p>
+                <SettingSwitch
+                  label={`Add ${w.name ?? w.role} as a referral contact`}
+                  checked={Boolean(w.add)}
+                  onCheckedChange={(on) => set("who_else", f.who_else.map((x, j) => (j === i ? { ...x, add: on } : x)))}
+                />
               </li>
             ))}
           </ul>

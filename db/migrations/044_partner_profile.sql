@@ -12,6 +12,10 @@
 -- suggested_from: a card Aeon suggested from a debrief ("you should meet the
 -- nurse navigator at ..."), pointing at the partner who mentioned them. It is
 -- labelled "Suggested from your debrief" and never contacted on its own.
+-- suggestion_confirmed_at: when she ticked "Add as a referral contact" for that
+-- person on the review card. A suggested card can't exist without it, so no
+-- unconfirmed name ever reaches the privacy guard's list of known providers
+-- (lib/aeon/guard.ts practiceAllowlist reads every card's name).
 --
 -- The follow-up email reuses the referral_letter approval kind (copy and send
 -- only), so the approvals kind check is unchanged.
@@ -27,4 +31,6 @@ alter table practice_os.referral_sources
   add column last_meeting_summary text check (length(last_meeting_summary) between 1 and 600),
   add column connection_points text check (length(connection_points) between 1 and 300),
   add column profile_updated_at timestamptz,
-  add column suggested_from uuid references practice_os.referral_sources (id) on delete set null;
+  add column suggested_from uuid references practice_os.referral_sources (id) on delete set null,
+  add column suggestion_confirmed_at timestamptz,
+  add constraint referral_sources_suggestion_confirmed check (suggested_from is null or suggestion_confirmed_at is not null);

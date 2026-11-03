@@ -44,3 +44,47 @@ export const LEAKY_FIELDS = {
 export const FOLLOW_UP_LETTER =
   "Dear Amara Okafor, MD,\n\nThank you for meeting me for coffee. It was good to hear that your office sends referrals by fax through your front desk " +
   "coordinator, and that you need a therapist who can see people within two weeks. As I said, I will send my flyer next week.\n\nWarmly,\nDana Reyes, LCPC\nReyes Counseling PLLC";
+
+// ---- adversarial probes (PR #129 review): default refuse ----
+
+/** Each line is about one person, and none of it may be stored or allowlisted. */
+export const PROBES = [
+  "Kevin Ortiz needs a therapist soon, she said.",
+  "Tom Becker, our receptionist's patient, needs help.",
+  "J.R. keeps missing appointments and needs someone with evening hours.",
+  "A new parent there has severe postpartum psychosis and was hospitalized.",
+  "Her husband died last month and she can't stop crying.",
+  "For urgent referrals, ask for the patient's mom.",
+];
+export const PROBE_WORDS = ["Kevin", "Ortiz", "Becker", "J.R", "JR ", "psychosis", "hospitalized", "husband", "crying", "patient's mom"];
+
+/** Staff who must still pass: an appositive role or "our receptionist, <name>". */
+export const STAFF_LINES = [
+  "Linda Park, the nurse navigator, handles their referrals.",
+  "Our receptionist, Rosa Diaz, answers the fax line.",
+  "Brian Lee, the office manager, schedules the calls.",
+  "She said I should meet Jenna Cho, the oncology nurse navigator at Lakeshore Cancer Center.",
+];
+export const STAFF = ["Linda Park", "Rosa Diaz", "Brian Lee", "Jenna Cho"];
+
+export const PROBE_TRANSCRIPT = ["I had coffee with Dr. Okafor from Northside Women's Health. They send referrals by fax.", ...PROBES, ...STAFF_LINES].join(" ");
+
+/** A model that copies every probe into the fields. */
+export const PROBE_FIELDS = {
+  refers_via: "fax",
+  referral_contact: "the patient's mom",
+  populations: ["A new parent with severe postpartum psychosis", "families in hospice"],
+  needs_from_therapist: "Kevin Ortiz needs a therapist soon",
+  waitlist: null,
+  payer_mix: null,
+  best_time: "Evening hours for J.R.",
+  last_meeting_summary: "Her husband died last month and she can't stop crying. They send referrals by fax.",
+  connection_points: null,
+  who_else: [
+    { name: "Kevin Ortiz", role: "therapist", organization: null },
+    { name: "Tom Becker", role: "receptionist's patient", organization: null },
+    { name: "J.R.", role: "patient", organization: null },
+    { name: "Linda Park", role: "nurse navigator", organization: null },
+  ],
+  follow_up_points: ["Call Tom Becker about help", "Check on the new parent who was hospitalized"],
+};

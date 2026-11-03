@@ -21,10 +21,23 @@ vi.mock("node:fs/promises", async (importOriginal) => {
 });
 
 import { loadEnv } from "../lib/env";
-import { aboutAPatient, checkRecording, keyTerms, MAX_DEBRIEF_SECONDS, numbersSupported, support, wavSeconds } from "../lib/referrals/debrief";
+import { aboutAPatient, checkRecording, genericGroup, hasInitials, keyTerms, MAX_DEBRIEF_SECONDS, namedAsPatient, numbersSupported, professionalNames, support, wavSeconds } from "../lib/referrals/debrief";
 import { memoryFactsFor, shortName } from "../lib/referrals/debrief-shape";
 import { STANDIN_TRANSCRIPT } from "../lib/referrals/debrief-standin";
-import { CRISIS_TRANSCRIPT, FEE_TRANSCRIPT, FOLLOW_UP_LETTER, LEAKY_FIELDS, PATIENT_WORDS, PHI_TRANSCRIPT } from "./fixtures/referrals/debrief";
+import {
+  CRISIS_TRANSCRIPT,
+  FEE_TRANSCRIPT,
+  FOLLOW_UP_LETTER,
+  LEAKY_FIELDS,
+  PATIENT_WORDS,
+  PHI_TRANSCRIPT,
+  PROBE_FIELDS,
+  PROBE_TRANSCRIPT,
+  PROBE_WORDS,
+  PROBES,
+  STAFF,
+  STAFF_LINES,
+} from "./fixtures/referrals/debrief";
 
 loadEnv();
 const hasDb = Boolean(process.env.DATABASE_URL);
@@ -60,6 +73,21 @@ describe("the recording", () => {
     // A low sample rate keeps 4 minutes under the byte cap; the header still gives it away.
     expect(() => checkRecording(wav(240, 8_000))).toThrow(/over 3 minutes/);
     expect(() => checkRecording(Buffer.alloc(0))).toThrow(/No recording/);
+  });
+  it("a crafted header can't shrink the length: the rate comes from the format, not the byte-rate field", () => {
+    const crafted = wav(200, 8_000);
+    crafted.writeUInt32LE(8_000 * 2 * 10, 28); // claims ten times the real byte rate (20 s)
+    expect(wavSeconds(crafted)).toBeCloseTo(200, 0);
+    expect(() => checkRecording(crafted)).toThrow(/over 3 minutes/);
+    const stereo = wav(100, 8_000);
+    stereo.writeUInt16LE(2, 22); // two channels: half the length
+    expect(wavSeconds(stereo)).toBeCloseTo(50, 0);
+    const float = wav(2);
+    float.writeUInt16LE(3, 20); // not PCM
+    expect(() => checkRecording(float)).toThrow(/WAV/);
+    const silly = wav(2);
+    silly.writeUInt16LE(0, 34); // zero bits per sample
+    expect(wavSeconds(silly)).toBeNull();
   });
   it("the route refuses a recording over 3 minutes before anything runs", async () => {
     const { POST } = await import("../app/api/referrals/[id]/debrief/route");
@@ -98,6 +126,26 @@ describe("plain-code checks", () => {
       "Dr. Okafor's office takes referrals by fax; ask for the oncology nurse navigator.",
       "Best time to reach Dr. Okafor's office: Tuesday mornings.",
     ]);
+  });
+  it("every probe about one person is left out; staff with an appositive role or title still pass", () => {
+    for (const p of PROBES) expect(aboutAPatient(p) || namedAsPatient(p, "Kevin Ortiz")).toBe(true);
+    for (const s of STAFF_LINES) expect(aboutAPatient(s)).toBe(false);
+    expect(professionalNames(STAFF_LINES.join(" "), STAFF)).toEqual(STAFF);
+    // Words after a name never make it a professional.
+    expect(professionalNames("Kevin Ortiz needs a therapist soon, she said.", ["Kevin Ortiz"])).toEqual([]);
+    expect(professionalNames("Tom Becker, our receptionist's patient, needs help.", ["Tom Becker"])).toEqual([]);
+    expect(professionalNames("Dr. Sam Patel runs the clinic.", ["Sam Patel"])).toEqual(["Sam Patel"]);
+    // A professional as the subject of a patient verb is dropped too: default refuse.
+    expect(professionalNames("Dr. Sam Patel sees adults.", ["Sam Patel"])).toEqual([]);
+    expect(professionalNames("Sam Patel, MD handles referrals.", ["Sam Patel"])).toEqual(["Sam Patel"]);
+    expect(hasInitials("J.R. keeps missing appointments")).toBe(true);
+    expect(hasInitials("J R keeps missing appointments")).toBe(true);
+    expect(hasInitials("JR keeps missing appointments")).toBe(true);
+    expect(hasInitials("The RN and the NP at the OB office")).toBe(false);
+    expect(professionalNames("J.R. is great.", ["J.R."])).toEqual([]);
+    expect(genericGroup("adults with cancer")).toBe(true);
+    expect(genericGroup("families in hospice")).toBe(true);
+    expect(genericGroup("A new parent with severe postpartum psychosis")).toBe(false);
   });
   it("the e2e stand-in transcript has a patient story for the privacy pass to take out", () => {
     expect(STANDIN_TRANSCRIPT).toMatch(/Maria Lopez/);
@@ -169,7 +217,13 @@ describe.skipIf(!hasDb)("the debrief against the database", async () => {
     expect(d.fields.populations).toEqual(["women going through cancer treatment", "new parents"]);
 
     // She confirms the draft as it is.
-    const saved = await saveDebrief(ID, { fields: d.fields, follow_up: d.follow_up, remember: true });
+    // She ticks Jenna Cho as a referral contact.
+    const saved = await saveDebrief(ID, {
+      fields: { ...d.fields, who_else: d.fields.who_else.map((w) => ({ ...w, add: true })) },
+      follow_up: d.follow_up,
+      remember: true,
+      professionals: d.professionals,
+    });
     expect(saved.follow_up_approval).toBeTruthy();
     const everything = JSON.stringify([
       await sql`select * from practice_os.referral_sources where id = ${ID} or suggested_from = ${ID}`,
@@ -242,6 +296,59 @@ describe.skipIf(!hasDb)("the debrief against the database", async () => {
     // And an edited field with fee language is refused at save.
     await expect(saveDebrief(ID, { fields: { ...r.draft.fields, needs_from_therapist: "We pay a referral fee for each client" } })).rejects.toThrow(/Nothing of value/);
   }, 120_000);
+
+  it("probes: nothing about one person reaches Muse, the card, the log, memory, approvals or the allowlist", async () => {
+    const { cleanTranscript } = await import("../lib/referrals/debrief");
+    const { practiceAllowlist } = await import("../lib/aeon/guard");
+    const source = { name: NAME, organization: "Northside Women's Health" };
+    const cleaned = await cleanTranscript(PROBE_TRANSCRIPT, source);
+    for (const w of PROBE_WORDS) expect(cleaned.text).not.toContain(w);
+    for (const s of STAFF) expect(cleaned.professionals).toContain(s);
+    expect(cleaned.professionals).not.toContain("Kevin Ortiz");
+    expect(cleaned.professionals).not.toContain("Tom Becker");
+
+    sent.length = 0;
+    const r = await analyzeDebrief(ID, { transcript: PROBE_TRANSCRIPT }, { chat: fakeChat(PROBE_FIELDS) });
+    if (r.status !== "ready") throw new Error(r.status);
+    for (const w of PROBE_WORDS) for (const s of sent) expect(s.text).not.toContain(w);
+    const f = r.draft.fields;
+    expect(f.referral_contact).toBeNull();
+    expect(f.needs_from_therapist).toBeNull();
+    expect(f.best_time).toBeNull();
+    expect(f.last_meeting_summary).toBeNull();
+    expect(f.populations).toBeNull();
+    expect(f.follow_up_points).toEqual([]);
+    expect(f.who_else.map((w) => w.name)).toEqual(["Linda Park"]);
+
+    // A forged person, or a forged seal of names, is refused at save.
+    await expect(
+      saveDebrief(ID, { fields: { ...f, who_else: [{ name: "Kevin Ortiz", role: "nurse", organization: null, add: true, token: "forged" }] }, professionals: r.draft.professionals }),
+    ).rejects.toThrow(/changed after Aeon checked/);
+    await expect(
+      saveDebrief(ID, { fields: { ...f, referral_contact: "Kevin Ortiz" }, professionals: { names: ["Kevin Ortiz"], token: r.draft.professionals.token } }),
+    ).rejects.toThrow();
+    // Edited fields carrying the probes are refused too.
+    for (const p of PROBES) {
+      await expect(saveDebrief(ID, { fields: { ...f, last_meeting_summary: `${p} They refer by fax.` }, professionals: r.draft.professionals })).rejects.toThrow();
+    }
+    // An unticked person never becomes a card; she saves without ticking Linda Park.
+    await saveDebrief(ID, { fields: f, professionals: r.draft.professionals, remember: true });
+    const everything = JSON.stringify([
+      await sql`select * from practice_os.referral_sources where id = ${ID} or suggested_from = ${ID}`,
+      await sql`select * from practice_os.referral_contacts where source_id = ${ID}`,
+      await sql`select * from practice_os.memories where source = 'referral_debrief'`,
+      await sql`select * from practice_os.approvals where payload ->> 'referral_source_id' = ${ID}`,
+    ]);
+    for (const w of PROBE_WORDS) expect(everything).not.toContain(w);
+    expect(everything).not.toContain("Linda Park");
+    forgetAllowlist();
+    const allow = JSON.stringify(await practiceAllowlist());
+    for (const w of ["Kevin", "Ortiz", "Becker", "J.R", "Linda Park"]) expect(allow).not.toContain(w);
+  }, 120_000);
+
+  it("the database refuses a suggested card she never confirmed", async () => {
+    await expect(sql`insert into practice_os.referral_sources (name, stage, suggested_from) values ('Unconfirmed Person', 'found', ${ID})`).rejects.toThrow(/suggestion_confirmed/);
+  });
 
   it("the chat's debrief_meeting finds the card and hands back a card that opens its recorder", async () => {
     const { TOOLS_BY_NAME } = await import("../lib/aeon/tools");

@@ -20,9 +20,10 @@
 //      copy-and-send only.
 // The raw transcript lives only in this request's memory. Audit rows carry
 // counts and field names, never words.
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { forgetAllowlist, guard, practiceAllowlist, type GuardResult } from "../aeon/guard";
-import { clientLike, mentionsDiagnosis, populationSentence, sentences, type Allowlist } from "../aeon/identity-filter";
+import { clientLike, clinicalForMemory, mentionsDiagnosis, populationSentence, sentenceAt, sentences, type Allowlist } from "../aeon/identity-filter";
 import { remember, MemoryRefused } from "../aeon/memory";
 import { findNames, isNameLike } from "../aeon/phi-classifier";
 import { queueApproval } from "../approvals";
@@ -42,6 +43,7 @@ import {
   type DebriefFields,
   type FollowUpDraft,
   type Rejected,
+  type WhoElse,
 } from "./debrief-shape";
 import { blockedReason, checkFacts, checkLetter, finishLetter, letterFacts, pendingLetter, valueOffered } from "./outreach";
 import { cardView } from "./plan";
@@ -71,14 +73,24 @@ export class DebriefError extends Error {
 /** Seconds of audio in a PCM WAV, read from its fmt and data chunks; null when it isn't a WAV. */
 export function wavSeconds(bytes: Buffer): number | null {
   if (bytes.length < 44 || bytes.subarray(0, 4).toString("ascii") !== "RIFF" || bytes.subarray(8, 12).toString("ascii") !== "WAVE") return null;
+  // The rate is worked out from the format itself (sample rate x channels x bytes per sample);
+  // the header's own byte-rate field is ignored, so a crafted header can't shrink the length.
   let byteRate = 0;
+  let pcm = false;
   let at = 12;
   while (at + 8 <= bytes.length) {
     const id = bytes.subarray(at, at + 4).toString("ascii");
     const size = bytes.readUInt32LE(at + 4);
-    if (id === "fmt " && at + 20 <= bytes.length) byteRate = bytes.readUInt32LE(at + 16);
+    if (id === "fmt " && at + 24 <= bytes.length) {
+      const format = bytes.readUInt16LE(at + 8);
+      const channels = bytes.readUInt16LE(at + 10);
+      const rate = bytes.readUInt32LE(at + 12);
+      const bits = bytes.readUInt16LE(at + 22);
+      pcm = format === 1 && channels >= 1 && channels <= 2 && rate >= 8_000 && rate <= 192_000 && [8, 16, 24, 32].includes(bits);
+      byteRate = pcm ? (rate * channels * bits) / 8 : 0;
+    }
     if (id === "data") {
-      if (!byteRate) return null;
+      if (!pcm || !byteRate) return null;
       // A streaming writer may leave the size at 0 or past the end: count what is there.
       const data = Math.min(size || Infinity, bytes.length - at - 8);
       return data / byteRate;
@@ -104,49 +116,94 @@ export async function transcribeDebrief(audio: Buffer): Promise<string> {
 }
 
 // ---- 3. the privacy pass -----------------------------------------------------
+// Default refuse: a sentence is kept only when nothing in it looks like one
+// person's story, and a name passes only with positive evidence that it is a
+// professional (a title, a credential, or an appositive role on the name itself).
 
-// One patient or client: "a patient", "one of my patients", "this client of hers".
-const ONE_PATIENT =
-  /\b(?:a|an|one|this|that|the|my|our|her|his|their)\s+(?:\w+\s+){0,2}?(?:patient|client|pt)\b(?!s)|\bone\s+of\s+(?:my|our|her|his|their|the)\s+(?:\w+\s+)?(?:patients|clients)\b|\b(?:patient|client)\s+(?:named|called)\b/i;
+// One patient or client: "a patient", "one of my patients", "her patient",
+// "the receptionist's patient", "Dr. Okafor's client", "the patient's mom".
+const ONE_PATIENT = new RegExp(
+  [
+    "\\b(?:a|an|one|this|that|the|my|our|her|his|their|your)\\s+(?:\\w+\\s+){0,2}?(?:patient|client|pt)\\b(?!s)",
+    "\\bone\\s+of\\s+(?:my|our|her|his|their|the|\\w+(?:'s|’s))\\s+(?:\\w+\\s+)?(?:patients|clients)\\b",
+    "\\b(?:my|our|her|his|their|your)\\s+(?:\\w+\\s+)?(?:patient|client)s?\\b",
+    "(?:'s|’s)\\s+(?:\\w+\\s+)?(?:patient|client)s?\\b",
+    "\\b(?:patient|client)s?(?:'s|’s|’|')(?:\\s|$)",
+    "\\b(?:patient|client)\\s+(?:named|called)\\b",
+  ].join("|"),
+  "i",
+);
 // An age, or "34," after a name: "a 34-year-old", "aged 60", "in her early 40s".
 const AN_AGE =
   /\b\d{1,3}[- ]?(?:year|yr|month)s?[- ]?olds?\b|\baged?\s+\d{1,3}\b|\bin\s+(?:her|his|their)\s+(?:early\s+|late\s+|mid-?\s*)?\d0s\b|\p{Lu}\p{Ll}+,\s*\d{1,2},/iu;
 const DIAGNOSED = /\bdiagnos\w*|\bdx\b|\bprognos\w*|\bstage\s+(?:[1-4]|i{1,3}v?|iv)\b/i;
-// One person who isn't a professional: "a woman", "this guy", "her son".
+// One person who isn't a professional: "a woman", "this guy", "her son", "a new parent there".
 const ONE_PERSON =
-  /\b(?:a|an|one|this|that)\s+(?:young\s+|older\s+)?(?:woman|man|lady|guy|girl|boy|kid|teen|teenager|mom|mother|dad|father|person|gentleman|veteran|student)\b|\b(?:her|his|their)\s+(?:son|daughter|husband|wife|kid|baby|child|partner|mother|father)\b|\bnamed\s+\p{Lu}/iu;
+  /\b(?:a|an|one|this|that)\s+(?:\w+\s+)?(?:woman|man|lady|guy|girl|boy|kid|teen|teenager|mom|mother|dad|father|parent|person|gentleman|veteran|student|family|couple|baby|child|widow|widower)\b|\b(?:her|his|their|my|our)\s+(?:son|daughter|husband|wife|kid|baby|child|partner|mother|father|mom|dad|brother|sister)\b|\bnamed\s+\p{Lu}|\bsomeone\b/iu;
 const MEDICAL = /\b(?:cancer|chemo\w*|radiation|tumou?r|surgery|pregnan\w*|miscarriage|stillbirth|overdose|rehab|hospitali[sz]ed|meds?|medication|condition|illness|terminal)\b/i;
+// An event in one person's life: never practice business, dropped wherever it appears.
+const LIFE_EVENT =
+  /\b(?:died|dies|dying|passed\s+away|death|funeral|widow\w*|grie(?:f|ving|ves)|bereave\w*|cry|cries|crying|cried|tears|hospitali[sz]\w*|admitted|psychosis|psychotic|overdos\w*|suicid\w*|relapse\w*|ER\s+visit|emergency\s+room|ICU|in\s+the\s+hospital|can'?t\s+stop|breakdown|miscarri\w*|stillbirth|abuse\w*|assault\w*|divorc\w*|arrest\w*)\b/i;
+// Initials stand in for a person: "J.R.", "J R", "JR". Known acronyms are fine.
+const ACRONYMS = new Set(
+  "MD DO RN NP PA LPN APRN CNM OB GYN OBGYN ER ICU NICU PICU HR PT OT ST SLP IL US USA LCSW LCPC LPC LMFT PHD PSYD PLLC LLC MSW BCBS UHC HMO PPO EAP FQHC CEO COO IOP PHP CBT DBT EMDR NPI EHR EMR AM PM OK TV PDF CPA FAQ".split(" "),
+);
+const DOTTED_INITIALS = /(?<![\p{L}])(?:\p{Lu}\.\s?){2,3}/u;
+const SPACED_INITIALS = /(?<![\p{L}])\p{Lu}\s\p{Lu}(?![\p{L}])/u;
+const BARE_CAPS = /(?<![\p{L}])\p{Lu}{2,3}(?![\p{L}])/gu;
 
-/** A sentence that may be about one of the partner's patients. Left out whole. */
-export function aboutAPatient(s: string): boolean {
-  if (ONE_PATIENT.test(s) || AN_AGE.test(s) || DIAGNOSED.test(s)) return true;
-  if (ONE_PERSON.test(s) && (MEDICAL.test(s) || mentionsDiagnosis(s) || clientLike(s))) return true;
-  return mentionsDiagnosis(s) && !populationSentence(s) && (ONE_PERSON.test(s) || /\b(?:she|he)\s+(?:has|had|was|is)\b/i.test(s));
+/** "J.R." / "J R" / "JR" (not MD, RN, OB...): someone written as initials. */
+export function hasInitials(s: string): boolean {
+  if (DOTTED_INITIALS.test(s) || SPACED_INITIALS.test(s.replace(/^I\s|\sI\s/g, " "))) return true;
+  return [...s.matchAll(BARE_CAPS)].some((m) => !ACRONYMS.has(m[0]));
 }
 
-// Who a professional is: a title, a credential, or a role next to the name.
+// A name as the subject of a need, visit, condition or feeling: patient talk.
+const PATIENT_VERB =
+  "needs?|wants?|has|had|have|keeps|kept|missed|misses|struggl\\w*|suffer\\w*|feels?|felt|cries|cried|was\\s+\\w+|is\\s+(?:struggling|seeing|having|dealing|going|getting|in|on|not|still|being|afraid|scared|sad|depressed|anxious|worried|sick|ill|pregnant|grieving)|can'?t|couldn'?t|won'?t|lost|died|came|comes|called|asked|booked|cancel\\w*|stopped|started|takes|took|sees|saw|went|goes|lives|lived";
+
+/** The name is the subject of a patient verb ("Kevin Ortiz needs a therapist", "Tom Becker, ..., needs help"). */
+export function namedAsPatient(sentence: string, name: string): boolean {
+  return new RegExp(`(?<![\\p{L}])${escapeRe(name)}(?:'s|’s)?(?:\\s*,[^,]{1,80},)?\\s+(?:\\w+ly\\s+|just\\s+|also\\s+|really\\s+|still\\s+)?(?:${PATIENT_VERB})\\b`, "iu").test(sentence);
+}
+
+/** A sentence that may be about one person: a patient, a family member, a life event. Left out whole. */
+export function aboutAPatient(s: string): boolean {
+  if (ONE_PATIENT.test(s) || AN_AGE.test(s) || DIAGNOSED.test(s) || LIFE_EVENT.test(s) || hasInitials(s)) return true;
+  if (ONE_PERSON.test(s) && (MEDICAL.test(s) || mentionsDiagnosis(s) || clientLike(s))) return true;
+  if (/\b(?:she|he)\s+(?:has|had|was|is|can'?t|feels?|felt|lost)\b/i.test(s) && (MEDICAL.test(s) || mentionsDiagnosis(s))) return true;
+  return mentionsDiagnosis(s) && !populationSentence(s) && ONE_PERSON.test(s);
+}
+
+// Who a professional is: a title before the name, a credential right after it,
+// or a role in apposition to the name itself ("Linda Park, the nurse navigator",
+// "our receptionist, Rosa Diaz"). Words that merely follow a name never count.
 const ROLE =
-  "nurse|navigator|coordinator|social\\s+worker|psychiatrist|psychologist|therapist|counsel(?:l)?or|doctor|physician|director|manager|midwife|doula|dietitian|nutritionist|chaplain|case\\s+manager|front\\s+desk|receptionist|scheduler|administrator|pediatrician|ob-?gyn|oncologist|internist|lactation\\s+consultant|educator|supervisor|liaison|practitioner|np|pa|md|do|rn|lcsw|lcpc|lpc|lmft|phd|psyd";
-const TITLE_BEFORE = /\b(?:Dr|Doctor)\.?\s+$/i;
-const ROLE_AFTER = new RegExp(`^,?\\s*(?:(?:the|a|an|their|our|her|his)\\s+)?(?:\\w+\\s+){0,3}?(?:${ROLE})\\b`, "i");
-const ROLE_BEFORE = new RegExp(`\\b(?:${ROLE})\\s*,?\\s*$`, "i");
+  "nurse|navigator|coordinator|social\\s+worker|psychiatrist|psychologist|therapist|counsel(?:l)?or|doctor|physician|director|manager|midwife|doula|dietitian|nutritionist|chaplain|case\\s+manager|front\\s+desk|receptionist|scheduler|administrator|pediatrician|ob-?gyn|oncologist|internist|lactation\\s+consultant|educator|supervisor|liaison|practitioner|biller|referral\\s+specialist";
+const CREDENTIAL = "MD|DO|RN|NP|PA|PA-C|APRN|CNM|LCSW|LICSW|LCPC|LPC|LMFT|LMHC|PhD|PsyD|IBCLC";
+const TITLE_BEFORE = /\b(?:Dr|Doctor)\.?\s+$/;
+const CREDENTIAL_AFTER = new RegExp(`^,?\\s*(?:${CREDENTIAL})\\b(?!['’])`);
+// ", the nurse navigator" / ", our receptionist" ending at a comma, period, "at", "from", "in" or "for": never "receptionist's patient".
+const APPOSITIVE_AFTER = new RegExp(`^,\\s*(?:the|our|their|her|his|a|an)\\s+(?:[\\w-]+\\s+){0,2}?(?:${ROLE})(?!['’\\w])\\s*(?:[,.;]|$|\\s+(?:at|from|in|for|with|on)\\b)`, "i");
+const APPOSITIVE_BEFORE = new RegExp(`\\b(?:the|our|their|her|his)\\s+(?:[\\w-]+\\s+){0,2}?(?:${ROLE})\\s*,\\s*$`, "i");
 
 function escapeRe(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/** Names in the text introduced as professionals, never in a sentence about a patient. */
+/** Names with positive evidence, at every place they appear, of being a professional. Everyone else is a stranger. */
 export function professionalNames(text: string, names: string[]): string[] {
   const out = new Set<string>();
   for (const name of names) {
+    if (hasInitials(name) || name.replace(/\./g, "").trim().length < 3) continue;
     const spots = [...text.matchAll(new RegExp(`(?<![\\p{L}])${escapeRe(name)}(?![\\p{L}])`, "gu"))].map((m) => m.index ?? 0);
     if (spots.length === 0) continue;
     const ok = spots.every((at) => {
-      const before = text.slice(Math.max(0, at - 30), at);
-      const after = text.slice(at + name.length, at + name.length + 50);
-      const sentence = sentences(text).find((s) => s.includes(name)) ?? "";
-      if (aboutAPatient(sentence) || clientLike(sentence)) return false;
-      return TITLE_BEFORE.test(before) || ROLE_AFTER.test(after) || ROLE_BEFORE.test(before);
+      const before = text.slice(Math.max(0, at - 40), at);
+      const after = text.slice(at + name.length, at + name.length + 80);
+      const sentence = sentenceAt(text, at);
+      if (aboutAPatient(sentence) || clientLike(sentence) || namedAsPatient(sentence, name)) return false;
+      return TITLE_BEFORE.test(before) || CREDENTIAL_AFTER.test(after) || APPOSITIVE_AFTER.test(after) || APPOSITIVE_BEFORE.test(before);
     });
     if (ok) out.add(name);
   }
@@ -159,19 +216,33 @@ function partnerNames(source: Pick<ReferralSource, "name" | "organization">): st
   return [bare, source.organization?.trim()].filter((v): v is string => Boolean(v));
 }
 
-/** The practice's allowlist plus this partner and the professionals named in this debrief. */
+/** Every word of the name is a word of the partner's own name or practice ("Okafor", "Dr. Okafor"). */
+function isPartner(name: string, source: Pick<ReferralSource, "name" | "organization">): boolean {
+  const mine = new Set(partnerNames(source).flatMap((n) => n.toLowerCase().split(/[\s,]+/)));
+  const words = name.toLowerCase().replace(/\b(?:dr|doctor)\.?\s+/g, "").split(/[\s,]+/).filter(Boolean);
+  return words.length > 0 && words.every((w) => mine.has(w));
+}
+
+/** The practice's allowlist plus this partner and the professionals plain code found in this debrief (never names from a request body). */
 export async function debriefAllowlist(source: Pick<ReferralSource, "name" | "organization">, professionals: string[] = []): Promise<Allowlist> {
   const base = await practiceAllowlist();
   return { ...base, names: [...base.names, ...partnerNames(source), ...professionals] };
 }
 
-export type Cleaned = { text: string; kept: number; withheld: number; professionals: string[] };
+export type Cleaned = { text: string; kept: number; withheld: number; professionals: string[]; fee: string | null };
 type FindNames = (text: string) => Promise<string[]>;
 type Check = (text: string, allow: Allowlist) => Promise<GuardResult>;
 const strictGuard: Check = (t, allow) => guard(t, "message", allow);
 
+/** "J.R." reads as "JR" so a sentence isn't cut at its dots; the initials check still catches it. */
+function joinInitials(text: string): string {
+  return text.replace(/(?<![\p{L}])((?:\p{Lu}\.\s?){2,3})/gu, (m) => m.replace(/[.\s]/g, "") + " ");
+}
+
 /**
- * Leaves out every sentence that could be about someone's patient, then runs
+ * Leaves out every sentence that could be about one person (a patient, a family
+ * member, a life event, initials), every sentence about money for referrals,
+ * and every sentence with a name that isn't plainly a professional, then runs
  * each remaining sentence through the full guard (every PHI kind, names refused
  * rather than blanked). What comes back is the only text Muse sees.
  */
@@ -182,17 +253,26 @@ export async function cleanTranscript(
 ): Promise<Cleaned> {
   const check = deps.check ?? strictGuard;
   const names = deps.names ?? ((t: string) => findNames(t, { failWhenCapped: false }));
-  const all = sentences(transcript.replace(/\s+/g, " ").trim()).map((s) => s.trim()).filter(Boolean);
-  const candidates = all.filter((s) => !aboutAPatient(s));
+  const all = sentences(joinInitials(transcript.replace(/\s+/g, " ").trim()))
+    .map((s) => s.trim())
+    .filter(Boolean);
+  let fee: string | null = null;
+  const candidates = all.filter((s) => {
+    const money = valueOffered(s);
+    if (money) fee ??= money;
+    return !money && !aboutAPatient(s);
+  });
   const found = candidates.length ? (await names(candidates.join(" "))).filter(isNameLike) : [];
   const professionals = professionalNames(candidates.join(" "), found);
   const allow = await debriefAllowlist(source, professionals);
   const kept: string[] = [];
   for (const s of candidates) {
+    // A name as the subject of a need or a visit is patient talk, whoever it is.
+    if (found.some((n) => s.includes(n) && !isPartner(n, source) && namedAsPatient(s, n))) continue;
     const r = await check(s, allow);
     if (r.ok) kept.push(s);
   }
-  return { text: kept.join(" "), kept: kept.length, withheld: all.length - kept.length, professionals };
+  return { text: kept.join(" "), kept: kept.length, withheld: all.length - kept.length, professionals, fee };
 }
 
 // ---- 4. Muse fills in the profile ---------------------------------------------
@@ -340,7 +420,16 @@ const VIA_WORDS: Record<(typeof REFERS_VIA)[number], RegExp> = {
 const WAITLIST_WORDS = /\bwait\s*-?\s*lists?\b|\bwaiting\s+lists?\b|\bwait\s+times?\b|\bbacklog\b|\bmonths?\s+out\b|\bno\s+openings\b|\bopenings\b/i;
 
 /** How much of a field's words must be in the debrief. The summary paraphrases, so it needs less. */
-const SUPPORT_NEEDED: Partial<Record<keyof DebriefFields, number>> = { last_meeting_summary: 0.5 };
+const SUPPORT_NEEDED: Partial<Record<keyof DebriefFields, number>> = { last_meeting_summary: 0.8 };
+/** Fields that get the memory-level clinical check (identity-filter clinicalForMemory). */
+const CLINICAL_CHECKED: (keyof DebriefFields)[] = ["last_meeting_summary", "needs_from_therapist", "populations", "best_time", "follow_up_points", "referral_contact", "connection_points", "payer_mix"];
+
+/** "adults with cancer", "families in hospice": a group, never one person. */
+export function genericGroup(value: string): boolean {
+  if (/^\s*(?:a|an|one|this|that|my|her|his|their|our|the\s+\w+(?:'s|’s))\b/i.test(value)) return false;
+  if (ONE_PERSON.test(value) || hasInitials(value) || /\p{Lu}\p{Ll}+\s+\p{Lu}\p{Ll}+/u.test(value)) return false;
+  return /\w{2,}s\b|\b(?:people|children|youth|elderly|women|men|folks|community)\b/i.test(value);
+}
 const NEEDED = 0.6;
 
 export type CheckedFields = { fields: DebriefFields; rejected: Rejected[] };
@@ -349,7 +438,13 @@ export type CheckedFields = { fields: DebriefFields; rejected: Rejected[] };
  * Keeps a field only when it passes every check: the strict guard, nothing of
  * value tied to referrals, its key words and numbers in the cleaned debrief.
  */
-export async function checkFields(raw: DebriefFields, cleaned: string, allow: Allowlist, deps: { check?: Check } = {}): Promise<CheckedFields> {
+export async function checkFields(
+  raw: DebriefFields,
+  cleaned: string,
+  allow: Allowlist,
+  deps: { check?: Check; professionals?: string[]; sourceId?: string } = {},
+): Promise<CheckedFields> {
+  const pros = new Set((deps.professionals ?? []).map((n) => n.toLowerCase()));
   const check = deps.check ?? strictGuard;
   const rejected: Rejected[] = [];
   const fields: DebriefFields = { ...EMPTY_FIELDS, who_else: [], follow_up_points: [] };
@@ -359,6 +454,9 @@ export async function checkFields(raw: DebriefFields, cleaned: string, allow: Al
     const fee = valueOffered(value);
     let why: string | null = null;
     if (fee) why = `it mentions ${fee}, and nothing of value can be tied to referrals`;
+    else if (aboutAPatient(value)) why = "it may be about one person, not the office";
+    else if (CLINICAL_CHECKED.includes(field) && clinicalForMemory(value)) why = "it has clinical details";
+    else if (field === "populations" && !genericGroup(value)) why = "it isn't a group of people";
     else if (!numbersSupported(value, cleaned)) why = "it has a number you didn't say";
     else if (support(value, cleaned) < need) why = "you didn't say that in the debrief";
     else if (!(await check(value, allow)).ok) why = "it may hold a patient's details";
@@ -398,9 +496,18 @@ export async function checkFields(raw: DebriefFields, cleaned: string, allow: Al
       reject("who_else", "a name you didn't say");
       continue;
     }
+    // A name only with positive evidence, from plain code, that it is a professional.
+    if (w.name && !pros.has(w.name.replace(/^(?:Dr|Doctor)\.?\s+/i, "").toLowerCase()) && !pros.has(w.name.toLowerCase())) {
+      reject("who_else", "a name not introduced as a professional");
+      continue;
+    }
+    if (hasInitials(`${w.name ?? ""} ${w.role}`) || aboutAPatient(`${w.name ?? ""}, ${w.role}`) || /\b(?:patient|client|mom|dad|mother|father|husband|wife|son|daughter|family)\b/i.test(w.role)) {
+      reject("who_else", "it may be about a patient or a family member");
+      continue;
+    }
     const about = [w.role, w.organization].filter(Boolean).join(" ");
     if (!(await textOk("who_else", `${w.name ? `${w.name}, ` : ""}${about}`, 0.5))) continue;
-    fields.who_else.push(w);
+    fields.who_else.push({ ...w, token: sealWho(deps.sourceId ?? "", w) });
   }
   return { fields, rejected };
 }
@@ -484,6 +591,31 @@ export async function writeFollowUp(
   return null;
 }
 
+// ---- the server's seal on what plain code passed ------------------------------------
+// The review card sends the draft back to be saved. Names it may allow (the
+// professionals found in the debrief, each "who else" person) are trusted only
+// with this seal, so a request body can never add a name to the allowlist.
+
+const KEY_SLOT = "__practiceOsDebriefKey";
+function sealKey(): Buffer {
+  const g = globalThis as unknown as Record<string, Buffer | undefined>;
+  return (g[KEY_SLOT] ??= randomBytes(32));
+}
+function seal(parts: string[]): string {
+  return createHmac("sha256", sealKey()).update(JSON.stringify(parts)).digest("base64url");
+}
+export function sealNames(sourceId: string, names: string[]): string {
+  return seal(["pros", sourceId, ...names]);
+}
+export function sealWho(sourceId: string, w: Pick<WhoElse, "name" | "role" | "organization">): string {
+  return seal(["who", sourceId, w.name ?? "", w.role, w.organization ?? ""]);
+}
+function sameToken(a: string, b: string): boolean {
+  const x = Buffer.from(a);
+  const y = Buffer.from(b);
+  return x.length === y.length && timingSafeEqual(x, y);
+}
+
 // ---- the whole analysis ------------------------------------------------------
 
 export type DebriefStep = "transcribing" | "privacy" | "profile" | "follow_up";
@@ -554,13 +686,14 @@ export async function analyzeDebrief(sourceId: string, input: { audio: Buffer } 
   // 4-5. Muse fills in the profile; plain code checks every field.
   deps.onStep?.("profile");
   const raw = await extractProfile(cleaned.text, source, deps.chat);
-  const { fields, rejected } = await checkFields(raw, cleaned.text, allow, { check: deps.check });
+  const { fields, rejected } = await checkFields(raw, cleaned.text, allow, { check: deps.check, professionals: cleaned.professionals, sourceId: source.id });
 
   // The follow-up: refused outright when the debrief talks about paying or rewarding referrals.
   deps.onStep?.("follow_up");
   let followUp: FollowUpDraft | null = null;
   let followUpNote: string | null = null;
-  const fee = valueOffered(cleaned.text);
+  // Money-for-referral sentences never reached Muse; the cleaning pass says if there were any.
+  const fee = cleaned.fee ?? valueOffered(cleaned.text);
   const blocked = await blockedReason(source);
   if (fee) {
     followUpNote = `No follow-up was drafted: the debrief mentions ${fee} tied to referrals, and Practice-OS never offers or accepts anything for a referral.`;
@@ -591,7 +724,16 @@ export async function analyzeDebrief(sourceId: string, input: { audio: Buffer } 
   });
   return {
     status: "ready",
-    draft: { source_id: source.id, partner: source.name, fields, rejected, withheld: cleaned.withheld, follow_up: followUp, follow_up_note: followUpNote },
+    draft: {
+      source_id: source.id,
+      partner: source.name,
+      fields,
+      rejected,
+      withheld: cleaned.withheld,
+      follow_up: followUp,
+      follow_up_note: followUpNote,
+      professionals: { names: cleaned.professionals, token: sealNames(source.id, cleaned.professionals) },
+    },
   };
 }
 
@@ -617,13 +759,24 @@ export const confirmedSchema = z.object({
     last_meeting_summary: short(LIMITS.last_meeting_summary),
     connection_points: short(LIMITS.connection_points),
     who_else: z
-      .array(z.object({ name: short(80), role: z.string().trim().min(1).max(80), organization: short(120) }))
+      .array(
+        z.object({
+          name: short(80),
+          role: z.string().trim().min(1).max(80),
+          organization: short(120),
+          token: z.string().max(128).optional(),
+          /** She ticked "Add as a referral contact" for this one. */
+          add: z.boolean().default(false),
+        }),
+      )
       .max(LIMITS.who_else)
       .default([]),
     follow_up_points: z.array(z.string().trim().min(1).max(LIMITS.point)).max(LIMITS.follow_up_points).default([]),
   }),
   follow_up: z.object({ subject: z.string().trim().min(2).max(150), letter: z.string().trim().min(80).max(2500) }).nullish(),
   remember: z.boolean().default(true),
+  /** The professionals plain code found in the debrief, sealed by the server at analysis. */
+  professionals: z.object({ names: z.array(z.string().max(80)).max(20), token: z.string().max(128) }).nullish(),
 });
 export type Confirmed = z.input<typeof confirmedSchema>;
 
@@ -646,14 +799,18 @@ export class DebriefRefused extends DebriefError {}
 export async function saveDebrief(sourceId: string, body: unknown, opts: { by?: string; check?: Check } = {}): Promise<SaveResult> {
   const parsed = confirmedSchema.safeParse(body);
   if (!parsed.success) throw new DebriefError("Some of those answers are too long or the wrong kind. Shorten them and try again.");
-  const { fields: f, follow_up, remember: keep } = parsed.data;
+  const { fields: f, follow_up, remember: keep, professionals } = parsed.data;
   const source = await getSource(sourceId);
   if (!source) throw new DebriefError("That referral source isn't on the board.", 404);
   const check = opts.check ?? strictGuard;
-  const allow = await debriefAllowlist(
-    source,
-    f.who_else.map((w) => w.name).filter((n): n is string => Boolean(n)),
-  );
+  // Names allowed here come only from the server's own seal on this debrief, never from the request body.
+  const pros = professionals && sameToken(professionals.token, sealNames(source.id, professionals.names)) ? professionals.names : [];
+  // Only people she ticked as referral contacts, exactly as plain code passed them.
+  const confirmedWho = f.who_else.filter((w) => w.add && w.token && sameToken(w.token, sealWho(source.id, w)) && (!w.name || pros.includes(w.name)));
+  if (f.who_else.some((w) => w.add) && confirmedWho.length < f.who_else.filter((w) => w.add).length) {
+    throw new DebriefRefused("A person in \"Who else to meet\" changed after Aeon checked them. Record the debrief again.");
+  }
+  const allow = await debriefAllowlist(source, pros);
 
   const texts: [keyof DebriefFields, string][] = [
     ...(["referral_contact", "needs_from_therapist", "payer_mix", "best_time", "last_meeting_summary", "connection_points"] as const)
@@ -661,11 +818,14 @@ export async function saveDebrief(sourceId: string, body: unknown, opts: { by?: 
       .map((k) => [k, f[k] as string] as [keyof DebriefFields, string]),
     ...(f.populations ?? []).map((p) => ["populations", p] as [keyof DebriefFields, string]),
     ...f.follow_up_points.map((p) => ["follow_up_points", p] as [keyof DebriefFields, string]),
-    ...f.who_else.map((w) => ["who_else", [w.name, w.role, w.organization].filter(Boolean).join(", ")] as [keyof DebriefFields, string]),
+    ...confirmedWho.map((w) => ["who_else", [w.name, w.role, w.organization].filter(Boolean).join(", ")] as [keyof DebriefFields, string]),
   ];
   for (const [key, value] of texts) {
     const fee = valueOffered(value);
     if (fee) throw new DebriefRefused(`"${FIELD_LABEL[key]}" mentions ${fee}. Nothing of value can be tied to referrals; take it out and save again.`);
+    if (aboutAPatient(value) || (CLINICAL_CHECKED.includes(key) && clinicalForMemory(value)) || (key === "populations" && !genericGroup(value))) {
+      throw new DebriefRefused(`"${FIELD_LABEL[key]}" may be about one person or hold clinical details. Keep it about the office and save again.`);
+    }
     const g = await check(value, allow);
     if (!g.ok) throw new DebriefRefused(`"${FIELD_LABEL[key]}" may hold a patient's details. Take them out and save again.`);
   }
@@ -704,15 +864,15 @@ export async function saveDebrief(sourceId: string, body: unknown, opts: { by?: 
   const existing = await sql<{ name: string }[]>`select lower(name) as name from practice_os.referral_sources`;
   const taken = new Set(existing.map((r) => r.name));
   const introducedBy = shortName(source.name, source.credential).slice(0, 120);
-  for (const w of f.who_else) {
+  for (const w of confirmedWho) {
     const plain = w.name ?? `${w.role}${w.organization ? `, ${w.organization}` : ""}`;
     // The fictional demo practice labels everything it makes as [Sample].
     const name = `${source.is_sample ? "[Sample] " : ""}${plain}`.slice(0, 160);
     if (taken.has(name.toLowerCase())) continue;
     taken.add(name.toLowerCase());
     const [row] = await sql<{ id: string }[]>`
-      insert into practice_os.referral_sources (name, organization, specialty, stage, introduced_by, suggested_from, notes, is_sample)
-      values (${name}, ${w.organization}, ${w.role}, 'found', ${introducedBy}, ${source.id}, 'Suggested from your debrief', ${source.is_sample})
+      insert into practice_os.referral_sources (name, organization, specialty, stage, introduced_by, suggested_from, suggestion_confirmed_at, notes, is_sample)
+      values (${name}, ${w.organization}, ${w.role}, 'found', ${introducedBy}, ${source.id}, now(), 'Suggested from your debrief', ${source.is_sample})
       returning id`;
     suggested.push({ id: row.id, name });
   }

@@ -60,7 +60,7 @@ function providerName(params: ChatParams): string {
 
 /** Stands in for lib/meta.ts chat(): the profile tool call, then the follow-up email. */
 export async function standinChat(feature: string, params: ChatParams): Promise<OpenAI.Chat.ChatCompletion> {
-  if (process.env.VERCEL) throw new Error("PLAYWRIGHT_DEBRIEF_STANDIN is for tests only.");
+  if (!debriefStandin()) throw new Error("PLAYWRIGHT_DEBRIEF_STANDIN is for tests only.");
   if (feature === "referral_debrief") {
     return reply({
       tool_calls: [{ id: "call_1", type: "function", function: { name: "record_debrief", arguments: JSON.stringify(STANDIN_FIELDS) } }],
@@ -74,8 +74,13 @@ export async function standinChat(feature: string, params: ChatParams): Promise<
 }
 
 export async function standinTranscribe(): Promise<string> {
-  if (process.env.VERCEL) throw new Error("PLAYWRIGHT_DEBRIEF_STANDIN is for tests only.");
+  if (!debriefStandin()) throw new Error("PLAYWRIGHT_DEBRIEF_STANDIN is for tests only.");
   return STANDIN_TRANSCRIPT;
 }
 
-export const debriefStandin = () => process.env.PLAYWRIGHT_DEBRIEF_STANDIN === "1" && !process.env.VERCEL;
+/**
+ * On only for the e2e: never on Vercel, and on a production build only when the
+ * Playwright web server also sets PRACTICE_OS_E2E=1 (playwright.config.ts).
+ */
+export const debriefStandin = () =>
+  process.env.PLAYWRIGHT_DEBRIEF_STANDIN === "1" && !process.env.VERCEL && (process.env.NODE_ENV !== "production" || process.env.PRACTICE_OS_E2E === "1");

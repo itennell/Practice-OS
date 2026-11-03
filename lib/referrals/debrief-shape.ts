@@ -7,7 +7,15 @@ export const REFERS_VIA = ["fax", "portal", "email", "phone"] as const;
 export type RefersVia = (typeof REFERS_VIA)[number];
 
 /** A professional the partner told her to meet. Never a patient. */
-export type WhoElse = { name: string | null; role: string; organization: string | null };
+export type WhoElse = {
+  name: string | null;
+  role: string;
+  organization: string | null;
+  /** The server's seal on this entry as plain code passed it (lib/referrals/debrief.ts). */
+  token?: string;
+  /** She ticked "Add as a referral contact": only then does it become a card. */
+  add?: boolean;
+};
 
 export type DebriefFields = PartnerProfile & {
   who_else: WhoElse[];
@@ -29,6 +37,8 @@ export type DebriefDraft = {
   follow_up: FollowUpDraft | null;
   /** Why there is no follow-up draft, when there isn't one. */
   follow_up_note: string | null;
+  /** Names plain code found introduced as professionals, sealed by the server. */
+  professionals: { names: string[]; token: string };
 };
 
 /** The longest each saved field may be (migration 044 checks the same). */
