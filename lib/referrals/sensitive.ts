@@ -10,8 +10,13 @@
 //     an address, so borderline names count as sensitive;
 //   - or (NPPES individuals) it sits at the same street address as a known
 //     sensitive card (siteHashes; only a one-way hash of that address is kept).
-// Migration 045 has the same cue list in SQL (practice_os.name_looks_sensitive)
-// for the backfill; tests/referrals-discovery-db.test.ts checks they agree.
+// Migration 045 has the first cue list in SQL (practice_os.name_looks_sensitive)
+// for its one-time backfill. The list below has grown since (Nov 3: "survivors",
+// "hope house", "safe place", "abuse", "trafficking" ...), and with no new
+// migration the app re-flags old cards itself: lib/referrals/sensitive-sites.ts
+// reflagSensitive runs before every discovery and save, so any card these cues
+// now catch loses its street on the next search. When unsure, a name counts as
+// sensitive: a false flag only hides an address.
 import { createHash } from "node:crypto";
 import { isSensitive as typeIsSensitive } from "./catalog";
 import { normalizeStreet, zip5 } from "./evidence/normalize";
@@ -29,11 +34,23 @@ export function cueText(s: string): string {
 }
 
 /** Plain cues, on cueText. Plurals included. */
-export const SENSITIVE_CUES =
-  /\b(?:domestic (?:violence|abuse)|family violence|intimate partner violence|sexual (?:assault|abuse|violence)|rape crisis|battered|womens (?:center|centre|centers|shelter|shelters|refuge|safe ?house|resource center)|shelters?|safe ?houses?|safe harbou?rs?|house of hope|ruths house|anti ?violence|survivors? of|violence (?:prevention|intervention))\b/;
+export const SENSITIVE_CUES = new RegExp(
+  "\\b(?:" +
+    [
+      "domestic", "family violence", "intimate partner", "dating violence", "violence", "anti ?violence",
+      "sexual (?:assault|abuse|violence|exploitation)", "assault", "rape", "incest", "stalking", "trafficking", "trafficked",
+      "abus(?:e|ed|ive)", "battered", "victims?", "survivors?",
+      "womens (?:center|centre|centers|shelter|shelters|refuge|safe ?house|resource center|services|crisis|aid|advocacy)",
+      "shelters?", "safe ?houses?", "safe harbou?rs?", "safe ?havens?", "safe ?places?", "safe ?homes?", "safe ?passage", "safe ?space",
+      "sanctuar(?:y|ies)", "hope ?houses?", "house of hope", "houses of hope", "ruths house", "apna ghar",
+      "family justice", "justice center", "crisis (?:center|centre|centers|line|lines|services|nursery|response)",
+      "transitional (?:housing|living)", "ywca",
+    ].join("|") +
+    ")\\b",
+);
 
 /** Borderline names: one of these with a services word counts as sensitive. */
-export const BORDERLINE = /\b(?:house of [a-z]+|havens?|refuges?|sanctuar(?:y|ies))\b/;
+export const BORDERLINE = /\b(?:house of [a-z]+|havens?|refuges?|harbou?rs? house|hope center|new beginnings?|new hope)\b/;
 export const SERVICES_WORD = /\b(?:services?|centers?|centres?|projects?|network|programs?|ministr(?:y|ies)|alliance|outreach|homes?|house|inc|foundation|coalition|place|support)\b/;
 
 export function looksSensitive(...names: (string | null | undefined)[]): boolean {

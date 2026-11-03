@@ -290,6 +290,22 @@ describe("do not contact without an NPI", () => {
     expect(keyMatches(orgKeyOf({ name: "Fullerton Funeral Home", address: "10 W Main St", zip: "60601" })!, listed)).toBe(false);
     expect(keyMatches(orgKeyOf({ name: "Fullerton Funeral Home", city: "Evanston" })!, listed)).toBe(false);
   });
+  it("near names, people at a listed office and anyone at its street are blocked; another city is not (Nov 3)", () => {
+    const listed = orgKeyOf({ name: "[Test] Westside Oncology Partners", npi_type: "organization", address: "100 W Madison St", city: "Chicago", zip: "60602" })!;
+    const m = (c: Parameters<typeof orgKeyOf>[0]) => keyMatches(orgKeyOf(c)!, listed);
+    expect(m({ name: "[Test] West Side Oncology Partners", npi_type: "organization", address: "100 West Madison Street", city: "Chicago", zip: "60602" })).toBe(true);
+    expect(m({ name: "[Test] Westside-Oncology, LLC", npi_type: "organization", city: "Chicago" })).toBe(true);
+    expect(m({ name: "[Test] Pat Doe", organization: "[Test] Westside Oncology Partners", npi_type: "individual", address: "100 W Madison St", city: "Chicago", zip: "60602" })).toBe(true);
+    expect(m({ name: "[Test] Pat Doe", organization: "[Test] West Side Oncology", npi_type: "individual", city: "Chicago" })).toBe(true);
+    expect(m({ name: "[Test] Other Clinic", npi_type: "organization", address: "100 W. Madison St., Suite 4", city: "Chicago", zip: "60602" })).toBe(true);
+    // Another branch in another city, or another name with no shared street, stays allowed.
+    expect(m({ name: "[Test] Westside Oncology Partners", npi_type: "organization", address: "1 Main St", city: "Evanston", zip: "60201" })).toBe(false);
+    expect(m({ name: "[Test] Eastside Oncology", npi_type: "organization", city: "Chicago" })).toBe(false);
+    // One listed person doesn't block everyone in their building.
+    const person = orgKeyOf({ name: "[Test] Jordan Ellis", organization: "Northside Hospital", npi_type: "individual", address: "2 Oak St", city: "Chicago", zip: "60614" })!;
+    expect(keyMatches(orgKeyOf({ name: "Northside Hospital", npi_type: "organization", address: "2 Oak St", city: "Chicago", zip: "60614" })!, person)).toBe(false);
+    expect(nameSuppressed({ name: "[Test] West Side Oncology", npi_type: "organization" }, { npis: new Set(), orgs: [listed] })).toBe(true);
+  });
   it("isSuppressed checks the NPI list and the org keys; a debrief's who-else with only an organisation matches too", () => {
     const list: Suppressed = { npis: new Set(["1900000001"]), orgs: [orgKeyOf({ name: "Northside Hospice", npi_type: "organization", city: "Chicago" })!] };
     expect(isSuppressed({ npi: "1900000001", name: "Anyone" }, list)).toBe(true);
