@@ -45,8 +45,10 @@ const ALWAYS: Rule[] = [
   [new RegExp(`\\b(?:buy|get|bring|treat)\\s+(?:you|${TEAM})\\s+(?:a\\s+|some\\s+|to\\s+)?(?:${MEALS})\\b`, "i"), GIFT],
   [new RegExp(`\\b(?:drop off|bring|send|buy|get|order)\\s+(?:a |an |some )?(?:${MEALS})\\s+(?:for|to)\\b`, "i"), GIFT],
   [new RegExp(`\\b(?:${MEALS})\\b[^.!?\\n]{0,25}\\bfor ${TEAM}\\b|\\b(?:${MEALS}) (?:friday|day|party)\\b`, "i"), GIFT],
-  [/\btake (?:you|your \w+)(?: all)? out\b|\bpick up the (?:check|tab|bill)\b|\b(?:get|buy|grab) the (?:next |first )?round\b/i, GIFT],
-  [/\b(?:something (?:nice|special|fun)|(?:a )?little something|worth your while|take (?:good )?care of you\b(?!r))/i, GIFT],
+  [/\b(?:I|we)(?:'ll|'d| will| would| can| could)?\s+(?:[\w']+\s+){0,3}?(?:take (?:you|your \w+)(?: all)? out\b(?!\s+of\b)|take (?:good )?care of you\b(?!r))/i, GIFT],
+  [/\bpick up the (?:check|tab|bill)\b|\b(?:get|buy|grab) the (?:next |first )?round\b|\b(?:my|our) shout\b|\b(?:it'?s|is) my round\b/i, GIFT],
+  [/\b(?:something (?:nice|special|fun)|(?:a )?little something|worth your while)\b/i, GIFT],
+  [/\b(?:venmo|paypal|zelle|cash ?app)\s+(?:you|your\b)|\b(?:send|pay|give)\s+(?:you|your \w+)\b[^.!?\n]{0,25}?\b(?:on|via|through|by|with)\s+(?:venmo|paypal|zelle|cash ?app)\b/i, MONEY],
   [/\b(?:I|we)(?:'ll| will| can| could| would|'d)?\s+(?:happily |gladly |also )?(?:cover|pay for)\s+(?:[\w']+\s+){0,3}?(?:ceus?|ce credits?|ce hours?|costs?|fees?|expenses?|tab|bill|copays?|parking|tuition|trainings?)\b/i, GIFT],
   [/\b(?:cover|pay for|reimburs\w*|fund)\b[^.!?\n]{0,30}\b(?:ceus?|ce credits?|ce hours?|continuing education|trainings?|tuition|conference fees?)\b/i, GIFT],
   [/\b(?:fruit (?:arrangements?|baskets?)|edible arrangements?)\b/i, GIFT],
@@ -65,12 +67,12 @@ const ALWAYS: Rule[] = [
   [/\b(?:reciprocat\w*|swap\w*|quid pro quo|scratch (?:my|your) back)\b|\bI(?:'ll| will)? refer\b[^.!?\n]{0,40}\byou(?:'ll| will)? refer\b|\byou(?:'ll| will)? refer\b[^.!?\n]{0,40}\bI(?:'ll| will)? refer\b/i, TRADE],
   [/\bas (?:a|my|our) (?:small |little |big )?thank ?you\b|\btokens? of (?:my |our )?(?:appreciation|thanks|gratitude)\b|\bthank ?you (?:gift|basket|lunch|treat|present)s?\b/i, TRADE],
   // "A thank-you for your referrals", "a little thank you": a thank-you as a thing; never "Thank you for any referrals" or a thank-you note.
-  [/\b(?:a|little|small|my|our)\s+thank ?you\b(?!\s+(?:note|letter|email|e-?mail|card|message|call))/i, TRADE],
+  [/\b(?:a|little|small|my|our)\s+thank ?you\b(?!\s+(?:note|letter|email|e-?mail|card|message|call)\b|\s+for\s+(?:meeting|your time|talking|the call|speaking|taking the time|the chat|the conversation|the visit|having me|the tour|your help|everything you do)\b)/i, TRADE],
   [/\bin thanks\b|\bas thanks\b|\bmy thanks will be\b/i, TRADE],
   // A share of her fees.
   [/(?:\b\d+(?:\.\d+)?\s*(?:%|percent\b|per\s+cent\b)|\b(?:cut|share|portion|percentage)\s+of\b)[^.!?\n]{0,40}\b(?:fees?|revenue|income|billing|referr\w*|each\s+client)\b/i, "a share of fees"],
   // Spanish, Polish, Portuguese, French and German offers.
-  [/\bd[oó]lares\b|\bpor\s+cada\s+(?:referid|paciente|cliente)\w*|\bcomisi[oó]n\b|\bregalos?\b|\bgratis\b|\btarjeta de regalo\b/i, MONEY],
+  [/\bd[oó]lares\b|\bpor\s+cada\s+(?:referid|paciente|cliente)\w*|\bcomisi[oó]n\b|\bregalos?\b|\bgratis\b|\btarjeta de regalo\b|\b(?:te|le|les|los|las)\s+invito\s+a\b|\binvitar(?:te|le|les)\s+a\s+(?:comer|cenar|almorzar|desayunar|un cafe)\b/i, MONEY],
   [/\bprezent\w*|\bprowizj\w*|\bznizk\w*|\bpodarun\w*|\bza\s+(?:kazde\s+|kazdego\s+)?polecen\w*/i, MONEY],
   [/\bpresentes?\b|\bcartao presente\b|\bcomissao\b|\bpor cada (?:indicac|encaminhament)\w*|\bcadeau\w*|\bcarte cadeau\b|\bpar (?:patient|client|recommandation)\b|\bpour chaque (?:patient|client)\b|\bgeschenk\w*|\bgutschein\w*|\bprovision\b|\bpro (?:patient|empfehlung|uberweisung)\b|\bfur jeden (?:patienten|klienten)\b/i, MONEY],
 ];
@@ -141,16 +143,36 @@ export function valueVariants(text: string): string[] {
 /** "Reimburse" is a plan paying her ("BCBS reimburses well"), or her paying them: only the first may be said. */
 const REIMBURSE = /\breimburs\w*/i;
 const PLAN_WORDS = /\b(?:insur\w*|plans?|payers?|medicare|medicaid|bcbs\w*|blue cross|aetna|cigna|united\w*|optum|tricare|humana|network|claims?|rates?|superbills?|out of network|benefits?)\b/i;
-/** "Coffee's on Reyes Counseling": a meal on a name (case matters: never "lunch is on Tuesday"). */
-const ON_A_NAME =
-  /\b(?:[Cc]offee|[Ll]unch|[Dd]inner|[Bb]runch|[Bb]reakfast|[Pp]izza|[Dd]rinks?|[Mm]eals?|[Ff]ood|[Tt]reats?|[Rr]ounds?|[Tt]he (?:tab|bill|check))(?:'s|\s+is|\s+are|\s+will be)\s+on\s+(?!(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|Zoom|Teams|Google|Epic)\w*)(?:[A-Z][\w']*)/;
+/** "Coffee's on Reyes Counseling" / "on Dr. Lee": a meal on a person or a practice. */
+const ON_WHO =
+  /\b(?:[Cc]offee|[Ll]unch|[Dd]inner|[Bb]runch|[Bb]reakfast|[Pp]izza|[Dd]rinks?|[Mm]eals?|[Ff]ood|[Tt]reats?|[Rr]ounds?|[Tt]he (?:tab|bill|check))(?:'s|\s+is|\s+are|\s+will be)\s+on\s+((?:Dr\.?\s+)?[A-Z][\w']*(?:\s+[A-Z][\w']*){0,3})/g;
+const STREET = /^(?:street|st|avenue|ave|boulevard|blvd|road|rd|drive|dr|lane|ln|way|place|pl|parkway|pkwy|court|ct|square|sq|plaza|highway|hwy|terrace|circle|row|floor)\.?$/i;
+const PRACTICE_WORD = /^(?:counseling|counselling|therapy|therapies|psychotherapy|wellness|health|group|associates|practice|pllc|llc|pc|clinic|center|centre)$/i;
+const NOT_A_NAME = /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|Zoom|Teams|Google|Epic|Halsted|Clark|Lincoln|Michigan|State|Main)/;
+
+/** True when a meal is "on" a person ("Dr. Lee", "Dana Reyes") or a practice ("Reyes Counseling"), never a street, a day or a company. */
+function mealOnSomeone(text: string): boolean {
+  for (const m of text.matchAll(ON_WHO)) {
+    const who = m[1];
+    const words = who.split(/\s+/);
+    const last = words[words.length - 1];
+    if (/^Dr\.?$/.test(words[0])) return true;
+    if (/'s$/.test(words[0]) || words.length === 1) continue;
+    if (STREET.test(last)) continue;
+    if (words.some((w) => PRACTICE_WORD.test(w))) return true;
+    if (NOT_A_NAME.test(words[0])) continue;
+    // Two capitalized words that aren't a street: a person's name.
+    return true;
+  }
+  return false;
+}
 const MET_OVER =
   /\b(?:met|meet|meeting|chatted|talked|caught up|sat down)(?: up)?(?: with [\w. ]{1,40}?)? (?:for|over) (?:a |an )?(?:quick |short )?(?:coffee|lunch|breakfast|brunch|dinner)\b|\bover (?:a |an )?(?:quick )?(?:coffee|lunch|breakfast|brunch|dinner)\b/gi;
-const NEAR_TEAM = new RegExp(`\\b${TEAM}\\b`, "i");
+const NEAR_TEAM = /\byour (?:team|staff|office|front desk|practice|nurses|clinic)\b/i;
 
 function offeredIn(text: string): string | null {
   for (const [pattern, what] of ALWAYS) if (pattern.test(text)) return what;
-  if (ON_A_NAME.test(text)) return GIFT;
+  if (mealOnSomeone(text)) return GIFT;
   const sentences = sentencesOf(text);
   if (sentences.some((s) => REIMBURSE.test(s) && !PLAN_WORDS.test(s))) return MONEY;
   let reward = REWARD.test(text);
@@ -171,13 +193,45 @@ function offeredIn(text: string): string | null {
   return reward && TIE.test(text) ? TRADE : null;
 }
 
+// ---- Notes, partner facts and debrief fields ------------------------------------------------
+// These describe the partner ("they offer free parking", "met over lunch"), so a value word alone
+// is a fact. Refused: plain trade wording anywhere, or a sentence that ties something of value to
+// referrals ("a $25 gift card for every client I take", "free sessions if they send people over").
+
+/** Trade wording that is never a fact about an office. */
+const EXPLICIT_TRADE: Rule[] = [
+  [/\b(?:per referral|for (?:each|every|any) referral|referral fees?|finder'?s fees?|kick ?backs?|in exchange for|quid pro quo|split the fee|revenue shar\w*|referral swap|swap referrals|paid (?:for|per) (?:a |each |every |your )?referrals?|pay(?:s|ing)? (?:you|them|her|me) for referrals?)\b/i, TRADE],
+  ...ALWAYS.filter(([, what]) => what === "a share of fees"),
+  // Spanish, Polish, Portuguese, French and German offers.
+  ...ALWAYS.slice(-3),
+];
+/** Something of value tied to referrals in the same sentence, whoever offers it. */
+const PARTNER_TIE =
+  /\b(?:per|for each|for every|each|every)\s+(?:new\s+)?(?:patient|client|referral|person|family|families|one|people|kid|child)s?\b|\bfor (?:the |your |our |my |their |any |all |those )?referrals?\b|\b(?:if|when|once|whenever|each time|every time)\s+(?:you|they|I|we|she|he|her office|their office)\s+(?:send|refer)\w*|\bin return\b|\bfor sending\b|\bsend\w* (?:\w+ )?(?:people|patients|clients) (?:over|my way|our way|to (?:me|us|her|them))\b|\b(?:anyone|anybody|whoever)\s+(?:you|they|I|we)\s+(?:send|refer)\w*/i;
+
+function partnerOfferedIn(text: string): string | null {
+  for (const [pattern, what] of EXPLICIT_TRADE) if (pattern.test(text)) return what;
+  for (const s of sentencesOf(text)) {
+    if (!PARTNER_TIE.test(s)) continue;
+    const what = offeredIn(s);
+    if (what) return what;
+  }
+  return null;
+}
+
+export type Speaker = "her" | "partner";
+
 /**
  * What a text offers or mentions of value tied to referrals (a gift, a treat, money, a trade
  * for "each patient you send"), or null. Plain code, default-refuse.
+ * - speaker "her" (the default): her letters and her own offers, the strict rules.
+ * - speaker "partner": notes, partner facts and debrief fields, which describe the office;
+ *   only trade wording or value tied to referrals in a sentence is refused.
  */
-export function valueOffered(text: string): string | null {
+export function valueOffered(text: string, opts: { speaker?: Speaker } = {}): string | null {
+  const check = opts.speaker === "partner" ? partnerOfferedIn : offeredIn;
   for (const v of valueVariants(text)) {
-    const what = offeredIn(v);
+    const what = check(v);
     if (what) return what;
   }
   return null;

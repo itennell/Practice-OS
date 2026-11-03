@@ -23,7 +23,10 @@ const { approvalIdsOf } = await import("../lib/aeon/agent");
 const { cardName, letterSummary, mapLimit, LETTERS_AT_ONCE, guardResult } = await import("../lib/aeon/tools");
 const { WITHHELD } = await import("../lib/aeon/guard");
 const outreach = await import("../lib/referrals/outreach");
-const { askedFor, checkLetter, checkSubject, finishLetter, nicheWords, providerRole, salutationFor, signatureLine, valueOffered, writeLetter } = outreach;
+const { askedFor, checkLetter, checkSubject, finishLetter, nicheWords, providerRole, salutationFor, signatureLine, writeLetter } = outreach;
+// Her letters' rules (speaker "her"); notes and partner facts are checked with speaker "partner".
+const { valueOffered } = await import("../lib/referrals/value-check");
+const partnerOffered = (t: string) => valueOffered(t, { speaker: "partner" });
 const { checkNote, CRISIS_NOTE, logContact } = await import("../lib/referrals/contacts");
 const { closeDb, db } = await import("../lib/db");
 
@@ -147,6 +150,11 @@ describe("salutation, role, niche and signature", () => {
     expect(salutationFor({ name: "Ann LEE MD", npi_type: "individual" })).toBe("Dr. LEE");
     expect(salutationFor({ name: "Ann Ma", npi_type: "individual" })).toBe("Ann Ma");
     expect(salutationFor({ name: "Ann Ma PA-C", npi_type: "individual" })).toBe("Ann Ma");
+    // Never down to one word.
+    expect(salutationFor({ name: "Ann MA", npi_type: "individual" })).toBe("Ann MA");
+    expect(salutationFor({ name: "John DO", npi_type: "individual" })).toBe("John DO");
+    expect(salutationFor({ name: "Tom RN MD", npi_type: "individual" })).toBe("Tom RN");
+    expect(salutationFor({ name: "Ann Lee OTR/L", npi_type: "individual" })).toBe("Ann Lee");
   });
   it("finishes the greeting and the sign-off once, whatever Muse wrote", () => {
     const src = card({ name: "Claudia Tellez, MD", credential: "MD", is_sample: false });
@@ -424,6 +432,50 @@ describe("no fees or gifts for referrals", () => {
   });
   it.each(["met over lunch", "Met Dr. Lee over lunch at the conference.", "We had breakfast with the team."])("saves the note: %s", async (note) => {
     expect(await checkNote(note, async (t: string) => ({ ok: true as const, text: t }))).toBeNull();
+  });
+  // Round 3 of the review (PR #140).
+  const ROUND3_REFUSE = ["I'll Venmo you", "I can send your team the money on Venmo.", "dinner's my shout", "le invito a comer", "Coffee's on Dr. Lee.", "Lunch is on Dana Reyes.", "I'd love to take you out for brunch", "I'll take care of you."];
+  it.each(ROUND3_REFUSE)("refuses round-3 probe: %s", (bad) => {
+    expect(valueOffered(bad)).not.toBeNull();
+    expect(checkLetter(`${base} ${bad}`).ok).toBe(false);
+  });
+  const ROUND3_PASS = [
+    "Lunch is on Halsted near their office.",
+    "Coffee is on Clark Street.",
+    "Drinks are on Lincoln Ave after the conference.",
+    "The bill is on Aetna's portal now.",
+    "I can take you out of my waitlist queue.",
+    "I wanted to send a thank you for meeting with me.",
+    "They give a free talk for the staff each spring.",
+  ];
+  it.each(ROUND3_PASS)("lets through round-3 line: %s", (ok) => {
+    expect(valueOffered(ok)).toBeNull();
+  });
+  const NOTE_FACTS = [
+    "They said they refer often and offer free parking.",
+    "They offer free parking for the staff and patients.",
+    "The office has free Wi-Fi for patients.",
+    "They take care of you from intake to discharge.",
+    "They give a discount for students.",
+    "Met Dr. Lee over lunch at the conference.",
+  ];
+  it.each(NOTE_FACTS)("partner facts pass in notes: %s", async (note) => {
+    expect(partnerOffered(note)).toBeNull();
+    expect(await checkNote(note, async (t: string) => ({ ok: true as const, text: t }))).toBeNull();
+  });
+  const NOTE_TRADES = [
+    "offered a $25 gift card for every client they send",
+    "goodie basket for each patient they refer",
+    "She offered to send me a $25 Starbucks gift card for every client I take.",
+    "Their last therapist bought the staff lunch every month in exchange for referrals.",
+    "She asked if I would give them 10 percent of the first session fee.",
+    "The other practice gives them a kickback for each referral.",
+    "She wants me to give their staff free therapy sessions if they send people over.",
+    "Drop off a thank-you basket for the team for every patient they send",
+    "Ella me ofrecio cincuenta dolares por cada referido.",
+  ];
+  it.each(NOTE_TRADES)("trades refuse in notes: %s", (note) => {
+    expect(partnerOffered(note)).not.toBeNull();
   });
   it("refuses a free short consult when it is tied to referrals", () => {
     expect(valueOffered("A free 15-minute consult for anyone you refer.")).not.toBeNull();

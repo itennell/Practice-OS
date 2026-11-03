@@ -18,7 +18,7 @@ import { allPayers } from "../payers/catalog";
 import { listPayerApplications, WAITING } from "../payers/store";
 import { CONTACT_LABEL, contactsFor, isSuppressed, screenedNote, suppressedList } from "./contacts";
 import { SPECIALTIES } from "./nppes";
-import { valueOffered } from "./value-check";
+import { valueOffered as letterValueOffered } from "./value-check";
 import { getSource, latestLetters, practiceFacts, type ReferralSource } from "./store";
 import { focusFrom, FOCUS_WORDS, type Focus } from "./tier";
 
@@ -27,7 +27,8 @@ export const FOLLOW_UP_DAYS = 7;
 // Anything of value tied to a referral, or the referral itself as a trade:
 // lib/referrals/value-check.ts (plain code, default-refuse). Her own fees, the
 // plans she takes, private pay and superbills are allowed.
-export { valueOffered } from "./value-check";
+/** Partner facts and debrief fields (what an office said or does): lib/referrals/value-check.ts with speaker "partner". */
+export const valueOffered = (text: string): string | null => letterValueOffered(text, { speaker: "partner" });
 
 /** Clinical content never goes in a letter. */
 const CLINICAL = /\b(?:suicid\w*|self-harm|diagnos\w*|treatment plan|medication)\b/i;
@@ -39,7 +40,7 @@ export function checkLetter(letter: string): LetterCheck {
   const text = letter.trim();
   if (text.length < 80) return { ok: false, reason: "The letter is too short." };
   if (text.length > 2500) return { ok: false, reason: "The letter is too long for a short introduction." };
-  const what = valueOffered(text);
+  const what = letterValueOffered(text);
   if (what) return { ok: false, reason: `The letter mentions ${what}. Referral letters can't offer or discuss anything of value.` };
   if (CLINICAL.test(text)) return { ok: false, reason: "The letter mentions clinical content. Referral letters stay about her practice: no diagnoses, medication or treatment plans." };
   return { ok: true };
@@ -47,7 +48,7 @@ export function checkLetter(letter: string): LetterCheck {
 
 /** The subject line gets the same value and clinical checks as the letter (no length rule). */
 export function checkSubject(subject: string): LetterCheck {
-  const what = valueOffered(subject);
+  const what = letterValueOffered(subject);
   if (what) return { ok: false, reason: `The subject line mentions ${what}. Referral letters can't offer or discuss anything of value.` };
   if (CLINICAL.test(subject)) return { ok: false, reason: "The subject line mentions clinical content. Keep it about her practice." };
   return { ok: true };
@@ -240,9 +241,9 @@ const KNOWN_CREDENTIALS = new Set(
 );
 /** A credential written as a word ("MD", "M.D.", "PhD", "PA-C"), from a known list: never an all-caps surname ("Ann LEE"). */
 const isCredentialWord = (w: string) => {
-  const bare = w.replace(/[.\-]/g, "");
+  const bare = w.replace(/[.\-/]/g, "");
   // Written as a credential: all capitals ("MD", "M.D.", "PA-C") or a known mixed form ("PhD", "PsyD"); "Ann Ma" keeps her surname.
-  return KNOWN_CREDENTIALS.has(bare.toUpperCase()) && (bare === bare.toUpperCase() || /^(?:PhD|PsyD|EdD|MSc|OTR\/?L)$/.test(bare));
+  return KNOWN_CREDENTIALS.has(bare.toUpperCase()) && (bare === bare.toUpperCase() || /^(?:PhD|PsyD|EdD|MSc|OTRL)$/.test(bare));
 };
 
 /**
@@ -257,7 +258,8 @@ export function salutationFor(source: Pick<ReferralSource, "name" | "npi_type"> 
   // Credentials written after the name with no comma ("Ann Lee MD") come off the end too.
   const words = head.trim().replace(/^Dr\.?\s+/i, "").split(/\s+/);
   const trailing: string[] = [];
-  while (words.length > 1 && isCredentialWord(words[words.length - 1])) trailing.unshift(words.pop()!);
+  // Never down to one word: "Ann MA" and "John DO" keep both words.
+  while (words.length > 2 && isCredentialWord(words[words.length - 1])) trailing.unshift(words.pop()!);
   const person = words.join(" ");
   const creds = [...rest, ...trailing, source.credential ?? ""]
     .join(" ")
@@ -267,7 +269,8 @@ export function salutationFor(source: Pick<ReferralSource, "name" | "npi_type"> 
   if (titled || creds.some((c) => DOCTOR.has(c))) {
     const words = person.split(/\s+/).filter((w) => w && !SUFFIX.has(w.replace(/\./g, "").toLowerCase()));
     const last = words[words.length - 1];
-    if (last) return `Dr. ${last}`;
+    // "Tom RN MD": the word left before "Dr." is itself a credential, so the name stays as written.
+    if (last && !isCredentialWord(last)) return `Dr. ${last}`;
   }
   return person || name;
 }

@@ -82,7 +82,7 @@ export async function checkNote(note: string, check = (t: string) => guard(t, "m
     }
     return CRISIS_NOTE;
   }
-  const value = valueOffered(note);
+  const value = valueOffered(note, { speaker: "partner" });
   if (value) return `I didn't save that note because it mentions ${value}. Nothing of value can be offered or taken for a referral.`;
   const r = await check(note);
   return r.ok ? null : REFUSAL[r.kind];
