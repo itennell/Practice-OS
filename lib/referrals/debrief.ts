@@ -23,7 +23,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { forgetAllowlist, guard, practiceAllowlist, type GuardResult } from "../aeon/guard";
-import { clientLike, clinicalForMemory, mentionsDiagnosis, populationSentence, sentenceAt, sentences, type Allowlist } from "../aeon/identity-filter";
+import { clinicalForMemory, mentionsDiagnosis, sentenceAt, sentences, type Allowlist } from "../aeon/identity-filter";
 import { remember, MemoryRefused } from "../aeon/memory";
 import { findNames, isNameLike } from "../aeon/phi-classifier";
 import { queueApproval } from "../approvals";
@@ -75,13 +75,20 @@ export function wavSeconds(bytes: Buffer): number | null {
   if (bytes.length < 44 || bytes.subarray(0, 4).toString("ascii") !== "RIFF" || bytes.subarray(8, 12).toString("ascii") !== "WAVE") return null;
   // The rate is worked out from the format itself (sample rate x channels x bytes per sample);
   // the header's own byte-rate field is ignored, so a crafted header can't shrink the length.
+  // Exactly one fmt and one data chunk; the audio is every byte from the data chunk to the
+  // end of the file, whatever its size field says.
   let byteRate = 0;
   let pcm = false;
+  let fmts = 0;
+  let dataAt = -1;
+  let datas = 0;
   let at = 12;
   while (at + 8 <= bytes.length) {
     const id = bytes.subarray(at, at + 4).toString("ascii");
     const size = bytes.readUInt32LE(at + 4);
-    if (id === "fmt " && at + 24 <= bytes.length) {
+    if (id === "fmt ") {
+      fmts++;
+      if (at + 24 > bytes.length || size < 16) return null;
       const format = bytes.readUInt16LE(at + 8);
       const channels = bytes.readUInt16LE(at + 10);
       const rate = bytes.readUInt32LE(at + 12);
@@ -90,14 +97,13 @@ export function wavSeconds(bytes: Buffer): number | null {
       byteRate = pcm ? (rate * channels * bits) / 8 : 0;
     }
     if (id === "data") {
-      if (!pcm || !byteRate) return null;
-      // A streaming writer may leave the size at 0 or past the end: count what is there.
-      const data = Math.min(size || Infinity, bytes.length - at - 8);
-      return data / byteRate;
+      datas++;
+      if (dataAt < 0) dataAt = at;
     }
     at += 8 + size + (size % 2);
   }
-  return null;
+  if (fmts !== 1 || datas !== 1 || dataAt < 0 || !pcm || !byteRate) return null;
+  return (bytes.length - dataAt - 8) / byteRate;
 }
 
 /** The recording's own checks, before anything else runs. Throws in plain words. */
@@ -116,34 +122,55 @@ export async function transcribeDebrief(audio: Buffer): Promise<string> {
 }
 
 // ---- 3. the privacy pass -----------------------------------------------------
-// Default refuse: a sentence is kept only when nothing in it looks like one
-// person's story, and a name passes only with positive evidence that it is a
-// professional (a title, a credential, or an appositive role on the name itself).
+// An allow-list. A sentence reaches Muse only when BOTH hold:
+//  (a) it carries a practice-business cue (how they refer, scheduling, payer
+//      mix, who they serve as a group, what they need from a therapist, a staff
+//      role on a name, meeting logistics), and
+//  (b) it has no single-person or health-event cue (room or bed numbers, ages,
+//      visit dates, family words about one person, a person with a health or
+//      life event, initials, an honorific, any name that isn't the partner or a
+//      professional introduced as one, any non-English sentence).
+// Everything else is dropped. Then the full guard reads what is left, with the
+// partner's and the professionals' names masked so it judges only the rest.
 
 // One patient or client: "a patient", "one of my patients", "her patient",
 // "the receptionist's patient", "Dr. Okafor's client", "the patient's mom".
 const ONE_PATIENT = new RegExp(
   [
     "\\b(?:a|an|one|this|that|the|my|our|her|his|their|your)\\s+(?:\\w+\\s+){0,2}?(?:patient|client|pt)\\b(?!s)",
-    "\\bone\\s+of\\s+(?:my|our|her|his|their|the|\\w+(?:'s|’s))\\s+(?:\\w+\\s+)?(?:patients|clients)\\b",
-    "\\b(?:my|our|her|his|their|your)\\s+(?:\\w+\\s+)?(?:patient|client)s?\\b",
-    "(?:'s|’s)\\s+(?:\\w+\\s+)?(?:patient|client)s?\\b",
+    "\\bone\\s+of\\s+(?:my|our|her|his|their|the|\\w+(?:'s|’s))\\s+(?:\\w+\\s+)?(?:patients|clients|kids|children|families)\\b",
+    "\\b(?:my|our|her|his|your)\\s+(?:\\w+\\s+)?(?:patient|client)s?\\b",
     "\\b(?:patient|client)s?(?:'s|’s|’|')(?:\\s|$)",
     "\\b(?:patient|client)\\s+(?:named|called)\\b",
   ].join("|"),
   "i",
 );
-// An age, or "34," after a name: "a 34-year-old", "aged 60", "in her early 40s".
-const AN_AGE =
-  /\b\d{1,3}[- ]?(?:year|yr|month)s?[- ]?olds?\b|\baged?\s+\d{1,3}\b|\bin\s+(?:her|his|their)\s+(?:early\s+|late\s+|mid-?\s*)?\d0s\b|\p{Lu}\p{Ll}+,\s*\d{1,2},/iu;
-const DIAGNOSED = /\bdiagnos\w*|\bdx\b|\bprognos\w*|\bstage\s+(?:[1-4]|i{1,3}v?|iv)\b/i;
-// One person who isn't a professional: "a woman", "this guy", "her son", "a new parent there".
+// Possessive patients except the partner's own group ("Dr. Okafor's patients are mostly new parents").
+const POSSESSIVE_PATIENT = /(?:'s|’s)\s+(?:\w+\s+)?(?:patient|client)\b(?!s)/i;
+const NUMBER_WORD = "(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)";
+const AN_AGE = new RegExp(
+  `\\b\\d{1,3}[- ]?(?:year|yr|month|week)s?[- ]?olds?\\b|\\b${NUMBER_WORD}(?:[- ]${NUMBER_WORD})?[- ](?:year|month|week)s?[- ]olds?\\b|\\baged?\\s+\\d{1,3}\\b|\\bin\\s+(?:her|his|their)\\s+(?:early\\s+|late\\s+|mid-?\\s*)?(?:\\d0s|${NUMBER_WORD}ies)\\b|\\p{Lu}\\p{Ll}+,\\s*\\d{1,2},`,
+  "iu",
+);
+const DIAGNOSED = /\bdiagnos\w*|\bdx\b|\bprognos\w*|\bstage\s+(?:[1-4]|i{1,3}v?|iv|one|two|three|four)\b/i;
+// A room, bed, unit or ward: "room 412", "bed 3", "in 4B".
+const ROOM = /\b(?:room|rm|bed|unit|ward|wing|suite|floor)\s*#?\s*\d+[A-Z]?\b|\bin\s+\d{1,3}[A-Z]\b|\b\d{1,3}[A-Z]\b(?=\s+(?:wants|needs|asked|is|has))/;
+const WEEKDAY = /\b(?:mon|tues?|wed(?:nes)?|thu(?:rs)?|fri|sat(?:ur)?|sun)(?:day)?s?\b/i;
+const A_DATE =
+  /\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+\d{1,2}(?:st|nd|rd|th)?\b|\b(?:the\s+)?\d{1,2}(?:st|nd|rd|th)\b|\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/i;
+const VISIT = /\b(?:saw|seen|sees|seeing|visit\w*|coming\s+in|came\s+in|comes\s+in|intake|appointments?|appt|session\s+with|admitted|discharged)\b/i;
+// Family and friends of one person: "her daughter", "his wife's stroke", "the mom of one of her kids".
+const FAMILY =
+  /\b(?:daughter|son|nephew|niece|husband|wife|widow\w*|grand(?:son|daughter|ma|pa|mother|father|child\w*)|twins?|brother|sister|cousin|fianc[eé]e?|boyfriend|girlfriend|friend|step\w+|in-laws?)\b|\b(?:mom|mother|dad|father|parent)\s+of\b|\b(?:my|her|his|their|the|your)\s+(?:mom|dad|mother|father|baby|kid|child|partner|family)\b(?!\s+(?:practice|medicine|services|doctor|physician|clinic))/i;
+// One person who isn't a professional: "a woman", "the man", "the Garcia boy", "a new parent there".
 const ONE_PERSON =
-  /\b(?:a|an|one|this|that)\s+(?:\w+\s+)?(?:woman|man|lady|guy|girl|boy|kid|teen|teenager|mom|mother|dad|father|parent|person|gentleman|veteran|student|family|couple|baby|child|widow|widower)\b|\b(?:her|his|their|my|our)\s+(?:son|daughter|husband|wife|kid|baby|child|partner|mother|father|mom|dad|brother|sister)\b|\bnamed\s+\p{Lu}|\bsomeone\b/iu;
-const MEDICAL = /\b(?:cancer|chemo\w*|radiation|tumou?r|surgery|pregnan\w*|miscarriage|stillbirth|overdose|rehab|hospitali[sz]ed|meds?|medication|condition|illness|terminal)\b/i;
-// An event in one person's life: never practice business, dropped wherever it appears.
-const LIFE_EVENT =
-  /\b(?:died|dies|dying|passed\s+away|death|funeral|widow\w*|grie(?:f|ving|ves)|bereave\w*|cry|cries|crying|cried|tears|hospitali[sz]\w*|admitted|psychosis|psychotic|overdos\w*|suicid\w*|relapse\w*|ER\s+visit|emergency\s+room|ICU|in\s+the\s+hospital|can'?t\s+stop|breakdown|miscarri\w*|stillbirth|abuse\w*|assault\w*|divorc\w*|arrest\w*)\b/i;
+  /\b(?:a|an|one|this|that|the)\s+(?:\p{Lu}\p{Ll}+\s+|young\s+|older\s+|new\s+|little\s+|\w+-year-old\s+)?(?:woman|man|lady|guy|girl|boy|kid|teen|teenager|mom|mother|dad|father|parent|person|gentleman|veteran|student|baby|child|toddler|infant|resident|pastor|priest|rabbi|widow|widower)\b|\bnamed\s+\p{Lu}/iu;
+const HONORIFIC = /\b(?:Mr|Mrs|Ms|Mx|Miss)\.?\s+\p{Lu}/u;
+// Health, life events and feelings. Applied to one person, they drop the sentence.
+const HEALTH =
+  /\b(?:cancer|leukemia|lymphoma|tumou?r|chemo\w*|radiation|surgery|scans?|biopsy|hospice|nicu|picu|icu|heart\s+failure|stroke|dementia|alzheimer\w*|pregnan\w*|miscarri\w*|stillbirth|overdos\w*|rehab|hospitali[sz]\w*|in\s+the\s+hospital|psychosis|psychotic|drinking|alcohol\w*|drugs?|meds?|medication|condition|illness|sick|ill|terminal|dying|died|dies|death|passed\s+away|funeral|grie(?:f|ving|ves)|bereave\w*|cry|cries|crying|cried|tears|depressed|anxious|scared|terrified|afraid|lonely|struggl\w*|upset|overwhelmed|not\s+sleeping|sleeping|eating|stopped\s+eating|suicid\w*|self[- ]?harm|relapse\w*|abuse\w*|assault\w*|divorc\w*|arrest\w*|lost\s+(?:her|his|their)|laid\s+off|evicted|out\s+on\s+leave|on\s+leave|in\s+treatment|treatment|ms|als|copd|diabetes|autism|autistic)\b/i;
+const PRONOUN = /\b(?:she|he|her|his|him|she's|he's)\b/i;
+
 // Initials stand in for a person: "J.R.", "J R", "JR". Known acronyms are fine.
 const ACRONYMS = new Set(
   "MD DO RN NP PA LPN APRN CNM OB GYN OBGYN ER ICU NICU PICU HR PT OT ST SLP IL US USA LCSW LCPC LPC LMFT PHD PSYD PLLC LLC MSW BCBS UHC HMO PPO EAP FQHC CEO COO IOP PHP CBT DBT EMDR NPI EHR EMR AM PM OK TV PDF CPA FAQ".split(" "),
@@ -158,32 +185,84 @@ export function hasInitials(s: string): boolean {
   return [...s.matchAll(BARE_CAPS)].some((m) => !ACRONYMS.has(m[0]));
 }
 
-// A name as the subject of a need, visit, condition or feeling: patient talk.
-const PATIENT_VERB =
-  "needs?|wants?|has|had|have|keeps|kept|missed|misses|struggl\\w*|suffer\\w*|feels?|felt|cries|cried|was\\s+\\w+|is\\s+(?:struggling|seeing|having|dealing|going|getting|in|on|not|still|being|afraid|scared|sad|depressed|anxious|worried|sick|ill|pregnant|grieving)|can'?t|couldn'?t|won'?t|lost|died|came|comes|called|asked|booked|cancel\\w*|stopped|started|takes|took|sees|saw|went|goes|lives|lived";
-
-/** The name is the subject of a patient verb ("Kevin Ortiz needs a therapist", "Tom Becker, ..., needs help"). */
-export function namedAsPatient(sentence: string, name: string): boolean {
-  return new RegExp(`(?<![\\p{L}])${escapeRe(name)}(?:'s|’s)?(?:\\s*,[^,]{1,80},)?\\s+(?:\\w+ly\\s+|just\\s+|also\\s+|really\\s+|still\\s+)?(?:${PATIENT_VERB})\\b`, "iu").test(sentence);
+// Any language but English is dropped for now: accents and two or more common Spanish,
+// Portuguese or French words ("Su paciente Juan tiene cáncer").
+const FOREIGN_WORDS =
+  /\b(?:el|la|los|las|una?|unos|del|que|es|est[aá]n?|tiene[n]?|su|sus|por|para|con|como|pero|muy|ella|él|me|mi|años|paciente|señora?|cada|dólares|ofreci[oó]|não|uma|com|muito|est|avec|pour|une|très|und|der|die|das|ist|nicht)\b/giu;
+export function notEnglish(s: string): boolean {
+  if (/[¿¡ñáéíóúãõçàèêâôœß]/i.test(s.replace(/\b\p{Lu}[\p{L}'’-]+/gu, ""))) return true;
+  return new Set((s.match(FOREIGN_WORDS) ?? []).map((w) => w.toLowerCase())).size >= 2;
 }
 
-/** A sentence that may be about one person: a patient, a family member, a life event. Left out whole. */
+// Organization names ("Lakeshore Cancer Center", "Northside Women's Health") are a place, not a person's health.
+const ORG_NAME =
+  /\b(?:\p{Lu}[\p{L}'’&.-]*\s+){1,5}(?:Center|Centre|Hospital|Clinic|Health|Healthcare|Institute|House|Program|Group|Associates|Partners|Pediatrics|Medicine|Services|Network|Practice|Care|Hospice|Society|Foundation|Alliance|Collective|Counseling|Wellness|OB-GYN|Oncology|Cardiology|University|College)\b/gu;
+// A role in apposition, kept out of the health check: ", the oncology nurse navigator,".
+const ROLE =
+  "nurse|navigator|coordinator|social\\s+worker|psychiatrist|psychologist|therapist|counsel(?:l)?or|doctor|physician|director|manager|midwife|doula|dietitian|nutritionist|chaplain|case\\s+manager|front\\s+desk|receptionist|scheduler|administrator|pediatrician|ob-?gyn|oncologist|cardiologist|surgeon|internist|lactation\\s+consultant|educator|supervisor|liaison|practitioner|biller|referral\\s+specialist|volunteer\\s+coordinator";
+
+/** The sentence without organization names, so "Lakeshore Cancer Center" isn't read as someone's cancer. */
+export function withoutOrgs(s: string): string {
+  return s.replace(ORG_NAME, " the org ");
+}
+
+const TWO_CAPS = /(?<![\p{L}])\p{Lu}\p{Ll}+(?:\s+\p{Lu}\p{Ll}+)+/gu;
+const TITLED = /\b(?:Dr|Doctor|Mr|Mrs|Ms|Mx|Miss)\.?\s+\p{Lu}\p{Ll}+/gu;
+// Payers and systems written like names: masked for the name checks.
+const PRODUCT_WORDS = /\b(?:Blue\s*Cross(?:\s+Blue\s+Shield)?|Blue\s+Shield|BlueCross|Aetna|Cigna|United\s*Healthcare|Humana|Medicaid|Medicare|Tricare|Ambetter|Meridian|Molina|Epic|MyChart|Athena|Cerner|Psychology\s+Today|Zoom|Google|Tuesday|Monday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/g;
+
+/** A name-like thing in the text: a title + surname, or two capitalized words not at an org. */
+function namesIn(s: string): string[] {
+  const plain = withoutOrgs(s).replace(PRODUCT_WORDS, "x");
+  const out = [...(plain.match(TITLED) ?? []), ...(plain.match(TWO_CAPS) ?? [])];
+  // The first word of a sentence ("Their patients", "Coffee with") is just capitalized.
+  return out.filter((n) => !/^(?:The|Their|They|Our|Her|His|She|He|We|I|Most|Coffee|Referrals?|Dr)\b\s*$/.test(n.split(/\s+/)[0] + " "));
+}
+
+/** One person's story with no name at all: a room, an age, a visit date, family, initials, an honorific, a person with a health event. */
 export function aboutAPatient(s: string): boolean {
-  if (ONE_PATIENT.test(s) || AN_AGE.test(s) || DIAGNOSED.test(s) || LIFE_EVENT.test(s) || hasInitials(s)) return true;
-  if (ONE_PERSON.test(s) && (MEDICAL.test(s) || mentionsDiagnosis(s) || clientLike(s))) return true;
-  if (/\b(?:she|he)\s+(?:has|had|was|is|can'?t|feels?|felt|lost)\b/i.test(s) && (MEDICAL.test(s) || mentionsDiagnosis(s))) return true;
-  return mentionsDiagnosis(s) && !populationSentence(s) && ONE_PERSON.test(s);
+  const residue = withoutOrgs(s);
+  if (ONE_PATIENT.test(s) || POSSESSIVE_PATIENT.test(s) || AN_AGE.test(s) || DIAGNOSED.test(s) || ROOM.test(s)) return true;
+  if (FAMILY.test(residue) || ONE_PERSON.test(residue) || HONORIFIC.test(s) || hasInitials(s)) return true;
+  if ((A_DATE.test(s) || WEEKDAY.test(s)) && PRONOUN.test(s) && VISIT.test(s)) return true;
+  if (A_DATE.test(s) && VISIT.test(s)) return true;
+  const someone = PRONOUN.test(residue) || namesIn(residue).length > 0;
+  if (someone && (HEALTH.test(residue) || mentionsDiagnosis(residue) || MEDICAL.test(residue))) return true;
+  // A diagnosis with no person in it reads as a group ("new moms with postpartum anxiety").
+  return false;
+}
+const MEDICAL = /\b(?:cancer|chemo\w*|radiation|tumou?r|surgery|pregnan\w*|miscarriage|stillbirth|overdose|rehab|hospitali[sz]ed|meds?|medication|condition|illness|terminal|leukemia|nicu|hospice|heart\s+failure|psychosis|drinking|alcohol\w*)\b/i;
+
+// (a) Practice-business cues.
+const BUSINESS = new RegExp(
+  [
+    // referral process
+    "\\brefer\\w*|\\bfax\\w*|\\bportal\\b|\\bintake\\s+(?:line|form|coordinator)|\\bsend\\s+(?:people|patients|clients|them|folks|families|parents|moms)\\b|\\bfront\\s+desk\\b|\\be-?mail\\b",
+    // scheduling
+    "\\bhours\\b|\\bwait\\s*-?\\s*list\\w*|\\bwait(?:s|ing)?\\b|\\bbest\\s+time\\b|\\bcall(?:s|ed|ing)?\\b|\\bmornings?\\b|\\bafternoons?\\b|\\bevenings?\\b|\\bopenings?\\b|\\bavailab\\w*|\\bschedul\\w*|\\bweekends?\\b|\\btelehealth\\b|\\bin[- ]person\\b",
+    // payer mix
+    "\\bmedicaid\\b|\\bmedicare\\b|\\binsur\\w*|\\bprivate(?:ly)?\\s+pay|\\bpay\\s+privately\\b|\\bself[- ]pay\\b|\\bsliding\\s+scale\\b|\\b(?:in|out\\s+of)[- ]network\\b|\\bblue\\s*cross\\b|\\bbcbs\\b|\\baetna\\b|\\bcigna\\b|\\bcopays?\\b|\\bsuperbills?\\b",
+    // who they serve, as a group
+    "\\b(?:patients|clients|families|parents|adults|kids|children|teens|teenagers|women|men|moms|dads|seniors|veterans|students|couples|folks|caregivers|survivors)\\b|\\bpeople\\s+(?:with|who|in|going)\\b",
+    // what they need from a therapist
+    "\\b(?:need|needs|want|wants|looking\\s+for|wish)\\b[^.]{0,40}\\b(?:therapists?|counsel(?:l)?ors?|clinicians?|someone\\s+who)\\b|\\btherapists?\\s+who\\b|\\bspeaks?\\s+\\p{Lu}",
+    // meeting logistics and what they have in common
+    "\\b(?:wants?|would\\s+like|like|love)\\s+to\\s+meet\\b|\\bmeet\\b|\\bcoffee\\b|\\bone-?pager\\b|\\bflyers?\\b|\\bbrochures?\\b|\\bfollow[- ]?up\\b|\\bintroduc\\w*|\\bin\\s+common\\b|\\bboth\\b|\\btrained\\s+at\\b|\\bconnection\\b",
+  ].join("|"),
+  "iu",
+);
+
+/** The sentence is about the practice's business (cue a). */
+export function businessCue(s: string): boolean {
+  return BUSINESS.test(s);
 }
 
 // Who a professional is: a title before the name, a credential right after it,
 // or a role in apposition to the name itself ("Linda Park, the nurse navigator",
 // "our receptionist, Rosa Diaz"). Words that merely follow a name never count.
-const ROLE =
-  "nurse|navigator|coordinator|social\\s+worker|psychiatrist|psychologist|therapist|counsel(?:l)?or|doctor|physician|director|manager|midwife|doula|dietitian|nutritionist|chaplain|case\\s+manager|front\\s+desk|receptionist|scheduler|administrator|pediatrician|ob-?gyn|oncologist|internist|lactation\\s+consultant|educator|supervisor|liaison|practitioner|biller|referral\\s+specialist";
 const CREDENTIAL = "MD|DO|RN|NP|PA|PA-C|APRN|CNM|LCSW|LICSW|LCPC|LPC|LMFT|LMHC|PhD|PsyD|IBCLC";
 const TITLE_BEFORE = /\b(?:Dr|Doctor)\.?\s+$/;
 const CREDENTIAL_AFTER = new RegExp(`^,?\\s*(?:${CREDENTIAL})\\b(?!['’])`);
-// ", the nurse navigator" / ", our receptionist" ending at a comma, period, "at", "from", "in" or "for": never "receptionist's patient".
 const APPOSITIVE_AFTER = new RegExp(`^,\\s*(?:the|our|their|her|his|a|an)\\s+(?:[\\w-]+\\s+){0,2}?(?:${ROLE})(?!['’\\w])\\s*(?:[,.;]|$|\\s+(?:at|from|in|for|with|on)\\b)`, "i");
 const APPOSITIVE_BEFORE = new RegExp(`\\b(?:the|our|their|her|his)\\s+(?:[\\w-]+\\s+){0,2}?(?:${ROLE})\\s*,\\s*$`, "i");
 
@@ -191,7 +270,7 @@ function escapeRe(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/** Names with positive evidence, at every place they appear, of being a professional. Everyone else is a stranger. */
+/** Names with positive evidence, at every place they appear, of being a professional, in sentences that are kept. */
 export function professionalNames(text: string, names: string[]): string[] {
   const out = new Set<string>();
   for (const name of names) {
@@ -202,7 +281,7 @@ export function professionalNames(text: string, names: string[]): string[] {
       const before = text.slice(Math.max(0, at - 40), at);
       const after = text.slice(at + name.length, at + name.length + 80);
       const sentence = sentenceAt(text, at);
-      if (aboutAPatient(sentence) || clientLike(sentence) || namedAsPatient(sentence, name)) return false;
+      if (aboutAPatient(sentence) || notEnglish(sentence)) return false;
       return TITLE_BEFORE.test(before) || CREDENTIAL_AFTER.test(after) || APPOSITIVE_AFTER.test(after) || APPOSITIVE_BEFORE.test(before);
     });
     if (ok) out.add(name);
@@ -210,10 +289,12 @@ export function professionalNames(text: string, names: string[]): string[] {
   return [...out];
 }
 
-/** The partner's own names, written several ways, so "Dr. Okafor" and "Amara Okafor" both pass as hers. */
+/** The partner's own names, written several ways: "Amara Okafor", "Okafor", the practice. */
 function partnerNames(source: Pick<ReferralSource, "name" | "organization">): string[] {
   const bare = source.name.replace(/^\[Sample\]\s*/, "").split(",")[0].trim();
-  return [bare, source.organization?.trim()].filter((v): v is string => Boolean(v));
+  const org = source.organization?.replace(/^\[Sample\]\s*/, "").trim();
+  const surname = bare.split(/\s+/).length >= 2 ? bare.split(/\s+/).pop() : null;
+  return [bare, surname, org].filter((v): v is string => Boolean(v && v.length >= 3));
 }
 
 /** Every word of the name is a word of the partner's own name or practice ("Okafor", "Dr. Okafor"). */
@@ -226,7 +307,21 @@ function isPartner(name: string, source: Pick<ReferralSource, "name" | "organiza
 /** The practice's allowlist plus this partner and the professionals plain code found in this debrief (never names from a request body). */
 export async function debriefAllowlist(source: Pick<ReferralSource, "name" | "organization">, professionals: string[] = []): Promise<Allowlist> {
   const base = await practiceAllowlist();
-  return { ...base, names: [...base.names, ...partnerNames(source), ...professionals] };
+  const surnames = professionals.map((p) => p.split(/\s+/).pop()!).filter((s) => s.length >= 3);
+  return { ...base, names: [...base.names, ...partnerNames(source), ...professionals, ...surnames] };
+}
+
+/**
+ * The text the guard reads: the partner's and the professionals' names (vetted
+ * above) and payer or system names become plain words, so the guard judges
+ * everything else: strangers, IDs, contacts, addresses, dates.
+ */
+function maskKnown(s: string, known: string[]): string {
+  let out = s.replace(PRODUCT_WORDS, "the plan");
+  for (const n of [...known].sort((a, b) => b.length - a.length)) {
+    out = out.replace(new RegExp(`(?:\\b(?:Dr|Doctor)\\.?\\s+)?(?<![\\p{L}])${escapeRe(n)}(?:'s|’s)?(?![\\p{L}])`, "gu"), "the colleague");
+  }
+  return out;
 }
 
 export type Cleaned = { text: string; kept: number; withheld: number; professionals: string[]; fee: string | null };
@@ -239,12 +334,18 @@ function joinInitials(text: string): string {
   return text.replace(/(?<![\p{L}])((?:\p{Lu}\.\s?){2,3})/gu, (m) => m.replace(/[.\s]/g, "") + " ");
 }
 
+/** Why a sentence doesn't go to Muse, or null when it may. */
+export function dropReason(s: string): "fee" | "not_english" | "one_person" | "not_business" | null {
+  if (valueOffered(s)) return "fee";
+  if (notEnglish(s)) return "not_english";
+  if (aboutAPatient(s)) return "one_person";
+  if (!businessCue(s)) return "not_business";
+  return null;
+}
+
 /**
- * Leaves out every sentence that could be about one person (a patient, a family
- * member, a life event, initials), every sentence about money for referrals,
- * and every sentence with a name that isn't plainly a professional, then runs
- * each remaining sentence through the full guard (every PHI kind, names refused
- * rather than blanked). What comes back is the only text Muse sees.
+ * The allow-list pass (see the top of this section). What comes back is the
+ * only text Muse sees.
  */
 export async function cleanTranscript(
   transcript: string,
@@ -258,21 +359,31 @@ export async function cleanTranscript(
     .filter(Boolean);
   let fee: string | null = null;
   const candidates = all.filter((s) => {
-    const money = valueOffered(s);
-    if (money) fee ??= money;
-    return !money && !aboutAPatient(s);
+    const why = dropReason(s);
+    if (why === "fee") fee ??= valueOffered(s);
+    return why === null;
   });
   const found = candidates.length ? (await names(candidates.join(" "))).filter(isNameLike) : [];
   const professionals = professionalNames(candidates.join(" "), found);
   const allow = await debriefAllowlist(source, professionals);
+  const known = [...partnerNames(source), ...professionals];
   const kept: string[] = [];
   for (const s of candidates) {
-    // A name as the subject of a need or a visit is patient talk, whoever it is.
-    if (found.some((n) => s.includes(n) && !isPartner(n, source) && namedAsPatient(s, n))) continue;
-    const r = await check(s, allow);
+    // Anyone named who isn't the partner or a professional introduced as one: dropped.
+    if (found.some((n) => s.includes(n) && !isPartner(n, source) && !professionals.includes(n) && !professionals.some((p) => p.includes(n)))) continue;
+    const r = await check(maskKnown(s, known), allow);
     if (r.ok) kept.push(s);
   }
   return { text: kept.join(" "), kept: kept.length, withheld: all.length - kept.length, professionals, fee };
+}
+
+/** A name (any, allowed or not) in the same sentence as a health, life-event or need word: refused in a field. */
+export function nameWithNeed(value: string): boolean {
+  return sentences(value).some((s) => {
+    const residue = withoutOrgs(s);
+    const named = namesIn(residue).length > 0 || /\b(?:Dr|Doctor)\.?\s+\p{Lu}/u.test(s);
+    return named && (HEALTH.test(residue) || MEDICAL.test(residue) || mentionsDiagnosis(residue) || /\b(?:needs?|wants?|help\s+with|looking\s+for\s+help)\b/i.test(residue));
+  });
 }
 
 // ---- 4. Muse fills in the profile ---------------------------------------------
@@ -422,7 +533,17 @@ const WAITLIST_WORDS = /\bwait\s*-?\s*lists?\b|\bwaiting\s+lists?\b|\bwait\s+tim
 /** How much of a field's words must be in the debrief. The summary paraphrases, so it needs less. */
 const SUPPORT_NEEDED: Partial<Record<keyof DebriefFields, number>> = { last_meeting_summary: 0.8 };
 /** Fields that get the memory-level clinical check (identity-filter clinicalForMemory). */
-const CLINICAL_CHECKED: (keyof DebriefFields)[] = ["last_meeting_summary", "needs_from_therapist", "populations", "best_time", "follow_up_points", "referral_contact", "connection_points", "payer_mix"];
+const CLINICAL_CHECKED: (keyof DebriefFields)[] = ["last_meeting_summary", "needs_from_therapist", "populations", "best_time", "follow_up_points", "referral_contact", "connection_points", "payer_mix", "who_else"];
+
+/** A who-else role or organization that describes a person's health or life, not a job or a place. */
+export function personalRole(role: string, organization: string | null): boolean {
+  for (const t of [role, organization ? withoutOrgs(organization) : ""]) {
+    if (!t) continue;
+    if (HEALTH.test(t) || MEDICAL.test(t) || mentionsDiagnosis(t) || clinicalForMemory(t) || FAMILY.test(t) || ONE_PERSON.test(t) || ONE_PATIENT.test(t) || hasInitials(t)) return true;
+    if (/\b(?:patient|client|mom|dad|mother|father|husband|wife|son|daughter|family|survivor|resident|widow\w*)\b/i.test(t)) return true;
+  }
+  return false;
+}
 
 /** "adults with cancer", "families in hospice": a group, never one person. */
 export function genericGroup(value: string): boolean {
@@ -454,7 +575,7 @@ export async function checkFields(
     const fee = valueOffered(value);
     let why: string | null = null;
     if (fee) why = `it mentions ${fee}, and nothing of value can be tied to referrals`;
-    else if (aboutAPatient(value)) why = "it may be about one person, not the office";
+    else if (aboutAPatient(value) || nameWithNeed(value)) why = "it may be about one person, not the office";
     else if (CLINICAL_CHECKED.includes(field) && clinicalForMemory(value)) why = "it has clinical details";
     else if (field === "populations" && !genericGroup(value)) why = "it isn't a group of people";
     else if (!numbersSupported(value, cleaned)) why = "it has a number you didn't say";
@@ -501,7 +622,7 @@ export async function checkFields(
       reject("who_else", "a name not introduced as a professional");
       continue;
     }
-    if (hasInitials(`${w.name ?? ""} ${w.role}`) || aboutAPatient(`${w.name ?? ""}, ${w.role}`) || /\b(?:patient|client|mom|dad|mother|father|husband|wife|son|daughter|family)\b/i.test(w.role)) {
+    if (hasInitials(w.name ?? "") || personalRole(w.role, w.organization)) {
       reject("who_else", "it may be about a patient or a family member");
       continue;
     }
@@ -820,10 +941,13 @@ export async function saveDebrief(sourceId: string, body: unknown, opts: { by?: 
     ...f.follow_up_points.map((p) => ["follow_up_points", p] as [keyof DebriefFields, string]),
     ...confirmedWho.map((w) => ["who_else", [w.name, w.role, w.organization].filter(Boolean).join(", ")] as [keyof DebriefFields, string]),
   ];
+  for (const w of confirmedWho) {
+    if (personalRole(w.role, w.organization)) throw new DebriefRefused(`"${FIELD_LABEL.who_else}" may describe a person's health or life. Remove them and save again.`);
+  }
   for (const [key, value] of texts) {
     const fee = valueOffered(value);
     if (fee) throw new DebriefRefused(`"${FIELD_LABEL[key]}" mentions ${fee}. Nothing of value can be tied to referrals; take it out and save again.`);
-    if (aboutAPatient(value) || (CLINICAL_CHECKED.includes(key) && clinicalForMemory(value)) || (key === "populations" && !genericGroup(value))) {
+    if (aboutAPatient(value) || nameWithNeed(value) || (CLINICAL_CHECKED.includes(key) && clinicalForMemory(value)) || (key === "populations" && !genericGroup(value))) {
       throw new DebriefRefused(`"${FIELD_LABEL[key]}" may be about one person or hold clinical details. Keep it about the office and save again.`);
     }
     const g = await check(value, allow);

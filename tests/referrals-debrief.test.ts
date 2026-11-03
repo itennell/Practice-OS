@@ -21,7 +21,7 @@ vi.mock("node:fs/promises", async (importOriginal) => {
 });
 
 import { loadEnv } from "../lib/env";
-import { aboutAPatient, checkRecording, genericGroup, hasInitials, keyTerms, MAX_DEBRIEF_SECONDS, namedAsPatient, numbersSupported, professionalNames, support, wavSeconds } from "../lib/referrals/debrief";
+import { aboutAPatient, checkRecording, genericGroup, hasInitials, keyTerms, MAX_DEBRIEF_SECONDS, dropReason, numbersSupported, professionalNames, support, wavSeconds } from "../lib/referrals/debrief";
 import { memoryFactsFor, shortName } from "../lib/referrals/debrief-shape";
 import { STANDIN_TRANSCRIPT } from "../lib/referrals/debrief-standin";
 import {
@@ -128,15 +128,16 @@ describe("plain-code checks", () => {
     ]);
   });
   it("every probe about one person is left out; staff with an appositive role or title still pass", () => {
-    for (const p of PROBES) expect(aboutAPatient(p) || namedAsPatient(p, "Kevin Ortiz")).toBe(true);
+    // "Kevin Ortiz needs a therapist" is dropped by the stranger-name rule in cleanTranscript (tested against the database below).
+    for (const p of PROBES.slice(1)) expect(dropReason(p)).not.toBeNull();
     for (const s of STAFF_LINES) expect(aboutAPatient(s)).toBe(false);
     expect(professionalNames(STAFF_LINES.join(" "), STAFF)).toEqual(STAFF);
     // Words after a name never make it a professional.
     expect(professionalNames("Kevin Ortiz needs a therapist soon, she said.", ["Kevin Ortiz"])).toEqual([]);
     expect(professionalNames("Tom Becker, our receptionist's patient, needs help.", ["Tom Becker"])).toEqual([]);
     expect(professionalNames("Dr. Sam Patel runs the clinic.", ["Sam Patel"])).toEqual(["Sam Patel"]);
-    // A professional as the subject of a patient verb is dropped too: default refuse.
-    expect(professionalNames("Dr. Sam Patel sees adults.", ["Sam Patel"])).toEqual([]);
+    // A professional with a health event is not: "Dr. Kim, the cardiologist, is here for her own heart failure."
+    expect(professionalNames("Dr. Sam Kim, the cardiologist, is here for her own heart failure.", ["Sam Kim"])).toEqual([]);
     expect(professionalNames("Sam Patel, MD handles referrals.", ["Sam Patel"])).toEqual(["Sam Patel"]);
     expect(hasInitials("J.R. keeps missing appointments")).toBe(true);
     expect(hasInitials("J R keeps missing appointments")).toBe(true);

@@ -40,9 +40,17 @@ const OFF_LIMITS: [RegExp, string][] = [
  * partner said): what it mentions of value tied to referrals, or null.
  */
 export function valueOffered(text: string): string | null {
-  for (const [pattern, what] of OFF_LIMITS.slice(0, -1)) if (pattern.test(text)) return what;
+  for (const [pattern, what] of [...OFF_LIMITS.slice(0, -1), ...VALUE_EXTRA]) if (pattern.test(text)) return what;
   return null;
 }
+
+// Also refused in what partners say: a share of her fees, free services for
+// referrals, and the same offers in Spanish.
+const VALUE_EXTRA: [RegExp, string][] = [
+  [/(?:\b\d+(?:\.\d+)?\s*(?:%|percent\b|per\s+cent\b)|\b(?:cut|share|portion|percentage)\s+of\b)[^.!?\n]{0,40}\b(?:fees?|revenue|income|billing|referr\w*|each\s+client)\b/i, "a share of fees"],
+  [/\bfree\b[^.!?\n]{0,40}\b(?:sessions?|therapy|consult\w*|services?|visits?|months?)\b[^.!?\n]*\b(?:if|when|for|so|as long as)\b|\b(?:if|when)\s+(?:they|you|she|he)\s+send\b[^.!?\n]*\bfree\b/i, "something free in return for referrals"],
+  [/\bd[oó]lares\b|\bpor\s+cada\s+(?:referid|paciente|cliente)\w*|\bcomisi[oó]n\b|\bregalo\b|\bgratis\b/i, "money or payment"],
+];
 
 export type LetterCheck = { ok: true } | { ok: false; reason: string };
 
