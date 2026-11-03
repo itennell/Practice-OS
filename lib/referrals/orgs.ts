@@ -17,7 +17,7 @@ import { geocodePlace, type Point } from "./geocode";
 import { haversineMiles, zipCenters } from "./geo";
 import { orgToCard, saveOrgCard, type SaveResult } from "./org-store";
 import { CMS_LIMIT, cmsByCcn, searchCmsAgencies, type CmsAgencyType, type FoundOrg } from "./sources/cms-agencies";
-import { OSM_ATTRIBUTION, osmByRef, osmTypes, searchOsmOrgs } from "./sources/osm-orgs";
+import { OSM_ATTRIBUTION, OVERPASS_DEADLINE_MS, osmByRef, osmTypes, searchOsmOrgs } from "./sources/osm-orgs";
 import type { StoreErrorSink } from "./sources/stored-cache";
 import { listSources, type ReferralSource } from "./store";
 import { isSensitiveSource } from "./sensitive";
@@ -80,6 +80,8 @@ type Deps = {
   sql?: postgres.Sql | null;
   /** Told, in plain words, when a CMS or OpenStreetMap answer couldn't be kept in referral_fetch_cache (demo:warm's notKept). */
   onStoreError?: StoreErrorSink;
+  /** How long the OpenStreetMap part may take, retries included, from the start of this search (default OVERPASS_DEADLINE_MS; demo:warm passes longer). */
+  osmDeadlineMs?: number;
 };
 
 const errText = (err: unknown) => (err instanceof Error ? err.message : String(err));
@@ -121,6 +123,8 @@ async function resolve(area: Area, radiusMiles: number, ctx: Ctx, deps: Deps) {
 
 /** The organisations near an area, nearest first, with what is already on her board. Saves nothing. */
 export async function discoverOrgs(req: { area: Area; radiusMiles: number; types?: string[] | null; niche?: string | null }, ctx: Ctx, deps: Deps = {}): Promise<DiscoveryResult> {
+  // Measured from here, so the CMS part counts toward it too.
+  const osmDeadlineAt = Date.now() + (deps.osmDeadlineMs ?? OVERPASS_DEADLINE_MS);
   const types = discoveryTypes(req.types, req.niche ?? null);
   if (types.length === 0) throw new AreaError("Pick at least one kind of place.");
   const { centers, center, label, zips, office, notes } = await resolve(req.area, req.radiusMiles, ctx, deps);
@@ -143,7 +147,7 @@ export async function discoverOrgs(req: { area: Area; radiusMiles: number; types
     if (req.radiusMiles > OSM_MAX_MILES) notes.push(`OpenStreetMap places are shown within ${OSM_MAX_MILES} miles.`);
     try {
       const onStoreError = deps.onStoreError && ((err: unknown) => deps.onStoreError!(`Couldn't keep an OpenStreetMap answer: ${errText(err)}`));
-      const r = await (deps.osm ?? searchOsmOrgs)(osmPicked, center, miles, { sql: deps.sql, onStoreError });
+      const r = await (deps.osm ?? searchOsmOrgs)(osmPicked, center, miles, { sql: deps.sql, onStoreError, deadlineAt: osmDeadlineAt });
       found.push(...r.orgs);
       for (const t of r.capped) notes.push(`There are many ${SOURCE_TYPE_BY_ID.get(t)?.label.toLowerCase() ?? t} nearby, so this shows the nearest.`);
     } catch {

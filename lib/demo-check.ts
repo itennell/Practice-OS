@@ -24,7 +24,7 @@ export const WARM_FRESH_MS = 24 * 3600 * 1000;
 /** demo:check gives up after this long instead of waiting forever on the database. */
 export const CHECK_TIMEOUT_MS = 60_000;
 export function checkTimeoutMessage(ms: number = CHECK_TIMEOUT_MS): string {
-  return `demo:check stopped after ${Math.round(ms / 1000)} seconds without an answer from the database, so nothing was checked (and nothing was changed). Make sure the database is reachable, then run npm run demo:check again.`;
+  return `demo:check stopped after ${Math.round(ms / 1000)} seconds without an answer from the database, so the demo wasn't checked. The check only reads, so it changed nothing. Make sure the database is reachable, then run npm run demo:check again.`;
 }
 /** The env files Next.js reads for `npm start`, highest priority first. */
 export const ENV_FILES = [".env.production.local", ".env.local", ".env.production", ".env"] as const;

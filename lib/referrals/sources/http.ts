@@ -15,7 +15,7 @@ export class SourceUnavailable extends Error {
   }
 }
 
-export type JsonFetcher = (url: string, init?: { method?: string; body?: string; headers?: Record<string, string> }) => Promise<unknown>;
+export type JsonFetcher = (url: string, init?: { method?: string; body?: string; headers?: Record<string, string>; /** Shorter than the fetcher's own timeout, e.g. to keep a deadline. */ timeoutMs?: number }) => Promise<unknown>;
 
 export function jsonFetcher(source: string, timeoutMs = 15_000): JsonFetcher {
   return async (url, init) => {
@@ -25,7 +25,7 @@ export function jsonFetcher(source: string, timeoutMs = 15_000): JsonFetcher {
         method: init?.method ?? "GET",
         body: init?.body,
         headers: { "User-Agent": USER_AGENT, Accept: "application/json", ...init?.headers },
-        signal: AbortSignal.timeout(timeoutMs),
+        signal: AbortSignal.timeout(Math.max(1, Math.min(timeoutMs, init?.timeoutMs ?? timeoutMs))),
       });
     } catch {
       throw new SourceUnavailable(source, null);

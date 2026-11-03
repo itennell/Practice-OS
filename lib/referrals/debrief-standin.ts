@@ -15,7 +15,7 @@ export const STANDIN_TRANSCRIPT =
   "One of their patients, Maria Lopez, 34, was just diagnosed with postpartum depression. " +
   "The best time to reach the office is Tuesday mornings. " +
   "We both trained at Loyola, so that was a nice connection. " +
-  "She said I should meet Jenna Cho, the lactation consultant at Lincoln Park Birth Center. " +
+  "She said I should meet Jenna Cho, the lactation consultant at Marigold Birth Center. " +
   "I said I would send my flyer and my openings next week.";
 
 /** What Muse would fill in, plus one person the debrief never named (plain code drops it). */
@@ -31,7 +31,7 @@ export const STANDIN_FIELDS = {
     "Coffee with the office manager at Fernhollow Pediatrics. They refer by fax through the front desk coordinator and need a therapist who can see new parents within two weeks.",
   connection_points: "We both trained at Loyola",
   who_else: [
-    { name: "Jenna Cho", role: "lactation consultant", organization: "Lincoln Park Birth Center" },
+    { name: "Jenna Cho", role: "lactation consultant", organization: "Marigold Birth Center" },
     { name: "Sam Patel", role: "social worker", organization: "Northwestern" },
   ],
   follow_up_points: ["Send my flyer and my openings next week"],

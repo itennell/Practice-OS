@@ -16,9 +16,9 @@ import { formatPhone, phoneDigits, zip5 } from "../evidence/normalize";
 import type { Fact } from "../evidence/merge";
 import { OSM_ATTRIBUTION } from "../evidence/merge";
 import { haversineMiles } from "../geo";
-import { cachedJson, postKey, waitTurn, withRetry } from "./cache";
+import { cachedJson, MIN_ATTEMPT_MS, postKey, waitTurn, withRetry } from "./cache";
 import type { FoundOrg } from "./cms-agencies";
-import { jsonFetcher, type JsonFetcher } from "./http";
+import { jsonFetcher, SourceUnavailable, type JsonFetcher } from "./http";
 import { OVERPASS_URL } from "./osm";
 import { looksSensitive } from "../sensitive";
 
@@ -161,8 +161,17 @@ export function osmOrgFacts(org: FoundOrg): Fact[] {
   return facts;
 }
 
-/** After a 429, a busy server or no answer, Overpass is asked again after these waits (each still after its 2-second turn). */
+/** After a 429, a busy server (503) or no answer, Overpass is asked again after these waits (each still after its 2-second turn). */
 export const OVERPASS_RETRY_MS = [5_000, 15_000] as const;
+/**
+ * In the app every Overpass search, retries included, is over within this long from the
+ * search's start, well inside the routes' maxDuration (discover 60 s, chat 120 s).
+ * demo:warm passes a longer one.
+ */
+export const OVERPASS_DEADLINE_MS = 40_000;
+const OVERPASS_TIMEOUT_MS = 30_000;
+const OVERPASS_HOST = "overpass-api.de";
+const OVERPASS_SOURCE = "OpenStreetMap (Overpass)";
 
 type Deps = {
   fetcher?: JsonFetcher;
@@ -173,24 +182,34 @@ type Deps = {
   /** Waits before asking again (default OVERPASS_RETRY_MS); tests pass [] or a fake sleep. */
   retryDelaysMs?: readonly number[];
   sleep?: (ms: number) => Promise<unknown>;
+  /** Absolute time (ms) the search must be over by, retries included. Default: OVERPASS_DEADLINE_MS from this call. */
+  deadlineAt?: number;
+  /** The clock for the deadline (tests). */
+  clock?: () => number;
 };
 
 async function overpass(query: string, deps: Deps): Promise<unknown> {
-  const fetcher = deps.fetcher ?? jsonFetcher("OpenStreetMap (Overpass)", 30_000);
+  const clock = deps.clock ?? Date.now;
+  const deadlineAt = deps.deadlineAt ?? clock() + OVERPASS_DEADLINE_MS;
+  const fetcher = deps.fetcher ?? jsonFetcher(OVERPASS_SOURCE, OVERPASS_TIMEOUT_MS);
   const body = new URLSearchParams({ data: query }).toString();
   return cachedJson(
     postKey(OVERPASS_URL, query),
     () =>
       withRetry(
         async () => {
-          await waitTurn("overpass-api.de", SPACING_MS);
+          await waitTurn(OVERPASS_HOST, SPACING_MS);
+          // The turn itself may have used up the time: don't start an attempt that can't finish.
+          const left = deadlineAt - clock();
+          if (left < MIN_ATTEMPT_MS) throw new SourceUnavailable(OVERPASS_SOURCE, null);
           // Sensitive places are dropped here, so their raw JSON is never cached or stored.
-          return dropSensitive(await fetcher(OVERPASS_URL, { method: "POST", body, headers: { "Content-Type": "application/x-www-form-urlencoded" } }));
+          return dropSensitive(
+            await fetcher(OVERPASS_URL, { method: "POST", body, headers: { "Content-Type": "application/x-www-form-urlencoded" }, timeoutMs: Math.min(OVERPASS_TIMEOUT_MS, left) }),
+          );
         },
-        deps.retryDelaysMs ?? OVERPASS_RETRY_MS,
-        deps.sleep,
+        { delaysMs: deps.retryDelaysMs ?? OVERPASS_RETRY_MS, deadlineAt, host: OVERPASS_HOST, sleep: deps.sleep, now: clock },
       ),
-    { sql: deps.sql, host: "overpass-api.de", source: "OpenStreetMap (Overpass)", onStoreError: deps.onStoreError },
+    { sql: deps.sql, host: OVERPASS_HOST, source: OVERPASS_SOURCE, onStoreError: deps.onStoreError },
   );
 }
 

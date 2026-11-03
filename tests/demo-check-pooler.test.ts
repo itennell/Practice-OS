@@ -115,7 +115,7 @@ describe.skipIf(!local)("demo:check behind a transaction pooler", () => {
 describe("demo:check's timeout message", () => {
   it("says what happened and what to do, in plain words", () => {
     expect(checkTimeoutMessage()).toBe(
-      "demo:check stopped after 60 seconds without an answer from the database, so nothing was checked (and nothing was changed). Make sure the database is reachable, then run npm run demo:check again.",
+      "demo:check stopped after 60 seconds without an answer from the database, so the demo wasn't checked. The check only reads, so it changed nothing. Make sure the database is reachable, then run npm run demo:check again.",
     );
   });
 });

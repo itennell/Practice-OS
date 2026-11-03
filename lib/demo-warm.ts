@@ -29,6 +29,8 @@ export const WARM_RADII = [1, 3, 5] as const;
 /** At most this many of each kind go on the board. */
 export const BOARD_PER_KIND = 3;
 export const BOARD_MILES = 5;
+/** demo:warm isn't behind a route's maxDuration, so OpenStreetMap gets every retry here. */
+export const WARM_OSM_DEADLINE_MS = 120_000;
 
 export type WarmReport = {
   /** The radius the map and Places counts below came from: the widest that answered (null when none did). */
@@ -131,7 +133,7 @@ async function warm(sql: postgres.Sql, deps: Deps, log: (line: string) => void):
     }
     try {
       const types = discoveryTypes(null, dctx.niche);
-      const r = await discover({ area, radiusMiles, types, niche: dctx.niche }, dctx, { sql, cards: await listSources(sql), onStoreError });
+      const r = await discover({ area, radiusMiles, types, niche: dctx.niche }, dctx, { sql, cards: await listSources(sql), onStoreError, osmDeadlineMs: WARM_OSM_DEADLINE_MS });
       for (const n of r.notes) if (FAIL_NOTE.test(n)) failed.add(`Places at ${radiusMiles} mi: ${n}`);
       log(`Places near you, ${radiusMiles} mi: ${r.orgs.length} places.`);
       places = r;

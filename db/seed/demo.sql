@@ -254,12 +254,12 @@ values ('system', 'demo_data_seeded', '{"practice": "Reyes Counseling PLLC (fict
 -- All [Sample]: example.com addresses, no real providers. "They referred someone" keeps a date only.
 insert into practice_os.referral_facts (source_id, field, value, origin, origin_url, match_method, match_score, detail, checked_at) values
   ('00000000-0000-4000-8000-000000000201', 'name', '[Sample] Juniper Row Family Medicine', 'osm', 'https://www.openstreetmap.org/node/1', 'name_address', 0.95, '{}', now() - interval '3 days'),
-  ('00000000-0000-4000-8000-000000000201', 'website', 'https://lakeview-fm.example.com', 'website', 'https://lakeview-fm.example.com', 'name_address', null, '{"robots": "robots.txt allows /contact", "robotsAllowed": true}', now() - interval '3 days'),
-  ('00000000-0000-4000-8000-000000000201', 'email', 'frontdesk@example.com', 'website', 'https://lakeview-fm.example.com/contact', 'name_address', null, '{"label": "on their contact page", "how": "mailto"}', now() - interval '3 days'),
+  ('00000000-0000-4000-8000-000000000201', 'website', 'https://juniper-row-fm.example.com', 'website', 'https://juniper-row-fm.example.com', 'name_address', null, '{"robots": "robots.txt allows /contact", "robotsAllowed": true}', now() - interval '3 days'),
+  ('00000000-0000-4000-8000-000000000201', 'email', 'frontdesk@example.com', 'website', 'https://juniper-row-fm.example.com/contact', 'name_address', null, '{"label": "on their contact page", "how": "mailto"}', now() - interval '3 days'),
   ('00000000-0000-4000-8000-000000000202', 'name', '[Sample] Dr. Alex Example', 'state_license', 'https://data.illinois.gov/d/pzzh-kp68', 'name_city', 0.9, '{}', now() - interval '40 days'),
   ('00000000-0000-4000-8000-000000000202', 'license_status', 'ACTIVE', 'state_license', 'https://data.illinois.gov/d/pzzh-kp68', 'name_city', 0.9, '{"state": "IL"}', now() - interval '40 days'),
   ('00000000-0000-4000-8000-000000000202', 'medicare', 'enrolled', 'cms_dac', 'https://data.cms.gov/provider-data/dataset/mj5m-pzi6', 'name_address', 0.95, '{}', now() - interval '40 days');
-update practice_os.referral_sources set checked_at = now() - interval '3 days', confidence = 'confirmed', website = 'https://lakeview-fm.example.com'
+update practice_os.referral_sources set checked_at = now() - interval '3 days', confidence = 'confirmed', website = 'https://juniper-row-fm.example.com'
  where id = '00000000-0000-4000-8000-000000000201';
 update practice_os.referral_sources set checked_at = now() - interval '40 days', confidence = 'confirmed'
  where id = '00000000-0000-4000-8000-000000000202';

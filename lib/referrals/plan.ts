@@ -262,7 +262,7 @@ export async function referralFollowUps(sql: postgres.Sql = db()): Promise<Follo
   return followUpsFrom(cards, contacts, today);
 }
 
-/** Board cards that her words name ("Dr. Rivera", "Lakeview Pediatrics"), best first. */
+/** Board cards that her words name ("Dr. Rivera", "Fernhollow Pediatrics"), best first. */
 export function cardsNamed(query: string, cards: ReferralSource[]): ReferralSource[] {
   const q = query.trim();
   if (!q) return [];
