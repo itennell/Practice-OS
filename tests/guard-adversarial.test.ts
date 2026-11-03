@@ -16,12 +16,16 @@ const allow = {
   names: DEMO_ALLOWED.names.map(normalizeForCheck),
   contacts: DEMO_ALLOWED.contacts.map(normalizeForCheck),
   directory: DEMO_ALLOWED.directory.map(normalizeForCheck),
+  places: DEMO_ALLOWED.places.map(normalizeForCheck),
 };
 
 /** What the plain-code rules alone say, on the cleaned text and each leet reading. */
 function rulesRefuse(text: string, at: string): boolean {
   const plain = normalizeForCheck(text);
-  return [plain, ...leetVariants(plain)].some((v) => !checkIdentity(v, allow).ok || (at === "memory" && clinicalForMemory(v)));
+  const flat = (v: string) => [v, v.replace(/[ \t]*\n+[ \t]*/g, " ")];
+  return [plain, ...leetVariants(plain)]
+    .flatMap(flat)
+    .some((v) => !checkIdentity(v, allow).ok || (at === "memory" && clinicalForMemory(v, allow.places)));
 }
 
 describe("adversarial table: size", () => {
@@ -91,20 +95,25 @@ describe.skipIf(!haveModel)("adversarial table: whole guard with the local name-
   });
 
   it("drops one sentence of a one-paragraph reply", async () => {
-    const reply = "Start with Claudia Tellez, MD, 0.6 mi away. My client has stage 3 breast cancer. Then try Westside Oncology Partners.";
+    const reply = "Start with Claudia Tellez, MD, 0.6 mi away. Text 312-555-0199 for the intake. Then try Westside Oncology Partners.";
     const r = await guard(reply, "reply", DEMO_ALLOWED);
-    expect(r.ok).toBe(true);
+    expect(r).toEqual({ ok: true, text: `Start with Claudia Tellez, MD, 0.6 mi away. ${PART_LEFT_OUT} Then try Westside Oncology Partners.` });
+  });
+
+  it("holds back the whole reply for a health detail or a pinned-down client, never keeping the sentences around it", async () => {
+    const spread = "Your client is 61. She lives in Lincoln Park. She has metastatic breast cancer. Brittany Keiser, MS, CGC can help.";
+    expect((await guard(spread, "reply", DEMO_ALLOWED)).ok).toBe(false);
+    const card = "Here are your next steps.\n1. Your Tuesday client Sarah Klein\n2. Started chemo last week\n3. Brittany Keiser, MS, CGC - 0.9 miles away\n4. Westside Oncology Partners - 1.2 mi away";
+    const r = await guard(card, "reply", DEMO_ALLOWED);
     if (r.ok) {
-      expect(r.text).toContain(PART_LEFT_OUT);
-      expect(r.text).not.toMatch(/breast cancer/);
-      expect(r.text).toContain("Westside Oncology Partners");
+      expect(r.text).not.toMatch(/chemo|Sarah|Klein/);
     }
   });
 
   it("holds back the whole reply when no one part is at fault, or most of it would go", async () => {
     // A street and a person on separate lines: each line passes alone, together they are a home address.
     expect(await guard("Mail it to 1200 W Fullerton Ave\nShe asked for it twice.", "reply", DEMO_ALLOWED)).toEqual({ ok: false, kind: "address" });
-    const most = "Sam Rivera came in today for his visit.\nMy client has stage 3 breast cancer.\nThanks.";
+    const most = "Sam Rivera came in today for his visit.\nKevin Ortiz cancelled his intake.\nThanks.";
     expect((await guard(most, "reply", DEMO_ALLOWED)).ok).toBe(false);
   });
 
