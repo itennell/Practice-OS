@@ -155,12 +155,12 @@ async function reset(sql: postgres.Sql, dir: string): Promise<ResetResult> {
     removed = await tx<RemovedDocument[]>`select stored_as, sha256 from practice_os.documents`;
     await tx.unsafe(`truncate ${DEMO_TABLES.map((t) => `practice_os.${t}`).join(", ")}`);
     await tx.unsafe(seed);
-    // Dana's demo niche and its kinds, every reset. referral_settings is otherwise hers and never
-    // reset, but on the fictional demo practice these two are demo data: the demo leads with them.
+    // Dana's demo home ZIP, niche and its kinds, every reset. referral_settings is otherwise hers and never
+    // reset, but on the fictional demo practice these are demo data: the demo leads with them.
     await tx`
       insert into practice_os.referral_settings (id, home_zip, specialties, niche_preset)
       values (true, ${DEMO_ZIP}, ${DEMO_REFERRAL_KINDS}, ${DEMO_NICHE})
-      on conflict (id) do update set niche_preset = excluded.niche_preset, specialties = excluded.specialties, updated_at = now()`;
+      on conflict (id) do update set home_zip = excluded.home_zip, niche_preset = excluded.niche_preset, specialties = excluded.specialties, updated_at = now()`;
     // The [Sample] posts' finished pictures, so the demo post can be approved.
     for (const post of SEED_POSTS) {
       if (!post.picture) continue;
