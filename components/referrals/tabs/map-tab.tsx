@@ -16,7 +16,7 @@ import { notify } from "@/components/shared/toaster";
 import { Button } from "@/components/ui";
 import { cardPins } from "@/lib/referrals/crm-views";
 import { DEFAULT_FILTERS, DISTANCE_OPTIONS, distanceLabel, filterPartners, kindOptions, partnerRows, type DistanceFilter } from "@/lib/referrals/partners";
-import { STAGE_LABEL } from "@/lib/referrals/stages";
+import { COLUMN_LABEL } from "@/lib/referrals/stages";
 import { cn } from "@/lib/utils";
 import { TierBadge } from "../tier-badge";
 import { CARD, getJson, postJson, type CrmTabProps } from "./tab-props";
@@ -86,7 +86,7 @@ export function MapTab({ data, onOpenPartner, onChanged }: CrmTabProps = {}) {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="relative h-[52vh] min-h-[320px] lg:h-[620px]">
+        <div className="relative h-[52vh] min-h-[320px] lg:h-[min(620px,calc(100dvh-20rem))]">
           {failed ? (
             <div className={cn(CARD, "flex h-full items-center justify-center")}>
               <EmptyState icon={<MapPinOff size={20} />} title="The map didn't load">
@@ -103,12 +103,12 @@ export function MapTab({ data, onOpenPartner, onChanged }: CrmTabProps = {}) {
               role="region"
               aria-label={`About ${pick.card.name}`}
               data-testid="map-popup"
-              className="tile absolute right-3 bottom-3 left-3 z-10 flex flex-col gap-2 bg-[var(--toast-bg)]! p-3 sm:right-auto sm:w-80"
+              className="tile absolute top-3 right-14 left-3 z-10 flex flex-col gap-2 bg-[var(--toast-bg)]! p-3 sm:right-auto sm:w-80"
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-semibold break-words">{pick.card.name}</p>
-                  <p className="text-small text-[var(--fg-muted)]">{[pick.kind, STAGE_LABEL[pick.card.stage], pick.card.sensitive ? null : distanceLabel(pick.card.distance_miles)].filter(Boolean).join(" · ")}</p>
+                  <p className="text-small text-[var(--fg-muted)]">{[pick.kind, COLUMN_LABEL[pick.column], pick.card.sensitive ? null : distanceLabel(pick.card.distance_miles)].filter(Boolean).join(" · ")}</p>
                 </div>
                 <IconButton label="Close" icon={<X aria-hidden size={16} />} onClick={() => setSelected(null)} className="-mt-2 -mr-2" />
               </div>
@@ -152,7 +152,11 @@ export function MapTab({ data, onOpenPartner, onChanged }: CrmTabProps = {}) {
                         {r.card.sensitive ? "Public line only, no pin" : on ? [r.kind, distanceLabel(r.card.distance_miles)].filter(Boolean).join(" · ") : `No pin: ${r.card.city ? `${r.card.city} only` : "no ZIP"}`}
                       </span>
                     </button>
-                    {data.tiers[r.card.id] && <TierBadge tier={data.tiers[r.card.id].tier} />}
+                    {data.tiers[r.card.id] && (r.column === "met" || r.column === "referring" ? (
+                      <span className="inline-flex h-7 shrink-0 items-center rounded-full border border-[var(--line)] px-2.5 text-small font-medium">{COLUMN_LABEL[r.column]}</span>
+                    ) : (
+                      <TierBadge tier={data.tiers[r.card.id].tier} />
+                    ))}
                   </li>
                 );
               })}

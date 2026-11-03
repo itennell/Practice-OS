@@ -83,16 +83,17 @@ test("partners: the Kind filter shows one kind at a time, and the panel names th
   const juniper = page.getByRole("listitem", { name: "[Sample] Juniper Row Family Medicine", exact: true });
   await expect(juniper).toBeVisible();
   await page.getByRole("button", { name: "Kind", exact: true }).click();
-  await page.getByRole("menuitemcheckbox", { name: /^Medical specialists/ }).click();
+  // The kind Aeon knows for the card: its specialty (Oncology), not only the broad category.
+  await page.getByRole("menuitemcheckbox", { name: /^Oncology/ }).click();
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("button", { name: "Kind: Medical specialists" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Kind: Oncology" })).toBeVisible();
   await expect(oncology).toBeVisible();
   await expect(juniper).toHaveCount(0);
   await axeClean(page);
   const panel = await openPartner(page, "[Sample] Quillmere Oncology Group");
   await expect(panel).toContainText("Fits your oncology & end-of-life focus (Medical specialists)");
   await closePanel(page);
-  await page.getByRole("button", { name: "Kind: Medical specialists" }).click();
+  await page.getByRole("button", { name: "Kind: Oncology" }).click();
   await page.getByRole("menuitem", { name: "Clear" }).click();
   await expect(juniper).toBeVisible();
 });

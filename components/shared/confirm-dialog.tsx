@@ -23,6 +23,8 @@ export type ConfirmDialogProps = {
   description: ReactNode;
   /** Repeats the action: "Delete 3 files". Never "OK" or "Yes". */
   confirmLabel: string;
+  /** The way out, when "Cancel" would read like the action ("Keep meeting" beside "Cancel meeting"). */
+  cancelLabel?: string;
   /** For the most serious actions: she types this (e.g. the practice name) before the button unlocks. */
   typeToConfirm?: string;
   /** Runs the action. Throw to keep the dialog open and show the message. */
@@ -36,6 +38,7 @@ export function ConfirmDialog({
   title,
   description,
   confirmLabel,
+  cancelLabel = "Cancel",
   typeToConfirm,
   onConfirm,
 }: ConfirmDialogProps) {
@@ -125,7 +128,7 @@ export function ConfirmDialog({
               disabled={busy}
               className="inline-flex h-touch items-center justify-center rounded-full border border-border bg-[var(--chip-off-bg)] px-6 text-body font-medium text-[var(--fg)] transition-colors duration-150 hover:border-accent disabled:opacity-50"
             >
-              Cancel
+              {cancelLabel}
             </AlertDialog.Close>
             <button
               type="button"

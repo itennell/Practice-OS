@@ -4,8 +4,10 @@
 // contact history, and the same boxes the board card had (where each fact came from,
 // the contact log, referring out, the drafted letter, the coffee debrief).
 
+import { useState, type FormEvent } from "react";
 import { Globe, Mail, MapPin, Phone } from "lucide-react";
-import { SettingSelect } from "@/components/shared/settings-controls";
+import { SettingSelect, TextField } from "@/components/shared/settings-controls";
+import { notify } from "@/components/shared/toaster";
 import { SideSheet } from "@/components/shared/side-sheet";
 import { Button } from "@/components/ui";
 import { CONTACT_LABEL } from "@/lib/referrals/contact-kinds";
@@ -14,7 +16,7 @@ import type { Evidence } from "@/lib/referrals/evidence/merge";
 import { looksResidential } from "@/lib/referrals/nppes";
 import type { GoingCold, ReferOutNotes } from "@/lib/referrals/nurture";
 import { dayLabel, distanceLabel, letterIsWaiting, nextStep } from "@/lib/referrals/partners";
-import { STAGES, STAGE_LABEL, type Stage } from "@/lib/referrals/stages";
+import { BOARD_COLUMNS, COLUMN_LABEL, columnFor, type BoardColumn } from "@/lib/referrals/stages";
 import type { LetterState, ReferralSource } from "@/lib/referrals/store";
 import type { TierResult } from "@/lib/referrals/tier";
 import { LetterBox } from "./board";
@@ -24,7 +26,8 @@ import { EvidenceBox } from "./evidence-box";
 import { GoingColdLine, ReciprocityLine, ReferOutBox } from "./nurture";
 import { TierBadge } from "./tier-badge";
 
-const MOVE_OPTIONS = STAGES.map((s) => ({ value: s, label: STAGE_LABEL[s] }));
+// The Board's words (Found, Reached out, Met, Referring, Not a fit): one vocabulary everywhere.
+const MOVE_OPTIONS = BOARD_COLUMNS.map((c) => ({ value: c, label: COLUMN_LABEL[c] }));
 
 export function PartnerPanel({
   card,
@@ -61,7 +64,7 @@ export function PartnerPanel({
   /** Open the coffee debrief recorder at once (More › Record a debrief, or /referrals?debrief=<id>). */
   debrief: boolean;
   onClose: () => void;
-  onMove: (stage: Stage) => void;
+  onMove: (column: BoardColumn) => void;
   onDraft: (nudge: boolean) => void;
   onUpdate: (card: ReferralSource, evidence: Evidence) => void;
   onLogged: (view: CardView, said: string) => void;
@@ -129,8 +132,9 @@ function Details({
         {card.name}
       </h3>
       <div className="flex flex-wrap items-center gap-2">
-        {tier && <TierBadge tier={tier.tier} />}
-        <span className="text-small font-medium text-[var(--fg-muted)]">{STAGE_LABEL[card.stage]}</span>
+        {/* "Reach out first" is advice for someone she hasn't met yet: never on Met or Referring. */}
+        {tier && !["met", "referring"].includes(columnFor(card, contacts)) && <TierBadge tier={tier.tier} />}
+        <span className="text-small font-medium text-[var(--fg-muted)]">{COLUMN_LABEL[columnFor(card, contacts)]}</span>
       </div>
 
       <section aria-labelledby={`${headingId}-next`} className="flex flex-col gap-1 rounded-[16px] border border-[var(--line)] bg-[var(--glass)] p-3">
@@ -211,6 +215,7 @@ function Details({
           </div>
         )}
       </dl>
+      {!card.website && !card.sensitive && card.stage !== "not_a_fit" && <WebsiteForm card={card} onSaved={onUpdate} />}
 
       {card.notes && (
         <section aria-labelledby={`${headingId}-notes`} className="flex flex-col gap-1">
@@ -249,14 +254,52 @@ function Details({
           cardId={card.id}
           name={card.name}
           demo={demo}
-          onSent={(view) => onLogged(view, (view as CardView & { already?: boolean }).already ? "Already logged: this letter is marked sent." : `Marked the email to ${card.name} as sent. It's in Contacted now, with a follow-up a week out.`)}
+          onSent={(view) => onLogged(view, (view as CardView & { already?: boolean }).already ? "Already logged: this letter is marked sent." : `Marked the email to ${card.name} as sent. It's in Reached out now, with a follow-up a week out.`)}
         />
       )}
       <ContactLog card={card} contacts={contacts} onUpdate={onLogged} />
       {card.stage !== "not_a_fit" && <ReferOutBox card={card} notes={referOut} onLogged={onLogged} onNotes={onReferOut} />}
       <EvidenceBox card={card} evidence={evidence} onUpdate={onUpdate} />
-      <SettingSelect compact label="Move to" value={card.stage} onValueChange={(v) => onMove(v)} options={MOVE_OPTIONS} />
+      <SettingSelect compact label="Move to" value={columnFor(card, contacts)} onValueChange={(v) => onMove(v)} options={MOVE_OPTIONS} />
       {card.stage !== "not_a_fit" && !card.suggested_from && <DebriefButton card={card} autoOpen={debrief} />}
     </div>
+  );
+}
+
+/** No website on file: she types it, so Find email has their own page to read. */
+function WebsiteForm({ card, onSaved }: { card: ReferralSource; onSaved: (card: ReferralSource, evidence: Evidence) => void }) {
+  const [typed, setTyped] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/referrals/${card.id}/website`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ website: typed }) });
+      const data = (await res.json().catch(() => ({}))) as { card?: ReferralSource; evidence?: Evidence; error?: string };
+      if (!res.ok || !data.card || !data.evidence) throw new Error(data.error ?? "Couldn't save that. Try again.");
+      onSaved(data.card, data.evidence);
+      notify.success(`Saved. Find email can read ${card.name}'s website now.`);
+      setTyped("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't save that. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <form onSubmit={save} aria-label={`Add website for ${card.name}`} className="flex flex-col gap-2 rounded-[16px] border border-[var(--line)] p-3">
+      <TextField compact label="Their website" placeholder="example.com" value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" required />
+      <p className="text-small text-[var(--fg-muted)]">No website on file to check. Add it, then press Find email in their row.</p>
+      {error && (
+        <p role="alert" className="text-small font-medium text-[var(--danger-fg)]">
+          {error}
+        </p>
+      )}
+      <Button type="submit" variant="quiet" disabled={busy || !typed.trim()} className="self-start">
+        {busy ? "Saving…" : "Save website"}
+      </Button>
+    </form>
   );
 }

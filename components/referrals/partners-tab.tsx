@@ -37,7 +37,7 @@ import {
   type PartnerFilters,
   type PartnerRow,
 } from "@/lib/referrals/partners";
-import { STAGES, STAGE_LABEL, type Stage } from "@/lib/referrals/stages";
+import { BOARD_COLUMNS, boardMove, COLUMN_LABEL, columnFor, type BoardColumn, type Stage } from "@/lib/referrals/stages";
 import type { LetterState, ReferralSource } from "@/lib/referrals/store";
 import type { TierResult } from "@/lib/referrals/tier";
 import { cn } from "@/lib/utils";
@@ -60,7 +60,8 @@ export type PartnersData = {
   demo: boolean;
 };
 
-type FindState = "working" | "none" | "error";
+/** "nosite": no website on file (or found) to read, so there was nothing to look in. */
+type FindState = "working" | "none" | "nosite" | "error";
 
 /** Bulk Find emails and Draft emails work through at most this many partners per click. */
 export const BULK_MAX = 10;
@@ -131,6 +132,8 @@ export function PartnersTab({
   const [drafting, setDrafting] = useState<Set<string>>(new Set());
   const [finding, setFinding] = useState<Record<string, FindState>>({});
   const [dncFor, setDncFor] = useState<string | null>(null);
+  // "Log a referral" asks first, the same as dropping a card on the Board's Referring column.
+  const [referFor, setReferFor] = useState<string | null>(null);
   const [bulk, setBulk] = useState<string | null>(null);
   const [announce, setAnnounce] = useState("");
 
@@ -174,14 +177,26 @@ export function PartnersTab({
     const card = byId.get(id);
     if (!card || card.stage === stage) return;
     setCards((all) => all.map((c) => (c.id === id ? { ...c, stage } : c)));
-    setAnnounce(`Moved ${card.name} to ${STAGE_LABEL[stage]}.`);
+    setAnnounce(`Moved ${card.name} to ${COLUMN_LABEL[columnFor({ stage }, contacts[id] ?? [])]}.`);
     try {
       await postJson(`/api/referrals/${id}/stage`, { stage });
       onChanged();
     } catch {
       setCards((all) => all.map((c) => (c.id === id ? { ...c, stage: card.stage } : c)));
-      say(`Couldn't move ${card.name}. It's back in ${STAGE_LABEL[card.stage]}.`, "error");
+      say(`Couldn't move ${card.name}. It's back in ${COLUMN_LABEL[columnFor(card, contacts[id] ?? [])]}.`, "error");
     }
+  }
+
+  /** A move picked by column (More › Move stage, the panel's Move to): the Board's rules. */
+  function moveTo(id: string, to: BoardColumn) {
+    const card = byId.get(id);
+    if (!card) return;
+    const m = boardMove(columnFor(card, contacts[id] ?? []), to);
+    if (m.do === "stage") void move(id, m.stage);
+    else if (m.do === "log_referral") setReferFor(id);
+    else if (m.do === "explain")
+      say(`${card.name} is in Referring because you logged a referral from them. To move them, delete that referral in their contact log first.`, "info");
+    else if (m.do === "refuse") say(`${card.name} is in Not a fit, so no referral is logged. Move them back to Found first if that changed.`, "info");
   }
 
   /** Muse writes it; it waits in Approvals. Returns false when it didn't work. */
@@ -210,7 +225,10 @@ export function PartnersTab({
   async function findEmail(card: ReferralSource, opts: { quiet?: boolean } = {}): Promise<"found" | "none" | { error: string }> {
     setFinding((f) => ({ ...f, [card.id]: "working" }));
     try {
-      const d = await postJson<{ email: string | null; evidence?: Evidence; card?: ReferralSource; notes?: string[] }>(`/api/referrals/${card.id}/find-email`, {});
+      const d = await postJson<{ email: string | null; website?: string | null; evidence?: Evidence; card?: ReferralSource; notes?: string[]; unavailable?: string[] }>(
+        `/api/referrals/${card.id}/find-email`,
+        {},
+      );
       if (d.card && d.evidence) updated(d.card, d.evidence);
       if (d.email) {
         setFinding((f) => {
@@ -221,8 +239,14 @@ export function PartnersTab({
         if (!opts.quiet) say(`Found ${d.email} on ${card.name}'s website.`);
         return "found";
       }
+      const down = d.unavailable?.length ? ` ${d.unavailable.join(" and ")} didn't answer this time.` : "";
+      if (!d.website) {
+        setFinding((f) => ({ ...f, [card.id]: "nosite" }));
+        if (!opts.quiet) say(`No website on file to check for ${card.name}. Add their website, then try Find email again.${down}`, "info");
+        return "none";
+      }
       setFinding((f) => ({ ...f, [card.id]: "none" }));
-      if (!opts.quiet) say(`No public email on ${card.name}'s website.${d.notes?.length ? ` ${d.notes.join(" ")}` : ""}`, "info");
+      if (!opts.quiet) say(`No public email on ${card.name}'s website.${d.notes?.length ? ` ${d.notes.join(" ")}` : ""}${down}`, "info");
       return "none";
     } catch (err) {
       setFinding((f) => ({ ...f, [card.id]: "error" }));
@@ -246,7 +270,7 @@ export function PartnersTab({
   async function logReferral(card: ReferralSource) {
     try {
       const view = await postJson<CardView>(`/api/referrals/${card.id}/contacts`, { kind: "referred", happened_on: localToday() });
-      logged(view, `Logged that ${card.name} referred someone today. ${REFERRED_NOTE}`);
+      logged(view, `Logged that ${card.name} referred someone today. They're in ${COLUMN_LABEL[columnFor(view.card, view.contacts)]} now. ${REFERRED_NOTE}`);
     } catch (err) {
       say(err instanceof Error ? err.message : "Couldn't log that.", "error");
     }
@@ -322,10 +346,12 @@ export function PartnersTab({
   const openCard = open ? byId.get(open.id) ?? null : null;
   const scriptCard = scriptFor ? byId.get(scriptFor) ?? null : null;
   const dncCard = dncFor ? byId.get(dncFor) ?? null : null;
+  const referCard = referFor ? byId.get(referFor) ?? null : null;
 
   const actions = (c: ReferralSource) => (
     <RowActions
       card={c}
+      column={columnFor(c, contacts[c.id] ?? [])}
       email={emails[c.id]}
       drafting={drafting.has(c.id)}
       canDraft={canDraftRow(c)}
@@ -333,15 +359,15 @@ export function PartnersTab({
       onCopy={() => copyEmail(c)}
       onDraft={() => draft(c, { nudge: Boolean(cold[c.id]) && c.stage !== "found" && c.stage !== "follow_up" })}
       onScript={() => setScriptFor(c.id)}
-      onReferral={() => logReferral(c)}
+      onReferral={() => setReferFor(c.id)}
       onDebrief={() => onOpenChange({ id: c.id, debrief: true })}
       onPlan={() => onPlanMeeting(c.id)}
-      onMove={(s) => move(c.id, s)}
+      onMove={(col) => moveTo(c.id, col)}
       onDnc={() => setDncFor(c.id)}
     />
   );
   const emailCell = (r: PartnerRow) => (
-    <EmailCell row={r} state={finding[r.card.id]} onFind={() => findEmail(r.card)} />
+    <EmailCell row={r} state={finding[r.card.id]} onFind={() => findEmail(r.card)} onAddWebsite={() => onOpenChange({ id: r.card.id, debrief: false })} />
   );
 
   return (
@@ -460,7 +486,7 @@ export function PartnersTab({
                     <td className="max-w-[11rem] px-2 py-2 align-middle">{emailCell(r)}</td>
                     <td className="px-2 py-2 align-middle whitespace-nowrap">{r.card.phone ?? <span className="text-[var(--fg-muted)]">None</span>}</td>
                     <td className="px-2 py-2 align-middle whitespace-nowrap">
-                      <StageLabel stage={r.card.stage} cold={Boolean(cold[r.card.id])} />
+                      <StageLabel column={r.column} cold={Boolean(cold[r.card.id])} />
                     </td>
                     <td className="px-2 py-2 align-middle whitespace-nowrap text-[var(--fg-muted)]">{dayLabel(r.lastContact, data.today)}</td>
                     <td className="py-1 pr-1 align-middle">{actions(r.card)}</td>
@@ -489,7 +515,7 @@ export function PartnersTab({
                   <dd>{r.card.phone ?? "None"}</dd>
                   <dt className="text-[var(--fg-muted)]">Stage</dt>
                   <dd>
-                    <StageLabel stage={r.card.stage} cold={Boolean(cold[r.card.id])} />
+                    <StageLabel column={r.column} cold={Boolean(cold[r.card.id])} />
                   </dd>
                   <dt className="text-[var(--fg-muted)]">Last contact</dt>
                   <dd>{dayLabel(r.lastContact, data.today)}</dd>
@@ -518,7 +544,7 @@ export function PartnersTab({
         drafting={openCard ? drafting.has(openCard.id) : false}
         debrief={open?.debrief ?? false}
         onClose={() => onOpenChange(null)}
-        onMove={(s) => openCard && move(openCard.id, s)}
+        onMove={(col) => openCard && moveTo(openCard.id, col)}
         onDraft={(nudge) => openCard && draft(openCard, { nudge })}
         onUpdate={updated}
         onLogged={logged}
@@ -537,6 +563,16 @@ export function PartnersTab({
         onClose={() => setScriptFor(null)}
         onLogged={logged}
         onDraft={(c) => draft(c)}
+      />
+      <ConfirmDialog
+        open={Boolean(referCard)}
+        onOpenChange={(next) => !next && setReferFor(null)}
+        title={referCard ? `Log a referral from ${referCard.name}?` : "Log a referral?"}
+        description={`This logs that they referred someone to you today, and moves them to Referring. ${REFERRED_NOTE}`}
+        confirmLabel="Log the referral"
+        onConfirm={async () => {
+          if (referCard) await logReferral(referCard);
+        }}
       />
       <ConfirmDialog
         open={Boolean(dncCard)}
@@ -576,16 +612,16 @@ function NameButton({ row, onOpen }: { row: PartnerRow; onOpen: () => void }) {
   );
 }
 
-function StageLabel({ stage, cold }: { stage: Stage; cold: boolean }) {
+function StageLabel({ column, cold }: { column: BoardColumn; cold: boolean }) {
   return (
     <span className="inline-flex items-center gap-1.5">
-      <span className="inline-flex h-6 items-center rounded-[6px] border border-[var(--line)] px-2 text-small font-medium">{STAGE_LABEL[stage]}</span>
+      <span className="inline-flex h-6 items-center rounded-[6px] border border-[var(--line)] px-2 text-small font-medium">{COLUMN_LABEL[column]}</span>
       {cold && <span className="text-small font-medium text-[var(--status-pending-fg)]">Going cold</span>}
     </span>
   );
 }
 
-function EmailCell({ row, state, onFind }: { row: PartnerRow; state: FindState | undefined; onFind: () => void }) {
+function EmailCell({ row, state, onFind, onAddWebsite }: { row: PartnerRow; state: FindState | undefined; onFind: () => void; onAddWebsite: () => void }) {
   const { card, email } = row;
   if (email) return <span className="block truncate select-all" title={email}>{email}</span>;
   if (card.sensitive) return <span className="text-[var(--fg-muted)]">Public line only</span>;
@@ -594,10 +630,24 @@ function EmailCell({ row, state, onFind }: { row: PartnerRow; state: FindState |
     return (
       <span role="status" className="inline-flex items-center gap-1.5 text-[var(--fg-muted)]">
         <Loader2 aria-hidden size={14} className="animate-spin motion-reduce:animate-none" />
-        Looking on their website…
+        Checking their website and public lists…
       </span>
     );
   if (state === "none") return <span className="text-[var(--fg-muted)]">No email found</span>;
+  if (state === "nosite")
+    return (
+      <span className="inline-flex flex-wrap items-center gap-x-2 text-[var(--fg-muted)]">
+        No website on file to check
+        <button
+          type="button"
+          onClick={onAddWebsite}
+          aria-label={`Add website for ${card.name}`}
+          className="inline-flex min-h-touch items-center px-1 font-medium text-[var(--link)] underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] focus-visible:outline-solid"
+        >
+          Add website
+        </button>
+      </span>
+    );
   return (
     <button
       type="button"
@@ -613,6 +663,7 @@ function EmailCell({ row, state, onFind }: { row: PartnerRow; state: FindState |
 
 function RowActions({
   card,
+  column,
   email,
   drafting,
   canDraft,
@@ -627,6 +678,7 @@ function RowActions({
   onDnc,
 }: {
   card: ReferralSource;
+  column: BoardColumn;
   email: string | null;
   drafting: boolean;
   canDraft: boolean;
@@ -638,7 +690,7 @@ function RowActions({
   onReferral: () => void;
   onDebrief: () => void;
   onPlan: () => void;
-  onMove: (s: Stage) => void;
+  onMove: (column: BoardColumn) => void;
   onDnc: () => void;
 }) {
   const out = card.stage === "not_a_fit";
@@ -654,12 +706,12 @@ function RowActions({
       />
       <IconButton label={`Call script for ${card.name}`} icon={<Phone aria-hidden size={16} />} onClick={onScript} disabled={out} reason="Set aside" />
       <IconButton label={`Log a referral from ${card.name}`} icon={<HandHeart aria-hidden size={16} />} onClick={onReferral} disabled={out} reason="Set aside" />
-      <MoreMenu card={card} onDebrief={onDebrief} onPlan={onPlan} onMove={onMove} onDnc={onDnc} />
+      <MoreMenu card={card} column={column} onDebrief={onDebrief} onPlan={onPlan} onMove={onMove} onDnc={onDnc} />
     </div>
   );
 }
 
-function MoreMenu({ card, onDebrief, onPlan, onMove, onDnc }: { card: ReferralSource; onDebrief: () => void; onPlan: () => void; onMove: (s: Stage) => void; onDnc: () => void }): ReactNode {
+function MoreMenu({ card, column, onDebrief, onPlan, onMove, onDnc }: { card: ReferralSource; column: BoardColumn; onDebrief: () => void; onPlan: () => void; onMove: (column: BoardColumn) => void; onDnc: () => void }): ReactNode {
   const out = card.stage === "not_a_fit";
   const label = `More for ${card.name}`;
   // Controlled, so picking a stage in the submenu closes the whole menu.
@@ -690,15 +742,15 @@ function MoreMenu({ card, onDebrief, onPlan, onMove, onDnc }: { card: ReferralSo
                 <Menu.Positioner sideOffset={4} className="z-50 outline-none">
                   <Menu.Popup className={MENU_POPUP}>
                     <Menu.RadioGroup
-                      value={card.stage}
+                      value={column}
                       onValueChange={(v) => {
                         setOpen(false);
-                        onMove(v as Stage);
+                        onMove(v as BoardColumn);
                       }}
                     >
-                      {STAGES.map((s) => (
+                      {BOARD_COLUMNS.map((s) => (
                         <Menu.RadioItem key={s} value={s} closeOnClick className={MENU_ITEM}>
-                          {STAGE_LABEL[s]}
+                          {COLUMN_LABEL[s]}
                           <Menu.RadioItemIndicator className="text-small text-[var(--fg-muted)]">Now</Menu.RadioItemIndicator>
                         </Menu.RadioItem>
                       ))}

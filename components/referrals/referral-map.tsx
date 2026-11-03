@@ -217,7 +217,7 @@ export function ReferralMap({
     if (!m || !ready) return;
     m.setFilter("pin-selected", ["==", ["get", "npi"], selected ?? ""]);
     const p = selected ? pins.find((x) => x.npi === selected) : null;
-    if (p) m.easeTo({ center: [p.lon, p.lat], zoom: Math.max(m.getZoom(), 16.5), duration: reduced() ? 0 : 500 });
+    if (p) m.easeTo({ center: [p.lon, p.lat], zoom: Math.max(m.getZoom(), 13), duration: reduced() ? 0 : 500 });
   }, [selected, ready, pins]);
 
   return (

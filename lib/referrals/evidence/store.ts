@@ -133,6 +133,32 @@ export async function evidenceFor(
 }
 
 /** The email she typed for a card (null clears it, and the card falls back to what Aeon found). */
+/** A practice website she typed ("https://example.com"), so Find email has a page to read. Null clears hers. */
+export async function setTypedWebsite(sourceId: string, website: string | null, sql: postgres.Sql = db()): Promise<Evidence> {
+  if (website === null) {
+    await sql`delete from practice_os.referral_facts where source_id = ${sourceId} and origin = 'clinician' and field = 'website'`;
+    await sql`update practice_os.referral_sources set website = null where id = ${sourceId}`;
+    return summarize(sourceId, sql);
+  }
+  await sql`update practice_os.referral_sources set website = ${website}, updated_at = now() where id = ${sourceId}`;
+  const fact: Fact = { field: "website", value: website, origin: "clinician", method: "manual", checkedAt: new Date().toISOString(), detail: { label: "you typed it" } };
+  const others = ((await factsFor([sourceId], sql)).get(sourceId) ?? []).filter((f) => f.origin === "clinician" && f.field !== "website");
+  return saveFacts(sourceId, [...others, fact], { checked: ["clinician"], sql });
+}
+
+/** "example.com/about" or "https://Example.com" to "https://example.com/about"; null when it isn't a web address. */
+export function cleanWebsite(text: string): string | null {
+  const t = text.trim();
+  if (!t || t.length > 300 || /\s/.test(t)) return null;
+  try {
+    const u = new URL(/^https?:\/\//i.test(t) ? t : `https://${t}`);
+    if (!["http:", "https:"].includes(u.protocol) || !u.hostname.includes(".") || u.username || u.password) return null;
+    return u.toString().replace(/\/$/, "");
+  } catch {
+    return null;
+  }
+}
+
 export async function setTypedEmail(sourceId: string, email: string | null, sql: postgres.Sql = db()): Promise<Evidence> {
   if (email === null) {
     await sql`delete from practice_os.referral_facts where source_id = ${sourceId} and origin = 'clinician' and field = 'email'`;

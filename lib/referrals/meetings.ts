@@ -18,6 +18,7 @@ import { db } from "../db";
 import type { guard } from "../aeon/guard";
 import { localDate, zonedTime } from "../frontdesk/calendar/zone";
 import { checkNote, isSuppressed, suppressedList } from "./contacts";
+import { canMarkDone, NOT_YET } from "./meeting-rules";
 import type { ReferralSource } from "./store";
 
 export const MEETING_KINDS = ["coffee", "call", "meeting", "lunch_talk", "other"] as const;
@@ -130,9 +131,12 @@ async function refuseClash(tx: postgres.TransactionSql, starts: Date, ends: Date
 
 /** Why Aeon may not plan a meeting with this card (do-not-contact, Not a fit), or null. */
 export async function meetingBlocked(
-  source: Pick<ReferralSource, "name" | "npi" | "stage"> & Partial<Pick<ReferralSource, "organization" | "npi_type" | "address" | "city" | "zip">>,
-  sql: postgres.Sql = db(),
+  source: Pick<ReferralSource, "name" | "npi" | "stage"> & Partial<Pick<ReferralSource, "organization" | "npi_type" | "address" | "city" | "zip" | "sensitive">>,
+  sql?: postgres.Sql,
 ): Promise<string | null> {
+  // A sensitive (DV/SA) organization: no meeting at a place, ever (checked first, with no database read).
+  if (source.sensitive) return `${source.name} is an organization Aeon keeps private, so I won't plan a meeting with them. Reach them through their public line only.`;
+  sql ??= db();
   if (isSuppressed(source, await suppressedList(sql))) return `${source.name} is on your do-not-contact list, so I won't plan a meeting with them.`;
   if (source.stage === "not_a_fit") return `${source.name} is in Not a fit, so I won't plan a meeting with them. Move the card back first if that changed.`;
   return null;
@@ -238,6 +242,8 @@ export async function updateMeeting(id: string, input: UpdateInput, sql: postgre
   const moved = input.startsAt !== undefined || input.endsAt !== undefined;
   // Moving a meeting needs a time still ahead (marking a past one done or canceled is fine).
   if (moved && status === "planned" && starts.getTime() <= (now ?? new Date()).getTime()) throw new MeetingError(PAST_TIME);
+  // Done means it happened: a meeting still ahead can't be marked done.
+  if (input.status === "done" && had.status !== "done" && !canMarkDone(starts, now)) throw new MeetingError(NOT_YET);
   const location = input.location !== undefined ? cleanText(input.location, 200, "The place") : had.location;
   const notes = input.notes !== undefined ? cleanText(input.notes, 500, "The note") : had.notes;
   if (input.location !== undefined) await screenNotes(location, check, input.by);

@@ -10,6 +10,7 @@ import {
   columnFor,
   countedBy,
   dayHeading,
+  dayIn,
   DEFAULT_BOARD_FILTERS,
   filterBoard,
   filterTimeline,
@@ -22,6 +23,9 @@ import {
   shortStep,
   timelineItems,
 } from "../lib/referrals/crm-views";
+import { canMarkDone } from "../lib/referrals/meeting-rules";
+import { meetingBlocked } from "../lib/referrals/meetings";
+import { coldNudges } from "../lib/referrals/nurture";
 import { partnerRows } from "../lib/referrals/partners";
 import type { ReferralSource } from "../lib/referrals/store";
 import type { TierResult } from "../lib/referrals/tier";
@@ -115,7 +119,13 @@ describe("board columns", () => {
     expect(boardMove("met", "not_a_fit")).toEqual({ do: "stage", stage: "not_a_fit" });
     expect(boardMove("met", "referring")).toEqual({ do: "log_referral" });
     expect(boardMove("referring", "met")).toEqual({ do: "explain" });
-    expect(boardMove("referring", "found")).toEqual({ do: "stage", stage: "found" });
+    // Every move out of Referring is explained, never done by a drag.
+    expect(boardMove("referring", "found")).toEqual({ do: "explain" });
+    expect(boardMove("referring", "not_a_fit")).toEqual({ do: "explain" });
+    expect(boardMove("referring", "reached_out")).toEqual({ do: "explain" });
+    // A Not a fit card dropped on Referring is refused: no referral is logged.
+    expect(boardMove("not_a_fit", "referring")).toEqual({ do: "refuse" });
+    expect(boardMove("found", "referring")).toEqual({ do: "log_referral" });
     expect(boardMove("met", "met")).toEqual({ do: "none" });
   });
 
@@ -166,7 +176,7 @@ describe("timeline", () => {
     expect(items.some((i) => i.id === "m-m2")).toBe(false);
     const planned = items.find((i) => i.id === "m-m1")!;
     expect(planned).toMatchObject({ kind: "meeting", day: addDays(TODAY, 2), planned: true, note: "At [Sample] Cafe" });
-    expect(planned.label).toMatch(/^Coffee at 9:00\sAM \(planned\)$/);
+    expect(planned.label).toBe("Coffee at 9:00 am (planned)");
     expect(items.filter((i) => i.kind === "referral").every((i) => i.note === null)).toBe(true);
   });
 
@@ -190,6 +200,53 @@ describe("timeline", () => {
     expect(dayHeading(addDays(TODAY, -1), TODAY)).toBe("Yesterday");
     expect(dayHeading("2026-10-30", TODAY)).toBe("Friday, Oct 30");
     expect(dayHeading("2025-10-30", TODAY)).toBe("Thursday, Oct 30, 2025");
-    expect(meetingRange(TODAY, 54, 7)).toEqual({ from: "2026-09-10T00:00:00Z", to: "2026-11-10T23:59:59Z" });
+    // Day starts in her zone: Chicago is UTC-5 in September (CDT) and UTC-6 after Nov 1 (CST).
+    expect(meetingRange(TODAY, 54, 7, "America/Chicago")).toEqual({ from: "2026-09-10T05:00:00.000Z", to: "2026-11-11T06:00:00.000Z" });
+    expect(meetingRange(TODAY, 0, 0, "America/Los_Angeles")).toEqual({ from: "2026-11-03T08:00:00.000Z", to: "2026-11-04T08:00:00.000Z" });
+    expect(meetingRange(TODAY, 0, 0, "UTC")).toEqual({ from: "2026-11-03T00:00:00.000Z", to: "2026-11-04T00:00:00.000Z" });
+  });
+});
+
+describe("final review fixes", () => {
+  it("dayIn reads database and ISO times in her zone, and never shows Invalid Date", () => {
+    expect(dayIn("America/Chicago", "2026-11-03T03:00:00Z")).toBe("2026-11-02");
+    expect(dayIn("America/Chicago", "2026-11-03 15:00:00+00")).toBe("2026-11-03");
+    expect(dayIn("America/Chicago", "not a date")).toBe("");
+    expect(dayIn("America/Chicago", null)).toBe("");
+    // An approval with an unreadable date is left out of Latest activity, not shown as "Invalid Date".
+    const items = latestActivity([], {}, [{ id: "x", kind: "referral_letter", title: "t", status: "done", created_at: "garbage", decided_at: null }], "America/Chicago");
+    expect(items).toEqual([]);
+  });
+
+  it("going-cold nudges never include a sensitive card", () => {
+    const old = (id: string, sensitive: boolean) => ({ id, name: `[Sample] ${id}`, email: null, stage: "connected" as const, last_contacted_at: "2025-01-01T12:00:00Z", sensitive });
+    const nudges = coldNudges([old("shelter", true), old("clinic", false)], {}, { shelter: { tier: "first" }, clinic: { tier: "first" } }, TODAY, "America/Chicago");
+    expect(nudges.map((n) => n.id)).toEqual(["clinic"]);
+  });
+
+  it("the timeline shows letters (waiting, ready) and stage moves, in the Board's words", () => {
+    const items = timelineItems(cards, {}, [], {
+      timeZone: "America/Chicago",
+      approvals: [
+        { id: "l1", kind: "referral_letter", title: "t", status: "pending", created_at: "2026-11-02T15:00:00Z", decided_at: null, source_id: "a" },
+        { id: "l2", kind: "referral_letter", title: "t", status: "done", created_at: "2026-11-01T15:00:00Z", decided_at: "2026-11-02T16:00:00Z", source_id: "b", sent: false },
+        { id: "l3", kind: "referral_letter", title: "t", status: "pending", created_at: "2026-11-02T15:00:00Z", decided_at: null, source_id: "gone" },
+      ],
+      moves: [{ id: "9", source_id: "b", from: "found", to: "contacted", at: "2026-11-02T18:00:00Z" }],
+    });
+    expect(filterTimeline(items, "letter", "all").map((i) => i.label)).toEqual(["Letter drafted: waiting for your approval", "Letter approved: ready to send"]);
+    expect(filterTimeline(items, "move", "all").map((i) => [i.name, i.label, i.day])).toEqual([["[Sample] Dr. Ada Example", "Moved to Reached out", "2026-11-02"]]);
+  });
+
+  it("Mark done only once a meeting has started", () => {
+    const now = new Date("2026-11-03T15:00:00Z");
+    expect(canMarkDone("2026-11-03T14:00:00Z", now)).toBe(true);
+    expect(canMarkDone("2026-11-05T15:00:00Z", now)).toBe(false);
+    expect(canMarkDone("nonsense", now)).toBe(false);
+  });
+
+  it("no meeting is planned with a sensitive card (checked before any database read)", async () => {
+    const said = await meetingBlocked({ name: "[Sample] Safe Harbor", npi: null, stage: "found", sensitive: true }, {} as never);
+    expect(said).toMatch(/public line only/);
   });
 });

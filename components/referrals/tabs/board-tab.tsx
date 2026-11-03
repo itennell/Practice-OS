@@ -36,7 +36,7 @@ import {
 import type { Evidence } from "@/lib/referrals/evidence/merge";
 import { coldCards, refersTo } from "@/lib/referrals/nurture";
 import { DISTANCE_OPTIONS, EMAIL_OPTIONS, distanceLabel, kindOptions, letterIsWaiting, nextStep, partnerRows, type PartnerRow } from "@/lib/referrals/partners";
-import { STAGE_LABEL, type Stage } from "@/lib/referrals/stages";
+import type { Stage } from "@/lib/referrals/stages";
 import type { ReferralSource } from "@/lib/referrals/store";
 import { cn } from "@/lib/utils";
 import type { CardView } from "../contact-log";
@@ -49,7 +49,7 @@ const MENU_ITEM =
 const CHIP =
   "inline-flex h-touch items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--line)] px-3 text-small font-medium whitespace-nowrap hover:border-[var(--fg-muted)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] focus-visible:outline-solid disabled:opacity-60";
 
-type FindState = "working" | "none" | "error";
+type FindState = "working" | "none" | "nosite" | "error";
 
 export function BoardTab({ data, onOpenPartner, onChanged }: CrmTabProps = {}) {
   const [cards, setCards] = useState(data?.cards ?? []);
@@ -78,6 +78,14 @@ export function BoardTab({ data, onOpenPartner, onChanged }: CrmTabProps = {}) {
     return view === "cold" ? f.filter((r) => cold[r.card.id]) : f;
   }, [rows, filters, today, view, cold]);
   const byId = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards]);
+  const [open, setOpenCols] = useState<Set<BoardColumn>>(new Set());
+  const byColumn = useMemo(() => {
+    const out = Object.fromEntries(BOARD_COLUMNS.map((c) => [c, [] as PartnerRow[]])) as Record<BoardColumn, PartnerRow[]>;
+    for (const r of shown) out[columnFor(r.card, contacts[r.card.id] ?? [])].push(r);
+    return out;
+  }, [shown, contacts]);
+  // What is really on screen: each column's first SHOW_FIRST, or all of it once opened.
+  const visible = BOARD_COLUMNS.reduce((n, c) => n + (open.has(c) ? byColumn[c].length : Math.min(byColumn[c].length, SHOW_FIRST)), 0);
 
   if (!data) {
     return (
@@ -109,7 +117,7 @@ export function BoardTab({ data, onOpenPartner, onChanged }: CrmTabProps = {}) {
       onChanged?.();
     } catch {
       setCards((all) => all.map((c) => (c.id === card.id ? { ...c, stage: card.stage } : c)));
-      say(`Couldn't move ${card.name}. It's back in ${STAGE_LABEL[card.stage]}.`, "error");
+      say(`Couldn't move ${card.name}. It's back in ${COLUMN_LABEL[columnFor(card, contacts[card.id] ?? [])]}.`, "error");
     }
   }
 
@@ -120,7 +128,9 @@ export function BoardTab({ data, onOpenPartner, onChanged }: CrmTabProps = {}) {
     const m = boardMove(from, to);
     if (m.do === "stage") void setStage(card, m.stage, to);
     else if (m.do === "log_referral") setConfirmFor(id);
-    else if (m.do === "explain") say(`${card.name} is in Referring because you logged a referral from them. To undo it, delete that entry in their contact log.`, "info");
+    else if (m.do === "explain")
+      say(`${card.name} is in Referring because you logged a referral from them. To move them, open their card: delete that referral in the contact log, or use Move to there.`, "info");
+    else if (m.do === "refuse") say(`${card.name} is in Not a fit, so no referral is logged. Move them back to Found first if that changed.`, "info");
   }
 
   async function logReferral(id: string) {
@@ -128,7 +138,9 @@ export function BoardTab({ data, onOpenPartner, onChanged }: CrmTabProps = {}) {
     if (!card) return;
     try {
       const view = await postJson<CardView>(`/api/referrals/${id}/contacts`, { kind: "referred", happened_on: localToday() });
-      logged(view, `Logged that ${card.name} referred someone today. They're in Referring now. ${REFERRED_NOTE}`);
+      // Say where the card really is now (the server decides the stage).
+      const now = COLUMN_LABEL[columnFor(view.card, view.contacts)];
+      logged(view, `Logged that ${card.name} referred someone today. They're in ${now} now. ${REFERRED_NOTE}`);
     } catch (err) {
       say(err instanceof Error ? err.message : "Couldn't log that.", "error");
     }
@@ -137,7 +149,11 @@ export function BoardTab({ data, onOpenPartner, onChanged }: CrmTabProps = {}) {
   async function findEmail(card: ReferralSource) {
     setFinding((f) => ({ ...f, [card.id]: "working" }));
     try {
-      const d = await postJson<{ email: string | null; evidence?: Evidence; card?: ReferralSource; notes?: string[] }>(`/api/referrals/${card.id}/find-email`, {});
+      const d = await postJson<{ email: string | null; website?: string | null; evidence?: Evidence; card?: ReferralSource; notes?: string[]; unavailable?: string[] }>(
+        `/api/referrals/${card.id}/find-email`,
+        {},
+      );
+      const down = d.unavailable?.length ? ` ${d.unavailable.join(" and ")} didn't answer this time.` : "";
       if (d.card && d.evidence) {
         setCards((all) => all.map((c) => (c.id === card.id ? { ...c, ...d.card, stage: c.stage } : c)));
         setEvidence((all) => ({ ...all, [card.id]: d.evidence! }));
@@ -150,9 +166,12 @@ export function BoardTab({ data, onOpenPartner, onChanged }: CrmTabProps = {}) {
         });
         say(`Found ${d.email} on ${card.name}'s website.`);
         onChanged?.();
+      } else if (!d.website) {
+        setFinding((f) => ({ ...f, [card.id]: "nosite" }));
+        say(`No website on file to check for ${card.name}. Open their card to add it, then try again.${down}`, "info");
       } else {
         setFinding((f) => ({ ...f, [card.id]: "none" }));
-        say(`No public email on ${card.name}'s website.${d.notes?.length ? ` ${d.notes.join(" ")}` : ""}`, "info");
+        say(`No public email on ${card.name}'s website.${d.notes?.length ? ` ${d.notes.join(" ")}` : ""}${down}`, "info");
       }
     } catch (err) {
       setFinding((f) => ({ ...f, [card.id]: "error" }));
@@ -225,7 +244,14 @@ export function BoardTab({ data, onOpenPartner, onChanged }: CrmTabProps = {}) {
         >
           <div className="grid snap-x snap-mandatory auto-cols-[minmax(16rem,82%)] grid-flow-col gap-3 sm:auto-cols-[minmax(15rem,1fr)] lg:snap-none xl:auto-cols-[minmax(12.5rem,1fr)]">
             {BOARD_COLUMNS.map((col) => (
-              <Column key={col} col={col} rows={shown.filter((r) => columnFor(r.card, contacts[r.card.id] ?? []) === col)} onDropCard={(id) => move(id, col)}>
+              <Column
+                key={col}
+                col={col}
+                rows={byColumn[col]}
+                all={open.has(col)}
+                onToggleAll={() => setOpenCols((o) => (o.has(col) ? new Set([...o].filter((c) => c !== col)) : new Set([...o, col])))}
+                onDropCard={(id) => move(id, col)}
+              >
                 {(r) => (
                   <BoardCard
                     key={r.card.id}
@@ -245,7 +271,8 @@ export function BoardTab({ data, onOpenPartner, onChanged }: CrmTabProps = {}) {
         </div>
       )}
       <p className="text-small text-[var(--fg-muted)]">
-        {shown.length} of {rows.length} {rows.length === 1 ? "partner" : "partners"} shown. Nothing is ever offered in return for a referral.
+        {view === "refer_out" ? `${referOutCards.length} of ${rows.length}` : `${visible} of ${rows.length}`} {rows.length === 1 ? "partner" : "partners"} shown
+        {view !== "refer_out" && visible < shown.length ? ` (${shown.length - visible} more behind Show all)` : ""}. Nothing is ever offered in return for a referral.
       </p>
 
       <ConfirmDialog
@@ -262,9 +289,23 @@ export function BoardTab({ data, onOpenPartner, onChanged }: CrmTabProps = {}) {
   );
 }
 
-function Column({ col, rows, children, onDropCard }: { col: BoardColumn; rows: PartnerRow[]; children: (r: PartnerRow) => React.ReactNode; onDropCard: (id: string) => void }) {
+function Column({
+  col,
+  rows,
+  all,
+  onToggleAll,
+  children,
+  onDropCard,
+}: {
+  col: BoardColumn;
+  rows: PartnerRow[];
+  /** Every card shown, not just the first SHOW_FIRST (kept by the board, so its count is right). */
+  all: boolean;
+  onToggleAll: () => void;
+  children: (r: PartnerRow) => React.ReactNode;
+  onDropCard: (id: string) => void;
+}) {
   const [over, setOver] = useState(false);
-  const [all, setAll] = useState(false);
   const headingId = `board-col-${col}`;
   return (
     <section
@@ -299,7 +340,7 @@ function Column({ col, rows, children, onDropCard }: { col: BoardColumn; rows: P
         <ul className="flex flex-col gap-2">{(all ? rows : rows.slice(0, SHOW_FIRST)).map(children)}</ul>
       )}
       {rows.length > SHOW_FIRST && (
-        <Button variant="quiet" onClick={() => setAll((a) => !a)} className="h-touch">
+        <Button variant="quiet" onClick={onToggleAll} className="h-touch">
           {all ? "Show fewer" : `Show all ${rows.length}`}
         </Button>
       )}
@@ -360,10 +401,14 @@ function BoardCard({
             (finding === "working" ? (
               <span role="status" className="inline-flex h-touch items-center gap-1.5 text-small text-[var(--fg-muted)]">
                 <Loader2 aria-hidden size={14} className="animate-spin motion-reduce:animate-none" />
-                Looking…
+                Checking their website…
               </span>
             ) : finding === "none" ? (
               <span className="text-small text-[var(--fg-muted)]">No email found</span>
+            ) : finding === "nosite" ? (
+              <button type="button" onClick={onOpen} aria-label={`Add website for ${card.name}`} className={CHIP}>
+                No website: add it
+              </button>
             ) : (
               <button type="button" onClick={onFindEmail} aria-label={`Find email for ${card.name}`} className={CHIP}>
                 <Search aria-hidden size={14} />

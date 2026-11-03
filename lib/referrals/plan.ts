@@ -163,6 +163,8 @@ export async function outreachPlan(sql: postgres.Sql = db(), max = NEW_PER_WEEK,
   };
   const fresh = cards.filter((c) => {
     if (isSuppressed(c, blocked)) return false;
+    // A sensitive (DV/SA) organization is reached through its public line only: never a "reach out" letter.
+    if (c.sensitive) return skipCard(c.id, "a sensitive agency: reach them through their public line only");
     if (due.has(c.id)) return skipCard(c.id, "a follow-up is due (listed under follow-ups)");
     if (c.stage !== "found") return skipCard(c.id, `already past a first letter (${STAGE_LABEL[c.stage]})`);
     if (letterWaiting(letters[c.id])) {

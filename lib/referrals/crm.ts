@@ -10,6 +10,7 @@ import { db } from "../db";
 import { loadMediaFacts } from "../media/facts";
 import { listPayerApplications, WAITING } from "../payers/store";
 import type { ScriptFacts } from "./call-script";
+import type { ApprovalBits, MoveBits } from "./crm-views";
 import { nicheWords } from "./outreach";
 import { outreachPlan } from "./plan";
 import { practiceFacts, type ReferralSource } from "./store";
@@ -36,6 +37,39 @@ export async function referralCounts(cards: Pick<ReferralSource, "stage">[], sql
   };
 }
 
+/**
+ * The newest referral approvals for Overview › Latest activity. Times are ISO instants in UTC
+ * ("2026-11-03T15:00:00Z") so every browser reads them; never Postgres's "2026-11-03 15:00:00+00".
+ */
+export async function recentReferralApprovals(sql: postgres.Sql = db(), limit = 8): Promise<ApprovalBits[]> {
+  const rows = await sql<ApprovalBits[]>`
+    select a.id, a.kind, a.title, a.status,
+           to_char(a.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as created_at,
+           to_char(a.decided_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as decided_at,
+           a.payload ->> 'referral_source_id' as source_id,
+           (a.status = 'done' and exists (
+             select 1 from practice_os.referral_contacts c
+              where c.source_id::text = a.payload ->> 'referral_source_id' and c.kind = 'sent_letter' and c.created_at >= a.decided_at)) as sent
+      from practice_os.approvals a
+     where a.kind like 'referral%'
+     order by coalesce(a.decided_at, a.created_at) desc
+     limit ${limit}`;
+  return [...rows];
+}
+
+/** Her stage moves from the audit log in the last `days` days, newest first (Meetings and notes). */
+export async function recentStageMoves(sql: postgres.Sql = db(), days = 62, limit = 300): Promise<MoveBits[]> {
+  const rows = await sql<MoveBits[]>`
+    select id::text as id, subject_id as source_id, details ->> 'from' as "from", details ->> 'to' as "to",
+           to_char(at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as at
+      from practice_os.audit_log
+     where action = 'referral_stage_moved' and subject_id is not null and details ->> 'to' is not null
+       and at > now() - make_interval(days => ${days})
+     order by at desc
+     limit ${limit}`;
+  return [...rows];
+}
+
 /** Her practice for the call script: her own settings and profile, nothing guessed. */
 export async function scriptFacts(): Promise<ScriptFacts> {
   const [media, payers, practice] = await Promise.all([
@@ -52,6 +86,7 @@ export async function scriptFacts(): Promise<ScriptFacts> {
     phone: media?.phone?.trim() || null,
     email: media?.email?.trim() || null,
     niche: nicheWords(practice.niche)?.words ?? null,
+    nicheId: nicheWords(practice.niche)?.id ?? null,
     whoSheHelps: practice.focus.map((f) => FOCUS_WORDS[f]),
     inNetwork,
     appliedPending: [...new Set(payers.filter((p) => WAITING.includes(p.status) && !inNetwork.includes(p.payer)).map((p) => p.payer))],

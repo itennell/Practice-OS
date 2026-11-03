@@ -35,24 +35,33 @@ type Overview = {
   approvals: ApprovalBits[];
 };
 
-const LINK = "rounded-[6px] text-small font-medium text-[var(--link)] underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] focus-visible:outline-solid";
+const LINK = "inline-flex min-h-touch items-center rounded-[6px] px-2 text-small font-medium text-[var(--link)] underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] focus-visible:outline-solid";
 
 export function OverviewTab({ data, onOpenPartner, onTab }: CrmTabProps = {}) {
   const [days, setDays] = useState<SourceWindow>("90");
   const [by, setBy] = useState<SourceGroup>("partner");
-  const [overview, setOverview] = useState<Overview | null>(null);
+  // null: still asking; "error": it didn't answer (she can try again).
+  const [overview, setOverview] = useState<Overview | "error" | null>(null);
   // null: still asking; false: the meetings calendar isn't there yet (404) or didn't answer.
   const [meetings, setMeetings] = useState<MeetingBits[] | false | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const today = data?.today ?? "";
+  const timeZone = data?.timeZone ?? "America/Chicago";
 
   useEffect(() => {
     if (!today) return;
     const ctl = new AbortController();
-    getJson<Overview>("/api/referrals/overview", ctl.signal).then((o) => !ctl.signal.aborted && setOverview(o ?? { follow_ups: [], reach_out: [], going_cold: [], approvals: [] }));
-    const { from, to } = meetingRange(today, 0, 7);
+    getJson<Overview>("/api/referrals/overview", ctl.signal).then((o) => !ctl.signal.aborted && setOverview(o ?? "error"));
+    const { from, to } = meetingRange(today, 0, 7, timeZone);
     getMeetings<MeetingBits>(from, to, ctl.signal).then((m) => !ctl.signal.aborted && setMeetings(m ? m.filter((x) => x.status !== "canceled") : false));
     return () => ctl.abort();
-  }, [today]);
+  }, [today, timeZone, attempt]);
+
+  function retry() {
+    setOverview(null);
+    setMeetings(null);
+    setAttempt((n) => n + 1);
+  }
 
   const cards = useMemo(() => data?.cards ?? [], [data]);
   const sources = useMemo(
@@ -61,7 +70,10 @@ export function OverviewTab({ data, onOpenPartner, onTab }: CrmTabProps = {}) {
   );
   const counted = useMemo(() => (data ? countedBy(data.contacts, Number(days), today) : { clinician: 0, aeon: 0 }), [data, days, today]);
   const letters = useMemo(() => (data ? letterCounts(data.letters, cards) : { waiting: 0, ready: 0 }), [data, cards]);
-  const activity = useMemo(() => (data ? latestActivity(cards, data.contacts, overview?.approvals ?? [], data.timeZone) : []), [cards, data, overview]);
+  const activity = useMemo(
+    () => (data ? latestActivity(cards, data.contacts, overview && overview !== "error" ? overview.approvals : [], data.timeZone) : []),
+    [cards, data, overview],
+  );
 
   if (!data) {
     return (
@@ -134,6 +146,8 @@ export function OverviewTab({ data, onOpenPartner, onTab }: CrmTabProps = {}) {
         <ListCard id="ov-week" label="This week">
           {overview === null ? (
             <li className="border-t border-[var(--line)] px-4 py-3 text-small text-[var(--fg-muted)]">Loading this week…</li>
+          ) : overview === "error" ? (
+            <LoadError what="this week" onRetry={retry} />
           ) : (
             <>
               {overview.follow_ups.map((f) => (
@@ -152,7 +166,7 @@ export function OverviewTab({ data, onOpenPartner, onTab }: CrmTabProps = {}) {
               <ListRow
                 icon={<Mail size={16} />}
                 title={letters.ready ? `${letters.ready} ${letters.ready === 1 ? "letter is" : "letters are"} ready to send` : "No letters ready to send"}
-                detail={letters.waiting ? `${letters.waiting} more waiting for your approval. Aeon never sends: you copy and send it yourself.` : "Approved letters wait here until you send them from your own email."}
+                detail={letters.waiting ? `${letters.waiting} waiting for your approval. Aeon never sends: you copy and send it yourself.` : "Approved letters wait here until you send them from your own email."}
                 end={letters.waiting ? <a href="/approvals" className={LINK}>Approvals</a> : undefined}
                 wrapEnd
               />
@@ -210,7 +224,9 @@ export function OverviewTab({ data, onOpenPartner, onTab }: CrmTabProps = {}) {
       </div>
 
       <ListCard id="ov-activity" label="Latest activity">
-        {activity.length === 0 ? (
+        {overview === "error" ? (
+          <LoadError what="the latest activity" onRetry={retry} />
+        ) : activity.length === 0 ? (
           <li className="border-t border-[var(--line)] px-4 py-3 text-small text-[var(--fg-muted)]">Nothing yet. Calls, letters, meetings and referrals you log show here.</li>
         ) : (
           activity.map((a) => (
@@ -226,6 +242,18 @@ export function OverviewTab({ data, onOpenPartner, onTab }: CrmTabProps = {}) {
         )}
       </ListCard>
     </div>
+  );
+}
+
+/** A list that didn't load: one plain line and Try again (never an empty state that looks like "nothing to do"). */
+function LoadError({ what, onRetry }: { what: string; onRetry: () => void }) {
+  return (
+    <li role="alert" className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--line)] px-4 py-3">
+      <span className="text-small">Couldn&rsquo;t load {what}. Try again.</span>
+      <Button variant="quiet" onClick={onRetry} className="h-touch px-4">
+        Try again
+      </Button>
+    </li>
   );
 }
 
