@@ -3,11 +3,12 @@
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Building2, MapPin, Phone, User } from "lucide-react";
+import { Building2, ChevronDown, MapPin, Phone, User } from "lucide-react";
 import { notify } from "@/components/shared/toaster";
 import { TextField } from "@/components/shared/settings-controls";
 import { Button, chipClass } from "@/components/ui";
 import type { AreaProvider, AreaResult } from "@/lib/referrals/area";
+import { groupByCategory } from "@/lib/referrals/categories";
 import { SPECIALTIES, type SpecialtyId } from "@/lib/referrals/nppes";
 import { TIER_LABEL, TIERS, milesLabel, type Tier } from "@/lib/referrals/tier";
 import { cn } from "@/lib/utils";
@@ -25,6 +26,9 @@ const ReferralMap = dynamic(() => import("./referral-map").then((m) => m.Referra
 const RADII = [1, 3, 5, 10] as const;
 export const HOME_ADDRESS = "Address may be a home address; call first";
 const SHOW_FIRST = 20;
+// The kinds of provider, grouped by the source catalog's categories.
+const GROUPS = groupByCategory(SPECIALTIES);
+
 const FOCUS = "outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] focus-visible:outline-solid";
 
 const TIER_HINT: Record<Tier, string> = {
@@ -230,6 +234,10 @@ export function AreaExplorer({
   const [area, setArea] = useState(defaultArea);
   const [radius, setRadius] = useState<(typeof RADII)[number]>(1);
   const [picked, setPicked] = useState<SpecialtyId[]>(initialSpecialties);
+  // Groups with something picked start open; the rest stay folded so the list fits a phone.
+  const [openGroups, setOpenGroups] = useState<Set<number>>(
+    () => new Set(GROUPS.filter((g) => g.items.some((s) => initialSpecialties.includes(s.id))).map((g) => g.category)),
+  );
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<AreaResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -384,21 +392,64 @@ export function AreaExplorer({
             ))}
           </div>
         </fieldset>
-        <fieldset className="flex flex-col gap-2">
-          <legend className="mb-2 text-small text-[var(--fg-muted)]">Who to look for</legend>
-          <div className="flex flex-wrap gap-2">
-            {SPECIALTIES.map((s) => {
-              const on = picked.includes(s.id);
+        <fieldset className="flex min-w-0 flex-col gap-2">
+          <legend className="sr-only">Who to look for</legend>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-small text-[var(--fg-muted)]" aria-hidden="true">
+              Who to look for
+            </p>
+            <div className="flex items-center gap-3">
+              <span className="text-small text-[var(--fg-muted)]" aria-live="polite">
+                {picked.length} picked
+              </span>
+              <Button type="button" variant="quiet" disabled={picked.length === 0} onClick={() => setPicked([])} className={FOCUS}>
+                Clear
+              </Button>
+            </div>
+          </div>
+          <div className="flex flex-col divide-y divide-[var(--line)] rounded-[var(--radius-card-sm)] border border-[var(--line)]">
+            {GROUPS.map((g) => {
+              const count = g.items.filter((s) => picked.includes(s.id)).length;
+              const open = openGroups.has(g.category);
               return (
-                <button
-                  key={s.id}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => setPicked((p) => (on ? p.filter((x) => x !== s.id) : [...p, s.id]))}
-                  className={chipClass(on, true, FOCUS)}
+                <details
+                  key={g.category}
+                  open={open}
+                  onToggle={(e) => {
+                    const now = (e.currentTarget as HTMLDetailsElement).open;
+                    setOpenGroups((prev) => {
+                      if (prev.has(g.category) === now) return prev;
+                      const next = new Set(prev);
+                      if (now) next.add(g.category);
+                      else next.delete(g.category);
+                      return next;
+                    });
+                  }}
                 >
-                  {s.id === "therapists" ? "Other therapists" : s.label}
-                </button>
+                  <summary className={cn("flex min-h-touch cursor-pointer list-none items-center justify-between gap-3 px-4 [&::-webkit-details-marker]:hidden", FOCUS)}>
+                    <span className="flex items-center gap-2 text-body font-medium">
+                      <ChevronDown size={16} aria-hidden="true" className={cn("shrink-0 transition-transform duration-150", open ? "" : "-rotate-90")} />
+                      {g.label}
+                    </span>
+                    <span className="shrink-0 text-small text-[var(--fg-muted)]">{count > 0 ? `${count} of ${g.items.length}` : g.items.length}</span>
+                  </summary>
+                  <div className="flex flex-wrap gap-2 px-4 pb-4">
+                    {g.items.map((s) => {
+                      const on = picked.includes(s.id);
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          aria-pressed={on}
+                          onClick={() => setPicked((p) => (on ? p.filter((x) => x !== s.id) : [...p, s.id]))}
+                          className={chipClass(on, true, cn("max-w-full text-left", FOCUS))}
+                        >
+                          {s.id === "therapists" ? "Other therapists" : s.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </details>
               );
             })}
           </div>

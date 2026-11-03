@@ -211,11 +211,16 @@ export async function searchArea(
   const inArea = new Set(zips);
   // Someone on her do-not-contact list never shows again (lib/referrals/contacts.ts).
   const providers = found.providers.filter((p) => inArea.has(p.zip) && !ctx.suppressed?.has(p.npi));
-  if (found.truncated) {
+  if (found.budgetCut && found.skipped?.length) {
+    // Each kind is its own set of questions, so fewer kinds is what makes room.
+    notes.push(
+      `I ran out of NPI Registry questions before finishing ${specialtyLabels(found.skipped)}, so ${found.skipped.length === 1 ? "that kind is" : "those kinds are"} only partly shown. Pick fewer kinds and search again to see everyone.`,
+    );
+  } else if (found.truncated) {
     notes.push(
       area.kind === "chicagoland"
         ? "The NPI Registry gives at most 1,200 people per search, so this is part of Chicagoland. Search a ZIP code to see everyone near you."
-        : "There were more than I could ask the NPI Registry for at once, so this is part of the list. A smaller radius shows everyone.",
+        : "The NPI Registry gives at most 1,200 people per search, so this is part of the list. A smaller radius shows everyone.",
     );
   }
 
