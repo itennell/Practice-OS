@@ -36,7 +36,7 @@ export function cueText(s: string): string {
 }
 
 /** Bump when the cues change: lib/referrals/sensitive-sites.ts re-flags old cards once per version. */
-export const CUE_VERSION = 3;
+export const CUE_VERSION = 4;
 
 /** Plain cues, on cueText. Plurals included. Always sensitive, whatever else the name says. */
 export const SENSITIVE_CUES = new RegExp(
@@ -49,7 +49,7 @@ export const SENSITIVE_CUES = new RegExp(
       "victims? of (?:crime|violence|abuse|assault|trafficking|domestic|sexual|rape)", "victim (?:services|advocates?|advocacy|assistance)",
       "survivors? of (?:abuse|violence|assault|trafficking|domestic|sexual|rape|incest)",
       "womens (?:center|centre|centers|shelter|shelters|refuge|safe ?house|resource center|services|crisis|aid|advocacy)",
-      "shelters?", "safe ?houses?", "house of hope", "houses of hope", "ruths house", "apna ghar",
+      "shelters?(?! insurance)", "safe ?houses?", "house of hope", "houses of hope", "ruths house", "apna ghar",
       "family justice", "(?:rape|sexual assault|sexual violence|domestic violence|dv) crisis",
       "transitional (?:housing|living)", "ywca",
       // Chicago DV and SA agencies by name, distinctive enough to match anywhere.
@@ -64,7 +64,7 @@ export const SENSITIVE_CUES = new RegExp(
 const MID_CUES =
   /\b(?:hope ?(?:houses?|haus)|safe ?places?|safe ?homes?|safe ?space|justice center|family rescue|wings program|casa de esperanza)\b/;
 /** Agency names too plain to match inside other names: they must start the name ("Life Span Center for Legal Services"). */
-const AGENCY_PREFIXES = /^(?:between friends|life span|resilience (?:chicago|formerly))\b/;
+const AGENCY_PREFIXES = /^(?:between friends|life span|resilience (?:chicago|formerly))\b|^resilience$/;
 const NAME_FILLER = /^(?:(?:test|sample|the)\s+)*/;
 
 /** "Survivors" alone is sensitive, except next to cancer, loss or grief ("Cancer Survivors Network"). */
@@ -77,7 +77,7 @@ const SOFT_CUES = /\b(?:safe harbou?rs?|safe ?havens?|safe passage|sanctuar(?:y|
 export const BORDERLINE = /\b(?:house of [a-z]+|havens?|refuges?|harbou?rs? house|hope center|new beginnings?|new hope)\b/;
 export const SERVICES_WORD = /\b(?:services?|centers?|centres?|projects?|network|programs?|ministr(?:y|ies)|alliance|outreach|homes?|house|inc|foundation|coalition|place|support)\b/;
 const CARE_CONTEXT =
-  /\b(?:hospice|home health|home care|funeral|cemetery|memorial|church|chapel|parish|cathedral|temple|synagogue|mosque|palliative|senior living|assisted living|nursing|counseling|counselling|therapy|therapists?|wellness|pediatrics?|clinics?|medical|medicine|health|healthcare|dental|cancer|oncology|ems|squad|ambulance|fire)\b/;
+  /\b(?:hospice|home health|home care|funeral|cemetery|memorial|church|chapel|parish|cathedral|temple|synagogue|mosque|palliative|senior living|assisted living|nursing|counseling|counselling|therapy|therapists?|psychotherapy|psychology|psychiatry|psychiatric|psychological|wellness|pediatrics?|clinics?|medical|medicine|health|healthcare|dental|cancer|oncology|ems|squad|ambulance|fire)\b/;
 
 /** Edit distance counting a swap of two neighbours as one, for "sheltr" and "shleter". */
 function editDistance(a: string, b: string): number {
@@ -96,8 +96,8 @@ function textLooksSensitive(t: string): boolean {
   if (SENSITIVE_CUES.test(t)) return true;
   if (SURVIVORS.test(t) && !SURVIVORS_OK.test(t)) return true;
   const words = t.split(" ");
-  // Typos: "shleter" (7+ letters, starting "sh", so never "smelter"), "domestc violence".
-  if (words.some((w) => w.length >= 7 && w.startsWith("sh") && (editDistance(w, "shelter") <= 1 || editDistance(w, "shelters") <= 1))) return true;
+  // Typos: "shleter", "sheltr" (6+ letters, starting "sh", so never "smelter"), "domestc violence".
+  if (words.some((w, i) => w.length >= 6 && w.startsWith("sh") && words[i + 1] !== "insurance" && (editDistance(w, "shelter") <= 1 || editDistance(w, "shelters") <= 1))) return true;
   for (let i = 0; i + 1 < words.length; i++) {
     if (editDistance(words[i], "domestic") <= 1 && (editDistance(words[i + 1], "violence") <= 1 || editDistance(words[i + 1], "abuse") <= 1)) return true;
   }

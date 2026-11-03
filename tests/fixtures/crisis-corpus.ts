@@ -231,6 +231,30 @@ export const MUST_ROUTE: string[] = [
   "she wants to die tonight",
   "he wants to die at home tonight with his pills",
   "she wants to die peacefully, she has a plan",
+  // PR #141 round 4 (Nov 3): restored and new misses
+  "she has been saving up her xanax",
+  "she is saving up her pills to take them all",
+  "he's in hospice and saving up his morphine",
+  "he's collecting pills",
+  "he wants to un alive himself",
+  "she said she might un-alive herself",
+  "a hospice patient asking about lethal doses of morphine",
+  "he wants to die at home and is giving his dog away",
+  "she wants to die in peace, she's done",
+  "she wants to die peacefully, she is collecting her meds",
+  "she said she's going to take all her pills",
+  "he said he has enough pills to not wake up",
+  "he's been stockpiling sleeping pills",
+  "she said she'd be better off gone",
+  "she said she's done with life",
+  "he says life isn't worth living",
+  "she's tired of living",
+  "he wants to join his late wife",
+  "he wants to disappear forever",
+  "she said there's no point anymore",
+  "k y s please",
+  "k ys",
+  "ky s",
 ];
 
 export const MUST_PASS: string[] = [
@@ -354,7 +378,6 @@ export const MUST_PASS: string[] = [
   "she saved her insulin in the fridge",
   "he saves his meds list in the portal",
   "the hospice nurse saved his morphine logs",
-  "she has been saving up her xanax", // moved: "saving" is too common
   "take a bottle of tylenol to the office",
   "el paciente quiere morir en casa con hospicio",
   "quiere morir en paz",
@@ -365,6 +388,21 @@ export const MUST_PASS: string[] = [
   "the dying patient gave away her things and said goodbye to the family",
   "the patient won't be around much longer, the hospice nurse said",
   "I want to end the session early",
+  // PR #141 round 4 (Nov 3): false alarms
+  "the hospice plan for patients who want to die at home",
+  "she wants to die at home; our plan is to coordinate hospice",
+  "she wants to die at home and the family plans a vigil",
+  "he wants to die peacefully, and the team plans to visit today",
+  "the dying patient wants to die at home tonight if possible, hospice is arranging transport",
+  "she wants to die at home, the pills for pain are managed by hospice",
+  "she gave away her stuff to the church and said goodbye to the parish",
+  "he said he won't be here much longer, he's retiring",
+  "how much morphine would take the pain away",
+  "collect the medication history at intake",
+  "I'm going to take all my meds to the pharmacy",
+  "k y s ticker",
+  "K Y S Foundation",
+  "K.Y.S. Inc",
 ];
 
 // PR #112 review probes: real crisis inside a practice-task message. A missed

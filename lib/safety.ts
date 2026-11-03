@@ -46,6 +46,8 @@ const SQUASHED: Record<CrisisCategory, string[]> = {
     "dontwannabehereanymore", "dontwannalive", "dontwannabealive", "dontwanttoexist", "dontwannaexist",
     "cantgoonliving", "wantittobeover", "wantsittobeover", "wantitalltobeover", "wantsitalltobeover",
     "doesntwanttoexist", "doesnotwanttoexist", "donotwanttoexist",
+    "betteroffgone", "lifeisntworthliving", "lifeisnotworthliving", "lifesnotworthliving", "notworthlivinganymore",
+    "tiredofliving", "tiredofbeingalive", "sickofliving", "sickofbeingalive", "donewithlife", "donewithliving",
     "noreasonforhertolive", "noreasonforhimtolive", "noreasonforthemtolive", "noreasonformetolive",
     // Spanish
     "quieromorir", "deseomorir", "ganasdemorir", "noquierovivir", "noquieroseguirviviendo",
@@ -71,6 +73,12 @@ const SELF = "(my|him|her|them|your|our)sel(f|ves)";
 // Drugs people overdose on, for "a bottle of xanax" and "took all her tylenol".
 const DRUGS =
   "(pills?|tablets?|meds|medications?|xanax|tylenol|advil|aspirin|ibuprofen|acetaminophen|paracetamol|oxy|oxys|oxycodone|oxycontin|percocets?|vicodin|norco|fentanyl|heroin|opioids?|opiates?|painkillers?|pain killers?|ambien|klonopin|valium|ativan|adderall|benadryl|benzos?|sleeping pills|sleep aids?|insulin|lithium|seroquel|trazodone|zoloft|prozac|lexapro|wellbutrin|antidepressants?|morphine|methadone|codeine|tramadol|gabapentin|lorazepam|alprazolam|diazepam|clonazepam)";
+// After a drug word: not a list, a log, a form or carrying it somewhere ("take all my meds to the pharmacy").
+const NOT_A_DOSE =
+  "(?! (to|into|in|for|from|at|with|back|home|off|forms?|information|info|lists?|logs?|charts?|records?|history|histories|reconciliation|data|refills?|orders?|schedules?|organizers?|in the fridge|fridge)\\b)";
+// After saving or collecting a drug: not a list, a log or the fridge ("saved her insulin in the fridge").
+const NOT_A_RECORD =
+  "(?! (forms?|information|info|lists?|logs?|charts?|records?|history|histories|reconciliation|data|refills?|orders?|schedules?|organizers?|in the fridge|fridge|for (the|a|our) (drive|donation|disposal|take back|takeback|pharmacy))\\b)";
 // Phrasal verbs where "off myself" is not slang: "sign off myself", "drop it off myself".
 // Up to 3 words may sit between ("drop the forms off myself", "mail the forms off myself").
 const OFF_OK = "sign|signed|signing|log|logged|logging|drop|dropped|dropping|show|showed|showing|kick|kicked|pay|paid|send|sent|sending|mail|mailed|mailing|fax|faxed|bring|brought|file|filed|cool|cooled|sort|sorted|turn|turned|head|headed|start|started|tip|tipped|write|wrote|call|called|finish|finished|top|topped|round|rounded|lay|laid|spin|ward|tell|brush|brushed|shake|switch|switched|shut|clock|clocked|tick|ticked|check|checked|knock|knocked|clear|cleared|wipe|wiped|ease|hold|level|pull|pulled|ring|seal|sealed|close|closed|ship|shipped|cut|take|took|back|pick|picked|tear|tore|peel|peeled|print|printed|hand|handed|mark|marked|cross|crossed|tee|teed";
@@ -90,7 +98,7 @@ const WORDS: Record<CrisisCategory, RegExp[]> = {
     /\b(slash|slashed|slashing|cut|cuts|cutting|slice|sliced|slicing)( (my|her|his|their|your|both|open))? wrists?\b/,
     new RegExp(`\\bdrown(s|ed|ing)? ${SELF}\\b(?! in (work|paperwork|emails?|admin|tasks|coffee|projects|notes|charts|billing|forms)\\b)`),
     /\bset (my|him|her|them)sel(f|ves) on fire\b/,
-    /\bunaliv(e|es|ed|ing)\b/,
+    /\bun ?aliv(e|es|ed|ing)\b/,
     /\bself ?delet(e|ed|es|ing)\b/,
     REFLEXIVE,
     // Not "stop existing clients from booking", "want it to stop syncing", "better off without him on the panel", "rather be dead tired".
@@ -105,12 +113,17 @@ const WORDS: Record<CrisisCategory, RegExp[]> = {
     new RegExp(`\\b(take|taking|swallow|swallowing|down|eat|chug|empty)( (her|his|my|their|the|a|an|that|this|those|these))?( (whole|entire|full))? bottles? of (\\w+ )?${DRUGS}\\b(?! (to|into|in|for|from|at|over|back|home|with)\\b)`),
     new RegExp(`\\b(took|taken|swallowed|downed|ate|chugged|popped)( (her|his|my|their|the|a|an|those|these))?( \\w+)? (whole|entire|full|handful|fistful|bunch|lot|ton|all|every one|too many|too much)( (of|of her|of his|of my|of their|of the))?( \\w+)? ${DRUGS}\\b`),
     // Stockpiling and researching doses.
-    new RegExp(`\\b(stockpil|hoard)\\w* (up )?(all )?(her|his|my|their) ${DRUGS}\\b(?! (list|lists|log|logs|chart|charts|record|records|in the fridge|fridge|schedule)\\b)`),
+    // Saving up or collecting them: "saving up her xanax", "he's collecting pills", "stockpiling sleeping pills".
+    new RegExp(`\\b(stockpil|hoard|sav|collect)\\w* (up )?(all )?((of )?(her|his|my|their) )?${DRUGS}\\b${NOT_A_RECORD}`),
+    // "going to take all her pills", "has enough pills to not wake up".
+    new RegExp(`\\b(going to|gonna|about to|plans? to|planning to|wants? to|will|is going to) (take|swallow|down) (all|every one|the rest)( of)?( (her|his|my|their|the|those|these))? ${DRUGS}\\b${NOT_A_DOSE}`),
+    new RegExp(`\\benough (of (her|his|my|their|the) )?${DRUGS} to (not wake|never wake|die|end it|kill|overdose|not be here|sleep forever)\\b`),
     // "how many pills it takes", not "how many meds she takes" or "how much insulin to stock".
-    new RegExp(`\\bhow (many|much) (of (her|his|my|their|the) )?(\\w+ )?${DRUGS} (it takes|it would take|would it take|would take|to die|to overdose|is lethal|would be lethal|to kill)\\b`),
+    // "would take" alone only with "to die": "how much morphine would take the pain away" passes.
+    new RegExp(`\\bhow (many|much) (of (her|his|my|their|the) )?(\\w+ )?${DRUGS} ((it takes|it would take|would it take)(?! (to (work|kick in|help|ease|treat|manage|control|relieve)|effect|the pain|away|for the pain|care of))|would take to (die|kill|overdose)|to die|to overdose|is lethal|would be lethal|to kill)\\b`),
     /\bhow (many|much) (it takes|it would take|would it take|would take) to die\b/,
     // Looking up a lethal dose; a bare "lethal dose" (a lecture, a CE course) passes.
-    /\b(look|looks|looked|looking|research|researched|researching|googled|googling|search|searched|searching)( up| for| into)?( the| a| her| his| my)? (lethal|fatal|deadly) (doses?|dosages?|amounts?)\b/,
+    /\b(look|looks|looked|looking|research|researched|researching|googled|googling|search|searched|searching|ask|asks|asked|asking|talk|talks|talked|talking)( up| for| into| about)?( the| a| her| his| my)? (lethal|fatal|deadly) (doses?|dosages?|amounts?)\b/,
     // Present tense needs an amount ("take all my meds off the list" passes; "take all her pills at once" is above).
     new RegExp(`\\b(take|taking|swallow|swallowing|eat|eating|pop|popping)( (her|his|my|their|the|a|an|those|these))?( \\w+)? (whole|entire|handful|fistful|bunch|ton|too many|too much)( (of|of her|of his|of my|of their|of the))?( \\w+)? ${DRUGS}\\b`),
     new RegExp(`\\b(od|odd|oded|oding|odeing)( ed)? on (my |her |his |their |the |those |some )?(\\w+ )?${DRUGS}\\b`),
@@ -124,8 +137,12 @@ const WORDS: Record<CrisisCategory, RegExp[]> = {
     /\b(says|said|told \w+|keeps saying|tells \w+)( that)? (she|he|they|i) (wont|will not|is not going to|isnt going to) be (around|here)( for)?( much)? longer\b/,
     /\b(note|notes|letter|letters|message|messages|video|text|post)( \w+)? (saying|that says|that said) (goodbye|good bye|bye) to (everyone|everybody|all of us|her family|his family|their family|the family|us all)\b/,
     // "k y s" spelled out, only standing alone at the end of a message.
-    /(^| )k [ym] s( (rn|now|lol|honestly|tbh|seriously|fr))?$/,
+    /(^| )(?<!\b(dr|doctor|mr|ms|mrs|mx|prof) )(k [ym] s|k [ym]s|k[ym] s)( (please|pls|plz|rn|now|lol|honestly|tbh|seriously|fr|already|today|man|bro|dude|ok|okay)){0,2}$/,
     /\b(dont|do not|doesnt|does not) want to exist\b/,
+    /\b(want|wants|wanted|wanting|ready) to (join|be with) (my|his|her|their) (late|dead|deceased) (wife|husband|spouse|partner|mom|mother|dad|father|son|daughter|child|brother|sister)\b/,
+    /\b(theres|there is|whats the|what is the|i see|she sees|he sees) no point( (anymore|any more|in (living|anything|going on|being here|life)|to (life|living|anything)))\b/,
+    // "wants to disappear forever"; not "wanted to disappear from the group chat".
+    /\b(wants to|wanted to) disappear\b(?! (into|from|off|for a|for the|until|before|after|during|at|in)\b)/,
     /\b(want|wants|wanna|wanted) to dye\b(?! (my|her|his|their|the|it|them|this|that|a|an|some|our|your)\b)/,
     /\bwanna die\b/,
     // Not a distance: "kms away from the office".
@@ -314,7 +331,8 @@ const WARNING_SIGNS: Array<{ re: RegExp; hard: boolean }> = [
   { re: /\b(wrote|writing|written|made|making|updated|updating|finished) (a |her |his |my |their )?(will|wills)\b/, hard: true },
   { re: /\b(plan|plans|planned|planning|arranging|arranged) (my|her|his|their) (own )?funeral\b/, hard: true },
 ];
-const END_OF_LIFE = /\b(hospice|dying|terminal|terminally|palliative|end of life|comfort care|prognosis|passed away|bereavement|grandkids|grandchildren)\b/;
+// Where two soft signs are ordinary: a dying patient, or giving to a church ("said goodbye to the parish").
+const END_OF_LIFE = /\b(hospice|dying|terminal|terminally|palliative|end of life|comfort care|prognosis|passed away|bereavement|grandkids|grandchildren|church|parish|congregation)\b/;
 
 // Benign idioms removed before matching, unless a finality cue is present: "I wanted to die laughing", "quiero morir de risa", "ending it all at 5pm".
 const IDIOMS = [
@@ -333,11 +351,17 @@ const PEACEFUL_DEATH = [
   // A brochure line: "what to do if your loved one says they want to die".
   /\b(si|if) (su|tu|your|a|their) (ser querido|loved one|familiar|family member|patient|paciente) (dice|says|said|dijo)( que| that)?( (he|she|they))? (quiere morir|wants to die|want to die)\b/g,
 ];
-const OTHER_CUE = /\b(tonight|soon|plan|plans|planning|pills?|overdose|gun|rope|kill|end it|end my|bridge|jump|today|right now|knife|matar\w*|esta noche|pronto)\b/;
+// What turns a hospice wish back into a crisis: a plan to die, a stash of pills, giving things away, "she's done".
+const OTHER_CUE =
+  /\b(tonight(?! if possible)|soon|(has|have|had|made) a plan|plans? to (kill|end|die|overdose)|planning to (kill|end|die|overdose)|(saved|saving|stockpiled|stockpiling|enough|all|bottle of|collecting|collected|hoarding|hoarded)( up)? (her |his |my |their )?(pills|meds|medication)|overdose|gun|rope|kill|end it|end my|bridge|jump|right now|knife|giving( \w+){0,2} away|gave( \w+){0,2} away|give( \w+){0,2} away|done|collect\w*|hoard\w*|stockpil\w*|matar\w*|esta noche|pronto)\b/;
+// Leaving a job or a town, not life: "he won't be here much longer, he's retiring".
+const LEAVING = /\b(retir\w*|moving|move|moved|new job|relocat\w*)\b/;
+const NOT_AROUND = /\b(wont|will not|isnt going to|is not going to|not going to) be (around|here)( for)?( much)? longer\b/g;
 
 function checkOne(text: string): CrisisResult {
   let spaced = FINALITY.test(text) ? text : IDIOMS.reduce((t, re) => t.replace(re, " "), text);
   if (!FINALITY.test(spaced) && !OTHER_CUE.test(spaced)) spaced = PEACEFUL_DEATH.reduce((t, re) => t.replace(re, " "), spaced);
+  if (LEAVING.test(spaced) && !FINALITY.test(spaced)) spaced = spaced.replace(NOT_AROUND, " ");
   const personal = PERSONAL.some((re) => re.test(spaced));
   const squashed = spaced.replace(/ /g, "");
   // 1. Ideation, self-harm and direct danger: always crisis, whatever else is said.

@@ -294,7 +294,7 @@ describe("do not contact without an NPI", () => {
     const yes = [
       "[Test] Survivors Healing Center", "[Test] Hope House Chicago", "Lakeview Safe Place", "Safe Haven Inc", "Sanctuary Services", "Family Justice Center",
       "Rape Crisis Line", "H.O.P.E. House", "Lakeview Shleter", "Hope Haus", "Domestc Violence Center", "Life Span Center for Legal Services", "Sarah's Inn", "Between Friends", "Family Rescue",
-      "Mujeres Latinas en Acción", "Life Span", "KAN-WIN", "WINGS Program", "Casa de Esperanza", "[Test] Resilience Chicago",
+      "Mujeres Latinas en Acción", "Life Span", "KAN-WIN", "WINGS Program", "Casa de Esperanza", "[Test] Resilience Chicago", "Resilience", "Sheltr of Hope", "Northside Sheltr",
       "Survivors of Abuse Network", "Domestic Violence Legal Clinic", "Victim Services of Cook County", "Sexual Assault Crisis Center", "Haven House Services",
       "Refuge Ministries", "Safe Harbor Center", "Ruth's House", "Battered Women's Network",
     ];
@@ -305,8 +305,8 @@ describe("do not contact without an NPI", () => {
       "Lakeview Family Medicine", "Northwestern Medicine Lurie Cancer Center", "Safe Passage Hospice",
       // round 2 over-flags
       "Safe Harbor Counseling", "Sanctuary Wellness", "Hope House Hospice", "Safe Place Pediatrics", "Justice Center Pediatrics", "Wings",
-      "Resilience Inc", "Resilience", "Wings Program for Kids with Cancer", "Family Rescue Squad EMS", "Holocaust Survivors Center", "Kids Survivors Camp",
-      "Smelter Clinic", "Northside Sheltr",
+      "Resilience Inc", "Wings Program for Kids with Cancer", "Family Rescue Squad EMS", "Holocaust Survivors Center", "Kids Survivors Camp",
+      "Smelter Clinic", "Sanctuary Psychotherapy", "Shelter Insurance Agency",
     ];
     for (const n of yes) expect(looksSensitive(n), n).toBe(true);
     for (const n of no) expect(looksSensitive(n), n).toBe(false);
