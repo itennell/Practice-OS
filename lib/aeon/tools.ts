@@ -1445,6 +1445,25 @@ export const TOOLS: AeonTool[] = [
       }
       try {
         const r = await logContact(card.id, { kind, happenedOn: day, note, followUpOn: follow_up_on, by: "aeon" });
+        if (r.already) {
+          // "I sent it" again within minutes: the first row stands, nothing new was logged.
+          const differs = [
+            ...(day && day !== r.contact.happened_on ? [`the date (${longDay(r.contact.happened_on)} is kept, not ${longDay(day)})`] : []),
+            ...((note?.trim() || null) !== (r.contact.note ?? null) ? ["the note (the first one is kept)"] : []),
+          ];
+          return text({
+            logged: true,
+            already: true,
+            added: false,
+            name: card.name,
+            what: CONTACT_LABEL[kind],
+            on: r.contact.happened_on,
+            logged_for: longDay(r.contact.happened_on),
+            column: STAGE_LABEL[r.stage],
+            next_follow_up_on: r.nextFollowUpOn,
+            say: `Already logged: this letter was marked sent ${longDay(r.contact.happened_on)}; nothing new was added.${differs.length ? ` This time ${differs.join(" and ")} differed.` : ""}`,
+          });
+        }
         return text({
           logged: true,
           name: card.name,

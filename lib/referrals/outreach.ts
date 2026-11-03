@@ -233,7 +233,17 @@ const SAMPLE = /^\[Sample\]\s*/i;
 const DOCTOR = new Set(["MD", "DO", "PHD", "PSYD"]);
 const SUFFIX = new Set(["jr", "sr", "ii", "iii", "iv"]);
 /** A credential written as a word: "MD", "M.D.", "PhD", "PsyD", "LCSW", "PA-C". Never a name ("Lee", "Ann"). */
-const CREDENTIAL_WORD = /^(?:[A-Z]{2,6}(?:-[A-Z])?|(?:[A-Z]\.){2,4}|Ph\.?D\.?|Psy\.?D\.?|Ed\.?D\.?|DNP|MSW|MSc)$/;
+const KNOWN_CREDENTIALS = new Set(
+  ("MD DO PHD PSYD EDD DNP DMD DDS OD DC DPT PT OT OTR OTRL SLP CCC CCCSLP NP PA PAC RN BSN MSN APRN CNM CNP FNP PMHNP CRNP CNS " +
+    "LCSW LICSW LCPC LPC LPCC LMHC LMFT MFT LMSW LSW MSW CGC MS MA MPH MBA MSC BA BS RD RDN LD LDN IBCLC CLC LAC LMT CDE CADC " +
+    "FACP FAAP FACOG BCBA CPM CD DONA CHPN ACHP CT FT").split(" "),
+);
+/** A credential written as a word ("MD", "M.D.", "PhD", "PA-C"), from a known list: never an all-caps surname ("Ann LEE"). */
+const isCredentialWord = (w: string) => {
+  const bare = w.replace(/[.\-]/g, "");
+  // Written as a credential: all capitals ("MD", "M.D.", "PA-C") or a known mixed form ("PhD", "PsyD"); "Ann Ma" keeps her surname.
+  return KNOWN_CREDENTIALS.has(bare.toUpperCase()) && (bare === bare.toUpperCase() || /^(?:PhD|PsyD|EdD|MSc|OTR\/?L)$/.test(bare));
+};
 
 /**
  * How the letter greets them: "Dr. Tellez" for an MD, DO, PhD or PsyD; otherwise the full name
@@ -247,7 +257,7 @@ export function salutationFor(source: Pick<ReferralSource, "name" | "npi_type"> 
   // Credentials written after the name with no comma ("Ann Lee MD") come off the end too.
   const words = head.trim().replace(/^Dr\.?\s+/i, "").split(/\s+/);
   const trailing: string[] = [];
-  while (words.length > 1 && CREDENTIAL_WORD.test(words[words.length - 1])) trailing.unshift(words.pop()!);
+  while (words.length > 1 && isCredentialWord(words[words.length - 1])) trailing.unshift(words.pop()!);
   const person = words.join(" ");
   const creds = [...rest, ...trailing, source.credential ?? ""]
     .join(" ")
@@ -495,10 +505,13 @@ function signOff(lines: string[], name: string, sign: string): string[] {
   const parts = name.trim().split(/\s+/);
   const firstName = escapeRe(parts[0]);
   const lastName = escapeRe(parts[parts.length - 1]);
+  // After the name only credentials, a practice name or a parenthesis ("Dana Reyes, LCPC"), never a
+  // sentence ("Dana Reyes is happy to talk."); or her first name alone ("Best,\nDana").
+  const tail = "(?:,?\\s*(?:[A-Z][A-Za-z.'\\-]*|\\([^)]*\\)))*\\s*$";
   const own =
     parts.length > 1
-      ? new RegExp(`^[-\\u2013\\u2014~\\s]*${firstName}(?:\\s+[A-Z][\\w.]*){0,2}?\\s+${lastName}\\b[^\\n]{0,60}$`, "i")
-      : new RegExp(`^[-\\u2013\\u2014~\\s]*${firstName}\\b[^\\n]{0,60}$`, "i");
+      ? new RegExp(`^[-\\u2013\\u2014~\\s]*(?:${firstName}(?:\\s+[A-Z][\\w.]*){0,2}?\\s+${lastName}${tail}|${firstName}[,.]?\\s*$)`)
+      : new RegExp(`^[-\\u2013\\u2014~\\s]*${firstName}${tail}`);
   const closing = lines.map((l, i) => (CLOSING.test(l.trim()) ? i : -1)).filter((i) => i > 0).pop();
   // Where to look: after the closing, or the last four lines when there is none.
   const from = closing !== undefined ? closing + 1 : Math.max(1, lines.length - 4);

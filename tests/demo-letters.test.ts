@@ -142,6 +142,11 @@ describe("salutation, role, niche and signature", () => {
     expect(salutationFor({ name: "Ann Lee MD", npi_type: "individual" })).toBe("Dr. Lee");
     expect(salutationFor({ name: "Ann Lee M.D.", npi_type: "individual" })).toBe("Dr. Lee");
     expect(salutationFor({ name: "Ann Lee LCSW", npi_type: "individual" })).toBe("Ann Lee");
+    // An all-caps surname is a name, not a credential.
+    expect(salutationFor({ name: "Ann LEE", npi_type: "individual" })).toBe("Ann LEE");
+    expect(salutationFor({ name: "Ann LEE MD", npi_type: "individual" })).toBe("Dr. LEE");
+    expect(salutationFor({ name: "Ann Ma", npi_type: "individual" })).toBe("Ann Ma");
+    expect(salutationFor({ name: "Ann Ma PA-C", npi_type: "individual" })).toBe("Ann Ma");
   });
   it("finishes the greeting and the sign-off once, whatever Muse wrote", () => {
     const src = card({ name: "Claudia Tellez, MD", credential: "MD", is_sample: false });
@@ -168,6 +173,14 @@ describe("salutation, role, niche and signature", () => {
       expect(out.startsWith("Dear Dr. Tellez,\n\nI'm Dana Reyes"), hello).toBe(true);
       expect(out.match(/^(?:Dear|Hello|Hi|Good)/gm), hello).toHaveLength(1);
     }
+    // Her first name alone after the closing: no stray "Dana".
+    const firstOnly = finishLetter(`Dear Dr. Tellez,\n\n${body}\n\nBest,\nDana`, src, FACTS);
+    expect(firstOnly).toContain("Best,\nDana Reyes, LCPC (fictional demo practice)");
+    expect(firstOnly).not.toMatch(/^Dana$/m);
+    // No closing word: a sentence near the end that starts with her name stays.
+    const talk = finishLetter(`Dear Dr. Tellez,\n\n${body}\nDana Reyes is happy to talk.`, src, FACTS);
+    expect(talk).toContain("\nDana Reyes is happy to talk.\n");
+    expect(signs(talk)).toBe(1);
     // A first line that is a sentence is not a greeting.
     expect(finishLetter(`Hello, I'm Dana Reyes.\n\n${body}`, src, FACTS).startsWith("Dear Dr. Tellez,\n\nHello, I'm Dana Reyes.")).toBe(true);
   });
@@ -354,6 +367,67 @@ describe("no fees or gifts for referrals", () => {
   ])("lets through review false positive: %s", (ok) => {
     expect(valueOffered(ok)).toBeNull();
     expect(checkLetter(`${base} ${ok}`)).toEqual({ ok: true });
+  });
+  // Round 2 of the review (PR #140).
+  const ROUND2_REFUSE = [
+    "fifty dollars per patient",
+    "no-cost session for anyone you refer",
+    "it's on-the-house",
+    "Coffee's on Reyes Counseling.",
+    "I'll comp the first visit for anyone you send",
+    "a $20 Starbuck's card",
+    "an e-card with $25 on it",
+    "g i f t",
+    "\u0261ift card",
+    "\u13C0IFT CARD",
+    "a token of thanks",
+    "I'll pick up the check",
+    "I'll get the next round",
+    "Refer to me. Then I'll send you a little thank you.",
+    "Send them my way. I'll take care of you.",
+    "For every 5 referrals we do something fun for your team",
+    "your staff can join a free yoga class on me",
+    "a thank-you for your referrals",
+    "sessions at $0 for your referrals",
+    "I'd be glad to give a free talk for your team",
+    "lunch on me",
+    "I'd love to buy you lunch",
+    "I'll bring lunch for the office",
+    "Um presente por cada paciente.",
+    "Un cadeau pour chaque patient.",
+    "Ein Geschenk f\u00fcr jeden Patienten.",
+  ];
+  it.each(ROUND2_REFUSE)("refuses round-2 probe: %s", (bad) => {
+    expect(valueOffered(bad)).not.toBeNull();
+    expect(checkLetter(`${base} ${bad}`).ok).toBe(false);
+  });
+  it("refuses 'a thank-you for your referrals' as a subject line", () => {
+    expect(checkSubject("A thank-you for your referrals").ok).toBe(false);
+  });
+  const ROUND2_PASS = [
+    "met over lunch",
+    "Met Dr. Lee over lunch at the conference.",
+    "We had breakfast with the team.",
+    "We met for coffee and she said they refer often.",
+    "Their office is next to a Starbucks.",
+    "Spa-like waiting room",
+    "I offer a free 15-minute call to your patients.",
+    "Your patients can book a free 15-minute consult on my website.",
+    "I'd be glad to give a short talk for your team.",
+    "Lunch is on Tuesday this week.",
+    "They refer families to the food pantry.",
+    "They treat adults and refer out for therapy.",
+    "Takes workers' comp.",
+  ];
+  it.each(ROUND2_PASS)("lets through round-2 fact: %s", (ok) => {
+    expect(valueOffered(ok)).toBeNull();
+  });
+  it.each(["met over lunch", "Met Dr. Lee over lunch at the conference.", "We had breakfast with the team."])("saves the note: %s", async (note) => {
+    expect(await checkNote(note, async (t: string) => ({ ok: true as const, text: t }))).toBeNull();
+  });
+  it("refuses a free short consult when it is tied to referrals", () => {
+    expect(valueOffered("A free 15-minute consult for anyone you refer.")).not.toBeNull();
+    expect(valueOffered("If you refer someone, they get a free 15-minute call.")).not.toBeNull();
   });
   it.each(PROBES)("refuses probe: %s", (bad) => {
     expect(valueOffered(bad)).not.toBeNull();
