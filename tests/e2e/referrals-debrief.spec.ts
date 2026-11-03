@@ -9,7 +9,7 @@ import { execSync } from "node:child_process";
 // and Muse are the fixed stand-ins (PLAYWRIGHT_DEBRIEF_STANDIN=1,
 // lib/referrals/debrief-standin.ts); every plain-code check runs for real.
 
-const PARTNER = "[Sample] Lincoln Park Pediatrics";
+const PARTNER = "[Sample] Fernhollow Pediatrics";
 const PARTNER_ID = "00000000-0000-4000-8000-000000000204";
 
 test.use({
@@ -49,8 +49,8 @@ test("debrief a coffee meeting: record, review, save", async ({ page }) => {
   await expect(review).toContainText("Who else to meet: a name you didn't say");
   await expect(review.getByRole("textbox", { name: "Who to ask for" })).toHaveValue("front desk coordinator");
   await expect(review.getByRole("textbox", { name: "Best time to reach them" })).toHaveValue("Tuesday mornings");
-  await expect(review).toContainText("Jenna Cho, lactation consultant, Lincoln Park Birth Center");
-  await expect(review).toContainText("Lincoln Park Pediatrics' office takes referrals by fax; ask for the front desk coordinator.");
+  await expect(review).toContainText("Jenna Cho, lactation consultant, Marigold Birth Center");
+  await expect(review).toContainText("Fernhollow Pediatrics' office takes referrals by fax; ask for the front desk coordinator.");
   await expect(review.getByRole("textbox", { name: /Follow-up email/ })).toHaveValue(/Thank you for meeting me for coffee/);
 
   // Nothing wider than the phone, and axe-clean.

@@ -1354,7 +1354,7 @@ export const TOOLS: AeonTool[] = [
     title: "Log a contact with a referral source",
     description:
       "Logs what she did with someone on her Referrals board: called, emailed, met, sent_letter, replied (they answered), note, or " +
-      "referred (they referred someone to her). Name the card as she said it ('Dr. Rivera', 'Lakeview Pediatrics') or pass its id. " +
+      "referred (they referred someone to her). Name the card as she said it ('Dr. Rivera', 'Fernhollow Pediatrics') or pass its id. " +
       "Reaching out moves the card to Contacted and sets a follow-up a week out unless she gives a date; a reply, meeting or referral " +
       "moves it to Connected and raises its tier. Pass her words for when in date_words; a fuzzy day ('yesterday-ish') comes back " +
       "needs_confirmation with the date it reads as: ask her, then call again with date_confirmed: true. Always tell her the date logged (logged_for). " +

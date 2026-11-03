@@ -218,7 +218,7 @@ describe.skipIf(!local)("migration 045 and discovery cards (built-in database on
     const { looksSensitive } = await import("../lib/referrals/sensitive");
     const names = ["Harbor Shelters Inc", "Ruth’s House", "Safe Harbor Center", "The Safehouse Project", "House of Hope Chicago", "Northside Sexual Abuse Program",
       "Family Violence Coalition", "Battered Women's Network", "Lakeview Women's Center", "Haven House Services", "Refuge Ministries", "Rape Crisis Line",
-      "Lakeview Family Medicine", "Gilda's Club Chicago", "Fullerton Funeral Home", "Haven", "Shelter", "House of Ruth"];
+      "Juniper Row Family Medicine", "Gilda's Club Chicago", "Fullerton Funeral Home", "Haven", "Shelter", "House of Ruth"];
     for (const n of names) {
       const [r] = await db()<{ v: boolean }[]>`select practice_os.name_looks_sensitive(${n}) as v`;
       expect(r.v, n).toBe(looksSensitive(n));

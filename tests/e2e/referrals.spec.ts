@@ -14,7 +14,7 @@ test("Referrals board: five columns, sample cards, Move to menu moves and announ
     await expect(page.getByRole("region", { name: col })).toBeVisible();
   }
   const found = page.getByRole("region", { name: "Found" });
-  const card = found.getByRole("listitem", { name: "[Sample] Lakeview Family Medicine" });
+  const card = found.getByRole("listitem", { name: "[Sample] Juniper Row Family Medicine" });
   await expect(card).toContainText("Family medicine");
   await expect(card).toContainText("0.6 mi");
   await expect(card).toContainText("Reach out first");
@@ -25,10 +25,10 @@ test("Referrals board: five columns, sample cards, Move to menu moves and announ
   const saved = page.waitForResponse((r) => r.url().endsWith("/stage") && r.request().method() === "POST");
   await page.getByRole("option", { name: "Connected" }).click();
   expect((await saved).ok()).toBe(true);
-  await expect(page.getByRole("status").filter({ hasText: "Moved [Sample] Lakeview Family Medicine to Connected." })).toBeAttached();
-  await expect(page.getByRole("region", { name: "Connected" }).getByRole("listitem", { name: "[Sample] Lakeview Family Medicine" })).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "Moved [Sample] Juniper Row Family Medicine to Connected." })).toBeAttached();
+  await expect(page.getByRole("region", { name: "Connected" }).getByRole("listitem", { name: "[Sample] Juniper Row Family Medicine" })).toBeVisible();
   await page.reload();
-  await expect(page.getByRole("region", { name: "Connected" }).getByRole("listitem", { name: "[Sample] Lakeview Family Medicine" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Connected" }).getByRole("listitem", { name: "[Sample] Juniper Row Family Medicine" })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -42,7 +42,7 @@ test("Referrals board passes axe", async ({ page }) => {
 test("Referrals changes only come from the app's own page, as JSON", async ({ request, baseURL }) => {
   const board = await request.get("/api/menu");
   expect(board.ok()).toBe(true);
-  const id = "00000000-0000-4000-8000-000000000203"; // [Sample] Old Town OB-GYN
+  const id = "00000000-0000-4000-8000-000000000203"; // [Sample] Thistlewood OB-GYN
   const own = await request.post(`/api/referrals/${id}/stage`, { headers: { origin: baseURL! }, data: { stage: "connected" } });
   expect(own.status()).toBe(200);
   expect((await own.json()).card.stage).toBe("connected");
