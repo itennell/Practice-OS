@@ -71,6 +71,17 @@ export function ReferralsCrm({
     writeUrl(next, next === "calendar" ? partner : null);
   }
 
+  // Overview, Board, Map and Meetings open the same partner panel as the table (?partner=<id>).
+  const tabProps = {
+    data: partners,
+    onOpenPartner: (id: string, debrief = false) => {
+      setOpen({ id, debrief });
+      writeUrl(tab, id);
+    },
+    onChanged: () => router.refresh(),
+    onTab: (next: ReferralTab) => go(next),
+  };
+
   const tiles: { label: string; value: number; hint: string }[] = [
     { label: "Partners", value: counts.partners, hint: "On your board" },
     { label: "Reach out this week", value: counts.reachOut, hint: "From your weekly plan" },
@@ -134,19 +145,19 @@ export function ReferralsCrm({
           />
         </TabPanel>
         <TabPanel value="overview">
-          <OverviewTab />
+          <OverviewTab {...tabProps} />
         </TabPanel>
         <TabPanel value="board">
-          <BoardTab />
+          <BoardTab {...tabProps} />
         </TabPanel>
         <TabPanel value="calendar">
           <CalendarTab partnerId={calendarPartner} />
         </TabPanel>
         <TabPanel value="map">
-          <MapTab />
+          <MapTab {...tabProps} />
         </TabPanel>
         <TabPanel value="meetings">
-          <MeetingsTab />
+          <MeetingsTab {...tabProps} />
         </TabPanel>
       </Tabs>
 
