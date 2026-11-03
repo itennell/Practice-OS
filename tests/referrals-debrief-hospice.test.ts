@@ -36,6 +36,50 @@ const PATIENTS: [string, string[]][] = [
   ["You should call the grief counselor, she is grieving her son.", ["grieving"]],
   ["Joe Banks, the hospice social worker, is dying of cancer and wants to meet.", ["Joe Banks", "dying"]],
   ["I should meet the oncology social worker for the 58-year-old with leukemia.", ["58-year-old", "leukemia"]],
+  // PR #139 adversarial review, round 1. A1: a health word in the slot between setting and job.
+  ["You should meet Marisol Quint, the hospice suicidal social worker.", ["suicidal"]],
+  ["Their hospice widowed team handles referrals.", ["widowed"]],
+  ["You should meet the hospice dying nurse at Orrindale Hospice.", ["dying"]],
+  ["You should call the oncology leukemia-patient navigator about referrals.", ["leukemia"]],
+  ["She said I should meet the hospice patient-family team.", ["patient-family"]],
+  ["You should meet Marisol Quint, the hospice terminal social worker.", ["terminal"]],
+  ["You should meet the hospice grieving social worker.", ["grieving social"]],
+  // A2: something after "handles referrals".
+  ["Their grief counselor takes referrals for someone whose spouse passed.", ["spouse passed"]],
+  ["Their palliative care team handles referrals for a man on a ventilator.", ["ventilator"]],
+  ["The hospice social worker handles referrals, and one of them is actively passing.", ["actively passing"]],
+  // B: someone who isn't she or he.
+  ["I should call the palliative care team, they have someone who needs a therapist right away.", ["they have someone"]],
+  ["You should meet the hospice social worker, who referred someone after a suicide attempt.", ["suicide attempt"]],
+  ["You should meet the hospice social worker for the referral; they have one on DNR status.", ["DNR"]],
+  ["You should meet the h0spice social worker, she is d1ying.", ["d1ying"]],
+  ["You should meet the grief counselor; they refer people whose kids took their own lives.", ["took their own lives"]],
+  ["You should meet the hospice nurse, somebody there has metastatic breast cancer.", ["metastatic"]],
+  ["I should call the oncology nurse navigator about the person with carcinoma.", ["carcinoma"]],
+  ["You should meet the hospice social worker, the one on comfort care asked for a therapist.", ["comfort care"]],
+  ["She said I should call the palliative care team because someone there has weeks left.", ["weeks left"]],
+  ["You should meet the oncology social worker; their mastectomy patient wants a therapist.", ["mastectomy"]],
+  ["You should talk to the hospice team about the one in remission who wants therapy.", ["remission"]],
+  ["You should meet the hospice social worker, someone she sees is bedbound now.", ["bedbound"]],
+  ["You should meet the hospice nurse; whose dad had a brain bleed, I forget.", ["brain bleed"]],
+  ["I should call the palliative care team about someone with Parkinson's who needs a therapist.", ["Parkinson"]],
+  ["You should meet the hospice social worker, they have a patient with end stage renal disease.", ["renal"]],
+  ["You should call the hospice chaplain, they will be with them until the end.", ["until the end"]],
+  ["You should meet the grief counselor; someone there killed himself last spring.", ["killed himself"]],
+  ["I should talk to the hospice team about the one who had an overdose and wants a therapist.", ["overdose"]],
+  ["You should meet the hospice social worker, they just had a loss and want to call me.", ["had a loss"]],
+  ["You should meet the oncology nurse navigator, somebody on the leukaemia ward wants a therapist.", ["leukaemia"]],
+  ["She told me to email the hospice social worker about a person with kidney failure.", ["kidney failure"]],
+  ["You should meet the grief counselor, one with a husband who passed wants to call.", ["passed"]],
+  ["You should meet the palliative care team, they're caring for someone who is d y i n g.", ["caring for someone"]],
+  ["Call the hospice social worker about them, they are not eating anymore.", ["not eating"]],
+  ["You should meet the hospice social worker; their own diagnosis is cancer.", ["diagnosis"]],
+  ["You should meet the hospice nurse, she said her cancer came back.", ["cancer came back"]],
+  ["You should meet the oncology nurse navigator, h3 is in chem0 now.", ["chem0"]],
+  ["Their hospice social worker handles referrals; one of them died yesterday.", ["died"]],
+  ["You should meet the hospice and palliative care team at Northside Hospital, someone there is terminal.", ["terminal"]],
+  ["You should meet the bereavement coordinator, whose son passed away in May.", ["passed away"]],
+  ["The hospice social worker said they have a person on a ventilator who wants a therapist.", ["ventilator"]],
 ];
 
 // Professionals she was pointed to, or a role that handles referrals. Each must pass.
@@ -52,14 +96,16 @@ const PROFESSIONALS: [string, string[]][] = [
 
 describe("hospice and oncology words in the privacy pass (real guard and name-finder)", () => {
   it("has enough cases on both sides", () => {
-    expect(PATIENTS.length).toBeGreaterThanOrEqual(12);
+    expect(PATIENTS.length).toBeGreaterThanOrEqual(60);
     expect(PROFESSIONALS.length).toBeGreaterThanOrEqual(6);
   });
 
   it.each(PATIENTS)("drops: %s", async (s, toks) => {
     const { cleanTranscript } = await import("../lib/referrals/debrief");
     const c = await cleanTranscript(`${BASE} ${s}`, SRC);
-    expect(c.text).not.toContain(s.slice(0, 25));
+    // A semicolon splits the sentence: a harmless "You should meet the grief counselor;" may stay, the part about someone never.
+    const about = s.includes(";") ? s.slice(s.indexOf(";") + 1).trim() : s;
+    expect(c.text).not.toContain(about.slice(0, 25));
     for (const t of toks) expect(c.text).not.toContain(t);
     expect(c.text).toContain("They send referrals by fax.");
   }, 120_000);
@@ -126,6 +172,17 @@ describe("hospice professionals in the field checks", () => {
     ["contact with health", { referral_contact: "Marisol Quint, the hospice social worker with cancer" }],
     ["summary staff dying", { last_meeting_summary: "They send referrals by fax. Marisol Quint, the hospice social worker, is dying." }],
     ["population one person", { populations: ["their father in hospice"] }],
+    // PR #139 review: a health word in the role's middle slot, a unit as a place, health words she never put together.
+    ["who_else hospice dying nurse", { who_else: [{ name: null, role: "hospice dying nurse", organization: "Orrindale Hospice" }] }],
+    ["who_else leukemia-patient navigator", { who_else: [{ name: null, role: "oncology leukemia-patient navigator", organization: "Orrindale Hospice" }] }],
+    ["who_else patient-family team", { who_else: [{ name: null, role: "hospice patient-family team", organization: "Orrindale Hospice" }] }],
+    ["who_else terminal social worker", { who_else: [{ name: "Marisol Quint", role: "hospice terminal social worker", organization: "Orrindale Hospice" }] }],
+    ["who_else local hospice unit", { who_else: [{ name: "Marisol Quint", role: "hospice social worker", organization: "the local hospice unit" }] }],
+    ["contact terminal social worker", { referral_contact: "Marisol Quint, hospice terminal social worker" }],
+    ["contact suicidal social worker", { referral_contact: "Marisol Quint, the hospice suicidal social worker" }],
+    ["population new health words", { populations: ["adults with metastatic cancer"] }],
+    ["population recombined", { populations: ["families in active treatment"] }],
+    ["follow-up hospice person", { follow_up_points: ["Ask the hospice social worker about the one on comfort care"] }],
   ];
   it.each(REFUSED)("refuses %s", async (_id, stub) => {
     const r = await run(stub);
@@ -144,6 +201,38 @@ describe("hospice professionals in the field checks", () => {
     expect(r.rejected).toEqual([]);
     expect(r.unsupported.map((x) => x.field)).toEqual(expect.arrayContaining(["Insurance and private pay", "Best time to reach them"]));
   }, 120_000);
+});
+
+describe("the follow-up letter is read sentence by sentence", () => {
+  const facts = { clinician: { name: "Dana Reyes", credential: "LCPC", practice: "Reyes Counseling PLLC", neighborhood: null, city: "Chicago" } };
+  const cleaned =
+    "I had coffee with Dr. Okafor from Northside Women's Health. They send referrals by fax. They mostly see adults in active treatment and their families. " +
+    "She said I should meet Marisol Quint, the hospice social worker at Orrindale Hospice. I said I would send my openings and a flyer next week.";
+  const wrap = (middle: string) =>
+    `Dear Amara Okafor, MD,\n\nThank you for meeting me for coffee. ${middle} As I said, I will send my openings and a flyer next week.\n\nWarmly,\nDana Reyes, LCPC\nReyes Counseling PLLC`;
+  const BAD = [
+    "I was so sorry to hear that one of your patients is dying in hospice.",
+    "I hope the man who just finished chemo is doing well.",
+    "Please tell the woman in hospice I said hello.",
+    "I hope they are comfortable on comfort care.",
+    "I can see the family whose son passed away.",
+    "I'd be glad to help your patient with metastatic cancer.",
+    "I'm glad Marisol Quint is coping with her diagnosis.",
+    "I can see someone with a brain bleed soon.",
+  ];
+  it.each(BAD)("refuses a letter with: %s", async (line) => {
+    const { letterAboutAPerson } = await import("../lib/referrals/debrief");
+    expect(letterAboutAPerson(wrap(line), SRC, facts, cleaned)).not.toBeNull();
+  });
+  it("passes a plain thank-you built from the debrief", async () => {
+    const { letterAboutAPerson } = await import("../lib/referrals/debrief");
+    expect(letterAboutAPerson(wrap("It was good to hear that your office sends referrals by fax and sees adults in active treatment and their families."), SRC, facts, cleaned)).toBeNull();
+  });
+  it("refuses a letter that is mostly not from the debrief", async () => {
+    const { letterAboutAPerson } = await import("../lib/referrals/debrief");
+    const made = wrap("Our shared love of sailing, jazz records, vintage bicycles and Portuguese cooking made the afternoon memorable, especially your stories about Lisbon harbors and Miles Davis.");
+    expect(letterAboutAPerson(made, SRC, facts, cleaned)).not.toBeNull();
+  });
 });
 
 describe("evidence matching reads the same word or number however it was said", () => {

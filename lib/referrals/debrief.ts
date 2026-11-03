@@ -45,7 +45,7 @@ import {
   type Rejected,
   type WhoElse,
 } from "./debrief-shape";
-import { blockedReason, checkFacts, checkLetter, finishLetter, letterFacts, pendingLetter, valueOffered } from "./outreach";
+import { blockedReason, checkFacts, checkLetter, finishLetter, letterFacts, pendingLetter, valueOffered, type LetterFacts } from "./outreach";
 import { cardView } from "./plan";
 import { getSource, type ReferralSource } from "./store";
 
@@ -168,8 +168,22 @@ const ONE_PERSON =
 const HONORIFIC = /\b(?:Mr|Mrs|Ms|Mx|Miss)\.?\s+\p{Lu}/u;
 // Health, life events and feelings. Applied to one person, they drop the sentence.
 const HEALTH =
-  /\b(?:cancer|leukemia|lymphoma|tumou?r|chemo\w*|radiation|surgery|scans?|biopsy|hospice|palliative|end[- ]of[- ]life|nicu|picu|icu|heart\s+failure|stroke|dementia|alzheimer\w*|pregnan\w*|miscarri\w*|stillbirth|overdos\w*|rehab|hospitali[sz]\w*|in\s+the\s+hospital|psychosis|psychotic|drinking|alcohol\w*|drugs?|meds?|medication|condition|illness|sick|ill|terminal|dying|died|dies|death|passed\s+away|funeral|grie(?:f|ving|ves)|bereave\w*|cry|cries|crying|cried|tears|depressed|anxious|scared|terrified|afraid|lonely|struggl\w*|upset|overwhelmed|not\s+sleeping|sleeping|eating|stopped\s+eating|suicid\w*|self[- ]?harm|relapse\w*|abuse\w*|assault\w*|divorc\w*|arrest\w*|lost\s+(?:her|his|their)|laid\s+off|evicted|out\s+on\s+leave|on\s+leave|in\s+treatment|treatment|ms|als|copd|diabetes|autism|autistic)\b/i;
+  /\b(?:cancer|leukemia|lymphoma|tumou?r|chemo\w*|radiation|surgery|scans?|biopsy|hospice|palliative|end[- ]of[- ]life|nicu|picu|icu|heart\s+failure|stroke|dementia|alzheimer\w*|pregnan\w*|miscarri\w*|stillbirth|overdos\w*|rehab|hospitali[sz]\w*|in\s+the\s+hospital|psychosis|psychotic|drinking|alcohol\w*|drugs?|meds?|medication|condition|illness|sick|ill|terminal|dying|died|dies|death|passed\s+away|funeral|grie(?:f|ving|ves)|bereave\w*|cry|cries|crying|cried|tears|depressed|anxious|scared|terrified|afraid|lonely|struggl\w*|upset|overwhelmed|not\s+sleeping|sleeping|eating|stopped\s+eating|suicid\w*|self[- ]?harm|relapse\w*|abuse\w*|assault\w*|divorc\w*|arrest\w*|lost\s+(?:her|his|their)|laid\s+off|evicted|out\s+on\s+leave|on\s+leave|in\s+treatment|treatment|ms|als|copd|diabetes|autism|autistic|carcinoma\w*|metasta\w*|leukaemia|mastectom\w*|renal|kidney\s+failure|ventilator\w*|dnr|comfort\s+care|actively\s+(?:passing|dying)|passed|passing\s+away|loss|losses|remission|bed-?bound|brain\s+bleed|parkinson\w*|end[- ]stage|until\s+the\s+end|(?:days|weeks|months)\s+left|killed\s+(?:him|her|them)sel(?:f|ves)|took\s+(?:his|her|their)\s+own\s+li(?:fe|ves)|suicide\s+attempt)\b/i;
 const PRONOUN = /\b(?:she|he|her|his|him|she's|he's)\b/i;
+// Someone not named and not she/he: "they have someone who", "the one on DNR status", "whose kids".
+// "They ..." opening a sentence is the office, and "their patients" / "their families" is the group they serve.
+const SOMEONE =
+  /(?<!^\s*)\bthey\b|\bthem\b|\btheir\b(?!\s+(?:patients|clients|families|parents|caregivers|staff|office|offices|team|teams|referrals?|practice|front|nurses|doctors|providers|therapists|intake|fax|portal|professional|own\s+(?:patients|clients)))|\bsome(?:one|body)\b|\b(?:a|the)\s+person\b|\bthe\s+one\b|\bone\s+(?:on|with|in|who)\b|\bwhose\b/i;
+/** Digits and symbols written for letters ("h0spice", "d1ying") read as the letters, for the health words only. */
+function leetFold(t: string): string {
+  const map: Record<string, string> = { "0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "@": "a", $: "s" };
+  return t.replace(/(?<=\p{L})[013457@$]+|[013457@$]+(?=\p{L})/gu, (m) => [...m].map((c) => map[c] ?? c).join(""));
+}
+/** A health, life-event or clinical word, also when written with digits for letters. */
+function healthWord(t: string): boolean {
+  const f = leetFold(t);
+  return HEALTH.test(f) || MEDICAL.test(f) || mentionsDiagnosis(f) || DIAGNOSED.test(f);
+}
 
 // Initials stand in for a person: "J.R.", "J R", "JR". Known acronyms are fine.
 const ACRONYMS = new Set(
@@ -212,14 +226,17 @@ const CARE_SETTING =
   "hospice|palliative(?:\\s+care)?|(?:radiation\\s+)?oncology|hematology(?:[- ]oncology)?|bereavement|grief|end[- ]of[- ]life|cancer\\s+(?:center|centre)";
 const CARE_GROUP = `(?:${CARE_SETTING})(?:\\s*(?:and|&|/|-)\\s*(?:${CARE_SETTING}))*`;
 // A job in that setting: "hospice social worker", "palliative care team", "oncology nurse navigator".
-const CARE_ROLE_SRC = `\\b${CARE_GROUP}\\s+(?:[\\w-]+\\s+)??(?:${ROLE}|team)\\b`;
+// The one word that may sit between setting and job is from a closed list: "hospice intake coordinator", never "hospice dying nurse".
+const JOB_WORD = "clinical|licensed|senior|lead|staff|program|intake|admissions|volunteer|spiritual|community|outreach|support|interdisciplinary|care|nurse|medical";
+const CARE_ROLE_SRC = `\\b${CARE_GROUP}\\s+(?:(?:${JOB_WORD})\\s+)?(?:${ROLE}|team)\\b`;
 const CARE_ROLE = new RegExp(CARE_ROLE_SRC, "gi");
 // She was told to meet or reach them: "I should meet", "told me to call", "you should talk to", "introduced me to".
 const INTRO_VERB = "meet|talk\\s+(?:to|with)|speak\\s+(?:to|with)|reach\\s+out\\s+to|get\\s+in\\s+touch\\s+with|contact|connect\\s+with|call|e-?mail";
 const TOLD_TO_MEET = new RegExp(`\\b(?:I|me|you|we|us)\\b(?:\\s+[\\w’']+){0,3}?\\s+(?:${INTRO_VERB})\\b|\\bintroduc\\w*\\s+(?:me|us)\\s+to\\b`, "i");
 // Or the role handles the referrals: "Their palliative care team handles referrals".
 const ROLE_HANDLES_REFERRALS = new RegExp(
-  `^\\s*(?:the|their|our)\\s+${CARE_ROLE_SRC}(?:\\s+(?:at|from)\\s+[^,.;]{1,60}?)?\\s+(?:handles?|coordinates?|manages?|reviews?|sends?|takes?|makes?)\\s+(?:\\w+\\s+){0,2}?(?:referrals?|intake)\\b`,
+  // Anchored at both ends: nothing may follow but how ("by fax"), so "takes referrals for someone whose spouse passed" never matches.
+  `^\\s*(?:the|their|our)\\s+${CARE_ROLE_SRC}(?:\\s+(?:at|from)\\s+[^,.;]{1,60}?)?\\s+(?:handles?|coordinates?|manages?|reviews?|sends?|takes?|makes?)\\s+(?:(?:all|the|their|our|new|most)\\s+){0,2}(?:referrals?|intake)(?:\\s+(?:by|through|via|over)\\s+(?:fax|phone|e-?mail|the\\s+portal|their\\s+portal|epic|mychart))?\\s*[.!]?\\s*$`,
   "i",
 );
 // "She said ..." at the start is the partner speaking, not a patient.
@@ -237,22 +254,31 @@ const SAID_LEAD = /^\s*(?:she|he)\s+(?:said|says|told\s+(?:me|us)|mentioned|sugg
 export function withoutCareRoles(s: string): string {
   const roles = [...s.matchAll(CARE_ROLE)];
   if (roles.length === 0) return s;
+  if (roles.some((m) => !jobOnly(m[0]))) return s;
   const told = TOLD_TO_MEET.exec(s);
   const pointedTo = told !== null && roles.every((m) => (m.index ?? 0) >= told.index + told[0].length - 1);
   if (!pointedTo && !ROLE_HANDLES_REFERRALS.test(s)) return s;
   const stripped = s.replace(CARE_ROLE, "professional");
   const residue = withoutOrgs(stripped);
-  if (HEALTH.test(residue) || MEDICAL.test(residue) || mentionsDiagnosis(residue) || DIAGNOSED.test(residue)) return s;
-  if (PRONOUN.test(residue.replace(SAID_LEAD, ""))) return s;
+  if (healthWord(residue)) return s;
+  const rest = residue.replace(SAID_LEAD, "");
+  if (PRONOUN.test(rest) || SOMEONE.test(rest)) return s;
   return stripped;
+}
+
+const CARE_WORDS = new RegExp(CARE_SETTING, "gi");
+/** The matched job, with its setting words taken out, holds no health, patient or person word. */
+function jobOnly(role: string): boolean {
+  const t = role.replace(CARE_WORDS, " ");
+  return !healthWord(t) && !clinicalForMemory(t) && !ONE_PATIENT.test(t) && !ONE_PERSON.test(t) && !FAMILY.test(t) && !/\b(?:patient|client|family|resident)\b/i.test(t);
 }
 
 /** The whole value is a care-setting job, maybe with "the": "hospice social worker", "the palliative care team". */
 export function isCareRole(role: string): boolean {
-  return new RegExp(`^\\s*(?:the\\s+)?${CARE_ROLE_SRC}\\s*$`, "i").test(role);
+  return new RegExp(`^\\s*(?:the\\s+)?${CARE_ROLE_SRC}\\s*$`, "i").test(role) && jobOnly(role);
 }
 /** A care-setting place with no name: "hospice", "the local palliative care program". */
-const CARE_PLACE = new RegExp(`^\\s*(?:the\\s+)?(?:local\\s+)?${CARE_GROUP}(?:\\s+(?:team|program|agency|center|centre|unit|department|service|services))?\\s*$`, "i");
+const CARE_PLACE = new RegExp(`^\\s*(?:the\\s+)?(?:local\\s+)?${CARE_GROUP}(?:\\s+(?:program|agency|center|centre))?\\s*$`, "i");
 
 const TWO_CAPS = /(?<![\p{L}])\p{Lu}\p{Ll}+(?:\s+\p{Lu}\p{Ll}+)+/gu;
 const TITLED = /\b(?:Dr|Doctor|Mr|Mrs|Ms|Mx|Miss)\.?\s+\p{Lu}\p{Ll}+/gu;
@@ -267,19 +293,27 @@ function namesIn(s: string): string[] {
   return out.filter((n) => !/^(?:The|Their|They|Our|Her|His|She|He|We|I|Most|Coffee|Referrals?|Dr)\b\s*$/.test(n.split(/\s+/)[0] + " "));
 }
 
+const BEFORE_JOB = new RegExp(`((?:[\\w'’-]+\\s+){1,2})(?:${ROLE}|team)\\b`, "gi");
+/** A health word in the two words before a job ("the hospice dying nurse", "oncology leukemia-patient navigator"); setting words don't count. */
+function healthBeforeJob(s: string): boolean {
+  return [...leetFold(s).matchAll(BEFORE_JOB)].some((m) => healthWord(m[1].replace(CARE_WORDS, " ")));
+}
+
 /** One person's story with no name at all: a room, an age, a visit date, family, initials, an honorific, a person with a health event. */
 export function aboutAPatient(s: string): boolean {
-  const residue = withoutOrgs(withoutCareRoles(s));
+  if (healthBeforeJob(withoutOrgs(s))) return true;
+  const residue = leetFold(withoutOrgs(withoutCareRoles(s)));
   if (ONE_PATIENT.test(s) || POSSESSIVE_PATIENT.test(s) || AN_AGE.test(s) || DIAGNOSED.test(s) || ROOM.test(s)) return true;
   if (FAMILY.test(residue) || ONE_PERSON.test(residue) || HONORIFIC.test(s) || hasInitials(s)) return true;
   if ((A_DATE.test(s) || WEEKDAY.test(s)) && PRONOUN.test(s) && VISIT.test(s)) return true;
   if (A_DATE.test(s) && VISIT.test(s)) return true;
-  const someone = PRONOUN.test(residue) || namesIn(residue).length > 0;
-  if (someone && (HEALTH.test(residue) || mentionsDiagnosis(residue) || MEDICAL.test(residue))) return true;
+  const someone = PRONOUN.test(residue) || SOMEONE.test(residue) || namesIn(residue).length > 0;
+  if (someone && healthWord(residue)) return true;
   // A diagnosis with no person in it reads as a group ("new moms with postpartum anxiety").
   return false;
 }
-const MEDICAL = /\b(?:cancer|chemo\w*|radiation|tumou?r|surgery|pregnan\w*|miscarriage|stillbirth|overdose|rehab|hospitali[sz]ed|meds?|medication|condition|illness|terminal|leukemia|nicu|hospice|palliative|heart\s+failure|psychosis|drinking|alcohol\w*)\b/i;
+const MEDICAL = /\b(?:cancer|chemo\w*|radiation|tumou?r|surgery|pregnan\w*|miscarriage|stillbirth|overdose|rehab|hospitali[sz]ed|meds?|medication|condition|illness|terminal|leukemia|leukaemia|carcinoma\w*|metasta\w*|mastectom\w*|renal|kidney\s+failure|ventilator\w*|dnr|comfort\s+care|remission|bed-?bound|brain\s+bleed|parkinson\w*|end[- ]stage|nicu|hospice|palliative|heart\s+failure|psychosis|drinking|alcohol\w*)\b/i;
+const HEALTH_ALL = new RegExp(`${HEALTH.source}|${MEDICAL.source}`, "gi");
 
 // (a) Practice-business cues.
 const BUSINESS = new RegExp(
@@ -431,7 +465,7 @@ export function nameWithNeed(value: string): boolean {
   return sentences(value).some((s) => {
     const residue = withoutOrgs(withoutCareRoles(s));
     const named = namesIn(residue).length > 0 || /\b(?:Dr|Doctor)\.?\s+\p{Lu}/u.test(s);
-    return named && (HEALTH.test(residue) || MEDICAL.test(residue) || mentionsDiagnosis(residue) || /\b(?:needs?|wants?|help\s+with|looking\s+for\s+help)\b/i.test(residue));
+    return named && (healthWord(residue) || /\b(?:needs?|wants?|help\s+with|looking\s+for\s+help)\b/i.test(residue));
   });
 }
 
@@ -590,6 +624,34 @@ export function support(field: string, cleaned: string): number {
   return want.filter((w) => have.has(w)).length / want.length;
 }
 
+const plainWords = (t: string) => ` ${leetFold(t).toLowerCase().replace(/[^\p{L}\p{N}'’-]+/gu, " ").trim()} `;
+
+/**
+ * A field with a health, life-event or clinical word is kept only as a phrase
+ * she said: the whole field word for word in the cleaned debrief. Muse can
+ * copy "adults in cancer treatment", never write "adults with metastatic
+ * cancer". The meeting summary (a paraphrase by design) needs each such word
+ * with two words on each side as she said them.
+ */
+export function healthWordsSaid(field: string, cleaned: string, exact = true): boolean {
+  const have = plainWords(cleaned);
+  const plain = plainWords(field);
+  const words = plain.trim().split(" ").filter(Boolean);
+  const hits = [...plain.matchAll(HEALTH_ALL)].map((m) => m[0].trim());
+  const diag = mentionsDiagnosis(field) || DIAGNOSED.test(field);
+  if (!hits.length && !diag) return true;
+  if (exact) return have.includes(plain.replace(/^\s*(?:the|a|an)\s+/, " "));
+  if (diag && !hits.length) return false;
+  for (const hit of hits) {
+    const first = hit.split(/\s+/);
+    const at = words.findIndex((_, i) => first.every((w, j) => words[i + j] === w));
+    if (at < 0) return false;
+    const window = words.slice(Math.max(0, at - 2), at + first.length + 2).join(" ");
+    if (!have.includes(` ${window} `)) return false;
+  }
+  return true;
+}
+
 /** Every number in the field is written in the cleaned debrief too. */
 export function numbersSupported(field: string, cleaned: string): boolean {
   const have = new Set(withDigits(cleaned).match(/\d+(?:[.,]\d+)?/g) ?? []);
@@ -617,7 +679,7 @@ export function personalRole(role: string, organization: string | null): boolean
   const place = CARE_PLACE.test(org) ? "the org" : org;
   for (const t of [job, place]) {
     if (!t) continue;
-    if (HEALTH.test(t) || MEDICAL.test(t) || mentionsDiagnosis(t) || clinicalForMemory(t) || FAMILY.test(t) || ONE_PERSON.test(t) || ONE_PATIENT.test(t) || hasInitials(t)) return true;
+    if (healthWord(t) || clinicalForMemory(t) || FAMILY.test(t) || ONE_PERSON.test(t) || ONE_PATIENT.test(t) || hasInitials(t)) return true;
     if (/\b(?:patient|client|mom|dad|mother|father|husband|wife|son|daughter|family|survivor|resident|widow\w*)\b/i.test(t)) return true;
   }
   return false;
@@ -643,7 +705,7 @@ const NEEDED = 0.6;
  * social worker Orrindale Hospice" into two strangers. Every other field reads
  * as written.
  */
-export type FieldViews = { person: string; guard: string };
+export type FieldViews = { person: string; guard: string; pieces?: string[] };
 
 const A_NAME = /^(?:(?:Dr|Doctor)\.?\s+)?\p{Lu}[\p{Ll}'’-]+(?:\s+\p{Lu}[\p{Ll}'’-]+){0,2}$/u;
 const noThe = (t: string) => t.trim().replace(/^the\s+/i, "");
@@ -655,6 +717,8 @@ export function whoElseViews(w: Pick<WhoElse, "name" | "role" | "organization">)
   const job = isCareRole(w.role) ? "professional" : noThe(w.role);
   const place = w.organization && CARE_PLACE.test(withoutOrgs(w.organization)) ? " at the org" : org;
   return {
+    // The health-word check reads the role and the organization each on its own, as she said them.
+    pieces: [w.name ?? "", w.role, w.organization ?? ""].filter(Boolean),
     words: `${lead}${[w.role, w.organization].filter(Boolean).join(" ")}`,
     person: `${lead}the ${job}${place}`,
     guard: `${lead}the ${job}${org}.`,
@@ -711,6 +775,7 @@ export async function checkFields(
     else if (CLINICAL_CHECKED.includes(field) && (clinicalForMemory(value) || clinicalForMemory(views.guard))) why = "it has clinical details";
     else if (field === "populations" && !genericGroup(value)) why = "it isn't a group of people";
     else if (!numbersSupported(value, cleaned)) why = "it has a number you didn't say";
+    else if (!(views.pieces ?? [value]).every((t) => healthWordsSaid(t, cleaned, field !== "last_meeting_summary"))) why = "it puts health words together in a way you didn't say";
     else if (support(value, cleaned) < need) why = "you didn't say that in the debrief";
     else if (!(await check(views.guard, allow)).ok) why = "it may hold a patient's details";
     if (why) reject(field, why);
@@ -786,6 +851,30 @@ function readJson(content: string | null | undefined): { subject?: unknown; lett
   }
 }
 
+// Words any thank-you letter uses: they need not be in the debrief.
+const LETTER_WORDS =
+  "dear thank thanks thanking meeting meet met coffee glad great enjoyed enjoy lovely nice pleasure warmly warm regards best sincerely kind " +
+  "hope look looking forward again soon talk chat speak hear hearing time taking learn learning learned about your office practice team work " +
+  "share sharing know please reach anytime touch connect connecting call email phone happy appreciate appreciated support helpful helping";
+
+/**
+ * Why the follow-up can't go, or null: any sentence about one person (the
+ * debrief's own checks, with the partner's and her own names read as
+ * colleagues), clinical words, or too little of it from the debrief.
+ */
+export function letterAboutAPerson(letter: string, source: Pick<ReferralSource, "name" | "organization">, facts: Pick<LetterFacts, "clinician">, cleaned: string): string | null {
+  const own = [facts.clinician?.name, facts.clinician?.practice].filter((v): v is string => Boolean(v));
+  const masked = maskKnown(letter.replace(/^\s*(?:dear|hello|hi)\b[^\n]*$/gim, " "), [...partnerNames(source), ...own]);
+  for (const s of sentences(masked)) {
+    if (ONE_PATIENT.test(s) || aboutAPatient(s) || nameWithNeed(s) || clinicalForMemory(s) || (healthWord(s) && !healthWordsSaid(s, cleaned, false))) {
+      return "It mentions a patient or someone's health.";
+    }
+  }
+  const body = masked.replace(/\b(?:Dr|LCPC|LCSW|LMFT|LPC|PLLC|MD|PhD|PsyD)\b/g, " ");
+  if (support(body, `${cleaned} ${LETTER_WORDS} ${own.join(" ")} colleague`) < 0.6) return "Too much of it isn't from the debrief.";
+  return null;
+}
+
 /**
  * Muse writes the follow-up from the cleaned debrief: the same text the profile
  * call reads, after the privacy pass, so it can run at the same time instead of
@@ -829,6 +918,11 @@ export async function writeFollowUp(
     }
     if (!numbersSupported(finished.replace(/(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/g, ""), JSON.stringify(data))) {
       problem = "It has a number that isn't in the facts. Rewrite it without that.";
+      continue;
+    }
+    const why = letterAboutAPerson(`${subject}. ${finished}`, source, facts, cleaned);
+    if (why) {
+      problem = `${why} Rewrite it about the practice only, from the debrief.`;
       continue;
     }
     const g = await check(finished, allow);
