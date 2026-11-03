@@ -369,6 +369,8 @@ describe.skipIf(!hasDb)("referrals against the database", () => {
     const [audit] = await db()<{ n: number }[]>`select count(*)::int as n from practice_os.audit_log where action = 'approval_declined' and approval_id = ${a.id}`;
     expect(audit.n).toBe(1);
     await db()`delete from practice_os.referral_suppressions where npi = (select npi from practice_os.referral_sources where id = ${id})`;
+    const { unsuppress } = await import("../lib/referrals/contacts");
+    await unsuppress(id); // its org key too (migration 045)
   });
 
   it("a revision keeps BCBS (as pending), sliding scale and 6 years; plain code checks, retrying until it does", async () => {

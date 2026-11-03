@@ -9,7 +9,8 @@ import { practiceTimeZone, practiceToday } from "../compliance/store";
 import { db } from "../db";
 import { orgNameScore } from "./evidence/match";
 import { jaroWinkler, normalizeName, normalizeOrg } from "./evidence/normalize";
-import { contactsFor, relationshipFrom, suppressedNpis, type Contact } from "./contacts";
+import { withoutDistance } from "./sensitive";
+import { contactsFor, isSuppressed, relationshipFrom, suppressedList, type Contact } from "./contacts";
 import { STAGE_LABEL } from "./stages";
 import { latestLetters, listSources, practiceFacts, tierContext, type LetterState, type ReferralSource } from "./store";
 import { boardTier, compareTiers, TIER_LABEL, withRelationship, type TierContext, type TierResult } from "./tier";
@@ -63,6 +64,7 @@ const LAST_WORDS: Record<Contact["kind"], string> = {
   replied: "they replied",
   note: "a note",
   referred: "they referred someone",
+  referred_out: "you referred someone to them",
 };
 
 /** Cards whose follow-up date is within `days` (overdue included), soonest first. */
@@ -90,7 +92,11 @@ export function tiersWithLog(
   ctx: Omit<TierContext, "miles">,
 ): Record<string, TierResult> {
   return Object.fromEntries(
-    cards.map((c) => [c.id, withRelationship(boardTier(c, ctx), relationshipFrom(contacts[c.id] ?? [], c.introduced_by ?? null))]),
+    cards.map((c) => {
+      const t = withRelationship(boardTier(c, ctx), relationshipFrom(contacts[c.id] ?? [], c.introduced_by ?? null));
+      // A sensitive card's reasons never say how far it is (lib/referrals/sensitive.ts).
+      return [c.id, c.sensitive ? { ...t, reasons: [t.reasons[0], ...withoutDistance(t.reasons.slice(1))] } : t];
+    }),
   );
 }
 
@@ -110,7 +116,7 @@ export function rankCards<T extends Pick<ReferralSource, "id" | "name" | "distan
  * come before those who see everyone, then by score.
  */
 export async function outreachPlan(sql: postgres.Sql = db(), max = NEW_PER_WEEK, opts: { specialties?: SpecialtyId[] } = {}): Promise<OutreachPlan> {
-  const [cards, today, facts, blocked] = await Promise.all([listSources(sql), practiceToday(sql), practiceFacts(sql), suppressedNpis(sql)]);
+  const [cards, today, facts, blocked] = await Promise.all([listSources(sql), practiceToday(sql), practiceFacts(sql), suppressedList(sql)]);
   const asked = opts.specialties?.length ? opts.specialties : await recentSearchKinds(sql).catch(() => [] as SpecialtyId[]);
   const contacts = await contactsFor(cards.map((c) => c.id), sql);
   const tiers = tiersWithLog(cards, contacts, tierContext(facts));
@@ -121,7 +127,7 @@ export async function outreachPlan(sql: postgres.Sql = db(), max = NEW_PER_WEEK,
   let waiting = 0;
   let letters_waiting = 0;
   const fresh = cards.filter((c) => {
-    if (c.stage !== "found" || due.has(c.id) || (c.npi && blocked.has(c.npi))) return false;
+    if (c.stage !== "found" || due.has(c.id) || isSuppressed(c, blocked)) return false;
     if (letterWaiting(letters[c.id])) {
       letters_waiting++;
       return false;

@@ -105,13 +105,15 @@ function ProviderRow({
         </dt>
         <dd className="text-[var(--fg-muted)]">
           <span className="sr-only">Location: </span>
-          {p.homeAddress
+          {p.sensitive
+            ? `${p.city}. Contact through their public line only.`
+            : p.homeAddress
             ? `${HOME_ADDRESS} (${p.city} ${p.zip})`
             : p.address
               ? `${p.address}, ${p.city} ${p.zip}`
               : `Address not listed in NPPES (${p.zip})`}
           {p.distanceMiles !== null && ` · ${milesLabel(p.distanceMiles, approximate)}`}
-          {approximate && !p.homeAddress && (
+          {approximate && !p.homeAddress && !p.sensitive && (
             <span className="block">Pin is at the ZIP code&rsquo;s center; the street address wasn&rsquo;t found on the map.</span>
           )}
         </dd>
@@ -132,9 +134,11 @@ function ProviderRow({
         </ul>
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button variant="quiet" onClick={onSelect} aria-label={`Show on map: ${p.name}`} aria-pressed={selected} className={FOCUS}>
-          Show on map
-        </Button>
+        {!p.sensitive && (
+          <Button variant="quiet" onClick={onSelect} aria-label={`Show on map: ${p.name}`} aria-pressed={selected} className={FOCUS}>
+            Show on map
+          </Button>
+        )}
         {onBoard ? (
           <span
             id={`onboard-${p.npi}`}
@@ -307,7 +311,11 @@ export function AreaExplorer({
     return out;
   }, [shown]);
 
-  const pins = useMemo(() => shown.map((p) => ({ npi: p.npi, name: p.name, lat: p.lat, lon: p.lon, tier: p.tier.tier })), [shown]);
+  // A sensitive provider (DV/SA agency, shelter) has no point and is never pinned.
+  const pins = useMemo(
+    () => shown.flatMap((p) => (p.lat === null || p.lon === null ? [] : [{ npi: p.npi, name: p.name, lat: p.lat, lon: p.lon, tier: p.tier.tier }])),
+    [shown],
+  );
 
   const select = useCallback((npi: string) => {
     setSelected(npi);
@@ -332,7 +340,7 @@ export function AreaExplorer({
       const res = await fetch("/api/referrals/add", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ items: [{ npi: p.npi, distanceMiles: p.distanceMiles }] }),
+        body: JSON.stringify({ items: [{ npi: p.npi, distanceMiles: p.distanceMiles, ...(p.sensitive ? { sensitive: true } : {}) }] }),
       });
       const data = (await res.json()) as { added?: { npi: string }[]; error?: string };
       if (!res.ok || !data.added?.length) throw new Error(data.error ?? `${p.name} isn't in the NPI Registry any more.`);

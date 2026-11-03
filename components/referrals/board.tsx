@@ -244,8 +244,14 @@ function Card({
           Suggested from your debrief{card.introduced_by ? ` with ${card.introduced_by}` : ""}. Not contacted.
         </p>
       )}
+      {card.found_via === "manual" && <p className="text-small font-medium">Added by you</p>}
+      {card.sensitive && (
+        <p className="text-small font-medium" data-testid="public-line-only">
+          Contact through their public line only.{card.city ? ` ${card.city}${card.state ? `, ${card.state}` : ""}.` : ""}
+        </p>
+      )}
       {tier && <p className="text-small text-[var(--fg-muted)]">Why: {tier.reasons.slice(1).join("; ")}.</p>}
-      {card.address && (
+      {card.address && !card.sensitive && (
         <p className="flex items-start gap-1.5 text-small text-[var(--fg-muted)]">
           <MapPin aria-hidden size={14} className="mt-0.5 shrink-0" />
           <span>

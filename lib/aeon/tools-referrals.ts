@@ -14,6 +14,11 @@ import { LetterNotWaiting, pendingLetter, reviseLetter } from "../referrals/outr
 import { normalizeName, normalizeOrg } from "../referrals/evidence/normalize";
 import { cardsNamed } from "../referrals/plan";
 import { listSources, STAGE_LABEL, STAGES, type ReferralSource } from "../referrals/store";
+import { isSensitive, SOURCE_TYPES } from "../referrals/catalog";
+import { readManual } from "../referrals/manual";
+import { addManual } from "../referrals/org-store";
+
+const SOURCE_TYPE_IDS = SOURCE_TYPES.map((t) => t.id) as [string, ...string[]];
 import type { AeonTool, ToolContext, ToolResult } from "./tools";
 
 const text = (value: unknown): ToolResult => ({ content: [{ type: "text", text: JSON.stringify(value, null, 2) }] });
@@ -33,6 +38,12 @@ export const ABOUT_NAMES =
   "These are doctors and clinicians from the public NPI Registry on her Referrals board, not clients. Call each one by name " +
   "(or 'they'); never guess he or she. Copy addresses, phones and emails exactly as written here (don't add periods or spell out " +
   "St or N), and say who they see (new parents, children, adults), not conditions, so the privacy check doesn't hold the answer back.";
+
+/** Said with organisations found by CMS or OpenStreetMap. */
+export const ABOUT_ORGS =
+  "Organisations from the CMS Provider Data Catalog or OpenStreetMap are businesses and congregations, not clients. Say where each " +
+  "came from; for OpenStreetMap places say 'data © OpenStreetMap contributors (ODbL)'. A hospice's office address is where it is " +
+  "based, not where it serves. Never offer anything in return for a referral.";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -228,6 +239,7 @@ export const REFERRAL_TOOLS: AeonTool[] = [
             phone: c.phone,
             email: email?.value ?? c.email ?? null,
             email_from: email ? (email.origins[0] === "clinician" ? "she typed it" : "Aeon found it; she should confirm it") : c.email ? "on the card" : null,
+            ...(c.sensitive ? { contact: "Contact through their public line only. Never give or look up their street address." } : {}),
             follow_up_on: c.next_follow_up_on,
             last_logged: last
               ? `${CONTACT_LABEL[last.kind]} on ${last.happened_on}${notes.get(c.id) ? `: ${notes.get(c.id)}` : last.note ? " (note held back by the privacy check)" : ""}`
@@ -245,7 +257,8 @@ export const REFERRAL_TOOLS: AeonTool[] = [
     title: "Don't contact someone again",
     description:
       "When she says a referral source isn't interested, asked not to be contacted, or 'don't contact them again': moves the card to " +
-      "Not a fit, clears its follow-up, and puts the NPI on her do-not-contact list so no search or weekly plan suggests them again. " +
+      "Not a fit, clears its follow-up, and puts them on her do-not-contact list (by NPI, or for a card with no NPI by its name and " +
+      "address or city) so no search, weekly plan, letter or debrief suggests them again. " +
       "A note alone does NOT do this, so use this tool, not log_referral_contact. A letter to them still waiting in Approvals is declined. " +
       "Name the card as she said it or pass its id; it acts only on an exact name match, otherwise it returns ask_which: list them " +
       "(name, credential, address), ask her which and call again with the id; never pick one yourself. undo: true takes them " +
@@ -375,6 +388,67 @@ export const REFERRAL_TOOLS: AeonTool[] = [
       } catch (err) {
         if (err instanceof LetterNotWaiting) return text({ revised: false, why: err.message });
         return text({ revised: false, why: err instanceof Error ? err.message : "I couldn't change the letter." });
+      }
+    },
+  }),
+
+  tool({
+    name: "add_referral_source",
+    title: "Add a referral source by hand",
+    description:
+      "When she names an organisation or person to add to her Referrals board herself ('add Gilda's Club Chicago as a cancer " +
+      "nonprofit, phone 312-555-0100'): saves it under Found, labelled 'Added by you'. `type` is the catalog kind that fits best " +
+      "(a cancer or disease nonprofit -> disease_orgs; a grief center -> grief_centers; a hospice -> hospice; a funeral home -> " +
+      "funeral_homes; a church or clergy -> clergy; a nurse navigator -> nurse_navigators; a hospital social worker -> " +
+      "hospital_social_workers; a support group -> support_group_leaders; a domestic violence or sexual assault agency -> " +
+      "dv_sa_agencies; a shelter -> shelters). Copy only what she said; never invent a phone, email, address or website. It needs " +
+      "a city or ZIP. A DV/SA agency or shelter keeps only the city (never a street address): say 'contact through their public " +
+      "line only'. If it matches a card already on her board it is not added twice: say which card it matched. Someone on her " +
+      "do-not-contact list is not added. Sends nothing.",
+    input: {
+      name: z.string().trim().min(2).max(160).describe("The organisation's or person's name, as she said it."),
+      kind: z.enum(["organization", "person"]).optional().describe("person for one professional; organization otherwise (default)."),
+      organization: z.string().trim().max(160).optional().describe("For a person: where they work, if she said."),
+      type: z.enum(SOURCE_TYPE_IDS).describe("The catalog kind that fits best."),
+      phone: z.string().trim().max(40).optional(),
+      email: z.string().trim().max(200).optional(),
+      street: z.string().trim().max(160).optional().describe("Street address, only if she said it."),
+      city: z.string().trim().max(80).optional().describe("The city; Chicago when she says 'in Chicago'."),
+      state: z.string().trim().max(2).optional().describe("Two letters, e.g. IL."),
+      zip: z.string().trim().max(10).optional(),
+      website: z.string().trim().max(300).optional(),
+      notes: z.string().trim().max(500).optional().describe("Her words about them. Never anything about a client."),
+      add_anyway: z.boolean().optional().describe("Only after she said, in this chat, that a possible duplicate is a different one: add it anyway."),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+    label: "Added to your Referrals board",
+    changesData: true,
+    // A write: from another app over MCP it waits for her approval.
+    queuesOverMcp: true,
+    run: async (input) => {
+      const read = readManual({ ...input, kind: input.kind ?? (input.organization && input.organization !== input.name ? "person" : "organization") });
+      if (!read.ok) return text({ added: false, why: read.error });
+      try {
+        const r = await addManual(read.input, { by: "aeon", addAnyway: input.add_anyway === true });
+        if (r.refused) return text({ added: false, why: r.refused });
+        if (r.possible) {
+          return text({
+            added: false,
+            possible_duplicate: { id: r.possible.id, name: r.possible.name },
+            ask: `${r.possible.name} is already on her board in the same city. Ask her whether this is a different one; only if she says so, call again with add_anyway: true.`,
+          });
+        }
+        if (r.matched) return text({ added: false, already_on_board: { id: r.matched.id, name: r.matched.name, matched_by: r.matched.label }, note: "It was already on her board, so nothing new was added." });
+        return text({
+          added: true,
+          id: r.id,
+          name: r.name,
+          column: STAGE_LABEL.found,
+          label: "Added by you",
+          ...(isSensitive(read.input.type) ? { sensitive: "Saved with the city only, never a street address. Contact through their public line only." } : {}),
+        });
+      } catch (err) {
+        return text({ added: false, why: err instanceof Error ? err.message : "I couldn't add that." });
       }
     },
   }),
