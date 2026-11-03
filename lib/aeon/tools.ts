@@ -45,8 +45,10 @@ import { draftOutreach } from "../referrals/outreach";
 import { DEFAULT_SPECIALTIES, getReferralSettings } from "../referrals/settings";
 import { DISCOVERY_IDS, findOrgsForChat } from "../referrals/orgs";
 import { isSensitiveSource, PUBLIC_LINE_ONLY } from "../referrals/sensitive";
-import { CONTACT_LABEL, logContact, REFERRED_NOTE, type ContactKind } from "../referrals/contacts";
+import { CONTACT_LABEL, contactsFor, logContact, REFERRED_NOTE, REFERRED_OUT_NOTE, type ContactKind } from "../referrals/contacts";
 import { LOGGABLE_KINDS } from "../referrals/contact-kinds";
+import { logReferralOut } from "../referrals/refer-out";
+import { reciprocity } from "../referrals/nurture";
 import { evidenceFor, setTypedEmail } from "../referrals/evidence/store";
 import { cardsNamed, NEW_PER_WEEK, outreachPlan } from "../referrals/plan";
 import { RecheckTooSoon, recheckDeps, recheckSource, recheckSummary } from "../referrals/sources/recheck";
@@ -332,6 +334,28 @@ export async function fuzzyDateCheck(
   return "ask" in r ? r.ask : null;
 }
 
+/**
+ * What a queued log entry will do, resolved now: the card's id and the exact day her words
+ * name, so her approval shows the card, the count and the date, and the approved run logs
+ * that same day (not the day she approves it). Null when the card or day isn't clear yet
+ * (preflight answers those before anything is queued).
+ */
+async function queuedLog<T extends { source: string; happened_on?: string; date_words?: string; date_confirmed?: boolean }>(
+  input: T,
+  ctx: Pick<ToolContext, "said">,
+  what: (name: string) => string,
+): Promise<{ args: T; shows: string } | null> {
+  const found = logCard(input.source, await listSources());
+  if (!found.card) return null;
+  const read = contactDay(input, ctx.said, await practiceToday());
+  if ("ask" in read) return null;
+  const day = read.day ?? (await practiceToday());
+  return {
+    args: { ...input, source: found.card.id, happened_on: day, date_confirmed: true },
+    shows: `${what(found.card.name)} on ${longDay(day)} (${day}).`,
+  };
+}
+
 /** The card a log entry is for: by id or by name; no match or several answer at once. */
 function logCard(source: string, cards: Awaited<ReturnType<typeof listSources>>): { card?: (typeof cards)[number]; result?: ToolResult } {
   const byId = cards.find((c) => c.id === source);
@@ -412,10 +436,11 @@ async function makeCms855i(ctx: ToolContext): Promise<ToolResult> {
 
 // Typed per tool, stored loosely: run() is only reached through runTool(), which parses the input first.
 function tool<I extends z.ZodRawShape>(
-  def: Omit<AeonTool, "run" | "input" | "preflight"> & {
+  def: Omit<AeonTool, "run" | "input" | "preflight" | "forApproval"> & {
     input: I;
     run: (input: z.infer<z.ZodObject<I>>, ctx: ToolContext) => Promise<ToolResult>;
     preflight?: (input: z.infer<z.ZodObject<I>>, ctx: ToolContext) => Promise<ToolResult | null>;
+    forApproval?: (input: z.infer<z.ZodObject<I>>, ctx: ToolContext) => Promise<{ args: unknown; shows: string } | null>;
   },
 ): AeonTool {
   return def as unknown as AeonTool;
@@ -1357,6 +1382,7 @@ export const TOOLS: AeonTool[] = [
       if (found.result) return found.result;
       return fuzzyDateCheck(input, ctx);
     },
+    forApproval: (input, ctx) => queuedLog(input, ctx, (name) => `Log "${CONTACT_LABEL[input.kind]}" for ${name}`),
     run: async ({ source, kind, happened_on, date_words, date_confirmed, note, follow_up_on }, ctx) => {
       const found = logCard(source, await listSources());
       if (found.result) return found.result;
@@ -1378,6 +1404,66 @@ export const TOOLS: AeonTool[] = [
           column: STAGE_LABEL[r.stage],
           next_follow_up_on: r.nextFollowUpOn,
           ...(kind === "referred" ? { note: REFERRED_NOTE } : {}),
+        });
+      } catch (err) {
+        return text({ logged: false, why: err instanceof Error ? err.message : "Couldn't log that." });
+      }
+    },
+  }),
+
+  tool({
+    name: "log_referral_out",
+    title: "Log that you referred someone to a provider",
+    description:
+      "When she says she referred someone (a client or caller she couldn't take) to someone on her Referrals board ('I sent " +
+      "two people to Dr. Patel this week'): logs the date and how many people, and NOTHING else. Never pass or repeat a name, " +
+      "initials, age, reason, diagnosis or any detail about the people referred; there is no field for them and the database " +
+      "refuses a note on this row. Name the card as she said it or pass its id; if more than one card fits it returns ask_which: " +
+      "list them and let her choose. Pass her words for when in date_words; a fuzzy day comes back needs_confirmation: ask her, " +
+      "then call again with date_confirmed: true. Returns the card's reciprocity line (they've referred N, you've referred M). " +
+      "Never offer or accept anything of value for a referral. Sends nothing.",
+    input: {
+      source: z.string().trim().min(2).max(160).describe("The card's name as she said it, or its id."),
+      count: z.number().int().min(1).max(20).optional().describe("How many people she referred to them. Default 1."),
+      happened_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("YYYY-MM-DD; today when left out."),
+      date_words: z.string().trim().max(80).optional().describe("Her exact words for when, if she said any ('yesterday', 'this week')."),
+      date_confirmed: z.boolean().optional().describe("True only after she confirmed the date in this chat, when an earlier call asked."),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: false },
+    label: "Logged a referral you made",
+    changesData: true,
+    // A change to her records: another app over MCP only queues it for her approval.
+    queuesOverMcp: true,
+    preflight: async (input, ctx) => {
+      const found = logCard(input.source, await listSources());
+      if (found.result) return found.result;
+      return fuzzyDateCheck(input, ctx);
+    },
+    forApproval: (input, ctx) => {
+      const n = input.count ?? 1;
+      return queuedLog({ ...input, count: n }, ctx, (name) => `Log that you referred ${n === 1 ? "1 person" : `${n} people`} to ${name} (the date and count only)`);
+    },
+    run: async ({ source, count, happened_on, date_words, date_confirmed }, ctx) => {
+      const found = logCard(source, await listSources());
+      if (found.result) return found.result;
+      const card = found.card!;
+      let day = happened_on;
+      if (!ctx.approved) {
+        const read = contactDay({ happened_on, date_words, date_confirmed }, ctx.said, await practiceToday());
+        if ("ask" in read) return read.ask;
+        day = read.day;
+      }
+      try {
+        const r = await logReferralOut(card.id, { count: count ?? 1, happenedOn: day, by: "aeon" });
+        const both = reciprocity((await contactsFor([card.id]))[card.id] ?? []);
+        return text({
+          logged: true,
+          name: card.name,
+          people: r.contact.people_count,
+          on: r.contact.happened_on,
+          logged_for: longDay(r.contact.happened_on),
+          reciprocity: both.line,
+          note: REFERRED_OUT_NOTE,
         });
       } catch (err) {
         return text({ logged: false, why: err instanceof Error ? err.message : "Couldn't log that." });
@@ -1919,7 +2005,7 @@ export function callKey(tool: string, args: unknown): string {
 
 /** One aeon_action approval per identical call: a second ask for the same change returns the one already waiting. */
 /** Tools whose same call can rightly happen twice (she called the same office twice): never deduped. */
-const REPEATABLE = new Set(["log_referral_contact"]);
+const REPEATABLE = new Set(["log_referral_contact", "log_referral_out"]);
 
 async function queueCallOnce(tool: AeonTool, input: unknown, ctx: ToolContext, body: string) {
   // A tool may show what will really change (set_fees: the code, its label, old and new fee) and queue exactly that.

@@ -74,6 +74,7 @@ export const REFERRAL_DEMO_TOOLS: readonly string[] = [
   "draft_outreach",
   "referral_outreach_plan",
   "log_referral_contact",
+  "log_referral_out",
   "recheck_referral_source",
   "set_referral_email",
   "find_referral_cards",

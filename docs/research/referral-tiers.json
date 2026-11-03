@@ -125,6 +125,22 @@
       "replied_to_letter": "They answered your letter."
     }
   },
+  "touch_cadence": {
+    "basis": "judgment",
+    "note": "How often to be in touch with someone already on the board, by tier. Judgment, not measured: no source measures how fast a referral relationship fades. It follows the common advice to stay in touch every month or two with the partners who matter most and quarterly with the rest. A card is 'going cold' when its last contact of any kind is older than max_weeks plus grace_days, counted in the practice's time zone. Cards never contacted, and Not a fit, are never going cold.",
+    "grace_days": 7,
+    "by_tier": {
+      "first": { "label": "Reach out first", "min_weeks": 6, "max_weeks": 8, "words": "every 6 to 8 weeks" },
+      "next": { "label": "Warm up next", "min_weeks": 12, "max_weeks": 12, "words": "every 12 weeks" },
+      "later": { "label": "Later", "min_weeks": 13, "max_weeks": 13, "words": "every quarter" }
+    },
+    "nudges_per_week": 2,
+    "suggested_actions": [
+      "a short follow-up note (drafted by Aeon, approved by her, copied and sent from her own email)",
+      "a one-page practice overview she hands over or attaches herself"
+    ],
+    "rule": "A nudge is a reason to say hello, never an offer of anything of value for a referral."
+  },
   "nppes_gives": [
     "name, credential, sole_proprietor flag",
     "primary and secondary NUCC taxonomy plus license number and state",

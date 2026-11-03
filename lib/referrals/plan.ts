@@ -15,6 +15,7 @@ import { STAGE_LABEL } from "./stages";
 import { latestLetters, listSources, practiceFacts, tierContext, type LetterState, type ReferralSource } from "./store";
 import { boardTier, compareTiers, TIER_LABEL, withRelationship, type TierContext, type TierResult } from "./tier";
 import { SPECIALTY_BY_ID, specialtyForCode, type SpecialtyId } from "./nppes";
+import { coldNudges, type ColdNudge } from "./nurture";
 
 /** At most this many new people a week: the research aims at 3 to 5 letters a month for the top tier. */
 export const NEW_PER_WEEK = 3;
@@ -32,6 +33,8 @@ export type OutreachPlan = {
   letters_waiting: number;
   /** The kinds of provider the new people were picked from, when she asked for (or just searched) some. */
   kinds: string[] | null;
+  /** Up to 2 people she knows who are going cold (no contact past their tier's cadence), with a suggested action. */
+  going_cold: ColdNudge[];
   summary: string;
 };
 
@@ -140,6 +143,10 @@ export async function outreachPlan(sql: postgres.Sql = db(), max = NEW_PER_WEEK,
     return tiers[c.id].tier !== "later";
   });
   const { picked, kinds, missing } = pickNew(fresh, tiers, asked, max);
+  // People she already knows whose last contact is past their tier's cadence (referral-tiers.json touch_cadence).
+  // Skipped: a due follow-up (already in the plan), her do-not-contact list (NPI or org key), and a letter waiting or ready.
+  const skip = new Set([...due, ...cards.filter((c) => isSuppressed(c, blocked) || letterWaiting(letters[c.id])).map((c) => c.id)]);
+  const going_cold = coldNudges(cards, contacts, tiers, today, await practiceTimeZone(sql), { skip, tierLabel: TIER_LABEL });
   const reach_out = picked.map((c) => {
       const t = tiers[c.id];
       return {
@@ -162,7 +169,8 @@ export async function outreachPlan(sql: postgres.Sql = db(), max = NEW_PER_WEEK,
     waiting,
     letters_waiting,
     kinds,
-    summary: summarizePlan({ follow_ups, reach_out, waiting, kinds, missing, letters_waiting }),
+    going_cold,
+    summary: summarizePlan({ follow_ups, reach_out, waiting, kinds, missing, letters_waiting, going_cold }),
   };
 }
 
@@ -189,7 +197,12 @@ export function pickNew(
 }
 
 export function summarizePlan(
-  p: Pick<OutreachPlan, "follow_ups" | "reach_out" | "waiting"> & { kinds?: string[] | null; missing?: string[] | null; letters_waiting?: number },
+  p: Pick<OutreachPlan, "follow_ups" | "reach_out" | "waiting"> & {
+    kinds?: string[] | null;
+    missing?: string[] | null;
+    letters_waiting?: number;
+    going_cold?: ColdNudge[];
+  },
 ): string {
   const lines: string[] = [];
   if (p.kinds?.length) lines.push(`Picked from the ${p.kinds.join(" and ")} on your board, as you asked.`);
@@ -205,7 +218,11 @@ export function summarizePlan(
     lines.push(`New this week (${p.reach_out.length}):`);
     for (const r of p.reach_out) lines.push(`- ${r.name} (${r.tier}): ${r.why}. ${r.next_step}`);
   }
-  if (!p.follow_ups.length && !p.reach_out.length) lines.push("Nobody new to reach out to this week. Search the map for more, or check in with someone you know.");
+  if (p.going_cold?.length) {
+    lines.push(`Going cold (${p.going_cold.length}):`);
+    for (const g of p.going_cold) lines.push(`- ${g.name} (${g.tier}): ${g.label.replace(/^Going cold: /, "")}; aim for ${g.cadence}. ${g.action}`);
+  }
+  if (!p.follow_ups.length && !p.reach_out.length && !p.going_cold?.length) lines.push("Nobody new to reach out to this week. Search the map for more, or check in with someone you know.");
   if (p.letters_waiting) {
     lines.push(`${p.letters_waiting} more already have a letter waiting for your approval or ready to send: finish those first.`);
   }
