@@ -119,8 +119,9 @@ function Details({
   const waiting = letterIsWaiting(letter);
   const letterReady = letter?.status === "done" && !letter.sent;
   const noLetterWaiting = letter?.status !== "pending" && !letterReady;
-  const canDraft = (card.stage === "found" || card.stage === "follow_up") && noLetterWaiting;
-  const canNudge = Boolean(cold) && !canDraft && noLetterWaiting && card.stage !== "not_a_fit";
+  // A sensitive (DV/SA) organization is reached through its public line only: never a letter.
+  const canDraft = !card.sensitive && (card.stage === "found" || card.stage === "follow_up") && noLetterWaiting;
+  const canNudge = !card.sensitive && Boolean(cold) && !canDraft && noLetterWaiting && card.stage !== "not_a_fit";
   const headingId = `ref-${card.id}`;
   return (
     <div className="flex flex-col gap-5" data-testid="partner-panel" aria-labelledby={headingId} role="region">

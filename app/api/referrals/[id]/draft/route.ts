@@ -1,4 +1,5 @@
 import { canChange } from "@/lib/referrals/http";
+import { limited } from "@/lib/referrals/rate-limit";
 import { draftOutreach } from "@/lib/referrals/outreach";
 import { nudgeRefusal } from "@/lib/referrals/refer-out";
 import { isUuid } from "../../../approvals/responses";
@@ -10,6 +11,9 @@ const KEEP_IN_TOUCH =
 // "Draft email" on a card: Muse writes it, the card shows it to copy, and it waits in Approvals. Sends nothing.
 export async function POST(request: Request, ctx: RouteContext<"/api/referrals/[id]/draft">) {
   if (!canChange(request)) return Response.json({ error: "Not allowed to change this here." }, { status: 403 });
+  // Each draft is a model call: at most 12 a minute from one place on the Vercel copy (bulk drafts send up to 10).
+  const tooMany = limited(request, "draft", 12);
+  if (tooMany) return tooMany;
   const { id } = await ctx.params;
   if (!isUuid(id)) return Response.json({ error: "Unknown card." }, { status: 404 });
   const body = (await request.json().catch(() => ({}))) as { nudge?: unknown };

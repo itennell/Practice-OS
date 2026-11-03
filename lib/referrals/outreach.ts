@@ -700,10 +700,12 @@ export async function pendingLetter(sourceId: string): Promise<PendingLetter | n
   return null;
 }
 
-/** On her do-not-contact list or set aside as Not a fit: no letter is written or approved. */
+/** On her do-not-contact list, set aside as Not a fit, or a sensitive (DV/SA) organization: no letter is written or approved. */
 export async function blockedReason(
-  source: Pick<ReferralSource, "name" | "npi" | "stage"> & Partial<Pick<ReferralSource, "organization" | "npi_type" | "address" | "city" | "zip">>,
+  source: Pick<ReferralSource, "name" | "npi" | "stage"> & Partial<Pick<ReferralSource, "organization" | "npi_type" | "address" | "city" | "zip" | "sensitive">>,
 ): Promise<string | null> {
+  // A domestic violence or sexual assault agency or shelter: their public line only, never a letter.
+  if (source.sensitive) return `${source.name} is reached through their public line only, so I won't write to them.`;
   // By NPI, or for a card with no NPI (a hospice, a church, someone she added) by its org key.
   if (isSuppressed(source, await suppressedList())) return `${source.name} is on your do-not-contact list, so I won't write to them.`;
   if (source.stage === "not_a_fit") return `${source.name} is in Not a fit, so I won't write to them. Move the card back first if that changed.`;
