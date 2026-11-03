@@ -11,14 +11,12 @@ import { pick } from "../helpers/controls";
 
 test.use({ viewport: { width: 390, height: 844 } });
 
-// referral_settings is hers and never reset (lib/demo-reset.ts): put Dana's demo niche back
-// first (a changed niche re-scores the board), then reseed the cards.
-test.beforeEach(async ({ request }) => {
-  expect((await request.put("/api/settings/referrals", { data: { nichePreset: "oncology_serious_illness" }, headers: { origin: "http://127.0.0.1:3100" } })).ok()).toBe(true);
+// db:reset gives Dana her demo niche and its kinds every time (lib/demo-reset.ts), so each test
+// starts there, and afterAll leaves both niche and kinds as the demo has them.
+test.beforeEach(() => {
   execSync("npm run db:reset", { stdio: "ignore" });
 });
-test.afterAll(async ({ request }) => {
-  await request.put("/api/settings/referrals", { data: { nichePreset: "oncology_serious_illness" }, headers: { origin: "http://127.0.0.1:3100" } });
+test.afterAll(() => {
   execSync("npm run db:reset", { stdio: "ignore" });
 });
 
@@ -52,15 +50,28 @@ test("Settings › Referrals: the niche picker saves", async ({ page }) => {
   await page.goto("/settings");
   const card = page.getByRole("region", { name: "Referrals", exact: true });
   await expect(card.getByRole("combobox", { name: "Your niche" })).toContainText("Oncology / serious illness / end of life");
-  await expect(card).toContainText("Aeon looks for these first: Oncology");
   await pick(page, card, "Your niche", "Grief and loss");
+  // Her search kinds stay unless she turns this on (off by default in Settings).
+  const switchKinds = card.getByRole("switch", { name: /Also switch your search kinds/ });
+  await expect(switchKinds).not.toBeChecked();
   const saved = page.waitForResponse((r) => r.url().endsWith("/api/settings/referrals") && r.request().method() === "PUT");
   await card.getByRole("button", { name: "Save niche" }).click();
-  expect((await saved).ok()).toBe(true);
+  const put = await saved;
+  expect(put.ok()).toBe(true);
+  expect(put.request().postDataJSON()).toEqual({ nichePreset: "grief_loss" });
   await expect(card).toContainText("Saved. Your map and board rank by it now.");
   await axeClean(page);
   await page.reload();
-  await expect(page.getByRole("region", { name: "Referrals", exact: true }).getByRole("combobox", { name: "Your niche" })).toContainText("Grief and loss");
+  const again = page.getByRole("region", { name: "Referrals", exact: true });
+  await expect(again.getByRole("combobox", { name: "Your niche" })).toContainText("Grief and loss");
+  // Turned on, the niche's kinds go with it.
+  await pick(page, again, "Your niche", "Oncology / serious illness / end of life");
+  await again.getByRole("switch", { name: /Also switch your search kinds/ }).click();
+  const second = page.waitForResponse((r) => r.url().endsWith("/api/settings/referrals") && r.request().method() === "PUT");
+  await again.getByRole("button", { name: "Save niche" }).click();
+  const body = (await second).request().postDataJSON() as { nichePreset: string; specialties: string[] };
+  expect(body.nichePreset).toBe("oncology_serious_illness");
+  expect(body.specialties).toContain("oncology");
 });
 
 test("board: category chips show one kind at a time, and cards name the niche", async ({ page }) => {

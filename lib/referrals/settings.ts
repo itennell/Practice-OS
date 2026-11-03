@@ -77,12 +77,9 @@ export async function saveReferralSettings(
       specialties = ${specialties === null ? sql`referral_settings.specialties` : sql`excluded.specialties`},
       updated_at = now()`;
   // Only when she gave one, so a database without migration 043 still saves the rest.
-  if (input.nichePreset !== undefined) {
-    const [was] = await sql<{ niche_preset: string | null }[]>`select niche_preset from practice_os.referral_settings where id`;
-    await sql`update practice_os.referral_settings set niche_preset = ${niche}, updated_at = now() where id`;
-    // The board's saved scores were weighted for the old niche: score them again (lib/referrals/store.ts rescoreOldCards).
-    if ((was?.niche_preset ?? null) !== niche) await sql`update practice_os.referral_sources set score_version = 0 where score_version is distinct from 0`;
-  }
+  // Saved scores carry the niche they were weighted for (tier.ts scoreVersionFor), so a new niche
+  // makes them stale on its own and the board scores them again (store.ts rescoreOldCards).
+  if (input.nichePreset !== undefined) await sql`update practice_os.referral_settings set niche_preset = ${niche}, updated_at = now() where id`;
   await audit(
     {
       actor,

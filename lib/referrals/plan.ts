@@ -12,7 +12,7 @@ import { jaroWinkler, normalizeName, normalizeOrg } from "./evidence/normalize";
 import { contactsFor, relationshipFrom, suppressedNpis, type Contact } from "./contacts";
 import { STAGE_LABEL } from "./stages";
 import { latestLetters, listSources, practiceFacts, tierContext, type LetterState, type ReferralSource } from "./store";
-import { boardTier, focusRank, TIER_LABEL, withRelationship, type TierContext, type TierResult } from "./tier";
+import { boardTier, compareTiers, TIER_LABEL, withRelationship, type TierContext, type TierResult } from "./tier";
 import { SPECIALTY_BY_ID, specialtyForCode, type SpecialtyId } from "./nppes";
 
 /** At most this many new people a week: the research aims at 3 to 5 letters a month for the top tier. */
@@ -94,6 +94,15 @@ export function tiersWithLog(
   );
 }
 
+/** Cards in the one order (tier.ts compareTiers): tier, "not who you help" last, niche weight, fit, score, distance. */
+export function rankCards<T extends Pick<ReferralSource, "id" | "name" | "distance_miles">>(cards: T[], tiers: Record<string, TierResult>): T[] {
+  return [...cards].sort(
+    (a, b) =>
+      (tiers[a.id] && tiers[b.id] ? compareTiers({ tier: tiers[a.id], miles: a.distance_miles }, { tier: tiers[b.id], miles: b.distance_miles }) : 0) ||
+      a.name.localeCompare(b.name),
+  );
+}
+
 /**
  * `specialties`: the kinds she asked about ("pediatricians and OB-GYNs"). Left
  * out, the kinds of her chat search from the last two hours count; with
@@ -153,8 +162,8 @@ export async function outreachPlan(sql: postgres.Sql = db(), max = NEW_PER_WEEK,
 
 /**
  * The new people to suggest, from cards ready for a first letter: only the
- * kinds she asked for (unless none of them is ready), those who see the
- * people she helps before those who see everyone, then by score and distance.
+ * kinds she asked for (unless none of them is ready), in the one order
+ * (rankCards: tier, niche weight, who-you-help fit, score, distance).
  */
 export function pickNew(
   fresh: ReferralSource[],
@@ -168,14 +177,7 @@ export function pickNew(
     return k !== null && wanted.has(k);
   });
   const useKinds = wanted.size > 0 && ofKind.length > 0;
-  const picked = [...(useKinds ? ofKind : fresh)]
-    .sort(
-      (a, b) =>
-        focusRank(tiers[a.id]) - focusRank(tiers[b.id]) ||
-        tiers[b.id].score - tiers[a.id].score ||
-        (a.distance_miles ?? 99) - (b.distance_miles ?? 99),
-    )
-    .slice(0, max);
+  const picked = rankCards(useKinds ? ofKind : fresh, tiers).slice(0, max);
   const labels = asked.map((k) => SPECIALTY_BY_ID.get(k)!.label);
   return { picked, kinds: useKinds ? labels : null, missing: wanted.size > 0 && !useKinds ? labels : null };
 }

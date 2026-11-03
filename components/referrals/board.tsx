@@ -8,7 +8,6 @@ import { SettingSelect } from "@/components/shared/settings-controls";
 import { StatusPill } from "@/components/shared/status-mark";
 import { Button } from "@/components/ui";
 import { looksResidential } from "@/lib/referrals/nppes";
-import { sensitiveLocation } from "@/lib/referrals/sensitive";
 import { STAGES, STAGE_LABEL, type Stage } from "@/lib/referrals/stages";
 import type { LetterState, ReferralSource } from "@/lib/referrals/store";
 import type { TierResult } from "@/lib/referrals/tier";
@@ -246,13 +245,7 @@ function Card({
         </p>
       )}
       {tier && <p className="text-small text-[var(--fg-muted)]">Why: {tier.reasons.slice(1).join("; ")}.</p>}
-      {tier?.sensitive ? (
-        // A DV/SA agency or shelter: never a street address (lib/referrals/catalog.ts isSensitive).
-        <p className="flex items-start gap-1.5 text-small text-[var(--fg-muted)]">
-          <MapPin aria-hidden size={14} className="mt-0.5 shrink-0" />
-          <span>{sensitiveLocation(card.city)}</span>
-        </p>
-      ) : card.address && (
+      {card.address && (
         <p className="flex items-start gap-1.5 text-small text-[var(--fg-muted)]">
           <MapPin aria-hidden size={14} className="mt-0.5 shrink-0" />
           <span>

@@ -12,7 +12,6 @@ import { groupByCategory } from "@/lib/referrals/categories";
 import { SPECIALTIES, type SpecialtyId } from "@/lib/referrals/nppes";
 import { TIER_LABEL, TIERS, milesLabel, type Tier } from "@/lib/referrals/tier";
 import { cn } from "@/lib/utils";
-import { sensitiveLocation, pinnable } from "@/lib/referrals/sensitive";
 import { CategoryFilter, categoriesIn } from "./category-filter";
 import { TierBadge } from "./tier-badge";
 
@@ -75,7 +74,7 @@ function ProviderRow({
       aria-labelledby={id}
       aria-current={selected ? "true" : undefined}
       onClick={(e) => {
-        if (!p.tier.sensitive && !(e.target as HTMLElement).closest("button,a")) onSelect();
+        if (!(e.target as HTMLElement).closest("button,a")) onSelect();
       }}
       className={cn(
         "flex scroll-mt-24 flex-col gap-2 border-t border-[var(--line)] px-4 py-3.5 transition-colors duration-150",
@@ -106,15 +105,13 @@ function ProviderRow({
         </dt>
         <dd className="text-[var(--fg-muted)]">
           <span className="sr-only">Location: </span>
-          {p.tier.sensitive
-            ? sensitiveLocation(p.city)
-            : p.homeAddress
+          {p.homeAddress
             ? `${HOME_ADDRESS} (${p.city} ${p.zip})`
             : p.address
               ? `${p.address}, ${p.city} ${p.zip}`
               : `Address not listed in NPPES (${p.zip})`}
-          {p.distanceMiles !== null && !p.tier.sensitive && ` · ${milesLabel(p.distanceMiles, approximate)}`}
-          {approximate && !p.homeAddress && !p.tier.sensitive && (
+          {p.distanceMiles !== null && ` · ${milesLabel(p.distanceMiles, approximate)}`}
+          {approximate && !p.homeAddress && (
             <span className="block">Pin is at the ZIP code&rsquo;s center; the street address wasn&rsquo;t found on the map.</span>
           )}
         </dd>
@@ -135,11 +132,9 @@ function ProviderRow({
         </ul>
       </div>
       <div className="flex flex-wrap gap-2">
-        {!p.tier.sensitive && (
-          <Button variant="quiet" onClick={onSelect} aria-label={`Show on map: ${p.name}`} aria-pressed={selected} className={FOCUS}>
-            Show on map
-          </Button>
-        )}
+        <Button variant="quiet" onClick={onSelect} aria-label={`Show on map: ${p.name}`} aria-pressed={selected} className={FOCUS}>
+          Show on map
+        </Button>
         {onBoard ? (
           <span
             id={`onboard-${p.npi}`}
@@ -311,8 +306,8 @@ export function AreaExplorer({
     for (const p of shown) out[p.tier.tier].push(p);
     return out;
   }, [shown]);
-  // Sensitive kinds (DV/SA agencies, shelters) never get a pin.
-  const pins = useMemo(() => pinnable(shown).map((p) => ({ npi: p.npi, name: p.name, lat: p.lat, lon: p.lon, tier: p.tier.tier })), [shown]);
+
+  const pins = useMemo(() => shown.map((p) => ({ npi: p.npi, name: p.name, lat: p.lat, lon: p.lon, tier: p.tier.tier })), [shown]);
 
   const select = useCallback((npi: string) => {
     setSelected(npi);

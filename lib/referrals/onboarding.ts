@@ -5,6 +5,7 @@
 // kinds of provider: picking one pre-selects that niche's top kinds, which she
 // can change on the next screen.
 import type { HelperBlock, HelperQuestion, PracticeBasics } from "../onboarding/helper-questions";
+import { REFERRALS_ONLY_DEMO } from "../features";
 import { SPECIALTIES } from "./nppes";
 import { DEFAULT_SPECIALTIES, getReferralSettings, NICHE_OPTIONS, saveReferralSettings, specialtiesForNiche } from "./settings";
 
@@ -26,22 +27,29 @@ export const referralsQuestions: HelperBlock = {
       "appliesWhen",
       { value: (b: PracticeBasics) => !b.officeZip, enumerable: false },
     ) as HelperQuestion,
-    {
-      id: "niche",
-      kind: "choices" as const,
-      multi: false,
-      ask: "Which of these is closest to your niche?",
-      help: "Aeon ranks who could send you clients by it, and picks who to look for first. You can change this later in Settings.",
-      says: "Your niche tells me who to reach out to first.",
-      refreshes: ["specialties"],
-      options: [...NICHE_OPTIONS, { value: NO_NICHE, label: "None of these, or not sure yet" }],
-    },
+    // Only on the referrals-only demo's short path for now (lib/features.ts); the full interview is unchanged.
+    Object.defineProperty(
+      {
+        id: "niche",
+        kind: "choices" as const,
+        multi: false,
+        ask: "Which of these is closest to your niche?",
+        help: "Aeon ranks who could send you clients by it, and picks who to look for first. You can change this later in Settings.",
+        says: "Your niche tells me who to reach out to first.",
+        refreshes: ["specialties"],
+        options: [...NICHE_OPTIONS, { value: NO_NICHE, label: "None of these, or not sure yet" }],
+      },
+      "appliesWhen",
+      { value: () => REFERRALS_ONLY_DEMO, enumerable: false },
+    ) as HelperQuestion,
     {
       id: "specialties",
       kind: "choices" as const,
       multi: true,
       ask: "Who would you like to hear from?",
-      help: "Aeon looks for these near you in the free federal NPI Registry. Your niche picked some; change them if you like.",
+      help: REFERRALS_ONLY_DEMO
+        ? "Aeon looks for these near you in the free federal NPI Registry. Your niche picked some; change them if you like."
+        : "Aeon looks for these near you in the free federal NPI Registry. You can change this later.",
       options: SPECIALTIES.map((s) => ({ value: s.id, label: s.id === "therapists" ? "Other therapists" : s.label })),
     },
   ],

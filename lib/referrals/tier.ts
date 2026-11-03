@@ -209,8 +209,6 @@ export type TierInput = {
   worksAt?: string | null;
   /** The practice location looks like a home (lib/referrals/nppes.ts looksResidential). */
   homeAddress?: boolean;
-  /** The catalog source type, when the card knows it (a source found outside NPPES). */
-  sourceType?: string | null;
 };
 
 export type TierContext = {
@@ -231,8 +229,8 @@ export type TierResult = {
   specialty: SpecialtyId | null;
   /** The catalog category (1 to 13) of the card's kind, or null when Aeon can't tell. */
   category?: number | null;
-  /** A sensitive kind (DV/SA agencies, shelters): never a map pin or a street address. */
-  sensitive?: boolean;
+  /** Her niche's weight for this kind (category weight x type boost); only when she has a niche. Higher ranks first. */
+  nicheWeight?: number;
 };
 
 // ---- her niche and her fees ------------------------------------------------------
@@ -258,10 +256,9 @@ export function nicheWords(preset: string): string {
   return NICHE_WORDS[preset] ?? NICHE_PRESET_BY_ID.get(preset)?.label.toLowerCase() ?? preset;
 }
 
-/** A card's catalog kind: its own source type if it has one, else the type that owns its NUCC code, else the specialty's. */
-export function sourceTypeFor(taxonomy: string | null, specialty: SpecialtyId | null, sourceType?: string | null): SourceType | null {
+/** A card's catalog kind: the type that owns its NUCC code, else the specialty's. */
+export function sourceTypeFor(taxonomy: string | null, specialty: SpecialtyId | null): SourceType | null {
   return (
-    (sourceType ? SOURCE_TYPE_BY_ID.get(sourceType) : undefined) ??
     (taxonomy ? typeForCode(taxonomy) : undefined) ??
     (specialty ? SOURCE_TYPE_BY_ID.get(specialty) : undefined) ??
     null
@@ -284,13 +281,41 @@ export function nichePoints(preset: string, type: SourceType): { points: number;
 const SELF_PAY = /\b(self[- ]?pay|private[- ]?pay|pay (?:me )?(?:themselves|privately)|clients pay me|not in[- ]network|out[- ]of[- ]network)\b/i;
 const TAKES_INSURANCE = /\b(takes? some insurance|in[- ]network with|i take (?:some )?insurance)\b/i;
 
+/** Her real settings, for "do her clients pay her themselves?". */
+export type FeeStance = {
+  /** Payers she is in network with (payer_applications approved). */
+  inNetwork: number;
+  /** Her onboarding "Do you take insurance?" answer, as saved. */
+  insurance: string | null | undefined;
+  /** She has a fee schedule (Settings › Office hours and fees). */
+  hasFees: boolean;
+};
+
 /**
- * Her fee and insurance stance (onboarding "Do you take insurance?" and her fees
- * answer) to "her clients pay her themselves". Taking some insurance is not self-pay.
+ * Self-pay: in network with no payer, she didn't say she takes insurance, and
+ * she said she's self-pay or has fees she charges clients herself. An in-network
+ * practice (Aetna approved) is never self-pay.
  */
-export function selfPayFrom(insurance: string | null | undefined, fees?: string | null): boolean {
-  if (insurance && TAKES_INSURANCE.test(insurance)) return false;
-  return SELF_PAY.test(insurance ?? "") || SELF_PAY.test(fees ?? "");
+export function selfPayFrom(f: FeeStance): boolean {
+  if (f.inNetwork > 0) return false;
+  if (f.insurance && TAKES_INSURANCE.test(f.insurance)) return false;
+  return SELF_PAY.test(f.insurance ?? "") || f.hasFees;
+}
+
+/**
+ * The order of cards everywhere (the map's list, a search's saved best, the
+ * board, the weekly plan): tier, then "not who you help" last, then how much
+ * her niche weights the kind, then who-you-help fit, then score, then distance.
+ */
+export function compareTiers(a: { tier: TierResult; miles: number | null }, b: { tier: TierResult; miles: number | null }): number {
+  return (
+    TIERS.indexOf(a.tier.tier) - TIERS.indexOf(b.tier.tier) ||
+    Number(isMismatch(a.tier.reasons)) - Number(isMismatch(b.tier.reasons)) ||
+    (b.tier.nicheWeight ?? 1) - (a.tier.nicheWeight ?? 1) ||
+    focusRank(a.tier) - focusRank(b.tier) ||
+    b.tier.score - a.tier.score ||
+    (a.miles ?? 99) - (b.miles ?? 99)
+  );
 }
 
 /** The reason on a session-capped kind's card for a self-pay practice. */
@@ -327,11 +352,10 @@ export function tierFor(p: TierInput, ctx: TierContext): TierResult {
   const reasons: string[] = [];
   let score = 0;
 
-  // Specialty, or her niche's points for this kind when she picked a niche.
-  const type = sourceTypeFor(p.taxonomy, specialty, p.sourceType);
+  // The kind: its catalog type (by exact code, else the specialty's) and her niche's weight for it.
+  const type = sourceTypeFor(p.taxonomy, specialty);
   const niche = ctx.niche && NICHE_PRESET_BY_ID.has(ctx.niche) ? ctx.niche : null;
   const weighted = niche && type ? nichePoints(niche, type) : null;
-  score += weighted ? weighted.points : specialty ? pointsForSpecialty(specialty) : MANUAL_SOURCE_POINTS;
   reasons.push((specialty && whyTheyRefer(p.taxonomy, specialty)) || "a kind of provider Aeon doesn't rank yet");
   const category = type?.category ?? null;
   if (weighted && type) {
@@ -341,16 +365,12 @@ export function tierFor(p: TierInput, ctx: TierContext): TierResult {
     else if (weighted.weight < 1) reasons.push(`${label}: less often a source for your ${words} focus`);
     else reasons.push(label);
   }
-  // Programs with a session cap hand clients off when it runs out: a boost for a self-pay practice.
-  if (ctx.selfPay && type?.session_capped && SESSION_CAPPED_BOOST > 0) {
-    score += SESSION_CAPPED_BOOST;
-    reasons.push(SESSION_CAPPED_REASON);
-  }
 
   // Who she helps: a reason, or "Later" when they only see people she doesn't.
   let mismatch = false;
-  const sees = specialty ? seesFor(specialty, p.taxonomy) : undefined;
-  if (ctx.focus.length > 0 && specialty && !sees) {
+  // A kind known only from the catalog (no NPI Registry specialty) uses the catalog's "who they see".
+  const sees = specialty ? seesFor(specialty, p.taxonomy) : ((type?.sees as Focus[] | "all" | undefined) ?? undefined);
+  if (ctx.focus.length > 0 && (specialty || type) && !sees) {
     // Fail closed: a kind with no "who they see" can't be ranked against her focus.
     mismatch = true;
     reasons.push(UNKNOWN_SEES_REASON);
@@ -366,6 +386,16 @@ export function tierFor(p: TierInput, ctx: TierContext): TierResult {
       reasons.push(`mostly sees ${sees.map((f) => FOCUS_WORDS[f]).join(" and ")}, not who you help`);
     }
   }
+
+  // Specialty points: her niche's for this kind when she picked one, else the plain ones. Programs
+  // with a session cap hand clients off when it runs out: a boost for a self-pay practice, added
+  // before the 35 cap, and never for a kind that doesn't see who she helps (or can't be told).
+  let kindPoints = weighted ? weighted.points : specialty ? pointsForSpecialty(specialty) : MANUAL_SOURCE_POINTS;
+  if (ctx.selfPay && !mismatch && type?.session_capped && SESSION_CAPPED_BOOST > 0) {
+    kindPoints += SESSION_CAPPED_BOOST;
+    reasons.push(SESSION_CAPPED_REASON);
+  }
+  score += Math.min(POINTS_MAX, kindPoints);
 
   // Distance.
   if (ctx.miles === null) {
@@ -414,7 +444,7 @@ export function tierFor(p: TierInput, ctx: TierContext): TierResult {
   // A home address can't be the first letter you send: at best "Warm up next", after a call.
   let tier: Tier = mismatch ? "later" : tierOf(score);
   if (tier === "first" && p.homeAddress) tier = "next";
-  return { tier, score, reasons, specialty, category, sensitive: type?.sensitive ?? false };
+  return { tier, score, reasons, specialty, category, ...(weighted ? { nicheWeight: weighted.weight } : {}) };
 }
 
 /** The tier of a provider straight from NPPES. */
@@ -432,6 +462,23 @@ export function providerTier(p: Provider, ctx: TierContext, worksAt: string | nu
  */
 export const SCORE_VERSION = 4;
 
+/** Niche ids fold into 300 buckets, so a version stays a smallint (at most 4 + 30,000). */
+const NICHE_BUCKETS = 300;
+
+/**
+ * The score_version a card scored for this niche carries: SCORE_VERSION with no
+ * niche, else SCORE_VERSION + 100 x (a stable bucket of the niche id). A saved
+ * score counts only when it was written for her current niche, so a search that
+ * finishes after she changed niche can't leave old-niche scores marked current
+ * (no migration: the niche rides in the existing column).
+ */
+export function scoreVersionFor(niche: string | null | undefined): number {
+  if (!niche || !NICHE_PRESET_BY_ID.has(niche)) return SCORE_VERSION;
+  let h = 0;
+  for (const ch of niche) h = (h * 31 + ch.charCodeAt(0)) % NICHE_BUCKETS;
+  return SCORE_VERSION + 100 * (h + 1);
+}
+
 /**
  * A board card: its reasons from what the board keeps, and its tier from the
  * score saved when it was found (that one saw the whole NPPES record: fax,
@@ -448,18 +495,16 @@ export function boardTier(
     fit_score: number | null;
     score_version: number | null;
     distance_miles: number | null;
-    /** A card found outside NPPES may carry its catalog type. */
-    source_type?: string | null;
   },
   ctx: Omit<TierContext, "miles">,
 ): TierResult {
   const homeAddress = card.npi_type !== "organization" && looksResidential(card.address);
   const r = tierFor(
-    { taxonomy: card.taxonomy, npiType: card.npi_type, phone: card.phone, state: card.state, homeAddress, sourceType: card.source_type ?? null },
+    { taxonomy: card.taxonomy, npiType: card.npi_type, phone: card.phone, state: card.state, homeAddress },
     { ...ctx, miles: card.distance_miles },
   );
   const mismatch = isMismatch(r.reasons);
-  if (card.fit_score === null || card.score_version !== SCORE_VERSION || mismatch) return r;
+  if (card.fit_score === null || card.score_version !== scoreVersionFor(ctx.niche) || mismatch) return r;
   return { ...r, score: card.fit_score, tier: tierOf(card.fit_score) };
 }
 

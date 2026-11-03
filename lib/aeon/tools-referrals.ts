@@ -144,19 +144,25 @@ export const REFERRAL_TOOLS: AeonTool[] = [
     title: "Set your referral niche",
     description:
       "When she tells Aeon her niche or asks to rank referral sources for it ('I focus on oncology and end of life', 'rank for grief " +
-      "and loss', 'no niche'): saves one of the catalog niches (Settings › Referrals) and pre-selects that niche's top kinds of " +
-      "provider for searches. The map, the board and the weekly plan rank by it from now on. Pass the niche id from the list in the " +
-      "input; 'none' clears it. Only pick a niche she named or clearly described; if her words fit two, ask which. Sends nothing.",
+      "and loss', 'no niche'): saves one of the catalog niches (Settings › Referrals). The map, the board and the weekly plan rank " +
+      "by it from now on. Her saved kinds of provider stay as they are (keep_kinds true, the default); pass keep_kinds: false only " +
+      "when she asks to switch her searches to the niche's kinds too. Pass the niche id from the list in the input; 'none' clears " +
+      "it. Only pick a niche she named or clearly described; if her words fit two, ask which. Sends nothing.",
     input: {
       niche: z
         .enum(["none", ...NICHE_PRESETS.map((p) => p.id)] as [string, ...string[]])
         .describe(`One of: ${NICHE_PRESETS.map((p) => `${p.id} (${p.label})`).join(", ")}; or none.`),
-      keep_kinds: z.boolean().optional().describe("True to keep her chosen kinds of provider instead of the niche's top kinds."),
+      keep_kinds: z
+        .boolean()
+        .optional()
+        .describe("Default true: keep her saved kinds of provider. False only when she asked to also switch them to the niche's top kinds."),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     label: "Saved your referral niche",
     changesData: true,
-    run: async ({ niche, keep_kinds }) => {
+    // Her settings: an MCP caller's change waits for her approval.
+    queuesOverMcp: true,
+    run: async ({ niche, keep_kinds = true }) => {
       const preset = niche === "none" ? null : niche;
       // Checked against the catalog again in saveReferralSettings, whatever the model sent.
       if (preset !== null && !isNichePreset(preset)) return text({ saved: false, why: "That isn't one of the niches. Ask her which one fits." });

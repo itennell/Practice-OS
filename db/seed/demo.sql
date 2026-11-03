@@ -36,29 +36,33 @@ insert into practice_os.settings (id) values (true) on conflict (id) do nothing;
 insert into practice_os.referral_sources
   (id, name, organization, taxonomy, specialty, npi_type, city, state, email, stage, last_contacted_at, next_follow_up_on, distance_miles, fit_score, score_version, notes, is_sample) values
   ('00000000-0000-4000-8000-000000000201', '[Sample] Lakeview Family Medicine', '[Sample] Lakeview Family Medicine',
-   '207Q00000X', 'Family medicine', 'organization', 'Chicago', 'IL', 'frontdesk@example.com', 'found', null, null, 0.6, 81, 4, '[Sample] Near the office.', true),
+   '207Q00000X', 'Family medicine', 'organization', 'Chicago', 'IL', 'frontdesk@example.com', 'found', null, null, 0.6, null, 0, '[Sample] Near the office.', true),
   ('00000000-0000-4000-8000-000000000202', '[Sample] Dr. Alex Example', '[Sample] North Side Internal Medicine',
-   '207R00000X', 'Internal medicine', 'individual', 'Chicago', 'IL', 'alex@example.com', 'contacted', now() - interval '8 days', current_date + 6, 1.4, 77, 4,
+   '207R00000X', 'Internal medicine', 'individual', 'Chicago', 'IL', 'alex@example.com', 'contacted', now() - interval '8 days', current_date + 6, 1.4, null, 0,
    '[Sample] Sent intro letter.', true),
   ('00000000-0000-4000-8000-000000000203', '[Sample] Old Town OB-GYN', '[Sample] Old Town OB-GYN',
-   '207V00000X', 'OB/GYN', 'organization', 'Chicago', 'IL', 'office@example.com', 'follow_up', now() - interval '20 days', current_date, 1.1, 69, 4,
+   '207V00000X', 'OB/GYN', 'organization', 'Chicago', 'IL', 'office@example.com', 'follow_up', now() - interval '20 days', current_date, 1.1, null, 0,
    '[Sample] Follow-up due today.', true),
   ('00000000-0000-4000-8000-000000000204', '[Sample] Lincoln Park Pediatrics', '[Sample] Lincoln Park Pediatrics',
-   '208000000X', 'Pediatrics', 'organization', 'Chicago', 'IL', 'hello@example.com', 'connected', now() - interval '35 days', null, 0.3, 79, 4,
+   '208000000X', 'Pediatrics', 'organization', 'Chicago', 'IL', 'hello@example.com', 'connected', now() - interval '35 days', null, 0.3, null, 0,
    '[Sample] Happy to share referrals for parents.', true),
   -- Dana's niche is oncology / serious illness / end of life: two kinds it ranks first.
   ('00000000-0000-4000-8000-000000000205', '[Sample] Lakeshore Oncology Group', '[Sample] Lakeshore Oncology Group',
-   '207RX0202X', 'Oncology', 'organization', 'Chicago', 'IL', 'intake@example.com', 'found', null, null, 0.9, 84, 4,
+   '207RX0202X', 'Oncology', 'organization', 'Chicago', 'IL', 'intake@example.com', 'found', null, null, 0.9, null, 0,
    '[Sample] Cancer center near the office.', true),
   ('00000000-0000-4000-8000-000000000206', '[Sample] North Side Hospice', '[Sample] North Side Hospice',
-   '251G00000X', 'Hospice', 'organization', 'Chicago', 'IL', 'care@example.com', 'found', null, null, 1.8, 82, 4,
+   '251G00000X', 'Hospice', 'organization', 'Chicago', 'IL', 'care@example.com', 'found', null, null, 1.8, null, 0,
    '[Sample] Bereavement coordinator on staff.', true);
 
--- Dana's Referrals setup. Seeded only when missing: db:reset never overwrites her choice.
-insert into practice_os.referral_settings (id, home_zip, specialties, niche_preset)
-values (true, '60614', array['oncology', 'genetic_counselors', 'palliative_care', 'hospice', 'internal_medicine', 'neurology'], 'oncology_serious_illness')
--- An older row with no niche yet gets the demo niche; a niche she picked is kept.
-on conflict (id) do update set niche_preset = coalesce(referral_settings.niche_preset, excluded.niche_preset);
+-- Her office phones ([Sample] 555 numbers), so the cards score the way the demo shows. Every card
+-- starts at score_version 0: the board scores them for her niche on first load (no typed-in scores).
+update practice_os.referral_sources set phone = '(312) 555-0141' where id = '00000000-0000-4000-8000-000000000201';
+update practice_os.referral_sources set phone = '(312) 555-0143' where id = '00000000-0000-4000-8000-000000000203';
+
+-- Dana's Referrals setup. Seeded only when missing; lib/demo-reset.ts then sets her demo niche and its kinds.
+insert into practice_os.referral_settings (id, home_zip, specialties)
+values (true, '60614', array['family_medicine', 'internal_medicine'])
+on conflict (id) do nothing;
 
 -- Pictures for 301 and 302 are loaded by db:reset from db/seed/posts/<id>.jpg (scripts/make-seed-posts.ts).
 insert into practice_os.posts (id, topic, headline, caption, status, is_sample) values

@@ -6,6 +6,11 @@ import { practiceToday, syncCalendar } from "./compliance/store";
 import { removeDocumentFiles, type RemovedDocument } from "./uploads/cleanup";
 import { dataDir } from "./uploads/store";
 import { SEED_POSTS } from "../scripts/seed-posts";
+import { specialtiesForNiche } from "./referrals/settings";
+
+/** The fictional demo practice's niche: oncology / serious illness / end of life, and that niche's kinds. */
+export const DEMO_NICHE = "oncology_serious_illness";
+export const DEMO_REFERRAL_KINDS: string[] = specialtiesForNiche(DEMO_NICHE);
 
 // What `npm run db:reset` (scripts/db-reset.ts) does once it has checked which
 // database it is on: empties the demo-data tables, reseeds the fictional Dana
@@ -134,6 +139,12 @@ async function reset(sql: postgres.Sql, dir: string): Promise<ResetResult> {
     removed = await tx<RemovedDocument[]>`select stored_as, sha256 from practice_os.documents`;
     await tx.unsafe(`truncate ${DEMO_TABLES.map((t) => `practice_os.${t}`).join(", ")}`);
     await tx.unsafe(seed);
+    // Dana's demo niche and its kinds, every reset. referral_settings is otherwise hers and never
+    // reset, but on the fictional demo practice these two are demo data: the demo leads with them.
+    await tx`
+      insert into practice_os.referral_settings (id, home_zip, specialties, niche_preset)
+      values (true, '60614', ${DEMO_REFERRAL_KINDS}, ${DEMO_NICHE})
+      on conflict (id) do update set niche_preset = excluded.niche_preset, specialties = excluded.specialties, updated_at = now()`;
     // The [Sample] posts' finished pictures, so the demo post can be approved.
     for (const post of SEED_POSTS) {
       if (!post.picture) continue;
