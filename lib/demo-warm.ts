@@ -9,8 +9,9 @@
 // "Who should I reach out to this week?" have real sourced partners next to the
 // [Sample] ones. Real public listings may show; nothing is ever sent to them.
 // Like db:reset it runs only on the database SUPABASE_PROJECT_REF names.
-import postgres from "postgres";
+import type postgres from "postgres";
 import { audit } from "./audit";
+import { poolerSafeClient } from "./db";
 import { DEMO_REFERRAL_KINDS, DEMO_ZIP, resetRefusal } from "./demo-reset";
 import { CATEGORY_LABELS, SPECIALTY_CATEGORY } from "./referrals/categories";
 import { categoryOf } from "./referrals/catalog";
@@ -28,6 +29,8 @@ export const WARM_RADII = [1, 3, 5] as const;
 /** At most this many of each kind go on the board. */
 export const BOARD_PER_KIND = 3;
 export const BOARD_MILES = 5;
+/** demo:warm isn't behind a route's maxDuration, so OpenStreetMap gets every retry here. */
+export const WARM_OSM_DEADLINE_MS = 120_000;
 
 export type WarmReport = {
   /** The radius the map and Places counts below came from: the widest that answered (null when none did). */
@@ -91,7 +94,9 @@ export function pickForBoard<T extends { distanceMiles: number | null; sensitive
 export async function warmDemo(opts: { url: string; expectedRef?: string; deps?: Deps; log?: (line: string) => void }): Promise<WarmReport> {
   const refusal = warmRefusal(opts.url, opts.expectedRef ?? process.env.SUPABASE_PROJECT_REF);
   if (refusal) throw new Error(refusal);
-  const sql = postgres(opts.url, { max: 2, prepare: false, onnotice: () => {} });
+  // No pipelining (lib/db.ts): the NPI Registry pages are read and kept four at a time, and
+  // on Supabase's transaction pooler a query pipelined behind another never gets its reply.
+  const sql = poolerSafeClient(opts.url, { max: 2 });
   try {
     return await warm(sql, opts.deps ?? {}, opts.log ?? (() => {}));
   } finally {
@@ -128,7 +133,7 @@ async function warm(sql: postgres.Sql, deps: Deps, log: (line: string) => void):
     }
     try {
       const types = discoveryTypes(null, dctx.niche);
-      const r = await discover({ area, radiusMiles, types, niche: dctx.niche }, dctx, { sql, cards: await listSources(sql) });
+      const r = await discover({ area, radiusMiles, types, niche: dctx.niche }, dctx, { sql, cards: await listSources(sql), onStoreError, osmDeadlineMs: WARM_OSM_DEADLINE_MS });
       for (const n of r.notes) if (FAIL_NOTE.test(n)) failed.add(`Places at ${radiusMiles} mi: ${n}`);
       log(`Places near you, ${radiusMiles} mi: ${r.orgs.length} places.`);
       places = r;

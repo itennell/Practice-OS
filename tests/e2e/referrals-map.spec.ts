@@ -87,29 +87,29 @@ test("Draft email waits for approval; once approved, Copy puts the subject and l
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   // Muse writes the letter in real use; here a fixed one stands in so the test doesn't need a model key.
   const letter =
-    "[Sample] Dear Old Town OB-GYN team,\n\nI'm Dana Reyes, a counselor in Lincoln Park. I wrote a few weeks ago and wanted to check in. " +
+    "[Sample] Dear Thistlewood OB-GYN team,\n\nI'm Dana Reyes, a counselor in Lincoln Park. I wrote a few weeks ago and wanted to check in. " +
     "Would a 15-minute call to introduce ourselves still work for you?\n\nDana Reyes, LCPC (fictional demo practice)";
   await page.route("**/api/referrals/*/draft", (route) =>
     route.fulfill({ json: { approval_id: "00000000-0000-4000-8000-0000000009aa", subject: "[Sample] Checking in from Reyes Counseling", letter } }),
   );
   await page.goto("/referrals");
-  const card = page.getByRole("region", { name: "Follow up" }).getByRole("listitem", { name: "[Sample] Old Town OB-GYN" });
+  const card = page.getByRole("region", { name: "Follow up" }).getByRole("listitem", { name: "[Sample] Thistlewood OB-GYN" });
   await card.getByRole("button", { name: "Draft check-in" }).click();
   await expect(card).toContainText("Email draft");
   await expect(card).toContainText("Then a Copy button shows here");
   await expect(card.getByRole("button", { name: /^Copy email/ })).toHaveCount(0);
 
   // The seeded Lakeview letter, approved: now Copy shows, with the demo warning.
-  const lakeview = () => page.getByRole("listitem", { name: "[Sample] Lakeview Family Medicine" });
+  const lakeview = () => page.getByRole("listitem", { name: "[Sample] Juniper Row Family Medicine" });
   await expect(lakeview().getByRole("button", { name: /^Copy email/ })).toHaveCount(0);
   const approved = await page.request.post("/api/approvals/00000000-0000-4000-8000-000000000901/approve", { headers: { origin: baseURL! } });
   expect(approved.ok()).toBe(true);
   await page.reload();
   await expect(lakeview()).toContainText("Demo practice: don\u2019t send this to a real provider.");
-  await lakeview().getByRole("button", { name: "Copy email to [Sample] Lakeview Family Medicine" }).click();
-  await expect(lakeview().getByRole("button", { name: "Copy email to [Sample] Lakeview Family Medicine" })).toHaveText("Copied");
+  await lakeview().getByRole("button", { name: "Copy email to [Sample] Juniper Row Family Medicine" }).click();
+  await expect(lakeview().getByRole("button", { name: "Copy email to [Sample] Juniper Row Family Medicine" })).toHaveText("Copied");
   const copied = await page.evaluate(() => navigator.clipboard.readText());
-  expect(copied).toMatch(/^Subject: \[Sample\] Introducing Reyes Counseling in Lincoln Park\n\n\[Sample\] Dear Lakeview Family Medicine team,/);
+  expect(copied).toMatch(/^Subject: \[Sample\] Introducing Reyes Counseling in Lincoln Park\n\n\[Sample\] Dear Juniper Row Family Medicine team,/);
   expect(copied).toContain("Dana Reyes, LCPC (fictional demo practice)");
 });
 

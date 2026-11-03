@@ -21,7 +21,7 @@ test.afterAll(() => {
 
 test.setTimeout(120_000);
 
-const PEDIATRICS = "[Sample] Lincoln Park Pediatrics";
+const PEDIATRICS = "[Sample] Fernhollow Pediatrics";
 const ROBIN = "[Sample] Dr. Robin Example, PsyD";
 
 async function axeClean(page: Page) {
