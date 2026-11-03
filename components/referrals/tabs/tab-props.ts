@@ -34,4 +34,15 @@ export async function getJson<T>(url: string, signal?: AbortSignal): Promise<T |
   return (await res.json().catch(() => null)) as T | null;
 }
 
+/**
+ * Meetings from her referrals calendar in a range (GET /api/referrals/meetings), or null when the
+ * calendar isn't installed yet (it is asked first, so no 404 shows in the console) or didn't answer.
+ */
+export async function getMeetings<T>(from: string, to: string, signal?: AbortSignal): Promise<T[] | null> {
+  const status = await getJson<{ ready: boolean }>("/api/referrals/meetings-ready", signal);
+  if (!status?.ready) return null;
+  const m = await getJson<{ meetings: T[] }>(`/api/referrals/meetings?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, signal);
+  return m?.meetings ?? null;
+}
+
 export const CARD = "rounded-[var(--radius-card-sm)] border border-[var(--line)] bg-[var(--glass)]";

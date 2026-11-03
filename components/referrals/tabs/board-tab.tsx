@@ -223,7 +223,7 @@ export function BoardTab({ data, onOpenPartner, onChanged }: CrmTabProps = {}) {
           aria-label="Referrals board. Drag a card to another column, or use its Move menu."
           className="-mx-4 overflow-x-auto px-4 pb-2 outline-none [scrollbar-width:thin] focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)] focus-visible:outline-solid lg:mx-0 lg:px-0"
         >
-          <div className="grid snap-x snap-mandatory auto-cols-[minmax(16rem,82%)] grid-flow-col gap-3 sm:auto-cols-[minmax(16rem,1fr)] lg:snap-none">
+          <div className="grid snap-x snap-mandatory auto-cols-[minmax(16rem,82%)] grid-flow-col gap-3 sm:auto-cols-[minmax(15rem,1fr)] lg:snap-none xl:auto-cols-[minmax(12.5rem,1fr)]">
             {BOARD_COLUMNS.map((col) => (
               <Column key={col} col={col} rows={shown.filter((r) => columnFor(r.card, contacts[r.card.id] ?? []) === col)} onDropCard={(id) => move(id, col)}>
                 {(r) => (
@@ -231,7 +231,7 @@ export function BoardTab({ data, onOpenPartner, onChanged }: CrmTabProps = {}) {
                     key={r.card.id}
                     row={r}
                     col={col}
-                    step={shortStep(nextStep(r.card, { email: r.email, letterWaiting: letterIsWaiting(data.letters[r.card.id]), cold: Boolean(cold[r.card.id]), today }))}
+                    step={r.card.sensitive && r.card.stage !== "not_a_fit" ? "Public line only: call them. No letters or email lookups." : shortStep(nextStep(r.card, { email: r.email, letterWaiting: letterIsWaiting(data.letters[r.card.id]), cold: Boolean(cold[r.card.id]), today }))}
                     cold={Boolean(cold[r.card.id])}
                     finding={finding[r.card.id]}
                     onOpen={() => onOpenPartner?.(r.card.id)}
@@ -355,7 +355,7 @@ function BoardCard({
       <p className="text-small text-[var(--fg-muted)]">{step}</p>
       {(cold || canFind) && (
         <div className="flex flex-wrap items-center gap-2">
-          {cold && <span className="text-small font-medium text-[var(--status-pending-fg)]">Going cold</span>}
+          {cold && !step.startsWith("Going cold") && <span className="text-small font-medium text-[var(--status-pending-fg)]">Going cold</span>}
           {canFind &&
             (finding === "working" ? (
               <span role="status" className="inline-flex h-touch items-center gap-1.5 text-small text-[var(--fg-muted)]">

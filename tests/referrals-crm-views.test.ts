@@ -140,7 +140,8 @@ describe("board columns", () => {
 
   it("a short next step keeps the first sentence", () => {
     expect(shortStep("Follow up now: a short check-in.")).toBe("Follow up now.");
-    expect(shortStep("Draft a short introduction letter, approve it, and send it from your own email.")).toBe("Draft a short introduction letter, approve it, and send it from your own email.");
+    expect(shortStep("Draft a short introduction letter, approve it, and send it from your own email.")).toBe("Draft a short introduction letter.");
+    expect(shortStep("Wait a week for a reply, then follow up.")).toBe("Wait a week for a reply, then follow up.");
     expect(shortStep("Set aside. Aeon won't suggest them.")).toBe("Set aside.");
   });
 });

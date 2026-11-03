@@ -25,7 +25,7 @@ import {
   type TimelineKind,
 } from "@/lib/referrals/crm-views";
 import { cn } from "@/lib/utils";
-import { CARD, getJson, type CrmTabProps } from "./tab-props";
+import { CARD, getMeetings, type CrmTabProps } from "./tab-props";
 
 const ICON: Record<TimelineKind, typeof Phone> = { meeting: CalendarDays, call: Phone, letter: Mail, referral: HandHeart, note: NotebookPen };
 const SHOW_DAYS = 30;
@@ -44,9 +44,7 @@ export function MeetingsTab({ data, onOpenPartner }: CrmTabProps = {}) {
     const ctl = new AbortController();
     // The calendar's API allows 62 days at most: the last 55 and the week ahead. No calendar yet (404): the log alone.
     const { from, to } = meetingRange(today, 54, 7);
-    getJson<{ meetings: MeetingBits[] }>(`/api/referrals/meetings?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, ctl.signal).then(
-      (m) => !ctl.signal.aborted && setMeetings(m?.meetings ?? []),
-    );
+    getMeetings<MeetingBits>(from, to, ctl.signal).then((m) => !ctl.signal.aborted && setMeetings(m ?? []));
     return () => ctl.abort();
   }, [today]);
 

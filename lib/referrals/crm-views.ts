@@ -281,8 +281,11 @@ export function filterBoard(rows: PartnerRow[], f: BoardFilters, today: string):
 
 /** A short next-step line for a compact card (partners.ts nextStep, cut to its first sentence). */
 export function shortStep(step: string): string {
-  const first = step.split(/(?<=[.:])\s/)[0] ?? step;
-  return first.endsWith(":") ? `${first.slice(0, -1)}.` : first;
+  let first = step.split(/(?<=[.:])\s/)[0] ?? step;
+  if (first.endsWith(":")) first = `${first.slice(0, -1)}.`;
+  // Still long: up to its first comma ("Draft a short introduction letter.").
+  if (first.length > 48 && first.includes(", ")) first = `${first.slice(0, first.indexOf(", "))}.`;
+  return first;
 }
 
 // ---- Map -----------------------------------------------------------------------

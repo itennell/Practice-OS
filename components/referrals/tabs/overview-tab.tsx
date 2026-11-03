@@ -26,7 +26,7 @@ import {
 } from "@/lib/referrals/crm-views";
 import { dayLabel } from "@/lib/referrals/partners";
 import { cn } from "@/lib/utils";
-import { CARD, getJson, type CrmTabProps } from "./tab-props";
+import { CARD, getJson, getMeetings, type CrmTabProps } from "./tab-props";
 
 type Overview = {
   follow_ups: { id: string; name: string; on: string; days_left: number }[];
@@ -50,9 +50,7 @@ export function OverviewTab({ data, onOpenPartner, onTab }: CrmTabProps = {}) {
     const ctl = new AbortController();
     getJson<Overview>("/api/referrals/overview", ctl.signal).then((o) => !ctl.signal.aborted && setOverview(o ?? { follow_ups: [], reach_out: [], going_cold: [], approvals: [] }));
     const { from, to } = meetingRange(today, 0, 7);
-    getJson<{ meetings: MeetingBits[] }>(`/api/referrals/meetings?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, ctl.signal).then(
-      (m) => !ctl.signal.aborted && setMeetings(m?.meetings ? m.meetings.filter((x) => x.status !== "canceled") : false),
-    );
+    getMeetings<MeetingBits>(from, to, ctl.signal).then((m) => !ctl.signal.aborted && setMeetings(m ? m.filter((x) => x.status !== "canceled") : false));
     return () => ctl.abort();
   }, [today]);
 
@@ -83,7 +81,7 @@ export function OverviewTab({ data, onOpenPartner, onTab }: CrmTabProps = {}) {
       {name}
     </button>
   );
-  const pinned = cards.filter((c) => !c.sensitive && c.zip).length;
+  const near = cards.filter((c) => !c.sensitive && c.distance_miles !== null && c.stage !== "not_a_fit").map((c) => c.distance_miles!);
 
   return (
     <div className="flex flex-col gap-4" data-testid="overview-tab">
@@ -110,7 +108,7 @@ export function OverviewTab({ data, onOpenPartner, onTab }: CrmTabProps = {}) {
           ) : (
             <ol aria-label={`Referrals ${by === "partner" ? "by partner" : "by kind"}`} className="flex flex-col gap-2.5">
               {sources.bars.slice(0, 8).map((b) => (
-                <li key={b.key} className="grid grid-cols-[minmax(0,11rem)_1fr_auto] items-center gap-3 text-small max-sm:grid-cols-[1fr_auto]" title={`${b.label}: ${b.count}, last on ${dayLabel(b.last, today)}`}>
+                <li key={b.key} className="grid grid-cols-[minmax(0,15rem)_1fr_auto] items-center gap-3 text-small max-sm:grid-cols-[1fr_auto]" title={`${b.label}: ${b.count}, last on ${dayLabel(b.last, today)}`}>
                   <span className="min-w-0 truncate font-medium max-sm:col-span-2">{by === "partner" ? nameButton(b.key, b.label) : b.label}</span>
                   <span aria-hidden className="h-3 rounded-r-[4px] bg-[var(--hairline)]">
                     <span className="block h-full rounded-r-[4px] bg-[var(--accent-fg)]" style={{ width: `${Math.max(4, (b.count / max) * 100)}%` }} />
@@ -200,12 +198,12 @@ export function OverviewTab({ data, onOpenPartner, onTab }: CrmTabProps = {}) {
                 Your partners on a map
               </h2>
               <p className="text-small text-[var(--fg-muted)]">
-                {pinned} of {cards.length} have a ZIP to pin. Places that ask for privacy never get a pin.
+                {near.length ? `${near.length} ${near.length === 1 ? "partner" : "partners"} within ${Math.ceil(Math.max(...near))} mi of your office.` : "Add partners to see them around your office."} Places that ask for privacy never get a pin.
               </p>
             </div>
           </div>
-          <MiniMap cards={cards.filter((c) => !c.sensitive && c.distance_miles !== null).map((c) => c.distance_miles!)} />
-          <Button variant="quiet" onClick={() => onTab?.("map")} className="h-touch self-start px-4">
+          <MiniMap cards={near} />
+          <Button variant="quiet" onClick={() => onTab?.("map")} className="mt-auto h-touch self-start px-4">
             Open the map
           </Button>
         </section>
@@ -234,7 +232,7 @@ export function OverviewTab({ data, onOpenPartner, onTab }: CrmTabProps = {}) {
 /** A quiet picture of how far partners are: dots on rings at 1, 3, 5 and 10 miles. Decorative; the Map tab has the real map. */
 function MiniMap({ cards }: { cards: number[] }) {
   const rings = [1, 3, 5, 10];
-  const r = (mi: number) => 8 + (Math.min(mi, 10) / 10) * 52;
+  const r = (mi: number) => 8 + Math.sqrt(Math.min(mi, 10) / 10) * 52;
   return (
     <svg aria-hidden viewBox="0 0 140 140" className="mx-auto h-36 w-36">
       {rings.map((mi) => (
