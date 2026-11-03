@@ -61,6 +61,7 @@ import { fileTools } from "./tools-files";
 import { forget, MEMORY_KINDS, MemoryRefused, recentChanges, remember } from "./memory";
 import { ABOUT_NAMES, ABOUT_ORGS, ASK_WHICH, choiceOf, noCard, REFERRAL_TOOLS, whatItSays } from "./tools-referrals";
 import { DEBRIEF_TOOLS } from "./tools-debrief";
+import { MEETING_TOOLS } from "./tools-meetings";
 import { outOfStateWarning } from "../referrals/states";
 import { RULES_TOOLS } from "./tools-rules";
 import { SETTINGS_TOOLS } from "./tools-settings";
@@ -84,8 +85,11 @@ export type ToolContext = {
   said?: string[];
 };
 
-/** aeon_action is queued only by runTool itself in Manual mode, never by an agent. */
-const QUEUEABLE_KINDS = APPROVAL_KINDS.filter((k) => k !== "aeon_action" && (FRONT_DESK_ENABLED || !FRONT_DESK_APPROVAL_KINDS.includes(k)) && demoApprovalKind(k)) as [Exclude<ApprovalKind, "aeon_action">, ...Exclude<ApprovalKind, "aeon_action">[]];
+/**
+ * aeon_action is queued only by runTool itself in Manual mode, never by an agent. referral_meeting
+ * only by plan_referral_meeting, which checks the card, the time and the note first.
+ */
+const QUEUEABLE_KINDS = APPROVAL_KINDS.filter((k) => k !== "aeon_action" && k !== "referral_meeting" && (FRONT_DESK_ENABLED || !FRONT_DESK_APPROVAL_KINDS.includes(k)) && demoApprovalKind(k)) as [Exclude<ApprovalKind, "aeon_action">, ...Exclude<ApprovalKind, "aeon_action">[]];
 
 /**
  * Saving or forgetting a memory never waits for her tap, in any mode. Nor do the
@@ -1588,6 +1592,8 @@ export const TOOLS: AeonTool[] = [
   // Find any card, do-not-contact, and change a waiting letter (lib/aeon/tools-referrals.ts).
   ...REFERRAL_TOOLS,
   ...DEBRIEF_TOOLS,
+  // The Referrals calendar: plan (queues an approval) and list meetings (lib/aeon/tools-meetings.ts).
+  ...MEETING_TOOLS,
 
   // ---- Instagram (Instagram session) ---------------------------------------------------------
   tool({
@@ -2045,6 +2051,7 @@ const VIEW_ONLY =
 export const FREE_TEXT_TOOLS: ReadonlySet<string> = new Set([
   "read_document", "find_documents", "open_document",
   "find_referral_cards", "list_referral_sources", "log_referral_contact", "recheck_referral_source",
+  "plan_referral_meeting", "list_referral_meetings",
   "recent_memory_changes", "remember",
   "status", "morning_brief", "queue_approval",
   "front_desk_status", "front_desk_check_now",
