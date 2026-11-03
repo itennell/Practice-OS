@@ -308,7 +308,7 @@ function Card({
       {card.stage !== "not_a_fit" && !card.suggested_from && <DebriefButton card={card} autoOpen={debriefOpen} />}
       {canDraft && (
         <Button variant="quiet" onClick={() => onDraft(false)} disabled={drafting} aria-describedby={headingId}>
-          {drafting ? "Aeon is writing…" : card.stage === "follow_up" ? "Draft a check-in email" : "Draft email"}
+          {drafting ? "Aeon is writing…" : card.stage === "follow_up" ? "Draft check-in" : "Draft email"}
         </Button>
       )}
       {canNudge && (

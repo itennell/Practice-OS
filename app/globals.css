@@ -473,3 +473,23 @@ textarea {
   color: #1f1e1d;
   text-decoration: underline;
 }
+/* The zoom buttons and attribution follow the app's colours, so they aren't white on the dark map. */
+.referral-map .maplibregl-ctrl-group {
+  background: var(--toast-bg);
+  box-shadow: 0 0 0 1px var(--line-strong);
+}
+.referral-map .maplibregl-ctrl-group button + button {
+  border-top-color: var(--line);
+}
+@media (prefers-color-scheme: dark) {
+  .referral-map .maplibregl-ctrl-group .maplibregl-ctrl-icon {
+    filter: invert(1);
+  }
+  .referral-map .maplibregl-ctrl-attrib {
+    color: #f5f4ef;
+    background: rgb(38 38 36 / 0.85);
+  }
+  .referral-map .maplibregl-ctrl-attrib a {
+    color: #f5f4ef;
+  }
+}

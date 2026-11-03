@@ -6,7 +6,8 @@
 // The audio and transcript never come back to the page; only the checked draft
 // does (lib/referrals/debrief.ts).
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { Dialog } from "@base-ui/react/dialog";
 import { Mic, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { notify } from "@/components/shared/toaster";
@@ -79,17 +80,33 @@ async function analyze(cardId: string, wav: Blob, onStep: (s: Step) => void): Pr
   return result;
 }
 
+// On a wide screen a board column is about 200px, too narrow for the debrief,
+// so it opens in a panel on the right (like Admin's side panel). Phones keep it on the card.
+const WIDE = "(min-width: 768px)";
+function useWide(): boolean {
+  return useSyncExternalStore(
+    (on) => {
+      const mq = window.matchMedia(WIDE);
+      mq.addEventListener("change", on);
+      return () => mq.removeEventListener("change", on);
+    },
+    () => window.matchMedia(WIDE).matches,
+    () => false,
+  );
+}
+
 export function DebriefButton({ card, autoOpen = false }: { card: ReferralSource; autoOpen?: boolean }) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>(autoOpen ? { at: "record" } : { at: "closed" });
   const [recording, setRecording] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
   const headingId = `debrief-${card.id}`;
+  const wide = useWide();
 
   // Opened from the chat (/referrals?debrief=<id>): bring the card into view.
   useEffect(() => {
-    if (autoOpen) boxRef.current?.scrollIntoView({ block: "center" });
-  }, [autoOpen]);
+    if (autoOpen && !wide) boxRef.current?.scrollIntoView({ block: "center" });
+  }, [autoOpen, wide]);
 
   async function recorded(wav: Blob) {
     setPhase({ at: "working", step: "transcribing" });
@@ -115,13 +132,17 @@ export function DebriefButton({ card, autoOpen = false }: { card: ReferralSource
     );
   }
 
-  return (
+  const box = (
     <div
       ref={boxRef}
       role="region"
       aria-labelledby={headingId}
       data-testid="debrief"
-      className="flex flex-col gap-3 rounded-[16px] border border-[var(--hairline)] bg-[var(--glass)] p-3 text-small"
+      className={
+        wide
+          ? "flex flex-col gap-4"
+          : "flex flex-col gap-3 rounded-[16px] border border-[var(--hairline)] bg-[var(--glass)] p-3 text-small"
+      }
     >
       <div className="flex items-start justify-between gap-2">
         <h4 id={headingId} className="font-semibold">
@@ -190,6 +211,33 @@ export function DebriefButton({ card, autoOpen = false }: { card: ReferralSource
         />
       )}
     </div>
+  );
+
+  if (!wide) return box;
+  return (
+    <>
+      <Button variant="quiet" disabled aria-describedby={`ref-${card.id}`}>
+        <Mic aria-hidden size={16} />
+        Debrief open
+      </Button>
+      <Dialog.Root
+        open
+        disablePointerDismissal
+        onOpenChange={(next) => {
+          if (!next && phase.at !== "working") setPhase({ at: "closed" });
+        }}
+      >
+        <Dialog.Portal>
+          <Dialog.Backdrop className="fixed inset-0 z-40 bg-[var(--scrim)]" />
+          <Dialog.Popup
+            aria-labelledby={headingId}
+            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-[560px] flex-col overflow-y-auto border-l border-[var(--glass-line)] bg-[var(--bg)] px-6 pt-[max(1.25rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[0_24px_64px_rgb(31_30_29/0.18)] outline-none"
+          >
+            {box}
+          </Dialog.Popup>
+        </Dialog.Portal>
+      </Dialog.Root>
+    </>
   );
 }
 

@@ -6,6 +6,7 @@ import type { ApprovalMode } from "../approval-policy";
 import { loadApprovalSettings } from "../approval-settings";
 import { db } from "../db";
 import { respond, type RespondOptions, type Reply, type Step, type Turn } from "./agent";
+import { safeTitle, shownTitle } from "./chat-title";
 
 export type Conversation = {
   id: string;
@@ -26,21 +27,22 @@ export type ChatMessage = {
   created_at: Date;
 };
 
-const TITLE_CHARS = 60;
-
-function titleFrom(text: string): string {
-  const clean = text.trim().replace(/\s+/g, " ");
-  return clean.length <= TITLE_CHARS ? clean : `${clean.slice(0, TITLE_CHARS - 1).trimEnd()}…`;
+/** Saved titles are checked again as they are read (lib/aeon/chat-title.ts). */
+async function withShownTitles(rows: Conversation[]): Promise<Conversation[]> {
+  const out: Conversation[] = [];
+  for (const row of rows) out.push({ ...row, title: await shownTitle(row.title) });
+  return out;
 }
 
 export async function listConversations(limit = 50): Promise<Conversation[]> {
-  return db()<Conversation[]>`select * from practice_os.conversations order by updated_at desc limit ${limit}`;
+  return withShownTitles(await db()<Conversation[]>`select * from practice_os.conversations order by updated_at desc limit ${limit}`);
 }
 
 export async function getConversation(id: string): Promise<{ conversation: Conversation; messages: ChatMessage[] } | null> {
   const sql = db();
   const [conversation] = await sql<Conversation[]>`select * from practice_os.conversations where id = ${id}`;
   if (!conversation) return null;
+  conversation.title = await shownTitle(conversation.title);
   const messages = await sql<ChatMessage[]>`
     select * from practice_os.chat_messages where conversation_id = ${id} order by id`;
   return { conversation, messages };
@@ -106,11 +108,13 @@ export async function saveExchange(input: {
 }): Promise<string> {
   const { reply } = input;
   const sql = db();
+  // Checked before the transaction: the name-finder can take a moment.
+  const title = input.conversationId ? null : await safeTitle(input.text);
   return sql.begin(async (tx) => {
     let id = input.conversationId ?? undefined;
     if (!id) {
       const [row] = await tx<{ id: string }[]>`
-        insert into practice_os.conversations (title, approval_mode) values (${titleFrom(input.text)}, ${input.mode ?? null}) returning id`;
+        insert into practice_os.conversations (title, approval_mode) values (${title}, ${input.mode ?? null}) returning id`;
       id = row.id;
     } else {
       await tx`update practice_os.conversations set updated_at = now(), approval_mode = coalesce(${input.mode ?? null}, approval_mode) where id = ${id}`;

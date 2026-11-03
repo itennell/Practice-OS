@@ -45,11 +45,12 @@ export function ModePicker({
           disabled={readOnly}
           aria-label={`Mode: ${MODE_INFO[mode].label}. ${readOnly ? "View only." : "Change mode"}`}
           // Sits inside the Prompt Bar's bottom row, styled like its other buttons.
-          className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full px-3 text-small font-medium text-[var(--fg-muted)] outline-none hover:bg-[var(--hairline)] hover:text-[var(--fg)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] focus-visible:outline-solid disabled:cursor-default disabled:hover:bg-transparent"
+          // On phones only the icon shows, so the placeholder isn't cut short (wave 4 UI).
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center gap-1.5 rounded-full text-small min-[480px]:w-auto min-[480px]:px-3 font-medium text-[var(--fg-muted)] outline-none hover:bg-[var(--hairline)] hover:text-[var(--fg)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] focus-visible:outline-solid disabled:cursor-default disabled:hover:bg-transparent"
         >
           <Icon aria-hidden className="size-4" />
-          {MODE_INFO[mode].label}
-          {!readOnly && <ChevronDown aria-hidden className="size-4" />}
+          <span aria-hidden className="hidden min-[480px]:inline">{MODE_INFO[mode].label}</span>
+          {!readOnly && <ChevronDown aria-hidden className="hidden size-4 min-[480px]:block" />}
         </Popover.Trigger>
         <Popover.Portal>
           <Popover.Positioner side="top" align="start" sideOffset={10} className="z-50">

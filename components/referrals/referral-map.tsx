@@ -93,6 +93,15 @@ export function ReferralMap({
 
       const addLayers = () => {
         if (m.getSource(SOURCE)) return;
+        // The dark basemap's street and place names are near-invisible on our dark page:
+        // draw them in the app's muted text colour with a page-coloured halo.
+        if (dark.matches) {
+          for (const layer of m.getStyle().layers ?? []) {
+            if (layer.type !== "symbol") continue;
+            m.setPaintProperty(layer.id, "text-color", cssVar("--fg-muted"));
+            m.setPaintProperty(layer.id, "text-halo-color", cssVar("--bg"));
+          }
+        }
         m.addSource(SOURCE, { type: "geojson", data: spreadPins(latest.current.pins), cluster: true, clusterRadius: 44, clusterMaxZoom: 15 });
         const color = ["match", ["get", "tier"], "first", cssVar("--pin-first"), "next", cssVar("--pin-next"), cssVar("--pin-later")];
         m.addLayer({
