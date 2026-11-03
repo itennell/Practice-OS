@@ -90,6 +90,19 @@ export function meetingOutcome(o: ApprovalOutcome | null, p: Planned): ToolResul
         "Never say it is waiting for her OK or in her Approvals.",
     });
   }
+  if (o?.status === "running") {
+    // Her mode started it and it hasn't finished: neither booked nor waiting for her.
+    return text({
+      booked: false,
+      being_saved: true,
+      waiting_for_her: false,
+      approval_id: p.approval_id,
+      meeting: p.proposed,
+      sent,
+      say: `${p.proposed.kind} with ${p.proposed.with} for ${p.proposed.when} is being saved; check the Referrals calendar in a moment.`,
+      about: "It is being saved now under her approval mode. Never say it is waiting for her OK.",
+    });
+  }
   if (o?.status === "failed" || o?.status === "rejected") {
     return text({ ok: false, booked: false, waiting_for_her: false, approval_id: p.approval_id, error: o.error ?? "The meeting couldn't be saved." });
   }

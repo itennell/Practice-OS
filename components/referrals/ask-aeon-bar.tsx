@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { PromptBar } from "@/components/shared/prompt-bar";
 import { Orb } from "@/components/ui";
+import { REFERRAL_TABS, type ReferralTab } from "@/lib/referrals/tabs";
 
 type Reply = { kind: string; text: string };
 type Event =
@@ -21,17 +22,28 @@ type Event =
 
 const FAILED = "Aeon couldn't answer just now. Try again in a minute.";
 
+/** A message from the route itself (its fixed error text), safe to show as it is. */
+class Said extends Error {}
+
+/** The tab's id from its id or label ("Meetings and notes" -> "meetings"); Partners when unknown. */
+function tabId(tab: string): ReferralTab {
+  return REFERRAL_TABS.find((t) => t.id === tab || t.label === tab)?.id ?? "partners";
+}
+
 /** Reads the route's JSON lines, calling onProgress for each progress line; returns the result. */
 async function readEvents(res: Response, onProgress: (label: string) => void): Promise<{ conversationId?: string | null; reply?: Reply }> {
   if (!res.body || !(res.headers.get("content-type") ?? "").includes("ndjson")) {
     const data = (await res.json().catch(() => ({}))) as { conversationId?: string | null; reply?: Reply; error?: string };
-    if (!res.ok || !data.reply) throw new Error(data.error ?? FAILED);
+    if (!res.ok || !data.reply) throw new Said(data.error ?? FAILED);
     return data;
   }
   const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
   let buffer = "";
   for (;;) {
-    const { value, done } = await reader.read();
+    // A dropped connection mid-answer shows the fixed message, never a browser error.
+    const { value, done } = await reader.read().catch(() => {
+      throw new Said(FAILED);
+    });
     if (value) buffer += value;
     const lines = buffer.split("\n");
     buffer = done ? "" : (lines.pop() ?? "");
@@ -45,11 +57,11 @@ async function readEvents(res: Response, onProgress: (label: string) => void): P
       }
       if (e.type === "progress" && typeof e.label === "string") onProgress(e.label.slice(0, 200));
       else if (e.type === "result") return e;
-      else if (e.type === "error") throw new Error(e.error || FAILED);
+      else if (e.type === "error") throw new Said(typeof e.error === "string" && e.error ? e.error.slice(0, 300) : FAILED);
     }
     if (done) break;
   }
-  throw new Error(FAILED);
+  throw new Said(FAILED);
 }
 
 export function AskAeonBar({ tab, picked }: { tab: string; picked: { id: string; name: string }[] }) {
@@ -66,10 +78,11 @@ export function AskAeonBar({ tab, picked }: { tab: string; picked: { id: string;
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ conversationId: null, text, context: { tab, picked }, stream: true }),
+        // The tab as its id and the picked cards as ids only: the server reads their names from her board.
+        body: JSON.stringify({ conversationId: null, text, context: { tab: tabId(tab), picked: picked.map((p) => ({ id: p.id })) }, stream: true }),
       });
       const data = await readEvents(res, setWorking);
-      if (!data.reply) throw new Error(FAILED);
+      if (!data.reply) throw new Said(FAILED);
       if (data.reply.kind === "answer" && data.conversationId) {
         setWorking("Opening Aeon's answer");
         router.push(`/?c=${data.conversationId}`);
@@ -79,7 +92,7 @@ export function AskAeonBar({ tab, picked }: { tab: string; picked: { id: string;
       setSaid(data.reply.text);
       if (data.reply.kind === "refused") throw new Error("refused");
     } catch (err) {
-      if (!(err instanceof Error && err.message === "refused")) setSaid(err instanceof Error ? err.message : FAILED);
+      if (!(err instanceof Error && err.message === "refused")) setSaid(err instanceof Said ? err.message : FAILED);
       throw err;
     } finally {
       setBusy(false);

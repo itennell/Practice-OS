@@ -5,6 +5,8 @@
 // bubble or the chat's title, and isn't saved with her message. Pure, so the box, the
 // route and the tests share it.
 
+import { REFERRAL_TABS, type ReferralTab } from "./tabs";
+
 /** The chat's limit on one message (app/api/chat/route.ts). */
 export const CHAT_MAX = 4000;
 /** A picked partner's name is cut to this many characters. */
@@ -14,7 +16,13 @@ export const MAX_PICKED = 25;
 /** The tab's name is cut to this many characters. */
 export const TAB_MAX = 40;
 
-export type AskContext = { tab: string; picked: { id: string; name: string }[] };
+/** What the box sends: a known tab id (lib/referrals/tabs.ts) and the picked card ids. Names come from her board on the server. */
+export type AskContext = { tab: ReferralTab; picked: { id: string; name?: string }[] };
+
+/** The tab's label for the context line, from its id. Never free text from the browser. */
+export function tabLabel(tab: ReferralTab): string {
+  return REFERRAL_TABS.find((t) => t.id === tab)?.label ?? "Referrals";
+}
 
 /** Control characters out (newlines and tabs become spaces), runs of spaces folded, trimmed. */
 export function clean(s: string): string {
@@ -30,7 +38,11 @@ export function contextSuffix(tab: string, picked: { id: string; name: string }[
 
 /** Her words, cut so that her words plus the context line fit the chat's limit. */
 export function withContext(text: string, tab: string, picked: { id: string; name: string }[]): string {
-  const suffix = contextSuffix(tab, picked);
+  return joinContext(text, contextSuffix(tab, picked));
+}
+
+/** Her words, cut to leave room, then a context line already built by contextSuffix. */
+export function joinContext(text: string, suffix: string): string {
   const room = Math.max(0, CHAT_MAX - suffix.length);
   return `${text.trim().slice(0, room)}${suffix}`;
 }

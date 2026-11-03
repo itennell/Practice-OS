@@ -6,6 +6,7 @@ import { sendMessage } from "@/lib/aeon/chat";
 import { DEMO_RESTING, demoCapReached, isViewOnly } from "@/lib/aeon/demo";
 import { reflectIfDue } from "@/lib/aeon/reflect";
 import { MAX_PICKED } from "@/lib/referrals/ask-context";
+import { REFERRAL_TABS, type ReferralTab } from "@/lib/referrals/tabs";
 import { isUuid } from "../approvals/responses";
 
 // One message to Aeon. The crisis check and the sensitive-info guard run before
@@ -23,9 +24,11 @@ const body = z.object({
   mode: z.enum(APPROVAL_MODES).optional(),
   context: z
     .object({
-      // Cut and cleaned again by contextSuffix (control characters out, caps, JSON quoting).
-      tab: z.string().max(200),
-      picked: z.array(z.object({ id: z.string().max(200), name: z.string().max(500) })).max(MAX_PICKED * 4),
+      // A known tab id only, never free text. Picked ids are looked up on her board on the server
+      // (lib/aeon/chat.ts resolvePicked): unknown, sensitive and do-not-contact ids are dropped and
+      // the stored names are used; a name the browser sends is ignored.
+      tab: z.enum(REFERRAL_TABS.map((t) => t.id) as [ReferralTab, ...ReferralTab[]]),
+      picked: z.array(z.object({ id: z.string().uuid(), name: z.string().max(500).optional() })).max(MAX_PICKED * 4),
     })
     .optional(),
   stream: z.boolean().optional(),

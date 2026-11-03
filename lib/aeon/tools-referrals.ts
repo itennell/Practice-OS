@@ -8,6 +8,7 @@ import type { chat } from "../meta";
 import { contactsFor, CONTACT_LABEL, isSuppressed, NoNpiToList, screenedNote, suppress, suppressedList, suppressionFor, unsuppress } from "../referrals/contacts";
 import { buildCallScript, SCRIPT_VARIANTS, type ScriptVariant } from "../referrals/call-script";
 import { scriptFacts } from "../referrals/crm";
+import { isSensitiveSource, PUBLIC_LINE_ONLY } from "../referrals/sensitive";
 import { evidenceFor } from "../referrals/evidence/store";
 import { isNichePreset, NICHE_PRESET_BY_ID, NICHE_PRESETS } from "../referrals/catalog";
 import { SPECIALTY_BY_ID, specialtyForCode } from "../referrals/nppes";
@@ -334,7 +335,8 @@ export const REFERRAL_TOOLS: AeonTool[] = [
     description:
       "When she asks for a call script, what to say when she phones someone on her Referrals board, or a voicemail to leave: returns the " +
       "built-in Call script (the same as Partners › Call script), from fixed templates and her own settings (her name, practice, real phone " +
-      "and email, who she helps, insurance). Every line passed the value check: nothing is offered for a referral. Never write a script " +
+      "and email, who she helps, insurance). Every line passed the value check: nothing is offered for a referral. A sensitive organization " +
+      "(public_line_only) is called on its public line only. Never write a script " +
       "yourself and never leave blanks like [say your number]: quote the lines exactly as returned, in their sections, and add no lines. " +
       "If phone_on_file is false, tell her to add her practice phone in Settings. variant: front_desk (default), provider or voicemail; " +
       "leave it out to get all three. Name the card as she said it or pass its id; several matches come back as ask_which. Sends nothing.",
@@ -361,7 +363,9 @@ export const REFERRAL_TOOLS: AeonTool[] = [
       return text({
         written: true,
         from: "the built-in Call script (Partners › Call script)",
+        // Never an address, theirs or hers: the script names her neighborhood only, and the card's phone is all she needs to call.
         to: { card_name: card.name, ...(card.phone ? { office_phone: card.phone } : {}) },
+        ...(card.sensitive || isSensitiveSource(card) ? { public_line_only: PUBLIC_LINE_ONLY } : {}),
         phone_on_file: Boolean(facts.phone),
         scripts,
         about:

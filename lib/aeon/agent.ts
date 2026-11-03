@@ -15,6 +15,7 @@ import { CRISIS_REPLY, alertCrisis, checkCrisis } from "../safety";
 import { guard, REFUSAL, type GuardKind } from "./guard";
 import { relevantMemories, type Memory } from "./memory";
 import { soul } from "./soul";
+import { joinContext } from "../referrals/ask-context";
 import { getProfile, STAGE_LABEL, type Profile } from "../profile";
 import type { ApprovalMode } from "../approval-policy";
 import { cardsFrom, type DocumentCard } from "../documents/card";
@@ -49,6 +50,8 @@ export type RespondOptions = {
   today?: string;
   /** Swapped in by tests to replay recorded model replies. */
   chat?: ChatFn;
+  /** The Ask Aeon context line (lib/referrals/ask-context.ts contextSuffix), added under her words for the model only. */
+  context?: string;
   /** Called with a plain line each time Aeon starts something ("Checking partner 2 of 3's public listings"). */
   onProgress?: (label: string) => void;
 };
@@ -126,20 +129,46 @@ export function systemPrompt(memories: Pick<Memory, "id" | "kind" | "text">[], t
 
 export type Outcome = { state: "ok" } | { state: "failed"; why: string } | { state: "waiting"; where: string };
 
+/** The result carries runTool's approval_outcomes block: an approval it queued already ran (done, failed or declined). */
+export function ranApprovals(result: ToolResult): boolean {
+  return result.content.some((b) => Array.isArray(asObject(b.text)?.approval_outcomes));
+}
+
+/** A JSON object, or null for plain text or anything else. */
+function asObject(text: string): Record<string, unknown> | null {
+  try {
+    const v = JSON.parse(text) as unknown;
+    return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * One convention for every tool: failed is an error, or JSON saying ok: false, saved: false
  * (unless already_remembered), an error, written: false, not_changed, not_checked,
  * moved: false, forgotten: false or prep: null. waiting_for_her is its own state.
  */
 export function outcomeOf(result: ToolResult): Outcome {
-  const text = result.content.map((b) => b.text).join("\n").trim();
-  let p: Record<string, unknown> | null = null;
-  try {
-    const v = JSON.parse(text) as unknown;
-    if (v && typeof v === "object" && !Array.isArray(v)) p = v as Record<string, unknown>;
-  } catch {
-    // Plain text: counts as working unless isError says otherwise.
+  // runTool's approval_outcomes block (lib/aeon/tools.ts withTrueOutcomes) is read on its own and kept
+  // out of the tool's own text, so the tool's JSON still parses.
+  const outcomes: Record<string, unknown>[] = [];
+  const own = result.content.filter((b) => {
+    const v = asObject(b.text);
+    if (v && Array.isArray(v.approval_outcomes)) {
+      outcomes.push(...(v.approval_outcomes as Record<string, unknown>[]));
+      return false;
+    }
+    return true;
+  });
+  // An approval her mode ran that failed or was declined: the change didn't happen, whatever the tool said.
+  const bad = outcomes.find((o) => o.status === "failed" || o.status === "rejected");
+  if (bad) {
+    const why = typeof bad.error === "string" && bad.error ? bad.error : `it ${String(bad.status)} when it ran`;
+    return { state: "failed", why: why.length > 220 ? `${why.slice(0, 217)}...` : why };
   }
+  const text = own.map((b) => b.text).join("\n").trim();
+  const p = asObject(text);
   if (p?.waiting_for_her === true) return { state: "waiting", where: typeof p.where === "string" ? p.where : "the bar above the chat box" };
   const failed =
     result.isError ||
@@ -167,16 +196,29 @@ const INTRO = /^(?:(?:hi|hello|hey)(?: there)?[,!.]?\s+)?(?:I['’]m|I am) Aeon\
 /** Her message greets Aeon or asks who it is or what it does: the one time an introduction fits. */
 const ASKS_WHO = /^\s*(?:hi|hello|hey|good (?:morning|afternoon|evening))\b[\s!.,]*(?:aeon)?[\s!.,]*$|\bwho are you\b|\bwhat (?:can|do) you do\b|\bwhat are you\b|\bintroduce yourself\b|\bhow can you help\b/i;
 
+/** The self-description right after the intro ("I help you find providers…"). */
+const SELF = /^I (?:help|can help|can) you\b/i;
+
 /**
  * Aeon introduces itself only in a conversation's first reply, and only when she greets it
- * or asks what it does. Anywhere else, a leading "I'm Aeon…" paragraph is dropped (plain code),
- * as long as something is left to say.
+ * or asks what it does. Anywhere else, the leading "I'm Aeon…" sentence (and an "I help you…"
+ * sentence right after it) is dropped in plain code; the rest of that paragraph and the reply
+ * stay, and a reply that would be left empty stays as it was.
  */
 export function withoutIntro(reply: string, opts: { firstReply: boolean; message: string }): string {
   if (opts.firstReply && ASKS_WHO.test(opts.message)) return reply;
-  const parts = reply.split(/\n\s*\n/);
-  if (parts.length < 2 || !INTRO.test(parts[0].trim())) return reply;
-  return parts.slice(1).join("\n\n").trim() || reply;
+  const lead = reply.match(/^\s*/)![0];
+  const body = reply.slice(lead.length);
+  if (!INTRO.test(body)) return reply;
+  const end = body.search(/(?<=[.!?])\s|\n/);
+  if (end < 0) return reply;
+  let rest = body.slice(end).replace(/^[ \t]+/, "");
+  if (SELF.test(rest)) {
+    const next = rest.search(/(?<=[.!?])\s|\n/);
+    rest = next < 0 ? "" : rest.slice(next).replace(/^[ \t]+/, "");
+  }
+  const out = rest.replace(/^\s*\n/, "").trim();
+  return out || reply;
 }
 
 /**
@@ -288,13 +330,17 @@ export async function verifiedApprovals(ids: string[], since: Date): Promise<str
   return ids.filter((id) => ok.has(id));
 }
 
-export async function respond(message: string, opts: RespondOptions): Promise<Reply> {
-  const crisis = checkCrisis(message);
+export async function respond(typed: string, opts: RespondOptions): Promise<Reply> {
+  // The crisis check reads her typed words only: a partner on her board named "Suicide Prevention
+  // Center" in the Ask Aeon context line never fires 988 and an urgent alert. Everything the
+  // model sees (her words and the context line) passes the privacy guard.
+  const crisis = checkCrisis(typed);
   if (crisis.crisis) {
     await audit({ actor: "safety", action: "crisis_reply", subjectType: "chat", details: { category: crisis.category, by: opts.by } });
     await alertCrisis({ source: "chat", category: crisis.category, by: opts.by });
     return { kind: "crisis", text: CRISIS_REPLY };
   }
+  const message = opts.context ? joinContext(typed, opts.context) : typed;
   const check = await guard(message, "message");
   if (!check.ok) {
     await audit({ actor: "safety", action: "phi_refused", subjectType: "chat", details: { kind: check.kind, by: opts.by } });
@@ -320,7 +366,7 @@ export async function respond(message: string, opts: RespondOptions): Promise<Re
   const started = new Date();
   const allIds = async () => [...new Set([...approvalIds, ...(await verifiedApprovals(textIds, started))])];
   // Her own words, for the plain-code checks inside tools (a fee's session length, a fuzzy date, who she helps).
-  const said = [...(opts.history ?? []).filter((t) => t.role === "clinician").slice(-SAID_TURNS).map((t) => t.content), message];
+  const said = [...(opts.history ?? []).filter((t) => t.role === "clinician").slice(-SAID_TURNS).map((t) => t.content), typed];
 
   const progress = (label: string) => {
     try {
@@ -339,7 +385,7 @@ export async function respond(message: string, opts: RespondOptions): Promise<Re
     const calls = readToolCalls(reply);
     if (calls.length === 0) {
       progress("Writing the answer");
-      const spoken = withoutIntro((reply.content ?? "").trim() || "I don't have an answer for that yet.", { firstReply: !(opts.history ?? []).length, message });
+      const spoken = withoutIntro((reply.content ?? "").trim() || "I don't have an answer for that yet.", { firstReply: !(opts.history ?? []).length, message: typed });
       const text = honestReply(spoken, attempts);
       const out = await guard(text, "reply");
       if (!out.ok) {
@@ -367,7 +413,8 @@ export async function respond(message: string, opts: RespondOptions): Promise<Re
       attempts.push({
         tool: call.name,
         failure,
-        writes: TOOLS_BY_NAME.get(call.name)?.changesData !== false,
+        // A tool that only queues (changesData: false) still made a change when her mode ran its approval.
+        writes: TOOLS_BY_NAME.get(call.name)?.changesData !== false || ranApprovals(result),
         ...(outcome.state === "waiting" ? { waiting: outcome.where } : {}),
         ...(ran ? { ran } : {}),
         cards: cards.length,
