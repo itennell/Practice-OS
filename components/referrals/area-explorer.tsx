@@ -340,7 +340,7 @@ export function AreaExplorer({
       const res = await fetch("/api/referrals/add", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ items: [{ npi: p.npi, distanceMiles: p.distanceMiles }] }),
+        body: JSON.stringify({ items: [{ npi: p.npi, distanceMiles: p.distanceMiles, ...(p.sensitive ? { sensitive: true } : {}) }] }),
       });
       const data = (await res.json()) as { added?: { npi: string }[]; error?: string };
       if (!res.ok || !data.added?.length) throw new Error(data.error ?? `${p.name} isn't in the NPI Registry any more.`);

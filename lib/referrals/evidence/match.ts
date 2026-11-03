@@ -79,7 +79,8 @@ export function orgNameScore(a: string | null | undefined, b: string | null | un
   return jaroWinkler(x, y);
 }
 
-function sameStreet(a: Candidate, b: Candidate): boolean {
+/** The same street address in the same ZIP (number exact, street name nearly). */
+export function sameStreet(a: Candidate, b: Candidate): boolean {
   const za = zip5(a.zip);
   const zb = zip5(b.zip);
   if (!za || za !== zb) return false;

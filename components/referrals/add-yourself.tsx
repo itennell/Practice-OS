@@ -25,6 +25,7 @@ const EMPTY: Form = { kind: "organization", name: "", organization: "", type: ""
 const STATUS: Record<PreviewRow["status"], string> = {
   new: "New",
   matched: "Matched existing card",
+  possible: "Possible duplicate",
   error: "Problem",
   do_not_contact: "On your do-not-contact list",
 };
@@ -34,18 +35,24 @@ function ManualForm({ types }: { types: TypeOption[] }) {
   const [f, setF] = useState<Form>(EMPTY);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [possible, setPossible] = useState<{ name: string; label: string } | null>(null);
   const set = (k: keyof Form) => (e: { target: { value: string } }) => setF((x) => ({ ...x, [k]: e.target.value }));
   const sensitive = types.find((t) => t.value === f.type)?.sensitive ?? false;
   const options = [{ value: "", label: "Pick a kind" }, ...types];
 
-  async function save() {
+  async function save(addAnyway = false) {
     setBusy(true);
     setError(null);
     try {
-      const body = sensitive ? { ...f, street: "", zip: "" } : f;
+      const body = { ...(sensitive ? { ...f, street: "", zip: "" } : f), add_anyway: addAnyway };
       const res = await fetch("/api/referrals/manual", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-      const data = (await res.json()) as { added?: { name: string }; matched?: { name: string; label: string }; error?: string };
+      const data = (await res.json()) as { added?: { name: string }; matched?: { name: string; label: string }; possible?: { name: string; label: string }; error?: string };
       if (!res.ok) throw new Error(data.error ?? "Couldn't add that.");
+      if (data.possible) {
+        setPossible(data.possible);
+        return;
+      }
+      setPossible(null);
       if (data.matched) notify.success(`${data.matched.name} is already on your board (${data.matched.label}), so nothing new was added.`);
       else notify.success(`${data.added?.name ?? f.name} is on your board under Found, added by you.`);
       setF(EMPTY);
@@ -99,6 +106,21 @@ function ManualForm({ types }: { types: TypeOption[] }) {
           {error}
         </p>
       )}
+      {possible && (
+        <div role="alert" className="flex flex-col gap-2">
+          <p className="text-small font-medium">
+            {possible.name} is already on your board in the same city. Is this a different one?
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="accent" disabled={busy} onClick={() => void save(true)} className={FOCUS}>
+              Add anyway
+            </Button>
+            <Button type="button" variant="quiet" disabled={busy} onClick={() => setPossible(null)} className={FOCUS}>
+              It&rsquo;s the same one
+            </Button>
+          </div>
+        </div>
+      )}
       <div>
         <Button type="submit" variant="accent" disabled={busy || f.name.trim().length < 2 || !f.type} className={FOCUS}>
           {busy ? "Adding…" : "Add to board"}
@@ -115,6 +137,8 @@ function CsvImport() {
   const [file, setFile] = useState<string | null>(null);
   const [rows, setRows] = useState<PreviewRow[] | null>(null);
   const [skip, setSkip] = useState<Set<number>>(new Set());
+  // Possible duplicates are skipped unless she ticks "Add anyway".
+  const [include, setInclude] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -127,6 +151,7 @@ function CsvImport() {
       if (!res.ok || !data.rows) throw new Error(data.error ?? "Couldn't read that file.");
       setRows(data.rows);
       setSkip(new Set());
+      setInclude(new Set());
     } catch (err) {
       setRows(null);
       setError(err instanceof Error ? err.message : "Couldn't read that file.");
@@ -140,7 +165,7 @@ function CsvImport() {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/referrals/import", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ csv, commit: true, skip: [...skip] }) });
+      const res = await fetch("/api/referrals/import", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ csv, commit: true, skip: [...skip], include: [...include] }) });
       const data = (await res.json()) as { added?: unknown[]; matched?: number; failed?: { line: number; error: string }[]; error?: string };
       if (!res.ok) throw new Error(data.error ?? "Couldn't import that file.");
       const failed = data.failed?.length ? ` ${data.failed.length} couldn't be added.` : "";
@@ -156,7 +181,7 @@ function CsvImport() {
     }
   }
 
-  const fresh = rows?.filter((r) => r.status === "new" && !skip.has(r.line)).length ?? 0;
+  const fresh = (rows?.filter((r) => r.status === "new" && !skip.has(r.line)).length ?? 0) + include.size;
 
   return (
     <div className="flex flex-col gap-3" data-testid="csv-import">
@@ -202,7 +227,7 @@ function CsvImport() {
       {rows && (
         <div role="region" aria-label="Import preview" className="flex flex-col gap-3">
           <p className="font-semibold" aria-live="polite">
-            {rows.filter((r) => r.status === "new").length} new, {rows.filter((r) => r.status === "matched").length} matched existing cards, {rows.filter((r) => r.status === "error").length} with a problem
+            {rows.filter((r) => r.status === "new").length} new, {rows.filter((r) => r.status === "matched").length} matched existing cards, {rows.filter((r) => r.status === "possible").length} possible duplicates, {rows.filter((r) => r.status === "error").length} with a problem
           </p>
           <ul className="overflow-hidden rounded-[var(--radius-card-sm)] border border-[var(--line)] bg-[var(--glass)]">
             {rows.map((r, i) => (
@@ -232,6 +257,22 @@ function CsvImport() {
                     className={chipClass(!skip.has(r.line), true, FOCUS)}
                   >
                     {skip.has(r.line) ? "Skipped" : "Add"}
+                  </button>
+                )}
+                {r.status === "possible" && (
+                  <button
+                    type="button"
+                    aria-pressed={include.has(r.line)}
+                    aria-label={`Add row ${r.line} anyway, ${r.name}`}
+                    onClick={() => setInclude((s) => {
+                      const next = new Set(s);
+                      if (next.has(r.line)) next.delete(r.line);
+                      else next.add(r.line);
+                      return next;
+                    })}
+                    className={chipClass(include.has(r.line), true, FOCUS)}
+                  >
+                    {include.has(r.line) ? "Adding anyway" : "Add anyway"}
                   </button>
                 )}
               </li>

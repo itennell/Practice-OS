@@ -85,6 +85,7 @@ describe.skipIf(!hasDb)("the log against the database", async () => {
   afterAll(async () => {
     if (ids.length) await db()`delete from practice_os.referral_sources where id in ${db()(ids)}`;
     await db()`delete from practice_os.referral_suppressions where npi like '19000009%'`;
+    await db()`delete from practice_os.referral_suppressions_org where name_key like 'test rivera%'`;
     await closeDb();
   });
   async function make(npi: string, name = "Test Rivera, MD") {

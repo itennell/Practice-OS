@@ -15,7 +15,7 @@ import { keyMatches, orgKeyOf, type OrgKey, type Suppressed } from "./dnc-key";
 import type { Stage } from "./stages";
 
 export { CONTACT_KINDS, CONTACT_LABEL, REFERRED_NOTE, REFERRED_OUT_NOTE, type ContactKind } from "./contact-kinds";
-export { isSuppressed, type Suppressed } from "./dnc-key";
+export { isSuppressed, nameSuppressed, type Suppressed } from "./dnc-key";
 
 /** Reaching out: sets "last contacted" and, unless she picks a date, a follow-up a week out. */
 const OUTREACH: ContactKind[] = ["called", "emailed", "sent_letter"];
@@ -216,7 +216,9 @@ async function dncCard(sourceId: string, sql: postgres.Sql): Promise<DncCard | u
 export async function suppress(sourceId: string, reason: SuppressReason, sql: postgres.Sql = db(), by: "clinician" | "aeon" = "clinician") {
   const found = await dncCard(sourceId, sql);
   if (!found) throw new Error("That referral source is no longer on the board.");
-  const key = found.npi ? null : orgKeyOf(found);
+  // The org key is written for every card, with or without an NPI, so a later card for the
+  // same place from a path that has no NPI (CSV, by hand, the chat, CMS, OpenStreetMap) is blocked too.
+  const key = orgKeyOf(found);
   if (!found.npi && !key) {
     throw new NoNpiToList("This card has no name I can list, so I can't add it to your do-not-contact list. Move it to Not a fit yourself, or delete the card.");
   }
@@ -225,10 +227,11 @@ export async function suppress(sourceId: string, reason: SuppressReason, sql: po
     await tx`update practice_os.referral_sources set stage = 'not_a_fit', next_follow_up_on = null, updated_at = now() where id = ${sourceId}`;
     if (found.npi) {
       await tx`insert into practice_os.referral_suppressions (npi, reason) values (${found.npi}, ${reason}) on conflict (npi) do update set reason = excluded.reason`;
-    } else if (key) {
+    }
+    if (key) {
       await tx`
-        insert into practice_os.referral_suppressions_org (org_key, name_key, street_key, city_key, reason)
-        values (${key.org_key}, ${key.name_key}, ${key.street_key}, ${key.city_key}, ${reason})
+        insert into practice_os.referral_suppressions_org (org_key, name_key, street_key, city_key, zip_key, reason)
+        values (${key.org_key}, ${key.name_key}, ${key.street_key}, ${key.city_key}, ${key.zip_key ?? null}, ${reason})
         on conflict (org_key) do update set reason = excluded.reason`;
     }
     const rows = await tx<{ id: string }[]>`
@@ -239,7 +242,7 @@ export async function suppress(sourceId: string, reason: SuppressReason, sql: po
     return rows.map((r) => r.id);
   })) as string[];
   await audit(
-    { actor: by, action: "referral_suppressed", subjectType: "referral_source", subjectId: sourceId, details: { reason, by: found.npi ? "npi" : "org_key", letters_declined: declined.length } },
+    { actor: by, action: "referral_suppressed", subjectType: "referral_source", subjectId: sourceId, details: { reason, by: found.npi ? (key ? "npi_and_org_key" : "npi") : "org_key", letters_declined: declined.length } },
     sql,
   );
   for (const id of declined) {
@@ -253,7 +256,7 @@ export class NoNpiToList extends Error {}
 
 async function orgRows(sql: postgres.Sql): Promise<(OrgKey & { reason: SuppressReason })[]> {
   return sql<(OrgKey & { reason: SuppressReason })[]>`
-    select org_key, name_key, street_key, city_key, reason from practice_os.referral_suppressions_org`;
+    select org_key, name_key, street_key, city_key, zip_key, reason from practice_os.referral_suppressions_org`;
 }
 
 /** Why this card is on her do-not-contact list, or null when it isn't. */
@@ -272,18 +275,17 @@ export async function suppressionFor(sourceId: string, sql: postgres.Sql = db())
 export async function unsuppress(sourceId: string, sql: postgres.Sql = db(), by: "clinician" | "aeon" = "clinician") {
   const card = await dncCard(sourceId, sql);
   if (card?.npi) await sql`delete from practice_os.referral_suppressions where npi = ${card.npi}`;
+  // Only this card's own key: a near match (the same name at another branch) stays listed.
   const key = card ? orgKeyOf(card) : null;
-  if (key) {
-    const gone = (await orgRows(sql)).filter((o) => keyMatches(key, o)).map((o) => o.org_key);
-    if (gone.length) await sql`delete from practice_os.referral_suppressions_org where org_key in ${sql(gone)}`;
-  }
+  if (key) await sql`delete from practice_os.referral_suppressions_org where org_key = ${key.org_key}`;
   await audit({ actor: by, action: "referral_unsuppressed", subjectType: "referral_source", subjectId: sourceId }, sql);
 }
 
 /** Her whole do-not-contact list: NPIs and org keys. Every search, the plan, letters and the debrief use it. */
 export async function suppressedList(sql: postgres.Sql = db()): Promise<Suppressed> {
-  const [npis, orgs] = await Promise.all([suppressedNpis(sql), orgRows(sql).catch(() => [] as OrgKey[])]);
-  return { npis, orgs: orgs.map(({ org_key, name_key, street_key, city_key }) => ({ org_key, name_key, street_key, city_key })) };
+  // Fail closed: if the list can't be read, the caller fails rather than suggesting someone on it.
+  const [npis, orgs] = await Promise.all([suppressedNpis(sql), orgRows(sql)]);
+  return { npis, orgs: orgs.map(({ org_key, name_key, street_key, city_key, zip_key }) => ({ org_key, name_key, street_key, city_key, zip_key })) };
 }
 
 /** A note from her log, screened again with the chat's full privacy check before it reaches the model or a tool result. Null when held back. */

@@ -1,6 +1,6 @@
-// The do-not-contact key for a card with no NPI (migration 045): the
-// normalized name (a group's name; for a person, their name at their group)
-// and the normalized street and ZIP, or the city when there is no street.
+// The do-not-contact org key (migration 045), written for every card she lists
+// (with or without an NPI): the normalized name (a group's name; for a person,
+// their name at their group) and the normalized street and ZIP, the city, or the ZIP.
 // Plain code, no database, so the page, the searches and the tests share it.
 import { normalizeName, normalizeOrg, normalizeStreet, zip5 } from "./evidence/normalize";
 
@@ -13,7 +13,7 @@ export type KeyCard = {
   zip?: string | null;
 };
 
-export type OrgKey = { org_key: string; name_key: string; street_key: string | null; city_key: string | null };
+export type OrgKey = { org_key: string; name_key: string; street_key: string | null; city_key: string | null; zip_key?: string | null };
 
 const cityKey = (city: string | null | undefined) => {
   const c = (city ?? "").toLowerCase().replace(/[^a-z\s]/g, " ").replace(/\s+/g, " ").trim();
@@ -42,19 +42,34 @@ export function orgKeyOf(card: KeyCard): OrgKey | null {
   const z = zip5(card.zip);
   const street_key = street && z ? `${street} ${z}`.slice(0, 200) : null;
   const city_key = cityKey(card.city);
-  return { org_key: `${name}|${street_key ?? city_key ?? ""}`, name_key: name, street_key, city_key };
+  const zip_key = z || null;
+  return { org_key: `${name}|${street_key ?? city_key ?? zip_key ?? ""}`.slice(0, 400), name_key: name, street_key, city_key, zip_key };
 }
 
 /**
  * True when a suppressed org key names this card: the same name, and the same
- * street and ZIP; or, when either has no street, the same city (or no place at
- * all on one side). Two branches of one chain at different streets are different.
+ * street and ZIP; else (one has no street) the same city, and the same ZIP when
+ * both have one; else the same ZIP. Without a place in common it is NOT a match:
+ * two branches of one chain, or a name with no place at all, are different.
  */
 export function keyMatches(card: OrgKey, listed: OrgKey): boolean {
   if (card.name_key !== listed.name_key) return false;
   if (card.street_key && listed.street_key) return card.street_key === listed.street_key;
-  if (!card.city_key || !listed.city_key) return true;
-  return card.city_key === listed.city_key;
+  const cz = card.zip_key ?? card.street_key?.slice(-5) ?? null;
+  const lz = listed.zip_key ?? listed.street_key?.slice(-5) ?? null;
+  if (card.city_key && listed.city_key) return card.city_key === listed.city_key && (!cz || !lz || cz === lz);
+  if (cz && lz) return cz === lz;
+  return false;
+}
+
+/**
+ * A debrief's "who else" names a person or an organisation with no place at
+ * all. Suggesting a card is the safe side to refuse, so there the name alone
+ * is enough: anyone on her list with that name is not suggested again.
+ */
+export function nameSuppressed(card: KeyCard, list: Suppressed): boolean {
+  const key = orgKeyOf(card);
+  return Boolean(key && list.orgs.some((o) => o.name_key === key.name_key));
 }
 
 /** Her do-not-contact list: NPIs, and org keys for cards without one. */

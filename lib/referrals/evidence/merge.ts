@@ -220,7 +220,6 @@ export function mergeEvidence(facts: Fact[], opts: { isOrg?: boolean; now?: Date
     if (origin === "state_license" && license) add(`State license: ${license.toLowerCase()}`);
     else if (origin === "cms_dac" || origin === "cms_order_referring") add("Medicare file");
     else if (origin === "cms_pdc") add(`CMS Provider Data Catalog (${shortDay(facts.find((f) => f.origin === "cms_pdc")!.checkedAt)})`);
-    else if (origin === "osm") add(`OpenStreetMap, ${OSM_ATTRIBUTION}`);
     else add(sentenceCase(ORIGIN_LABEL[origin]));
   }
   if (facts.some((f) => f.origin === "clinician")) add("You");

@@ -1131,6 +1131,8 @@ export const TOOLS: AeonTool[] = [
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: true },
     label: "Found referral sources",
     changesData: true,
+    // A write: from another app over MCP it waits for her approval.
+    queuesOverMcp: true,
     run: async ({ zip: askedZip, specialties: asked, organizations, radius_miles, show }) => {
       const setup = await getReferralSettings();
       const zip = askedZip ?? setup.searchZip;
@@ -1213,6 +1215,8 @@ export const TOOLS: AeonTool[] = [
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     label: "Moved a card on your Referrals board",
     changesData: true,
+    // A write: from another app over MCP it waits for her approval.
+    queuesOverMcp: true,
     run: async ({ id, stage }) => {
       const moved = await moveSource(id, stage, "aeon");
       return text(moved ? { moved: true, name: moved.name, column: STAGE_LABEL[stage] } : { moved: false, reason: "No card with that id." });
@@ -1346,6 +1350,8 @@ export const TOOLS: AeonTool[] = [
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: false },
     label: "Logged a referral contact",
     changesData: true,
+    // A write: from another app over MCP it waits for her approval.
+    queuesOverMcp: true,
     preflight: async (input, ctx) => {
       const found = logCard(input.source, await listSources());
       if (found.result) return found.result;

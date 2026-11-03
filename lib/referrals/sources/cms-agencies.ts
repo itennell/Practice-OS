@@ -35,18 +35,22 @@ export const CMS_DATASETS: Record<CmsAgencyType, { id: string; title: string; pa
 };
 
 const QUERY_BASE = "https://data.cms.gov/provider-data/api/1/datastore/query";
-/** At most this many agencies per dataset per search; nearest kept. */
+/** At most this many agencies per kind are shown, the nearest ones (lib/referrals/orgs.ts sorts by distance first). */
 export const CMS_LIMIT = 100;
+/** Rows per datastore page, and at most this many pages per dataset per search (all asked before any is cut). */
+export const CMS_PAGE = 100;
+export const CMS_MAX_PAGES = 5;
 const SPACING_MS = 500;
 
 /** The datastore query for one dataset: the agencies in these ZIPs (or with these CCNs). */
-export function pdcUrl(type: CmsAgencyType, by: { zips: string[] } | { ccns: string[] }): string {
+export function pdcUrl(type: CmsAgencyType, by: { zips: string[] } | { ccns: string[] }, offset = 0): string {
   const q = new URLSearchParams();
   const [property, values] = "zips" in by ? ["zip_code", by.zips] : ["cms_certification_number_ccn", by.ccns];
   q.set("conditions[0][property]", property);
   for (const v of [...new Set(values)].sort()) q.append("conditions[0][value][]", v);
   q.set("conditions[0][operator]", "in");
-  q.set("limit", String(CMS_LIMIT));
+  q.set("limit", String(CMS_PAGE));
+  if (offset) q.set("offset", String(offset));
   return `${QUERY_BASE}/${CMS_DATASETS[type].id}/0?${q}`;
 }
 
@@ -141,24 +145,36 @@ async function ask(url: string, deps: Deps): Promise<unknown> {
       await waitTurn("data.cms.gov", SPACING_MS);
       return fetcher(url);
     },
-    { sql: deps.sql },
+    { sql: deps.sql, host: "data.cms.gov", source: "CMS Provider Data Catalog" },
   );
 }
 
 /** Hospices and/or home health agencies with an office in these ZIPs. A dataset that doesn't answer is named in `unavailable`. */
-export async function searchCmsAgencies(types: CmsAgencyType[], zips: string[], deps: Deps = {}): Promise<{ orgs: FoundOrg[]; unavailable: string[] }> {
+/**
+ * Hospices and/or home health agencies with an office in these ZIPs: every
+ * page (up to CMS_MAX_PAGES), so the caller can sort by distance before it
+ * keeps the nearest. `more`: kinds the catalog had more rows for than were read.
+ */
+export async function searchCmsAgencies(types: CmsAgencyType[], zips: string[], deps: Deps = {}): Promise<{ orgs: FoundOrg[]; unavailable: string[]; more?: CmsAgencyType[] }> {
   const checkedAt = (deps.now?.() ?? new Date()).toISOString();
   const orgs: FoundOrg[] = [];
   const unavailable: string[] = [];
-  if (zips.length === 0) return { orgs, unavailable };
+  const more: CmsAgencyType[] = [];
+  if (zips.length === 0) return { orgs, unavailable, more };
   for (const type of types) {
     try {
-      orgs.push(...parsePdc(type, await ask(pdcUrl(type, { zips }), deps), checkedAt));
+      for (let page = 0; page < CMS_MAX_PAGES; page++) {
+        const reply = (await ask(pdcUrl(type, { zips }, page * CMS_PAGE), deps)) as { results?: unknown[]; count?: number };
+        orgs.push(...parsePdc(type, reply, checkedAt));
+        const got = reply?.results?.length ?? 0;
+        if (got < CMS_PAGE) break;
+        if (page === CMS_MAX_PAGES - 1 && (reply.count ?? 0) > CMS_PAGE * CMS_MAX_PAGES) more.push(type);
+      }
     } catch {
       unavailable.push(`CMS ${CMS_DATASETS[type].title}`);
     }
   }
-  return { orgs, unavailable };
+  return { orgs, unavailable, more };
 }
 
 /** Agencies by CCN, looked up again before they are saved (the page sends ids only). */

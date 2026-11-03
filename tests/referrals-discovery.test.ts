@@ -14,12 +14,12 @@ import { mergeEvidence, OSM_ATTRIBUTION } from "../lib/referrals/evidence/merge"
 import { discoverOrgs, discoveryTypes, DISCOVERY_IDS } from "../lib/referrals/orgs";
 import { CSV_TEMPLATE, parseCsv, readCsv, readManual } from "../lib/referrals/manual";
 import { findDuplicate } from "../lib/referrals/dedupe";
-import { isSuppressed, keyMatches, orgKeyOf, type Suppressed } from "../lib/referrals/dnc-key";
+import { isSuppressed, keyMatches, nameSuppressed, orgKeyOf, type Suppressed } from "../lib/referrals/dnc-key";
 import { manualToCard, orgToCard, stripSensitive } from "../lib/referrals/org-store";
 import { REFERRAL_DEMO_TOOLS } from "../lib/features";
 import { haversineMiles } from "../lib/referrals/geo";
 import { CONTACT_KINDS, LOGGABLE_KINDS } from "../lib/referrals/contact-kinds";
-import { isSensitiveSource, withoutDistance } from "../lib/referrals/sensitive";
+import { isSensitiveSource, siteHashes, withoutDistance } from "../lib/referrals/sensitive";
 import { searchArea } from "../lib/referrals/area";
 import type { Provider } from "../lib/referrals/nppes";
 
@@ -123,7 +123,9 @@ describe("OpenStreetMap organisations (Overpass)", () => {
     expect(facts.every((f) => f.detail?.attribution === OSM_ATTRIBUTION)).toBe(true);
     expect(OSM_ATTRIBUTION).toBe("© OpenStreetMap contributors (ODbL)");
     const ev = mergeEvidence(facts, { isOrg: true, now: new Date(AT) });
-    expect(ev.confirmedBy.join(" ")).toContain(OSM_ATTRIBUTION);
+    // The card names the source; the evidence box shows the attribution line beside it (components/referrals/evidence-box.tsx).
+    expect(ev.confirmedBy).toContain("OpenStreetMap");
+    expect(ev.fields.name?.origins).toContain("osm");
   });
   it("asks Overpass once per search, by POST, and the second search is cached", async () => {
     clearSourceCache();
@@ -214,7 +216,9 @@ describe("adding by hand and from a CSV", () => {
     const stripped = stripSensitive(card);
     expect(stripped).toMatchObject({ street: null, zip: null, city: "Chicago" });
     expect(stripped.facts.some((f) => f.field === "address")).toBe(false);
-    expect(stripSensitive({ ...card, type: "funeral_homes" }).street).toBe("100 Hidden St");
+    expect(stripSensitive({ ...card, name: "[Sample] Elm Street Funeral Home", organization: null, type: "funeral_homes" }).street).toBe("100 Hidden St");
+    // A name cue alone is enough, even with a harmless type.
+    expect(stripSensitive({ ...card, type: "funeral_homes" }).street).toBeNull();
   });
   it("parses CSV: quotes, commas and line breaks inside quotes, a BOM, CRLF", () => {
     expect(parseCsv('\uFEFFname,notes\r\n"Smith, Jones & Co","said ""hi""\nthen left"\r\n\r\n')).toEqual([
@@ -242,7 +246,15 @@ describe("adding by hand and from a CSV", () => {
     expect(findDuplicate({ npi: "1900000001", name: "Dr. Rivera", isOrg: false }, cards)?.card.id).toBe("npi");
     expect(findDuplicate({ ccn: "141599", name: "Other", isOrg: true }, cards)?.card.id).toBe("ccn");
     expect(findDuplicate({ name: "GILDA'S CLUB CHICAGO", isOrg: true, street: "537 North Wells Street", zip: "60654" }, cards)).toMatchObject({ card: { id: "org" }, how: "name_address" });
-    expect(findDuplicate({ name: "Gilda's Club Chicago", isOrg: true, city: "chicago" }, cards)).toMatchObject({ card: { id: "org" }, how: "name_city" });
+    // The same name in the same city with no street is only a possible duplicate: she decides.
+    expect(findDuplicate({ name: "Gilda's Club Chicago", isOrg: true, city: "chicago" }, cards)).toMatchObject({ card: { id: "org" }, how: "possible" });
+    // Apostrophes don't matter.
+    expect(findDuplicate({ name: "Gildas Club Chicago", isOrg: true, street: "537 N Wells St", zip: "60654" }, cards)).toMatchObject({ card: { id: "org" }, how: "name_address" });
+    // A phone alone never merges: the same name and phone at another street is someone new.
+    expect(findDuplicate({ name: "Gilda's Club Chicago", isOrg: true, street: "1 Other St", zip: "60601", phone: "312-555-0100" }, cards)).toBeNull();
+    expect(findDuplicate({ name: "Somebody Else", isOrg: true, phone: "312-555-0100", city: "Chicago" }, cards)).toBeNull();
+    // Saint and St are one word.
+    expect(findDuplicate({ name: "St. Joseph Hospice", isOrg: true, street: "2 Elm St", zip: "60614" }, [{ id: "sj", name: "Saint Joseph Hospice", npi_type: "organization", address: "2 Elm Street", zip: "60614" }])).toMatchObject({ card: { id: "sj" } });
     expect(findDuplicate({ name: "Jordan Ellis", organization: "Northside Hospital", isOrg: false }, cards)).toMatchObject({ card: { id: "nav" }, how: "name_org" });
     expect(findDuplicate({ name: "Jordan Ellis", organization: "Southside Clinic", isOrg: false }, cards)).toBeNull();
     expect(findDuplicate({ name: "Gilda's Club Evanston", isOrg: true, city: "Evanston" }, cards)).toBeNull();
@@ -261,7 +273,7 @@ describe("adding by hand and from a CSV", () => {
 describe("do not contact without an NPI", () => {
   it("keys an organisation by name and street, or city; a person by name at their group", () => {
     expect(orgKeyOf({ name: "Gilda's Club Chicago LLC", npi_type: "organization", address: "537 North Wells Street, Suite 2", zip: "60654" })).toMatchObject({
-      name_key: "gilda s club chicago",
+      name_key: "gildas club chicago",
       street_key: "537 n wells st 60654",
     });
     expect(orgKeyOf({ name: "[Sample] Jordan Ellis, RN", organization: "Northside Hospital", npi_type: "individual", city: "Chicago" })).toMatchObject({ name_key: "jordan ellis at northside hospital", city_key: "chicago" });
@@ -270,6 +282,11 @@ describe("do not contact without an NPI", () => {
     const listed = orgKeyOf({ name: "Fullerton Funeral Home", npi_type: "organization", address: "2401 N Lincoln Ave", zip: "60614", city: "Chicago" })!;
     expect(keyMatches(orgKeyOf({ name: "FULLERTON FUNERAL HOME", address: "2401 North Lincoln Avenue", zip: "60614" })!, listed)).toBe(true);
     expect(keyMatches(orgKeyOf({ name: "Fullerton Funeral Home", city: "Chicago" })!, listed)).toBe(true);
+    expect(keyMatches(orgKeyOf({ name: "Fullerton Funeral Home", zip: "60614" })!, listed)).toBe(true);
+    expect(keyMatches(orgKeyOf({ name: "Fullerton Funeral Home", zip: "60601" })!, listed)).toBe(false);
+    // No place in common is never a match ("match anything" is gone).
+    expect(keyMatches(orgKeyOf({ name: "Fullerton Funeral Home" })!, listed)).toBe(false);
+    expect(orgKeyOf({ name: "x".repeat(600), npi_type: "organization", city: "Chicago" })!.org_key.length).toBeLessThanOrEqual(400);
     expect(keyMatches(orgKeyOf({ name: "Fullerton Funeral Home", address: "10 W Main St", zip: "60601" })!, listed)).toBe(false);
     expect(keyMatches(orgKeyOf({ name: "Fullerton Funeral Home", city: "Evanston" })!, listed)).toBe(false);
   });
@@ -277,7 +294,10 @@ describe("do not contact without an NPI", () => {
     const list: Suppressed = { npis: new Set(["1900000001"]), orgs: [orgKeyOf({ name: "Northside Hospice", npi_type: "organization", city: "Chicago" })!] };
     expect(isSuppressed({ npi: "1900000001", name: "Anyone" }, list)).toBe(true);
     expect(isSuppressed({ name: "Northside Hospice", npi_type: "organization", address: "1 Main St", zip: "60614", city: "Chicago" }, list)).toBe(true);
-    expect(isSuppressed({ name: "Northside Hospice", organization: "Northside Hospice", npi_type: "organization" }, list)).toBe(true);
+    // No place at all: not by the key, but a debrief's who-else is checked by name.
+    expect(isSuppressed({ name: "Northside Hospice", organization: "Northside Hospice", npi_type: "organization" }, list)).toBe(false);
+    expect(nameSuppressed({ name: "Northside Hospice", npi_type: "organization" }, list)).toBe(true);
+    expect(nameSuppressed({ name: "Southside Hospice", npi_type: "organization" }, list)).toBe(false);
     expect(isSuppressed({ name: "Southside Hospice", npi_type: "organization", city: "Chicago" }, list)).toBe(false);
   });
 });
@@ -301,7 +321,15 @@ describe("sensitive kinds: no street, ZIP, point or distance anywhere", () => {
     expect(isSensitiveSource({ name: "Northside Domestic Violence Center" })).toBe(true);
     expect(isSensitiveSource({ name: "Lakeside Rape Crisis Center" })).toBe(true);
     expect(isSensitiveSource({ organization: "Harbor Women's Shelter" })).toBe(true);
-    expect(isSensitiveSource({ name: "Shelter Island Pediatrics", type: "pediatrics" })).toBe(false);
+    // Shelters (any form), apostrophes straight or curly, plurals, and the named cues.
+    for (const n of ["Harbor Shelters Inc", "Ruth’s House", "Ruth's House", "Safe Harbor Center", "The Safehouse Project", "Sarah's Safe House", "House of Hope Chicago",
+      "Northside Sexual Abuse Program", "Family Violence Coalition", "Battered Women's Network", "Lakeview Women’s Center", "Haven House Services", "Refuge Ministries", "Sanctuary Outreach"])
+      expect(isSensitiveSource({ name: n }), n).toBe(true);
+    for (const n of ["Lakeview Family Medicine", "Gilda's Club Chicago", "Fullerton Funeral Home", "Haven"]) expect(isSensitiveSource({ name: n }), n).toBe(false);
+    // One-way site hashes match however NPPES writes the street; never the street itself.
+    const [a] = siteHashes("2400 N LINCOLN AVE", "60614-1234");
+    expect(siteHashes("2400 n lincoln ave", "60614")).toContain(a);
+    expect(a).toMatch(/^[0-9a-f]{64}$/);
     expect(withoutDistance(["fit", "0.4 mi from your office", "on your block", "sees all ages"])).toEqual(["fit", "sees all ages"]);
   });
   it("the map search gives a sensitive provider no street, ZIP, point or distance, and no distance in its reasons", async () => {

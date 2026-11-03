@@ -173,7 +173,7 @@ export function PlaceFinder({ defaultArea, kinds, defaultKinds }: { defaultArea:
         </h2>
         <p className="text-small text-[var(--fg-muted)]">Hospices, home health agencies, funeral homes, places of worship and community places. They have no NPI, so the NPI Registry can&rsquo;t find them.</p>
         <div className="flex flex-wrap items-end gap-3">
-          <TextField label="Area" description="A ZIP code, a city or a neighborhood." placeholder="60614 or Lincoln Park" value={area} onChange={(e) => setArea(e.target.value)} maxLength={80} wrapClassName="min-w-[14rem] flex-1" />
+          <TextField label="Where to look" description="A ZIP code, a city or a neighborhood." placeholder="60614 or Lincoln Park" value={area} onChange={(e) => setArea(e.target.value)} maxLength={80} wrapClassName="min-w-[14rem] flex-1" />
           <Button type="submit" variant="accent" disabled={busy || !area.trim() || picked.length === 0} className={cn("mb-2", FOCUS)}>
             {busy ? "Searching…" : "Search places"}
           </Button>

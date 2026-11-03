@@ -20,6 +20,7 @@ import { cachedJson, postKey, waitTurn } from "./cache";
 import type { FoundOrg } from "./cms-agencies";
 import { jsonFetcher, type JsonFetcher } from "./http";
 import { OVERPASS_URL } from "./osm";
+import { looksSensitive } from "../sensitive";
 
 export { OSM_ATTRIBUTION };
 
@@ -83,13 +84,25 @@ function typeOf(tags: Record<string, string>, types: string[]): string | null {
 
 const SAFE_URL = /^https?:\/\/[^\s"'<>]+$/i;
 
+/** True for an element that may be a shelter or a DV/SA agency, by its tags or its name. */
+export function sensitiveElement(t: Record<string, string> | undefined): boolean {
+  if (!t) return false;
+  return SENSITIVE_TAG.test(t.social_facility ?? "") || SENSITIVE_TAG.test(t["social_facility:for"] ?? "") || looksSensitive(t.name, t.operator, t.official_name);
+}
+
+/** Overpass's answer with every sensitive element taken out, before anything is cached or read. */
+export function dropSensitive(reply: unknown): { elements: Element[] } {
+  const elements = ((reply as { elements?: Element[] })?.elements ?? []).filter((e) => !sensitiveElement(e.tags));
+  return { elements };
+}
+
 /** Overpass elements as organisations of the picked types, nearest first, capped. */
 export function parseOsmOrgs(reply: unknown, types: string[], center: [number, number], checkedAt: string, opts: { capPerType?: number; capWorship?: number; capTotal?: number } = {}): { orgs: FoundOrg[]; capped: string[] } {
   const elements = ((reply as { elements?: Element[] })?.elements ?? []).filter((e) => e.tags?.name);
   const found: (FoundOrg & { miles: number })[] = [];
   for (const e of elements) {
     const t = e.tags!;
-    if (SENSITIVE_TAG.test(t.social_facility ?? "") || SENSITIVE_TAG.test(t["social_facility:for"] ?? "")) continue;
+    if (sensitiveElement(t)) continue;
     const type = typeOf(t, types);
     if (!type) continue;
     const at = e.center ?? (e.lat !== undefined && e.lon !== undefined ? { lat: e.lat, lon: e.lon } : null);
@@ -157,9 +170,10 @@ async function overpass(query: string, deps: Deps): Promise<unknown> {
     postKey(OVERPASS_URL, query),
     async () => {
       await waitTurn("overpass-api.de", SPACING_MS);
-      return fetcher(OVERPASS_URL, { method: "POST", body, headers: { "Content-Type": "application/x-www-form-urlencoded" } });
+      // Sensitive places are dropped here, so their raw JSON is never cached or stored.
+      return dropSensitive(await fetcher(OVERPASS_URL, { method: "POST", body, headers: { "Content-Type": "application/x-www-form-urlencoded" } }));
     },
-    { sql: deps.sql },
+    { sql: deps.sql, host: "overpass-api.de", source: "OpenStreetMap (Overpass)" },
   );
 }
 

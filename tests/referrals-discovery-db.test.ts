@@ -20,7 +20,7 @@ const okGuard = async (t: string) => ({ ok: true as const, text: t });
 describe.skipIf(!local)("migration 045 and discovery cards (built-in database only)", async () => {
   const { addManual, commitImport, previewImport, saveOrgCard, orgToCard } = await import("../lib/referrals/org-store");
   const { readManual } = await import("../lib/referrals/manual");
-  const { suppress, unsuppress, suppressionFor, suppressedList, isSuppressed, logContact, contactsFor } = await import("../lib/referrals/contacts");
+  const { suppress, unsuppress, suppressionFor, suppressedList, nameSuppressed, logContact, contactsFor } = await import("../lib/referrals/contacts");
   const { outreachPlan } = await import("../lib/referrals/plan");
   const { blockedReason } = await import("../lib/referrals/outreach");
   const { discoverOrgs } = await import("../lib/referrals/orgs");
@@ -98,13 +98,17 @@ describe.skipIf(!local)("migration 045 and discovery cards (built-in database on
       "[Test045] Broken Row,not_a_kind,Chicago,,,",
     ].join("\n");
     const preview = await previewImport(csv);
-    expect(preview.rows.map((r) => r.status)).toEqual(["matched", "new", "matched", "error"]);
-    expect(preview.rows[0].matched).toMatchObject({ id: first.id, label: "same name in the same city" });
+    expect(preview.rows.map((r) => r.status)).toEqual(["possible", "new", "matched", "error"]);
+    expect(preview.rows[0].matched).toMatchObject({ id: first.id, label: expect.stringMatching(/same city.*you choose/) });
     const done = await commitImport(csv, [], { check: okGuard });
     expect(done.added.map((a) => a.name)).toEqual(["[Test045] Riverside Grief Center"]);
     done.added.forEach((a) => track(a.id));
     const again = await commitImport(csv, [], { check: okGuard });
     expect(again.added).toEqual([]);
+    // The possible duplicate is added only when she ticks "Add anyway".
+    const anyway = await commitImport(csv, [], { check: okGuard, include: [2] });
+    expect(anyway.added.map((x) => x.name)).toEqual(["[Test045] Lakeside Cancer Support"]);
+    anyway.added.forEach((x) => track(x.id));
     const [{ n }] = await db()<{ n: number }[]>`select count(*)::int as n from practice_os.referral_sources where name = '[Test045] Riverside Grief Center'`;
     expect(n).toBe(1);
     const [manualCard] = await db()<{ found_via: string }[]>`select found_via from practice_os.referral_sources where id = ${done.added[0].id}`;
@@ -143,7 +147,7 @@ describe.skipIf(!local)("migration 045 and discovery cards (built-in database on
     expect(r.orgs.some((o) => /northside family clinic/i.test(o.name))).toBe(false);
     expect(r.orgs.length).toBe(1);
     // A debrief's who-else naming only the organisation, as the debrief checks it.
-    expect(isSuppressed({ name: "[Test045] Northside Family Clinic", organization: "[Test045] Northside Family Clinic", npi_type: "organization" }, list)).toBe(true);
+    expect(nameSuppressed({ name: "[Test045] Northside Family Clinic", organization: "[Test045] Northside Family Clinic", npi_type: "organization" }, list)).toBe(true);
     // Adding it again by hand is refused.
     const again = await addManual(manual({ name: "[Test045] Northside Family Clinic", type: "family_medicine", city: "Chicago" }), { check: okGuard });
     expect(again.refused).toMatch(/do-not-contact/);
@@ -185,5 +189,91 @@ describe.skipIf(!local)("migration 045 and discovery cards (built-in database on
     await saveSources([{ ...p, name: "[Test045] Harbor Services" } as never]);
     const [again] = await db()<{ address: string | null; sensitive: boolean }[]>`select address, sensitive from practice_os.referral_sources where id = ${card.id}`;
     expect(again).toEqual({ address: null, sensitive: true });
+  });
+
+  it("the migration backfills: an existing shelter loses its street, ZIP, distance and address evidence", async () => {
+    const [row] = await db()<{ id: string }[]>`
+      insert into practice_os.referral_sources (name, organization, npi_type, address, city, state, zip, distance_miles)
+      values ('[Test045] Lakeshore Women’s Shelter', null, 'organization', '77 Quiet Ln', 'Chicago', 'IL', '60614', 0.4) returning id`;
+    const id = track(row.id);
+    const [plain] = await db()<{ id: string }[]>`
+      insert into practice_os.referral_sources (name, npi_type, address, city, state, zip) values ('[Test045] Lakeshore Family Practice', 'organization', '1 Main St', 'Chicago', 'IL', '60614') returning id`;
+    track(plain.id);
+    await db()`insert into practice_os.referral_facts (source_id, field, value, origin, match_method) values (${id}, 'address', '77 Quiet Ln, Chicago, IL 60614', 'nppes', 'npi'), (${id}, 'phone', '312-555-0100', 'nppes', 'npi')`;
+    const body = await readFile(new URL("../db/migrations/045_referral_dnc_org.sql", import.meta.url), "utf8");
+    await db().unsafe(body);
+    const [after] = await db()<{ sensitive: boolean; address: string | null; zip: string | null; distance_miles: number | null; site_hashes: string[] | null }[]>`
+      select sensitive, address, zip, distance_miles, site_hashes from practice_os.referral_sources where id = ${id}`;
+    expect(after).toMatchObject({ sensitive: true, address: null, zip: null, distance_miles: null });
+    const { siteHashes } = await import("../lib/referrals/sensitive");
+    // The SQL hash is one of the app's, so a person NPPES lists at 77 Quiet Ln is marked too.
+    expect(siteHashes("77 Quiet Ln", "60614")).toContain(after.site_hashes![0]);
+    const facts = await db()<{ field: string }[]>`select field from practice_os.referral_facts where source_id = ${id}`;
+    expect(facts.map((f) => f.field)).toEqual(["phone"]);
+    const [other] = await db()<{ sensitive: boolean; address: string | null }[]>`select sensitive, address from practice_os.referral_sources where id = ${plain.id}`;
+    expect(other).toEqual({ sensitive: false, address: "1 Main St" });
+  });
+
+  it("the SQL cue list agrees with lib/referrals/sensitive.ts", async () => {
+    const { looksSensitive } = await import("../lib/referrals/sensitive");
+    const names = ["Harbor Shelters Inc", "Ruth’s House", "Safe Harbor Center", "The Safehouse Project", "House of Hope Chicago", "Northside Sexual Abuse Program",
+      "Family Violence Coalition", "Battered Women's Network", "Lakeview Women's Center", "Haven House Services", "Refuge Ministries", "Rape Crisis Line",
+      "Lakeview Family Medicine", "Gilda's Club Chicago", "Fullerton Funeral Home", "Haven", "Shelter", "House of Ruth"];
+    for (const n of names) {
+      const [r] = await db()<{ v: boolean }[]>`select practice_os.name_looks_sensitive(${n}) as v`;
+      expect(r.v, n).toBe(looksSensitive(n));
+    }
+  });
+
+  it("an NPPES person at a known sensitive site is saved sensitive, with no street", async () => {
+    const { saveSources } = await import("../lib/referrals/store");
+    const base = {
+      organization: null, practiceName: null, credential: "LCSW", taxonomy: "1041C0700X", taxonomyLabel: "Social Worker, Clinical", specialty: "therapists" as const,
+      specialtyLabel: "Therapists", city: "Chicago", state: "IL", zip: "60614", phone: null, homeAddress: false, fax: null, distanceMiles: 0.2, fitScore: 50,
+    };
+    await saveSources([{ ...base, npi: "1999999970", name: "[Test045] Bayview Safe House", npiType: "organization", address: "88 Harbor Rd" } as never]);
+    await saveSources([{ ...base, npi: "1999999971", name: "[Test045] Robin Example", npiType: "individual", address: "88 HARBOR ROAD" } as never]);
+    const rows = await db()<{ npi: string; id: string; sensitive: boolean; address: string | null; distance_miles: number | null }[]>`
+      select npi, id, sensitive, address, distance_miles from practice_os.referral_sources where npi in ('1999999970', '1999999971') order by npi`;
+    rows.forEach((r) => track(r.id));
+    expect(rows.map((r) => [r.sensitive, r.address, r.distance_miles])).toEqual([[true, null, null], [true, null, null]]);
+  });
+
+  it("summarize leaves a sensitive card's address evidence out, so recheck and email answers never carry it", async () => {
+    const { summarize } = await import("../lib/referrals/evidence/store");
+    const r = await addManual(manual({ name: "[Test045] Quiet Harbor Agency", type: "dv_sa_agencies", city: "Chicago" }), { check: okGuard });
+    const id = track(r.id);
+    await db()`insert into practice_os.referral_facts (source_id, field, value, origin, match_method) values (${id}, 'address', '5 Secret St, Chicago, IL 60614', 'osm', 'name_address')`;
+    const ev = await summarize(id);
+    expect(ev.fields.address).toBeUndefined();
+    expect(JSON.stringify(ev)).not.toMatch(/Secret St/);
+  });
+
+  it("suppress writes the NPI and the org key; a later card for the same place with no NPI is blocked; unsuppress removes only this card's key", async () => {
+    const [a] = await db()<{ id: string }[]>`
+      insert into practice_os.referral_sources (npi, name, organization, npi_type, address, city, state, zip, found_via)
+      values ('1999999960', '[Test045] Elm Grove Clinic', '[Test045] Elm Grove Clinic', 'organization', '10 Elm St', 'Chicago', 'IL', '60614', 'nppes') returning id`;
+    const [b] = await db()<{ id: string }[]>`
+      insert into practice_os.referral_sources (name, organization, npi_type, address, city, state, zip, found_via)
+      values ('[Test045] Elm Grove Clinic', '[Test045] Elm Grove Clinic', 'organization', '99 Oak St', 'Evanston', 'IL', '60201', 'manual') returning id`;
+    track(a.id);
+    track(b.id);
+    await suppress(a.id, "not_interested");
+    await suppress(b.id, "not_interested");
+    expect((await db()`select 1 from practice_os.referral_suppressions where npi = '1999999960'`).length).toBe(1);
+    const keys = await db()<{ org_key: string }[]>`select org_key from practice_os.referral_suppressions_org where name_key = 'test045 elm grove clinic' order by org_key`;
+    expect(keys).toHaveLength(2);
+    const blocked = await addManual(manual({ name: "[Test045] Elm Grove Clinic", type: "family_medicine", street: "10 Elm Street", zip: "60614", city: "Chicago" }), { check: okGuard });
+    expect(blocked.refused).toMatch(/do-not-contact/);
+    await unsuppress(a.id);
+    const left = await db()<{ org_key: string }[]>`select org_key from practice_os.referral_suppressions_org where name_key = 'test045 elm grove clinic'`;
+    expect(left.map((k) => k.org_key)).toEqual([keys.find((k) => k.org_key.includes("60201"))!.org_key]);
+    await unsuppress(b.id);
+  });
+
+  it("referred_out needs a count: the database refuses one without", async () => {
+    const r = await addManual(manual({ name: "[Test045] Count Check Group", type: "therapists", city: "Chicago" }), { check: okGuard });
+    const id = track(r.id);
+    await expect(db()`insert into practice_os.referral_contacts (source_id, kind, happened_on, created_by) values (${id}, 'referred_out', current_date, 'clinician')`).rejects.toThrow(/referred_out_date_and_count/);
   });
 });

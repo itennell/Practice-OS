@@ -12,6 +12,7 @@ import { audit } from "../audit";
 import { db } from "../db";
 import { SOURCE_TYPE_BY_ID } from "./catalog";
 import { isSensitiveSource } from "./sensitive";
+import { knownSensitiveSites, sensitiveAt } from "./sensitive-sites";
 import { checkNote, suppressedList } from "./contacts";
 import { findDuplicate, DUP_LABEL, type DupHow } from "./dedupe";
 import { isSuppressed } from "./dnc-key";
@@ -47,17 +48,31 @@ export type OrgCard = {
 };
 
 /** Sensitive types keep a city only: no street, no ZIP, no address fact. Exported for the tests. */
-export function stripSensitive<T extends Pick<OrgCard, "type" | "street" | "zip" | "facts"> & Partial<Pick<OrgCard, "name" | "organization" | "distanceMiles">>>(card: T): T {
-  if (!isSensitiveSource({ type: card.type, name: card.name, organization: card.organization })) return card;
+export function stripSensitive<T extends Pick<OrgCard, "type" | "street" | "zip" | "facts"> & Partial<Pick<OrgCard, "name" | "organization" | "distanceMiles">>>(card: T, force = false): T {
+  if (!force && !isSensitiveSource({ type: card.type, name: card.name, organization: card.organization })) return card;
   return { ...card, street: null, zip: null, ...("distanceMiles" in card ? { distanceMiles: null } : {}), facts: card.facts.filter((f) => f.field !== "address") };
 }
 
-export type SaveResult = { id: string; name: string; added: boolean; matched?: { id: string; name: string; how: DupHow; label: string }; refused?: string };
+export type SaveResult = {
+  id: string;
+  name: string;
+  added: boolean;
+  matched?: { id: string; name: string; how: DupHow; label: string };
+  /** The same name in the same city with nothing else to tell them apart: nothing saved until she says "add anyway". */
+  possible?: { id: string; name: string; label: string };
+  refused?: string;
+};
 
-/** Saves one card (or finds the one already on the board). Never sends anything. */
-export async function saveOrgCard(input: OrgCard, opts: { sql?: postgres.Sql; cards?: ReferralSource[]; by?: "clinician" | "aeon" } = {}): Promise<SaveResult> {
+/**
+ * Saves one card (or finds the one already on the board). Never sends anything.
+ * `addPossible`: she said "add anyway" to a possible duplicate (a search result
+ * with its own street is always added rather than silently skipped).
+ */
+export async function saveOrgCard(input: OrgCard, opts: { sql?: postgres.Sql; cards?: ReferralSource[]; by?: "clinician" | "aeon"; addPossible?: boolean } = {}): Promise<SaveResult> {
   const sql = opts.sql ?? db();
-  const card = stripSensitive(input);
+  // Sensitive by kind, name, or a street that is a known sensitive site: city only from here on.
+  const at = sensitiveAt({ type: input.type, name: input.name, organization: input.organization, street: input.street, zip: input.zip }, await knownSensitiveSites(sql));
+  const card = stripSensitive(input, at.sensitive);
   const cards = opts.cards ?? (await listSources(sql));
   const blocked = await suppressedList(sql);
   const keyCard = { npi: card.npi, name: card.name, organization: card.organization, npi_type: card.npiType, address: card.street, city: card.city, zip: card.zip };
@@ -66,7 +81,11 @@ export async function saveOrgCard(input: OrgCard, opts: { sql?: postgres.Sql; ca
     { npi: card.npi, ccn: card.ccn, osmRef: card.osmRef, name: card.name, organization: card.organization, isOrg: card.npiType === "organization", street: card.street, city: card.city, zip: card.zip, phone: card.phone },
     cards,
   );
-  if (dup) {
+  const possibleOk = opts.addPossible ?? input.foundVia !== "manual";
+  if (dup && dup.how === "possible" && !possibleOk) {
+    return { id: "", name: card.name, added: false, possible: { id: dup.card.id, name: dup.card.name, label: DUP_LABEL.possible } };
+  }
+  if (dup && dup.how !== "possible") {
     const matched = { id: dup.card.id, name: dup.card.name, how: dup.how, label: DUP_LABEL[dup.how] };
     // A search refreshing its own card (same CCN or OpenStreetMap id) updates what that source says; nothing she set changes.
     if ((dup.how === "ccn" || dup.how === "osm") && card.facts.length) {
@@ -76,15 +95,15 @@ export async function saveOrgCard(input: OrgCard, opts: { sql?: postgres.Sql; ca
     return { id: dup.card.id, name: dup.card.name, added: false, matched };
   }
   const label = SOURCE_TYPE_BY_ID.get(card.type)?.label ?? null;
-  const sensitive = isSensitiveSource({ type: card.type, name: card.name, organization: card.organization });
+  const sensitive = at.sensitive;
   const [row] = await sql<{ id: string }[]>`
     insert into practice_os.referral_sources
       (npi, name, organization, specialty, npi_type, address, city, state, zip, phone, email, website, notes,
-       stage, distance_miles, fit_score, score_version, source_type, found_via, ccn, osm_ref, sensitive)
+       stage, distance_miles, fit_score, score_version, source_type, found_via, ccn, osm_ref, sensitive, site_hashes)
     values (${card.npi}, ${card.name}, ${card.organization}, ${label}, ${card.npiType}, ${card.street}, ${card.city}, ${card.state},
        ${card.zip}, ${card.phone}, ${card.email}, ${card.website}, ${card.notes}, 'found',
-       ${card.distanceMiles === null ? null : Math.max(0, Math.min(500, card.distanceMiles))}, null, ${SCORE_VERSION},
-       ${card.type}, ${card.foundVia}, ${card.ccn}, ${card.osmRef}, ${sensitive})
+       ${sensitive || card.distanceMiles === null ? null : Math.max(0, Math.min(500, card.distanceMiles))}, null, ${SCORE_VERSION},
+       ${card.type}, ${card.foundVia}, ${card.ccn}, ${card.osmRef}, ${sensitive}, ${sensitive && at.hashes.length ? at.hashes : null})
     returning id`;
   if (card.facts.length) await saveFacts(row.id, card.facts, { checked: [...new Set(card.facts.map((f) => f.origin))], sql });
   forgetAllowlist();
@@ -152,13 +171,13 @@ export function manualToCard(m: ManualInput): OrgCard {
 type Check = (t: string) => Promise<{ ok: boolean } & Record<string, unknown>>;
 
 /** One card she added herself. Her notes go through the privacy check first. Throws in plain words. */
-export async function addManual(m: ManualInput, opts: { sql?: postgres.Sql; by?: "clinician" | "aeon"; check?: Check } = {}): Promise<SaveResult> {
+export async function addManual(m: ManualInput, opts: { sql?: postgres.Sql; by?: "clinician" | "aeon"; check?: Check; addAnyway?: boolean } = {}): Promise<SaveResult> {
   const sql = opts.sql ?? db();
   if (m.notes) {
     const refused = await checkNote(m.notes, opts.check as Parameters<typeof checkNote>[1]);
     if (refused) throw new Error(refused);
   }
-  const r = await saveOrgCard(manualToCard(m), { sql, by: opts.by });
+  const r = await saveOrgCard(manualToCard(m), { sql, by: opts.by, addPossible: opts.addAnyway ?? false });
   if (r.added) {
     await audit({ actor: opts.by ?? "clinician", action: "referral_source_added_by_hand", subjectType: "referral_source", subjectId: r.id, details: { type: m.type, kind: m.kind } }, sql);
   }
@@ -169,7 +188,8 @@ export type PreviewRow = {
   line: number;
   name: string;
   type: string | null;
-  status: "new" | "matched" | "error" | "do_not_contact";
+  /** possible: the same name in the same city, nothing else to go on. Skipped unless she ticks it. */
+  status: "new" | "matched" | "possible" | "error" | "do_not_contact";
   matched?: { id: string; name: string; label: string };
   error?: string;
 };
@@ -188,7 +208,7 @@ export async function previewImport(csv: string, sql: postgres.Sql = db()): Prom
     if (isSuppressed(keyCard, blocked)) return { line: r.line, name: c.name, type: c.type, status: "do_not_contact" };
     const dupIn = { npi: c.npi, name: c.name, organization: c.organization, isOrg: c.npiType === "organization", street: c.street, city: c.city, zip: c.zip, phone: c.phone };
     const dup = findDuplicate(dupIn, cards);
-    if (dup) return { line: r.line, name: c.name, type: c.type, status: "matched", matched: { id: dup.card.id, name: dup.card.name, label: DUP_LABEL[dup.how] } };
+    if (dup) return { line: r.line, name: c.name, type: c.type, status: dup.how === "possible" ? "possible" : "matched", matched: { id: dup.card.id, name: dup.card.name, label: DUP_LABEL[dup.how] } };
     // The same one twice in the file: the second is a match of the first.
     const twice = findDuplicate(dupIn, seen.map((s) => ({ ...s, address: s.address })));
     if (twice) return { line: r.line, name: c.name, type: c.type, status: "matched", matched: { id: "", name: `${twice.card.name} (earlier in this file)`, label: DUP_LABEL[twice.how] } };
@@ -199,7 +219,7 @@ export async function previewImport(csv: string, sql: postgres.Sql = db()): Prom
 }
 
 /** Adds the CSV's new rows (minus any she unticked). Read again on the server; matched rows are never added twice. */
-export async function commitImport(csv: string, skip: number[], opts: { sql?: postgres.Sql; check?: Check } = {}): Promise<{ added: SaveResult[]; matched: number; failed: { line: number; error: string }[] }> {
+export async function commitImport(csv: string, skip: number[], opts: { sql?: postgres.Sql; check?: Check; /** Possible duplicates she ticked to add anyway. */ include?: number[] } = {}): Promise<{ added: SaveResult[]; matched: number; failed: { line: number; error: string }[] }> {
   const sql = opts.sql ?? db();
   const { rows, error, parsed } = await previewImport(csv, sql);
   if (error) throw new Error(error);
@@ -210,7 +230,8 @@ export async function commitImport(csv: string, skip: number[], opts: { sql?: po
   const cards = await listSources(sql);
   for (const row of rows) {
     if (row.status === "matched") matched++;
-    if (row.status !== "new" || skipped.has(row.line)) continue;
+    const anyway = row.status === "possible" && (opts.include ?? []).includes(row.line);
+    if ((row.status !== "new" && !anyway) || skipped.has(row.line)) continue;
     const p = parsed.find((x) => x.line === row.line);
     if (!p?.ok) continue;
     try {
@@ -218,7 +239,7 @@ export async function commitImport(csv: string, skip: number[], opts: { sql?: po
         const refused = await checkNote(p.input.notes, opts.check as Parameters<typeof checkNote>[1]);
         if (refused) throw new Error(refused);
       }
-      const r = await saveOrgCard(manualToCard(p.input), { sql, cards });
+      const r = await saveOrgCard(manualToCard(p.input), { sql, cards, addPossible: anyway });
       if (r.added) added.push(r);
       else if (r.matched) matched++;
       else if (r.refused) failed.push({ line: row.line, error: r.refused });

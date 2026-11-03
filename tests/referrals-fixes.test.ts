@@ -249,6 +249,8 @@ afterAll(async () => {
   if (made.length) {
     const npis = (await db()`select npi from practice_os.referral_sources where id in ${db()(made)}`).map((r) => r.npi as string).filter(Boolean);
     if (npis.length) await db()`delete from practice_os.referral_suppressions where npi in ${db()(npis)}`;
+    // The org keys suppress() wrote for the same cards (migration 045).
+    await db()`delete from practice_os.referral_suppressions_org where name_key like any (array['tess komorowski%', 'quinn askednot%', 'noel npiless%'])`;
     await db()`delete from practice_os.referral_sources where id in ${db()(made)}`;
   }
   await closeDb();
@@ -298,6 +300,9 @@ describe.skipIf(!hasDb)("do not contact, from the chat", () => {
     expect(audit.actor).toBe("aeon");
     const plan = await outreachPlan(db(), 50);
     expect([...plan.reach_out, ...plan.follow_ups].some((p) => p.id === id)).toBe(false);
+    // suppress() also lists the name and place (migration 045): the same name at the same place is blocked from here on.
+    expect((await db()`select 1 from practice_os.referral_suppressions_org where name_key like 'tess komorowski%'`).length).toBe(1);
+    await db()`delete from practice_os.referral_suppressions_org where name_key like 'tess komorowski%'`;
   });
   it("names nobody it didn't find", async () => {
     const { REFERRAL_TOOLS } = await import("../lib/aeon/tools-referrals");

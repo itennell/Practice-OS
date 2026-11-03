@@ -31,7 +31,7 @@ import { audit } from "../audit";
 import { db } from "../db";
 import { chat, readToolCalls, transcribeBytes, transcriptText, type ChatParams } from "../meta";
 import { alertCrisis, checkCrisis, CRISIS_REPLY } from "../safety";
-import { isSuppressed, logContact, suppressedList } from "./contacts";
+import { logContact, nameSuppressed, suppressedList } from "./contacts";
 import {
   EMPTY_FIELDS,
   FIELD_LABEL,
@@ -995,7 +995,11 @@ export async function saveDebrief(sourceId: string, body: unknown, opts: { by?: 
     // The fictional demo practice labels everything it makes as [Sample].
     const name = `${source.is_sample ? "[Sample] " : ""}${plain}`.slice(0, 160);
     if (taken.has(name.toLowerCase())) continue;
-    if (isSuppressed({ name: w.name ?? w.organization ?? w.role, organization: w.organization, npi_type: w.name ? "individual" : "organization" }, blockedList)) {
+    // By name (who-else has no place): the person, or the organisation they were named with.
+    if (
+      nameSuppressed({ name: w.name ?? w.organization ?? w.role, organization: w.organization, npi_type: w.name ? "individual" : "organization" }, blockedList) ||
+      (w.organization && nameSuppressed({ name: w.organization, npi_type: "organization" }, blockedList))
+    ) {
       notes.push(`${plain} is on your do-not-contact list, so no card was made.`);
       continue;
     }

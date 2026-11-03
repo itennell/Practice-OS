@@ -16,7 +16,7 @@ import { isSuppressed, type Suppressed } from "./dnc-key";
 import { geocodePlace, type Point } from "./geocode";
 import { haversineMiles, zipCenters } from "./geo";
 import { orgToCard, saveOrgCard, type SaveResult } from "./org-store";
-import { cmsByCcn, searchCmsAgencies, type CmsAgencyType, type FoundOrg } from "./sources/cms-agencies";
+import { CMS_LIMIT, cmsByCcn, searchCmsAgencies, type CmsAgencyType, type FoundOrg } from "./sources/cms-agencies";
 import { OSM_ATTRIBUTION, osmByRef, osmTypes, searchOsmOrgs } from "./sources/osm-orgs";
 import { listSources, type ReferralSource } from "./store";
 import { isSensitiveSource } from "./sensitive";
@@ -127,6 +127,7 @@ export async function discoverOrgs(req: { area: Area; radiusMiles: number; types
     const r = await (deps.cms ?? searchCmsAgencies)(cmsTypes, zips, { sql: deps.sql });
     found.push(...r.orgs);
     for (const u of r.unavailable) notes.push(`${u} didn't answer. Try again in a minute.`);
+    for (const t of r.more ?? []) notes.push(`The CMS list has more ${SOURCE_TYPE_BY_ID.get(t)?.label.toLowerCase() ?? t} there than one search reads. A smaller radius shows them all.`);
     attribution.push(
       `Hospices and home health agencies: CMS Provider Data Catalog (${cmsTypes.map((t) => (t === "hospice" ? "dataset yc9t-dgbk" : "dataset 6jpm-sxkc")).join(", ")}), Medicare-certified agencies by office address.`,
     );
@@ -170,6 +171,14 @@ export async function discoverOrgs(req: { area: Area; radiusMiles: number; types
     });
   }
   orgs.sort((a, b) => (a.distanceMiles ?? 99) - (b.distanceMiles ?? 99) || a.name.localeCompare(b.name));
+  // CMS rows are all read first, then the nearest CMS_LIMIT of each kind kept, and the cut is said.
+  for (const t of cmsTypes) {
+    const ofType = orgs.filter((o) => o.type === t);
+    if (ofType.length <= CMS_LIMIT) continue;
+    const drop = new Set(ofType.slice(CMS_LIMIT).map((o) => o.key));
+    for (let i = orgs.length - 1; i >= 0; i--) if (drop.has(orgs[i].key)) orgs.splice(i, 1);
+    notes.push(`There are ${ofType.length} ${SOURCE_TYPE_BY_ID.get(t)?.label.toLowerCase() ?? t} there, so this shows the nearest ${CMS_LIMIT}.`);
+  }
   if (!office) notes.push("Add your office address in setup so distances are from your door.");
   return { label, center, zips, types, orgs, notes, attribution };
 }

@@ -418,16 +418,26 @@ export const REFERRAL_TOOLS: AeonTool[] = [
       zip: z.string().trim().max(10).optional(),
       website: z.string().trim().max(300).optional(),
       notes: z.string().trim().max(500).optional().describe("Her words about them. Never anything about a client."),
+      add_anyway: z.boolean().optional().describe("Only after she said, in this chat, that a possible duplicate is a different one: add it anyway."),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     label: "Added to your Referrals board",
     changesData: true,
+    // A write: from another app over MCP it waits for her approval.
+    queuesOverMcp: true,
     run: async (input) => {
       const read = readManual({ ...input, kind: input.kind ?? (input.organization && input.organization !== input.name ? "person" : "organization") });
       if (!read.ok) return text({ added: false, why: read.error });
       try {
-        const r = await addManual(read.input, { by: "aeon" });
+        const r = await addManual(read.input, { by: "aeon", addAnyway: input.add_anyway === true });
         if (r.refused) return text({ added: false, why: r.refused });
+        if (r.possible) {
+          return text({
+            added: false,
+            possible_duplicate: { id: r.possible.id, name: r.possible.name },
+            ask: `${r.possible.name} is already on her board in the same city. Ask her whether this is a different one; only if she says so, call again with add_anyway: true.`,
+          });
+        }
         if (r.matched) return text({ added: false, already_on_board: { id: r.matched.id, name: r.matched.name, matched_by: r.matched.label }, note: "It was already on her board, so nothing new was added." });
         return text({
           added: true,

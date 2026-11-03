@@ -16,10 +16,10 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as { items?: unknown; orgs?: unknown; center?: unknown };
   const seen = new Set<string>();
   const items = (Array.isArray(body.items) ? body.items : [])
-    .filter((i): i is { npi: string; distanceMiles?: unknown } => typeof i?.npi === "string" && /^\d{10}$/.test(i.npi))
+    .filter((i): i is { npi: string; distanceMiles?: unknown; sensitive?: unknown } => typeof i?.npi === "string" && /^\d{10}$/.test(i.npi))
     .filter((i) => !seen.has(i.npi) && Boolean(seen.add(i.npi)))
     .slice(0, 50)
-    .map((i) => ({ npi: i.npi, distanceMiles: typeof i.distanceMiles === "number" ? i.distanceMiles : null }));
+    .map((i) => ({ npi: i.npi, distanceMiles: typeof i.distanceMiles === "number" ? i.distanceMiles : null, sensitive: i.sensitive === true }));
   const orgs = (Array.isArray(body.orgs) ? body.orgs : [])
     .filter((i): i is { key: string; distanceMiles?: unknown } => typeof i?.key === "string" && ORG_KEY.test(i.key))
     .filter((i) => !seen.has(i.key) && Boolean(seen.add(i.key)))

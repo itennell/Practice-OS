@@ -44,10 +44,13 @@ export function normalizeName(raw: string | null | undefined): PersonName {
 export function normalizeOrg(raw: string | null | undefined): string {
   return (raw ?? "")
     .toLowerCase()
+    // "Gilda's" and "Gildas" are one name: apostrophes go before the punctuation pass.
+    .replace(/['’‘`]/g, "")
     .replace(/&/g, " and ")
     .replace(/[^a-z0-9\s]/g, " ")
     .split(/\s+/)
     .filter((w) => w && !["llc", "pllc", "pc", "sc", "ltd", "inc", "the", "llp", "corp", "co"].includes(w))
+    .map((w) => (w === "saint" ? "st" : w))
     .join(" ");
 }
 

@@ -13,7 +13,8 @@ import { nppesFacts, saveFacts } from "./evidence/store";
 import { compareTiers, focusFrom, providerTier, SCORE_VERSION, scoreVersionFor, selfPayFrom, tierFor, type Focus } from "./tier";
 import { isNichePreset } from "./catalog";
 import { STAGES, STAGE_LABEL, type Stage } from "./stages";
-import { isSensitiveSource } from "./sensitive";
+import { knownSensitiveSites, sensitiveAt } from "./sensitive-sites";
+import { siteHashes } from "./sensitive";
 
 export { STAGES, STAGE_LABEL, type Stage };
 
@@ -70,6 +71,8 @@ export type PartnerProfile = {
 };
 
 export type FoundSource = Provider & {
+  /** The map search marked it sensitive (a person at a sensitive site): only ever makes it safer. */
+  forceSensitive?: boolean;
   distanceMiles: number | null;
   fitScore: number;
   id?: string;
@@ -151,7 +154,7 @@ export function tierContext(f: Pick<PracticeFacts, "focus" | "state" | "niche" |
  * under Found with its distance and tier score.
  */
 export async function addToBoard(
-  items: { npi: string; distanceMiles: number | null }[],
+  items: { npi: string; distanceMiles: number | null; sensitive?: boolean }[],
   sql: postgres.Sql = db(),
   lookup: (npi: string) => Promise<Provider | null> = (npi) => providerByNpi(npi),
 ): Promise<{ added: FoundSource[]; missing: string[] }> {
@@ -174,7 +177,7 @@ export async function addToBoard(
     const sent = item.distanceMiles === null || !Number.isFinite(item.distanceMiles) ? null : Math.max(0, Math.min(500, item.distanceMiles));
     // Added again without a distance: keep (and score with) the one the card already has.
     const miles = sent ?? (await knownMiles(npi, sql));
-    const one: FoundSource = { ...p, distanceMiles: miles, fitScore: providerTier(p, { miles, focus, clinicianState: state, niche, selfPay }).score, scoreVersion: scoreVersionFor(niche) };
+    const one: FoundSource = { ...p, forceSensitive: item.sensitive === true, distanceMiles: miles, fitScore: providerTier(p, { miles, focus, clinicianState: state, niche, selfPay }).score, scoreVersion: scoreVersionFor(niche) };
     await saveSources([one], sql);
     added.push(one);
   }
@@ -206,9 +209,15 @@ export async function saveSources(found: FoundSource[], sql: postgres.Sql = db()
   // A score weighted for a niche she has since changed is not saved as current: a new card
   // gets version 0 (scored again), a card she has keeps its score (rescoreOldCards fixes it).
   const current = scoreVersionFor(await currentNiche(sql));
+  // A DV/SA agency or shelter (by NUCC code or name cue, lib/referrals/sensitive.ts) keeps its city only,
+  // and so does anyone NPPES lists at a sensitive site's street: one already on the board, or in this batch.
+  const sites = await knownSensitiveSites(sql);
+  for (const p of found) {
+    if (sensitiveAt({ taxonomy: p.taxonomy, name: p.name, organization: p.organization }, sites).sensitive) for (const h of siteHashes(p.address, p.zip)) sites.add(h);
+  }
   const rows = found.map((p) => {
-    // A DV/SA agency or shelter (by NUCC code or name cue, lib/referrals/sensitive.ts) keeps its city only.
-    const sensitive = isSensitiveSource({ taxonomy: p.taxonomy, name: p.name, organization: p.organization });
+    const at = sensitiveAt({ taxonomy: p.taxonomy, name: p.name, organization: p.organization, street: p.address, zip: p.zip }, sites);
+    const sensitive = at.sensitive || Boolean(p.forceSensitive);
     return {
     npi: p.npi,
     name: p.name,
@@ -223,6 +232,7 @@ export async function saveSources(found: FoundSource[], sql: postgres.Sql = db()
     zip: sensitive ? null : p.zip,
     phone: p.phone,
     sensitive,
+    site_hashes: sensitive && at.hashes.length ? at.hashes : null,
     distance_miles: sensitive ? null : p.distanceMiles,
     fit_score: p.fitScore,
     score_version: (p.scoreVersion ?? SCORE_VERSION) === current ? current : 0,
@@ -236,6 +246,7 @@ export async function saveSources(found: FoundSource[], sql: postgres.Sql = db()
       address = case when excluded.sensitive or referral_sources.sensitive then null else excluded.address end, city = excluded.city, state = excluded.state,
       zip = case when excluded.sensitive or referral_sources.sensitive then null else excluded.zip end,
       phone = excluded.phone, sensitive = excluded.sensitive or referral_sources.sensitive,
+      site_hashes = coalesce(excluded.site_hashes, referral_sources.site_hashes),
       -- A search that doesn't know the distance never wipes the one the card has.
       distance_miles = case when excluded.sensitive or referral_sources.sensitive then null else coalesce(excluded.distance_miles, referral_sources.distance_miles) end,
       fit_score = case when excluded.score_version = 0 then referral_sources.fit_score else excluded.fit_score end,

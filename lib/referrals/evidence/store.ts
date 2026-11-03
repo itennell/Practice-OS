@@ -67,7 +67,8 @@ export async function saveFacts(
 ): Promise<Evidence> {
   const sql = opts.sql ?? db();
   // A sensitive card (DV/SA agency, shelter; migration 045) never keeps a street address, from any source.
-  const [card] = await sql<{ sensitive: boolean }[]>`select sensitive from practice_os.referral_sources where id = ${sourceId}`.catch(() => []);
+  // Fail closed: no .catch, so if this can't be read nothing is saved.
+  const [card] = await sql<{ sensitive: boolean }[]>`select sensitive from practice_os.referral_sources where id = ${sourceId}`;
   if (card?.sensitive) facts = facts.filter((f) => f.field !== "address");
   const origins = [...new Set([...(opts.checked ?? []), ...facts.map((f) => f.origin)])];
   await sql.begin(async (tx) => {
@@ -104,8 +105,9 @@ export async function factsFor(sourceIds: string[], sql: postgres.Sql = db()): P
 
 /** Re-merges one card's facts and writes the result onto the card. */
 export async function summarize(sourceId: string, sql: postgres.Sql = db()): Promise<Evidence> {
-  const [card] = await sql<{ npi_type: string | null }[]>`select npi_type from practice_os.referral_sources where id = ${sourceId}`;
-  const facts = (await factsFor([sourceId], sql)).get(sourceId) ?? [];
+  const [card] = await sql<{ npi_type: string | null; sensitive: boolean }[]>`select npi_type, sensitive from practice_os.referral_sources where id = ${sourceId}`;
+  // A sensitive card's evidence never carries an address (the recheck and email routes answer with this).
+  const facts = ((await factsFor([sourceId], sql)).get(sourceId) ?? []).filter((f) => !card?.sensitive || f.field !== "address");
   const ev = mergeEvidence(facts, { isOrg: card?.npi_type === "organization" });
   const email = ev.fields.email?.value ?? null;
   const website = ev.fields.website?.value ?? null;

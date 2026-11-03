@@ -58,8 +58,10 @@ test("add a referral source by hand, then preview and import a CSV", async ({ pa
   await expect(box.getByRole("link", { name: "Download the template" })).toHaveAttribute("href", "/api/referrals/import/template");
   await box.getByLabel("CSV file to import").setInputFiles({ name: "contacts.csv", mimeType: "text/csv", buffer: Buffer.from(CSV) });
   const preview = box.getByRole("region", { name: "Import preview" });
-  await expect(preview).toContainText("1 new, 1 matched existing cards, 1 with a problem");
-  await expect(preview).toContainText("Matched existing card: [Sample] Lakeview Family Medicine");
+  // Same name, same city, no street on either: a possible duplicate, skipped unless she says "Add anyway".
+  await expect(preview).toContainText("1 new, 0 matched existing cards, 1 possible duplicates, 1 with a problem");
+  await expect(preview).toContainText("Possible duplicate: [Sample] Lakeview Family Medicine");
+  await expect(preview.getByRole("button", { name: /Add row 2 anyway/ })).toHaveAttribute("aria-pressed", "false");
   await expect(preview).toContainText("Pick what kind of referral source this is.");
 
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
