@@ -48,10 +48,10 @@ const WAITLIST_OPTIONS = [
 ];
 
 /** Reads the analysis stream: one JSON event per line. */
-async function analyze(cardId: string, wav: Blob, onStep: (s: Step) => void): Promise<Result> {
+async function analyze(cardId: string, wav: Blob, onStep: (s: Step) => void, signal?: AbortSignal): Promise<Result> {
   const form = new FormData();
   form.append("audio", wav, "debrief.wav");
-  const res = await fetch(`/api/referrals/${cardId}/debrief`, { method: "POST", body: form });
+  const res = await fetch(`/api/referrals/${cardId}/debrief`, { method: "POST", body: form, signal });
   if (!res.ok || !res.body) {
     const data = (await res.json().catch(() => ({}))) as { error?: string };
     throw new Error(data.error ?? "Aeon couldn't read that debrief. Try again.");
@@ -102,6 +102,19 @@ export function DebriefButton({ card, autoOpen = false }: { card: ReferralSource
   const boxRef = useRef<HTMLDivElement>(null);
   const headingId = `debrief-${card.id}`;
   const wide = useWide();
+  const openerRef = useRef<HTMLButtonElement>(null);
+  const wasOpen = useRef(false);
+  const working = useRef<AbortController | null>(null);
+
+  // Closing the debrief puts focus back on the card's Debrief button.
+  useEffect(() => {
+    if (phase.at === "closed") {
+      if (wasOpen.current) openerRef.current?.focus();
+      wasOpen.current = false;
+    } else wasOpen.current = true;
+  }, [phase.at]);
+  // Leaving the page while Aeon reads stops the request.
+  useEffect(() => () => working.current?.abort(), []);
 
   // Opened from the chat (/referrals?debrief=<id>): bring the card into view.
   useEffect(() => {
@@ -110,22 +123,34 @@ export function DebriefButton({ card, autoOpen = false }: { card: ReferralSource
 
   async function recorded(wav: Blob) {
     setPhase({ at: "working", step: "transcribing" });
+    const controller = new AbortController();
+    working.current = controller;
     try {
-      const r = await analyze(card.id, wav, (step) => setPhase({ at: "working", step }));
+      const r = await analyze(card.id, wav, (step) => !controller.signal.aborted && setPhase({ at: "working", step }), controller.signal);
+      if (controller.signal.aborted) return;
       if (r.status === "crisis") setPhase({ at: "crisis", reply: r.reply });
       else if (r.status === "empty") {
         notify.error(r.why);
         setPhase({ at: "record" });
       } else setPhase({ at: "review", draft: r.draft });
     } catch (err) {
+      if (controller.signal.aborted) return; // she pressed Cancel
       notify.error(err instanceof Error ? err.message : "Aeon couldn't read that debrief. Try again.");
       setPhase({ at: "record" });
+    } finally {
+      if (working.current === controller) working.current = null;
     }
+  }
+
+  function cancelWorking() {
+    working.current?.abort();
+    working.current = null;
+    setPhase({ at: "record" });
   }
 
   if (phase.at === "closed") {
     return (
-      <Button variant="quiet" onClick={() => setPhase({ at: "record" })} aria-describedby={`ref-${card.id}`}>
+      <Button ref={openerRef} variant="quiet" onClick={() => setPhase({ at: "record" })} aria-describedby={`ref-${card.id}`}>
         <Mic aria-hidden size={16} />
         Debrief
       </Button>
@@ -187,6 +212,11 @@ export function DebriefButton({ card, autoOpen = false }: { card: ReferralSource
           collapseOnSettle={false}
         />
       )}
+      {phase.at === "working" && (
+        <Button variant="quiet" className="self-start" onClick={cancelWorking}>
+          Cancel
+        </Button>
+      )}
 
       {phase.at === "crisis" && (
         <div role="alert" className="flex flex-col gap-2 rounded-[12px] border border-[var(--hairline)] p-3">
@@ -224,7 +254,9 @@ export function DebriefButton({ card, autoOpen = false }: { card: ReferralSource
         open
         disablePointerDismissal
         onOpenChange={(next) => {
-          if (!next && phase.at !== "working") setPhase({ at: "closed" });
+          // Escape never throws away a draft she is reviewing or a debrief Aeon is reading:
+          // the panel closes only from its own buttons then (X, Discard, Cancel).
+          if (!next && phase.at !== "working" && phase.at !== "review") setPhase({ at: "closed" });
         }}
       >
         <Dialog.Portal>

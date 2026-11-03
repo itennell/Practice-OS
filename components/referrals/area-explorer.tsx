@@ -287,6 +287,7 @@ export function AreaExplorer({
         const first = data.providers.filter((p) => p.tier.tier === "first").length;
         setAnnounce(`Found ${data.providers.length} in ${data.label}. ${first} to reach out to first.`);
       } catch (err) {
+        scrollToResults.current = false; // nothing new to scroll to
         const msg = err instanceof Error ? err.message : "The search didn't work. Try again.";
         setError(msg);
         setAnnounce(msg);
@@ -303,6 +304,16 @@ export function AreaExplorer({
     started.current = true;
     void search(defaultArea);
   }, [defaultArea, search]);
+
+  // "Change" opens the picker and puts focus on its first choice (an open group's first kind, else the first group).
+  function openPicker() {
+    setPickerOpen(true);
+    requestAnimationFrame(() => {
+      const box = document.getElementById("who-to-look-for");
+      const first = box?.querySelector<HTMLElement>("details[open] button[aria-pressed]") ?? box?.querySelector<HTMLElement>("summary");
+      first?.focus();
+    });
+  }
 
   // After a search she ran (not the first one on opening), bring the results and map into view.
   useEffect(() => {
@@ -441,7 +452,7 @@ export function AreaExplorer({
                   Clear
                 </Button>
               ) : (
-                <Button type="button" variant="quiet" aria-expanded={false} aria-controls="who-to-look-for" onClick={() => setPickerOpen(true)} className={FOCUS}>
+                <Button type="button" variant="quiet" aria-expanded={false} aria-controls="who-to-look-for" onClick={openPicker} className={FOCUS}>
                   Change
                 </Button>
               )}

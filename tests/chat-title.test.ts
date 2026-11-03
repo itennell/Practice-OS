@@ -1,71 +1,81 @@
 // A chat title shows on every page, so anything the guards would refuse becomes "New chat".
-import { beforeEach, describe, expect, it } from "vitest";
-import { NEUTRAL_TITLE, forgetCheckedTitles, safeTitle, shownTitle, titleFrom, type TitleCheck } from "../lib/aeon/chat-title";
-import { checkIdentity } from "../lib/aeon/identity-filter";
+import { readFileSync } from "node:fs";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Layer 1 of the guard (plain-code rules) stands in for the whole guard here,
-// so this runs without the name-finder model.
-const rulesOnly: TitleCheck = async (text) => {
-  const r = checkIdentity(text, { names: [], contacts: [] });
-  return r.ok ? { ok: true, text } : r;
-};
-const refuseName = (name: string): TitleCheck => async (text) => (text.includes(name) ? { ok: false, kind: "client_name" } : { ok: true, text });
+// The read path must never load the name-finder: fail the test if it is touched.
+vi.mock("../lib/aeon/phi-classifier", () => ({
+  findNames: () => {
+    throw new Error("the name-finder ran on read");
+  },
+  loadNameFinder: () => {
+    throw new Error("the name-finder ran on read");
+  },
+}));
+
+const { NEUTRAL_TITLE, forgetCheckedTitles, plainRefuses, safeTitle, shownTitle, titleFrom, titleReadings } = await import("../lib/aeon/chat-title");
+type TitleCheck = Parameters<typeof safeTitle>[1] & {};
+
+const pass: TitleCheck = async (text) => ({ ok: true, text });
+const refuseName = (name: string): TitleCheck => async (text) => (text.toLowerCase().includes(name.toLowerCase()) ? { ok: false, kind: "client_name" } : { ok: true, text });
 
 beforeEach(() => forgetCheckedTitles());
 
-describe("safeTitle", () => {
+describe("safeTitle (on save: plain code, then the whole guard)", () => {
   it("keeps a practice question as the title", async () => {
-    expect(await safeTitle("Find oncology practices near 60614", rulesOnly)).toBe("Find oncology practices near 60614");
+    expect(await safeTitle("Find oncology practices near 60614", pass)).toBe("Find oncology practices near 60614");
   });
 
   it("cuts a long first message short", async () => {
     const long = "Draft a letter to the hospice on Clark Street about how I take referrals and what plans I accept";
-    expect(await safeTitle(long, rulesOnly)).toBe(titleFrom(long));
+    expect(await safeTitle(long, pass)).toBe(titleFrom(long));
     expect(titleFrom(long).length).toBeLessThanOrEqual(60);
   });
 
-  it("uses New chat when the guard refuses the text", async () => {
-    expect(await safeTitle("My client Sarah Klein has PTSD", rulesOnly)).toBe(NEUTRAL_TITLE);
+  it("uses New chat when the plain-code rules refuse the text", async () => {
+    expect(await safeTitle("My client Sarah Klein has PTSD", pass)).toBe(NEUTRAL_TITLE);
   });
 
-  it("reads digits as letters, so the stress-test title is refused (wave 4 finding)", async () => {
+  it("reads look-alikes as letters, so the stress-test title is refused (wave 4 finding)", async () => {
     expect(await safeTitle("My cl1ent S4rah K1ein has PTSD", refuseName("Sarah Klein"))).toBe(NEUTRAL_TITLE);
-    expect(await safeTitle("My cl1ent S4rah K1ein has PTSD", refuseName("Sarah Kiein"))).toBe(NEUTRAL_TITLE);
+    expect(await safeTitle("talked with m@ri$ g9rcia", refuseName("maris"))).toBe(NEUTRAL_TITLE);
+    expect(await safeTitle("talked with S.a.r.a.h K-l-e-i-n", refuseName("Sarah Klein"))).toBe(NEUTRAL_TITLE);
   });
 
   it("leaves numbers that are not letters alone", async () => {
+    expect(titleReadings("Who refers in 60614?")).toEqual(["Who refers in 60614?"]);
     expect(await safeTitle("Who refers in 60614?", refuseName("6o614"))).toBe("Who refers in 60614?");
   });
 
   it("uses New chat for a crisis message", async () => {
-    expect(await safeTitle("I want to kill myself", rulesOnly)).toBe(NEUTRAL_TITLE);
+    expect(await safeTitle("I want to kill myself", pass)).toBe(NEUTRAL_TITLE);
   });
 
-  it("fails closed when the check can't run", async () => {
+  it("fails closed when the guard can't run", async () => {
     expect(await safeTitle("Find hospices", async () => ({ ok: false, kind: "unavailable" }))).toBe(NEUTRAL_TITLE);
     expect(await safeTitle("Find hospices", async () => { throw new Error("down"); })).toBe(NEUTRAL_TITLE);
   });
 });
 
-describe("shownTitle (saved titles, checked again on read)", () => {
-  it("hides an old title the guard now refuses", async () => {
-    expect(await shownTitle("my clinet maria g. is pregnant and has postpartum depresion", refuseName("maria"))).toBe(NEUTRAL_TITLE);
+describe("shownTitle (on read: plain code only)", () => {
+  it("hides an old title the rules now refuse, without the name-finder", () => {
+    expect(shownTitle("My cl1ent S4rah K1ein has PTSD")).toBe(NEUTRAL_TITLE);
+    expect(shownTitle("I don't want to be here anymore")).toBe(NEUTRAL_TITLE);
   });
 
-  it("shows a title that still passes, and remembers it", async () => {
-    let calls = 0;
-    const counting: TitleCheck = async (text) => {
-      calls++;
-      return { ok: true, text };
-    };
-    expect(await shownTitle("Referral letters", counting)).toBe("Referral letters");
-    const after = calls;
-    expect(await shownTitle("Referral letters", counting)).toBe("Referral letters");
-    expect(calls).toBe(after);
+  it("shows a title that still passes", () => {
+    expect(shownTitle("Referral letters")).toBe("Referral letters");
+    expect(plainRefuses("Referral letters")).toBe(false);
   });
 
-  it("does not remember a title it could not check", async () => {
-    expect(await shownTitle("Referral letters", async () => ({ ok: false, kind: "unavailable" }))).toBe(NEUTRAL_TITLE);
-    expect(await shownTitle("Referral letters", async (text) => ({ ok: true, text }))).toBe("Referral letters");
+  it("keeps a verdict for a minute, then checks again", () => {
+    expect(shownTitle("Referral letters", 1_000)).toBe("Referral letters");
+    expect(shownTitle("Referral letters", 30_000)).toBe("Referral letters");
+    expect(shownTitle("Referral letters", 200_000)).toBe("Referral letters");
+  });
+
+  it("keys its cache by a hash, never the title text", () => {
+    const src = readFileSync(new URL("../lib/aeon/chat-title.ts", import.meta.url), "utf8");
+    expect(src).toMatch(/createHash\("sha256"\)\.update\(title\)/);
+    expect(src).not.toMatch(/checked\.(set|get)\(title/);
   });
 });
