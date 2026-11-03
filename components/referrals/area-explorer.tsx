@@ -12,6 +12,8 @@ import { groupByCategory } from "@/lib/referrals/categories";
 import { SPECIALTIES, type SpecialtyId } from "@/lib/referrals/nppes";
 import { TIER_LABEL, TIERS, milesLabel, type Tier } from "@/lib/referrals/tier";
 import { cn } from "@/lib/utils";
+import { sensitiveLocation, pinnable } from "@/lib/referrals/sensitive";
+import { CategoryFilter, categoriesIn } from "./category-filter";
 import { TierBadge } from "./tier-badge";
 
 // Referrals: find people near her on a map with a tiered list beside it
@@ -73,7 +75,7 @@ function ProviderRow({
       aria-labelledby={id}
       aria-current={selected ? "true" : undefined}
       onClick={(e) => {
-        if (!(e.target as HTMLElement).closest("button,a")) onSelect();
+        if (!p.tier.sensitive && !(e.target as HTMLElement).closest("button,a")) onSelect();
       }}
       className={cn(
         "flex scroll-mt-24 flex-col gap-2 border-t border-[var(--line)] px-4 py-3.5 transition-colors duration-150",
@@ -104,13 +106,15 @@ function ProviderRow({
         </dt>
         <dd className="text-[var(--fg-muted)]">
           <span className="sr-only">Location: </span>
-          {p.homeAddress
+          {p.tier.sensitive
+            ? sensitiveLocation(p.city)
+            : p.homeAddress
             ? `${HOME_ADDRESS} (${p.city} ${p.zip})`
             : p.address
               ? `${p.address}, ${p.city} ${p.zip}`
               : `Address not listed in NPPES (${p.zip})`}
-          {p.distanceMiles !== null && ` · ${milesLabel(p.distanceMiles, approximate)}`}
-          {approximate && !p.homeAddress && (
+          {p.distanceMiles !== null && !p.tier.sensitive && ` · ${milesLabel(p.distanceMiles, approximate)}`}
+          {approximate && !p.homeAddress && !p.tier.sensitive && (
             <span className="block">Pin is at the ZIP code&rsquo;s center; the street address wasn&rsquo;t found on the map.</span>
           )}
         </dd>
@@ -131,9 +135,11 @@ function ProviderRow({
         </ul>
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button variant="quiet" onClick={onSelect} aria-label={`Show on map: ${p.name}`} aria-pressed={selected} className={FOCUS}>
-          Show on map
-        </Button>
+        {!p.tier.sensitive && (
+          <Button variant="quiet" onClick={onSelect} aria-label={`Show on map: ${p.name}`} aria-pressed={selected} className={FOCUS}>
+            Show on map
+          </Button>
+        )}
         {onBoard ? (
           <span
             id={`onboard-${p.npi}`}
@@ -246,6 +252,7 @@ export function AreaExplorer({
   const [justAdded, setJustAdded] = useState<string | null>(null);
   const [board, setBoard] = useState(initialBoard);
   const [announce, setAnnounce] = useState("");
+  const [category, setCategory] = useState<number | null>(null);
   const [seenBoard, setSeenBoard] = useState(initialBoard);
   if (seenBoard !== initialBoard) {
     setSeenBoard(initialBoard);
@@ -292,12 +299,20 @@ export function AreaExplorer({
     void search(defaultArea);
   }, [defaultArea, search]);
 
+  // One catalog category at a time on the list and the map, or all.
+  const categories = useMemo(() => categoriesIn((result?.providers ?? []).map((p) => p.tier)), [result]);
+  const shownCategory = category !== null && categories.some((c) => c.id === category) ? category : null;
+  const shown = useMemo(
+    () => (result?.providers ?? []).filter((p) => shownCategory === null || p.tier.category === shownCategory),
+    [result, shownCategory],
+  );
   const byTier = useMemo(() => {
     const out: Record<Tier, AreaProvider[]> = { first: [], next: [], later: [] };
-    for (const p of result?.providers ?? []) out[p.tier.tier].push(p);
+    for (const p of shown) out[p.tier.tier].push(p);
     return out;
-  }, [result]);
-  const pins = useMemo(() => (result?.providers ?? []).map((p) => ({ npi: p.npi, name: p.name, lat: p.lat, lon: p.lon, tier: p.tier.tier })), [result]);
+  }, [shown]);
+  // Sensitive kinds (DV/SA agencies, shelters) never get a pin.
+  const pins = useMemo(() => pinnable(shown).map((p) => ({ npi: p.npi, name: p.name, lat: p.lat, lon: p.lon, tier: p.tier.tier })), [shown]);
 
   const select = useCallback((npi: string) => {
     setSelected(npi);
@@ -480,6 +495,17 @@ export function AreaExplorer({
               </p>
             ))}
           </div>
+          <CategoryFilter
+            label="Show results by kind"
+            categories={categories}
+            value={shownCategory}
+            total={result.providers.length}
+            onChange={(c) => {
+              setCategory(c);
+              setSelected(null);
+              setAnnounce(c === null ? "Showing everyone." : `Showing ${categories.find((x) => x.id === c)?.label ?? "one kind"} only.`);
+            }}
+          />
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]">
             <div className="h-[340px] lg:sticky lg:top-4 lg:h-[calc(100dvh-8rem)] lg:max-h-[760px]">
               <ReferralMap pins={pins} center={result.center} selected={selected} onSelect={select} label={result.label} />

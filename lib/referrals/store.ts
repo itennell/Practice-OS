@@ -9,7 +9,8 @@ import { nearbyZips, zipCenters, zipDistance } from "./geo";
 import { fetchProviders, looksResidential, providerByNpi, SPECIALTY_BY_ID, type Provider, type SpecialtyId } from "./nppes";
 import { suppressedNpis } from "./contacts";
 import { nppesFacts, saveFacts } from "./evidence/store";
-import { focusFrom, providerTier, SCORE_VERSION, tierFor, type Focus } from "./tier";
+import { focusFrom, providerTier, SCORE_VERSION, selfPayFrom, tierFor, type Focus } from "./tier";
+import { isNichePreset } from "./catalog";
 import { STAGES, STAGE_LABEL, type Stage } from "./stages";
 
 export { STAGES, STAGE_LABEL, type Stage };
@@ -70,11 +71,11 @@ export async function findReferralSources(
   const zips = nearbyZips(centers, opts.zip, opts.radiusMiles ?? 3, 5);
   const blocked = await suppressedNpis(sql);
   const providers = (await fetchProviders(opts.specialties, zips, opts.fetcher)).filter((p) => !blocked.has(p.npi));
-  const { focus, state } = await practiceFacts(sql);
+  const { focus, state, niche, selfPay } = await practiceFacts(sql);
   const scored = providers
     .map((p) => {
       const distanceMiles = zipDistance(centers, opts.zip, p.zip);
-      return { ...p, distanceMiles, fitScore: providerTier(p, { miles: distanceMiles, focus, clinicianState: state }).score };
+      return { ...p, distanceMiles, fitScore: providerTier(p, { miles: distanceMiles, focus, clinicianState: state, niche, selfPay }).score };
     })
     .sort((a, b) => b.fitScore - a.fitScore || (a.distanceMiles ?? 99) - (b.distanceMiles ?? 99) || a.name.localeCompare(b.name));
   // A city ZIP has thousands; the board keeps the best few of each kind.
@@ -90,11 +91,30 @@ export async function findReferralSources(
 
 const PER_SPECIALTY = 20;
 
-/** Who she helps (onboarding), as the groups the tiers match on, and her state. */
-export async function practiceFacts(sql: postgres.Sql = db()): Promise<{ focus: Focus[]; state: string | null }> {
-  const [row] = await sql<{ who: string | null; state: string | null }[]>`
-    select onboarding_answers ->> 'who_i_help' as who, state from practice_os.clinician_profile limit 1`.catch(() => []);
-  return { focus: focusFrom(row?.who), state: row?.state ?? null };
+export type PracticeFacts = {
+  focus: Focus[];
+  state: string | null;
+  /** Her niche preset (Settings › Referrals), checked against the catalog. */
+  niche: string | null;
+  /** Her clients pay her themselves (onboarding fees and "Do you take insurance?"). */
+  selfPay: boolean;
+};
+
+/** Who she helps (onboarding), as the groups the tiers match on, her state, her niche and whether she is self-pay. */
+export async function practiceFacts(sql: postgres.Sql = db()): Promise<PracticeFacts> {
+  const [row] = await sql<{ who: string | null; state: string | null; insurance: string | null; fees: string | null }[]>`
+    select onboarding_answers ->> 'who_i_help' as who, state, onboarding_answers ->> 'insurance' as insurance,
+           onboarding_answers ->> 'fees' as fees
+      from practice_os.clinician_profile limit 1`.catch(() => []);
+  // Its own query: a database without migration 043 still has the rest.
+  const [setting] = await sql<{ niche: string | null }[]>`select niche_preset as niche from practice_os.referral_settings where id`.catch(() => []);
+  const niche = setting?.niche && isNichePreset(setting.niche) ? setting.niche : null;
+  return { focus: focusFrom(row?.who), state: row?.state ?? null, niche, selfPay: selfPayFrom(row?.insurance, row?.fees) };
+}
+
+/** The tier context from her practice facts (everything but the distance). */
+export function tierContext(f: Pick<PracticeFacts, "focus" | "state" | "niche" | "selfPay">) {
+  return { focus: f.focus, clinicianState: f.state, niche: f.niche, selfPay: f.selfPay };
 }
 
 /**
@@ -107,7 +127,7 @@ export async function addToBoard(
   sql: postgres.Sql = db(),
   lookup: (npi: string) => Promise<Provider | null> = (npi) => providerByNpi(npi),
 ): Promise<{ added: FoundSource[]; missing: string[] }> {
-  const { focus, state } = await practiceFacts(sql);
+  const { focus, state, niche, selfPay } = await practiceFacts(sql);
   const blocked = await suppressedNpis(sql);
   const added: FoundSource[] = [];
   const missing: string[] = [];
@@ -126,7 +146,7 @@ export async function addToBoard(
     const sent = item.distanceMiles === null || !Number.isFinite(item.distanceMiles) ? null : Math.max(0, Math.min(500, item.distanceMiles));
     // Added again without a distance: keep (and score with) the one the card already has.
     const miles = sent ?? (await knownMiles(npi, sql));
-    const one: FoundSource = { ...p, distanceMiles: miles, fitScore: providerTier(p, { miles, focus, clinicianState: state }).score };
+    const one: FoundSource = { ...p, distanceMiles: miles, fitScore: providerTier(p, { miles, focus, clinicianState: state, niche, selfPay }).score };
     await saveSources([one], sql);
     added.push(one);
   }
@@ -210,9 +230,9 @@ export async function rescoreOldCards(
     select id, npi, taxonomy, npi_type, phone, state, address, distance_miles::float8 as distance_miles
       from practice_os.referral_sources where score_version <> ${SCORE_VERSION} limit ${max}`;
   if (rows.length === 0) return 0;
-  const { focus, state } = await practiceFacts(sql);
+  const { focus, state, niche, selfPay } = await practiceFacts(sql);
   for (const row of rows) {
-    const ctx = { miles: row.distance_miles, focus, clinicianState: state };
+    const ctx = { miles: row.distance_miles, focus, clinicianState: state, niche, selfPay };
     const p = row.npi ? await lookup(row.npi).catch(() => null) : null;
     const score = p
       ? providerTier(p, ctx).score

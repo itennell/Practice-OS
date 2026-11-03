@@ -13,7 +13,8 @@ import { isKnownPlace } from "./places";
 import { searchProviders, SPECIALTY_BY_ID, type Provider, type SpecialtyId } from "./nppes";
 import { getReferralSettings } from "./settings";
 import { outOfStateWarning, stateCode, stateName } from "./states";
-import { capFirst, focusFrom, providerTier, TIERS, type Focus, type TierResult } from "./tier";
+import { capFirst, focusFrom, providerTier, selfPayFrom, TIERS, type Focus, type TierResult } from "./tier";
+import { withoutStreet } from "./sensitive";
 
 type Centers = Record<string, Point>;
 
@@ -85,7 +86,7 @@ export type AreaResult = {
 };
 
 /** `suppressed`: NPIs on her do-not-contact list, left out of every search. */
-export type PracticeContext = { office: Point | null; officeZip: string | null; state: string; focus: Focus[]; suppressed?: Set<string> };
+export type PracticeContext = { office: Point | null; officeZip: string | null; state: string; focus: Focus[]; suppressed?: Set<string>; niche?: string | null; selfPay?: boolean };
 
 type Deps = {
   search?: typeof searchProviders;
@@ -229,7 +230,7 @@ export async function searchArea(
   const rough = (p: Provider) => {
     const c = centers[p.zip];
     const miles = officePoint && c ? haversineMiles(officePoint, c) : null;
-    return providerTier(p, { miles, focus: ctx.focus, clinicianState: ctx.state }).score;
+    return providerTier(p, { miles, focus: ctx.focus, clinicianState: ctx.state, niche: ctx.niche, selfPay: ctx.selfPay }).score;
   };
   const byPromise = [...providers].sort((a, b) => rough(b) - rough(a));
   const located = await (deps.geocode ?? geocodeAddresses)(
@@ -245,15 +246,16 @@ export async function searchArea(
     if (!point) continue;
     const distanceMiles = officePoint ? Math.round(haversineMiles(officePoint, point) * 10) / 10 : null;
     const worksAt = works.get(p.npi) ?? null;
-    out.push({
-      ...p,
-      lat: point[0],
-      lon: point[1],
-      precision: exact ? "address" : "zip",
-      distanceMiles,
+    const tier = providerTier(
+      p,
+      { miles: distanceMiles, focus: ctx.focus, approximate: !exact || !ctx.office, clinicianState: ctx.state, niche: ctx.niche, selfPay: ctx.selfPay },
       worksAt,
-      tier: providerTier(p, { miles: distanceMiles, focus: ctx.focus, approximate: !exact || !ctx.office, clinicianState: ctx.state }, worksAt),
-    });
+    );
+    // A sensitive kind (DV/SA agencies, shelters) leaves without its street address or exact point, and gets no pin.
+    const zipPoint = tier.sensitive ? (centers[p.zip] ?? point) : point;
+    out.push(
+      withoutStreet({ ...p, lat: zipPoint[0], lon: zipPoint[1], precision: exact && !tier.sensitive ? "address" : "zip", distanceMiles, worksAt, tier }),
+    );
   }
   const order = (a: AreaProvider, b: AreaProvider) =>
     TIERS.indexOf(a.tier.tier) - TIERS.indexOf(b.tier.tier) ||
@@ -268,8 +270,9 @@ export async function searchArea(
 /** Her office, state and who she helps, for distances and tiers. Business facts only. */
 export async function practiceContext(sql: postgres.Sql = db()): Promise<PracticeContext> {
   const settings = await getReferralSettings(sql);
-  const [profile] = await sql<{ state: string | null; who: string | null }[]>`
-    select state, onboarding_answers ->> 'who_i_help' as who from practice_os.clinician_profile limit 1`.catch(() => []);
+  const [profile] = await sql<{ state: string | null; who: string | null; insurance: string | null; fees: string | null }[]>`
+    select state, onboarding_answers ->> 'who_i_help' as who, onboarding_answers ->> 'insurance' as insurance,
+           onboarding_answers ->> 'fees' as fees from practice_os.clinician_profile limit 1`.catch(() => []);
   const [loc] = await sql<{ street: string | null; city: string | null; state: string | null; zip: string | null }[]>`
     select practice_location ->> 'street' as street, practice_location ->> 'city' as city,
            practice_location ->> 'state' as state, practice_location ->> 'zip' as zip
@@ -280,7 +283,15 @@ export async function practiceContext(sql: postgres.Sql = db()): Promise<Practic
     office = (await geocodeAddresses([key])).get(addressKey(key)) ?? null;
   }
   const suppressed = await suppressedNpis(sql).catch(() => new Set<string>());
-  return { office, officeZip: settings.searchZip, state: profile?.state ?? "IL", focus: focusFrom(profile?.who), suppressed };
+  return {
+    office,
+    officeZip: settings.searchZip,
+    state: profile?.state ?? "IL",
+    focus: focusFrom(profile?.who),
+    suppressed,
+    niche: settings.nichePreset,
+    selfPay: selfPayFrom(profile?.insurance, profile?.fees),
+  };
 }
 
 export function specialtyLabels(ids: SpecialtyId[]): string {

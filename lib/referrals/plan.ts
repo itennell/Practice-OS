@@ -11,8 +11,8 @@ import { orgNameScore } from "./evidence/match";
 import { jaroWinkler, normalizeName, normalizeOrg } from "./evidence/normalize";
 import { contactsFor, relationshipFrom, suppressedNpis, type Contact } from "./contacts";
 import { STAGE_LABEL } from "./stages";
-import { latestLetters, listSources, practiceFacts, type LetterState, type ReferralSource } from "./store";
-import { boardTier, focusRank, TIER_LABEL, withRelationship, type Focus, type TierResult } from "./tier";
+import { latestLetters, listSources, practiceFacts, tierContext, type LetterState, type ReferralSource } from "./store";
+import { boardTier, focusRank, TIER_LABEL, withRelationship, type TierContext, type TierResult } from "./tier";
 import { SPECIALTY_BY_ID, specialtyForCode, type SpecialtyId } from "./nppes";
 
 /** At most this many new people a week: the research aims at 3 to 5 letters a month for the top tier. */
@@ -87,7 +87,7 @@ export function followUpsFrom(cards: ReferralSource[], contacts: Record<string, 
 export function tiersWithLog(
   cards: ReferralSource[],
   contacts: Record<string, Contact[]>,
-  ctx: { focus: Focus[]; clinicianState: string | null },
+  ctx: Omit<TierContext, "miles">,
 ): Record<string, TierResult> {
   return Object.fromEntries(
     cards.map((c) => [c.id, withRelationship(boardTier(c, ctx), relationshipFrom(contacts[c.id] ?? [], c.introduced_by ?? null))]),
@@ -104,7 +104,7 @@ export async function outreachPlan(sql: postgres.Sql = db(), max = NEW_PER_WEEK,
   const [cards, today, facts, blocked] = await Promise.all([listSources(sql), practiceToday(sql), practiceFacts(sql), suppressedNpis(sql)]);
   const asked = opts.specialties?.length ? opts.specialties : await recentSearchKinds(sql).catch(() => [] as SpecialtyId[]);
   const contacts = await contactsFor(cards.map((c) => c.id), sql);
-  const tiers = tiersWithLog(cards, contacts, { focus: facts.focus, clinicianState: facts.state });
+  const tiers = tiersWithLog(cards, contacts, tierContext(facts));
   const follow_ups = followUpsFrom(cards, contacts, today);
   const due = new Set(follow_ups.map((f) => f.id));
 
@@ -270,6 +270,6 @@ export async function cardView(id: string, sql: postgres.Sql = db()) {
   const card = (await listSources(sql)).find((c) => c.id === id) ?? null;
   if (!card) return null;
   const [facts, contacts] = await Promise.all([practiceFacts(sql), contactsFor([id], sql)]);
-  const tier = tiersWithLog([card], contacts, { focus: facts.focus, clinicianState: facts.state })[id];
+  const tier = tiersWithLog([card], contacts, tierContext(facts))[id];
   return { card, tier, contacts: contacts[id] ?? [] };
 }

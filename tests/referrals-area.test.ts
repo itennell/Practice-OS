@@ -180,6 +180,8 @@ describe("tiers (plain code, with reasons)", () => {
       tier: "first",
       score: 94,
       specialty: "pediatrics",
+      category: 1,
+      sensitive: false,
       reasons: [
         // The catalog's why_they_refer for pediatrics, as a card reason.
         "child and teen behavior, ADHD follow-up and parent stress land on their desk",

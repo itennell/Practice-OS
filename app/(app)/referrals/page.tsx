@@ -8,7 +8,7 @@ import { STAGE_LABEL } from "@/lib/referrals/stages";
 import { getProfile } from "@/lib/profile";
 import { evidenceFor } from "@/lib/referrals/evidence/store";
 import { recheckIfDue, recheckDeps } from "@/lib/referrals/sources/recheck";
-import { latestLetters, listSources, moveDueFollowUps, practiceFacts, rescoreOldCards } from "@/lib/referrals/store";
+import { latestLetters, listSources, moveDueFollowUps, practiceFacts, rescoreOldCards, tierContext } from "@/lib/referrals/store";
 import { contactsFor } from "@/lib/referrals/contacts";
 import { tiersWithLog } from "@/lib/referrals/plan";
 import { SCORE_VERSION, type TierResult } from "@/lib/referrals/tier";
@@ -55,7 +55,7 @@ async function Referrals({ searchParams }: { searchParams: PageProps<"/referrals
   const board = Object.fromEntries(sources.filter((s) => s.npi).map((s) => [s.npi!, { stage: STAGE_LABEL[s.stage] }]));
   // Tiers with her contact log on top (a prior referral, a warm intro, a meeting, a reply).
   const contacts = await contactsFor(sources.map((s) => s.id));
-  const tiers: Record<string, TierResult> = tiersWithLog(sources, contacts, { focus: facts.focus, clinicianState: facts.state });
+  const tiers: Record<string, TierResult> = tiersWithLog(sources, contacts, tierContext(facts));
   return (
     <div className="flex flex-col gap-8">
       <AreaExplorer

@@ -1,0 +1,81 @@
+import AxeBuilder from "@axe-core/playwright";
+import { expect, test, type Page } from "@playwright/test";
+import { execSync } from "node:child_process";
+import { REFERRALS_ONLY_DEMO } from "../../lib/features";
+import { pick } from "../helpers/controls";
+
+// Her niche at phone width (390px), on the fictional demo practice: the onboarding
+// niche screen pre-selects that niche's kinds, Settings › Referrals saves a niche,
+// and the board's category chips show one kind at a time. axe-clean, nothing
+// wider than the phone. No model call, no internet.
+
+test.use({ viewport: { width: 390, height: 844 } });
+
+// referral_settings is hers and never reset (lib/demo-reset.ts): put Dana's demo niche back
+// first (a changed niche re-scores the board), then reseed the cards.
+test.beforeEach(async ({ request }) => {
+  expect((await request.put("/api/settings/referrals", { data: { nichePreset: "oncology_serious_illness" }, headers: { origin: "http://127.0.0.1:3100" } })).ok()).toBe(true);
+  execSync("npm run db:reset", { stdio: "ignore" });
+});
+test.afterAll(async ({ request }) => {
+  await request.put("/api/settings/referrals", { data: { nichePreset: "oncology_serious_illness" }, headers: { origin: "http://127.0.0.1:3100" } });
+  execSync("npm run db:reset", { stdio: "ignore" });
+});
+
+test.setTimeout(120_000);
+
+async function axeClean(page: Page) {
+  // Let chip colour transitions settle so axe reads the final colours.
+  await page.waitForTimeout(300);
+  const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
+  expect(results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+}
+
+test("onboarding: picking a niche pre-selects its kinds on the next screen", async ({ page }) => {
+  test.skip(!REFERRALS_ONLY_DEMO, "The niche screen is on the referrals-only short path (lib/features.ts).");
+  await page.goto("/onboarding?q=referrals:niche");
+  const heading = page.getByRole("heading", { level: 1 });
+  await expect(heading).toHaveText(/closest to your niche/);
+  // Dana's seeded niche is already picked.
+  await expect(page.getByRole("radio", { name: /Oncology \/ serious illness/ })).toBeChecked();
+  await page.getByRole("radio", { name: /Grief and loss/ }).click();
+  await axeClean(page);
+  await page.getByRole("button", { name: /^(Next|Finish setup)$/ }).click();
+  await expect(heading).toHaveText(/Who would you like to hear from/, { timeout: 20_000 });
+  await expect(page.getByRole("button", { name: "Hospice", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Pediatrics", exact: true })).toHaveAttribute("aria-pressed", "false");
+  await axeClean(page);
+});
+
+test("Settings › Referrals: the niche picker saves", async ({ page }) => {
+  await page.goto("/settings");
+  const card = page.getByRole("region", { name: "Referrals", exact: true });
+  await expect(card.getByRole("combobox", { name: "Your niche" })).toContainText("Oncology / serious illness / end of life");
+  await expect(card).toContainText("Aeon looks for these first: Oncology");
+  await pick(page, card, "Your niche", "Grief and loss");
+  const saved = page.waitForResponse((r) => r.url().endsWith("/api/settings/referrals") && r.request().method() === "PUT");
+  await card.getByRole("button", { name: "Save niche" }).click();
+  expect((await saved).ok()).toBe(true);
+  await expect(card).toContainText("Saved. Your map and board rank by it now.");
+  await axeClean(page);
+  await page.reload();
+  await expect(page.getByRole("region", { name: "Referrals", exact: true }).getByRole("combobox", { name: "Your niche" })).toContainText("Grief and loss");
+});
+
+test("board: category chips show one kind at a time, and cards name the niche", async ({ page }) => {
+  // The map searches the live NPI Registry; the board is what this checks.
+  await page.route("**/api/referrals/area", (route) => route.fulfill({ status: 503, json: { error: "[Sample] offline in this test" } }));
+  await page.goto("/referrals");
+  const filter = page.getByRole("group", { name: "Show cards by kind" });
+  await expect(filter.getByRole("button", { name: /^All/ })).toHaveAttribute("aria-pressed", "true");
+  const oncology = page.getByRole("listitem", { name: "[Sample] Lakeshore Oncology Group" });
+  await expect(oncology).toContainText("Fits your oncology & end-of-life focus (Medical specialists)");
+  await filter.getByRole("button", { name: /^Medical specialists/ }).click();
+  await expect(filter.getByRole("button", { name: /^Medical specialists/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(oncology).toBeVisible();
+  await expect(page.getByRole("listitem", { name: "[Sample] Lakeview Family Medicine" })).toHaveCount(0);
+  await axeClean(page);
+  await filter.getByRole("button", { name: /^All/ }).click();
+  await expect(page.getByRole("listitem", { name: "[Sample] Lakeview Family Medicine" })).toBeVisible();
+});
