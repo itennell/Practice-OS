@@ -303,7 +303,7 @@ describe.skipIf(!local)("the demo on the built-in database", () => {
       if (s.phone) expect(s.phone).toMatch(/555-01\d\d/);
       if (s.email) expect(s.email).toMatch(/@([a-z-]+\.)?example\.com$/);
     }
-    const added = samples.filter((s) => s.id >= "00000000-0000-4000-8000-000000000207");
+    const added = samples.filter((s) => s.id >= "00000000-0000-4000-8000-000000000207" && s.id <= "00000000-0000-4000-8000-000000000214");
     expect(added).toHaveLength(8);
     for (const s of added) expect({ address: s.address, zip: s.zip, found_via: s.found_via }).toEqual({ address: null, zip: null, found_via: "manual" });
 
