@@ -10,6 +10,8 @@ import { evidenceFor } from "@/lib/referrals/evidence/store";
 import { recheckIfDue, recheckDeps } from "@/lib/referrals/sources/recheck";
 import { latestLetters, listSources, moveDueFollowUps, practiceFacts, rescoreOldCards, tierContext } from "@/lib/referrals/store";
 import { contactsFor } from "@/lib/referrals/contacts";
+import { referOutNotesFor } from "@/lib/referrals/refer-out";
+import { practiceToday } from "@/lib/compliance/store";
 import { rankCards, tiersWithLog } from "@/lib/referrals/plan";
 import { scoreVersionFor, type TierResult } from "@/lib/referrals/tier";
 
@@ -54,7 +56,7 @@ async function Referrals({ searchParams }: { searchParams: PageProps<"/referrals
   const evidence = await evidenceFor(sources);
   const board = Object.fromEntries(sources.filter((s) => s.npi).map((s) => [s.npi!, { stage: STAGE_LABEL[s.stage] }]));
   // Tiers with her contact log on top (a prior referral, a warm intro, a meeting, a reply).
-  const contacts = await contactsFor(sources.map((s) => s.id));
+  const [contacts, referOut, today] = await Promise.all([contactsFor(sources.map((s) => s.id)), referOutNotesFor(sources.map((s) => s.id)), practiceToday()]);
   const tiers: Record<string, TierResult> = tiersWithLog(sources, contacts, tierContext(facts));
   // Each column in the one order (tier, niche weight, fit, score, distance).
   const ranked = rankCards(sources, tiers);
@@ -69,7 +71,7 @@ async function Referrals({ searchParams }: { searchParams: PageProps<"/referrals
         <h2 id="board-heading" className="text-body font-semibold">
           Your board
         </h2>
-        <ReferralBoard initial={ranked} letters={letters} tiers={tiers} evidence={evidence} contacts={contacts} demo={profile?.is_sample ?? true} openDebrief={openDebrief} />
+        <ReferralBoard initial={ranked} letters={letters} tiers={tiers} evidence={evidence} contacts={contacts} referOut={referOut} today={today} demo={profile?.is_sample ?? true} openDebrief={openDebrief} />
       </section>
     </div>
   );

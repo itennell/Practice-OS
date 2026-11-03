@@ -18,6 +18,8 @@ import { DebriefButton, PartnerProfileBox } from "./debrief";
 import { EvidenceBox } from "./evidence-box";
 import { CategoryFilter, categoriesIn } from "./category-filter";
 import { TierBadge } from "./tier-badge";
+import { BoardViews, GoingColdLine, ReciprocityLine, ReferOutBox, ReferOutList, type BoardView } from "./nurture";
+import { coldCards, refersTo, type GoingCold, type ReferOutNotes } from "@/lib/referrals/nurture";
 
 // The Referrals board (Isaiah's pipeline, AGENTS.md > Referrals). Cards move by
 // drag and drop, or by the "Move to" menu on every card, which is the way for
@@ -192,6 +194,8 @@ function Card({
   letter,
   evidence,
   contacts,
+  cold,
+  referOut,
   drafting,
   demo,
   debriefOpen,
@@ -199,25 +203,34 @@ function Card({
   onDraft,
   onUpdate,
   onLogged,
+  onReferOut,
 }: {
   card: ReferralSource;
   tier: TierResult | undefined;
   letter: LetterState | undefined;
   evidence: Evidence | undefined;
   contacts: Contact[];
+  /** Past its tier's touch cadence (lib/referrals/nurture.ts). */
+  cold: GoingCold | undefined;
+  /** Her notes about them for referring out. */
+  referOut: ReferOutNotes | undefined;
   onUpdate: (card: ReferralSource, evidence: Evidence) => void;
   onLogged: (view: CardView, said: string) => void;
+  onReferOut: (id: string, notes: ReferOutNotes, said: string) => void;
   drafting: boolean;
   demo: boolean;
   /** Opened from the chat ("debrief my coffee with ..."): the recorder is open on this card. */
   debriefOpen: boolean;
   onMove: (stage: Stage) => void;
-  onDraft: () => void;
+  onDraft: (nudge: boolean) => void;
 }) {
   const headingId = `ref-${card.id}`;
   // No second draft while one waits for approval or an approved one is ready to send.
   const letterReady = letter?.status === "done" && !letter.sent;
-  const canDraft = (card.stage === "found" || card.stage === "follow_up") && letter?.status !== "pending" && !letterReady;
+  const noLetterWaiting = letter?.status !== "pending" && !letterReady;
+  const canDraft = (card.stage === "found" || card.stage === "follow_up") && noLetterWaiting;
+  // Going cold: a short follow-up note through the same letter path (approve, then copy and send).
+  const canNudge = Boolean(cold) && !canDraft && noLetterWaiting && card.stage !== "not_a_fit";
   const meta = [
     card.specialty ?? card.taxonomy,
     card.distance_miles === null ? null : card.distance_miles < 0.1 ? "in your ZIP" : `${card.distance_miles} mi`,
@@ -239,6 +252,8 @@ function Card({
         {tier && <TierBadge tier={tier.tier} />}
       </div>
       <p className="text-small text-[var(--fg-muted)]">{meta.join(" · ")}</p>
+      <GoingColdLine cold={cold} />
+      <ReciprocityLine contacts={contacts} />
       {card.suggested_from && (
         <p className="text-small font-medium">
           Suggested from your debrief{card.introduced_by ? ` with ${card.introduced_by}` : ""}. Not contacted.
@@ -267,6 +282,7 @@ function Card({
       <PartnerProfileBox card={card} />
       <EvidenceBox card={card} evidence={evidence} onUpdate={onUpdate} />
       <ContactLog card={card} contacts={contacts} onUpdate={onLogged} />
+      {card.stage !== "not_a_fit" && <ReferOutBox card={card} notes={referOut} onLogged={onLogged} onNotes={onReferOut} />}
       {letter && (
         <LetterBox
           letter={letter}
@@ -285,8 +301,13 @@ function Card({
       />
       {card.stage !== "not_a_fit" && !card.suggested_from && <DebriefButton card={card} autoOpen={debriefOpen} />}
       {canDraft && (
-        <Button variant="quiet" onClick={onDraft} disabled={drafting} aria-describedby={headingId}>
+        <Button variant="quiet" onClick={() => onDraft(false)} disabled={drafting} aria-describedby={headingId}>
           {drafting ? "Aeon is writing…" : card.stage === "follow_up" ? "Draft a check-in email" : "Draft email"}
+        </Button>
+      )}
+      {canNudge && (
+        <Button variant="quiet" onClick={() => onDraft(true)} disabled={drafting} aria-describedby={headingId}>
+          {drafting ? "Aeon is writing…" : "Draft a follow-up note"}
         </Button>
       )}
     </li>
@@ -360,6 +381,8 @@ export function ReferralBoard({
   tiers,
   evidence: initialEvidence,
   contacts: initialContacts,
+  referOut: initialReferOut = {},
+  today,
   demo,
   openDebrief = null,
 }: {
@@ -370,6 +393,10 @@ export function ReferralBoard({
   evidence: Record<string, Evidence>;
   /** Each card's contact log, newest first (lib/referrals/contacts). */
   contacts: Record<string, Contact[]>;
+  /** Her notes about the people she refers to, by card (lib/referrals/refer-out). */
+  referOut?: Record<string, ReferOutNotes>;
+  /** The practice's today (its time zone), for "going cold". */
+  today: string;
   /** The fictional demo practice: letters must never reach a real provider. */
   demo: boolean;
   /** A card id from /referrals?debrief=<id> (the chat's debrief_meeting card): its recorder opens. */
@@ -380,6 +407,8 @@ export function ReferralBoard({
   const [evidence, setEvidence] = useState(initialEvidence);
   const [contacts, setContacts] = useState(initialContacts);
   const [tierById, setTierById] = useState(tiers);
+  const [referOut, setReferOut] = useState(initialReferOut);
+  const [view, setView] = useState<BoardView>("board");
   const [drafting, setDrafting] = useState<string | null>(null);
   const [announce, setAnnounce] = useState("");
   // Show one catalog category at a time (primary care, medical specialists, …), or all.
@@ -396,6 +425,16 @@ export function ReferralBoard({
     setEvidence(initialEvidence);
     setContacts(initialContacts);
     setTierById(tiers);
+    setReferOut(initialReferOut);
+  }
+  const cold = coldCards(cards, contacts, tierById, today);
+  const referringTo = cards.filter((c) => refersTo(contacts[c.id] ?? [], referOut[c.id]));
+  const inView = (c: ReferralSource) => view !== "cold" || Boolean(cold[c.id]);
+
+  function referOutSaved(id: string, notes: ReferOutNotes, said: string) {
+    setReferOut((all) => ({ ...all, [id]: notes }));
+    setAnnounce(said);
+    notify.success(said);
   }
 
   function logged(view: CardView, said: string) {
@@ -433,10 +472,14 @@ export function ReferralBoard({
     }
   }
 
-  async function draft(card: ReferralSource) {
+  async function draft(card: ReferralSource, nudge = false) {
     setDrafting(card.id);
     try {
-      const res = await fetch(`/api/referrals/${card.id}/draft`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+      const res = await fetch(`/api/referrals/${card.id}/draft`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(nudge ? { nudge: true } : {}),
+      });
       const data = (await res.json()) as { approval_id?: string; subject?: string; letter?: string; error?: string };
       if (!res.ok || !data.approval_id) throw new Error(data.error ?? "I couldn't write the letter. Try again.");
       setLetters((l) => ({
@@ -456,6 +499,15 @@ export function ReferralBoard({
       <p role="status" aria-live="polite" className="sr-only">
         {announce}
       </p>
+      <BoardViews
+        value={view}
+        cold={Object.keys(cold).length}
+        referOut={referringTo.length}
+        onChange={(v) => {
+          setView(v);
+          setAnnounce(v === "board" ? "Showing the whole board." : v === "cold" ? `Showing the ${Object.keys(cold).length} going cold.` : "Showing the people you refer to.");
+        }}
+      />
       <CategoryFilter
         label="Show cards by kind"
         categories={categories}
@@ -466,6 +518,9 @@ export function ReferralBoard({
           setAnnounce(c === null ? "Showing every card." : `Showing ${categories.find((x) => x.id === c)?.label ?? "one kind"} only.`);
         }}
       />
+      {view === "refer_out" ? (
+        <ReferOutList cards={referringTo.filter(inCategory)} contacts={contacts} notes={referOut} />
+      ) : (
       <div
         tabIndex={0}
         role="region"
@@ -474,7 +529,7 @@ export function ReferralBoard({
       >
         <div className="grid grid-cols-1 gap-4 md:grid-cols-[repeat(5,minmax(16rem,1fr))]">
           {STAGES.map((stage) => (
-            <Column key={stage} stage={stage} cards={cards.filter((c) => c.stage === stage && inCategory(c))} onDropCard={(id) => move(id, stage)}>
+            <Column key={stage} stage={stage} cards={cards.filter((c) => c.stage === stage && inCategory(c) && inView(c))} onDropCard={(id) => move(id, stage)}>
               {(shown) =>
                 shown.map((c) => (
                   <Card
@@ -484,13 +539,16 @@ export function ReferralBoard({
                     letter={letters[c.id]}
                     evidence={evidence[c.id]}
                     contacts={contacts[c.id] ?? []}
+                    cold={cold[c.id]}
+                    referOut={referOut[c.id]}
                     onUpdate={updated}
                     onLogged={logged}
+                    onReferOut={referOutSaved}
                     drafting={drafting === c.id}
                     demo={demo}
                     debriefOpen={openDebrief === c.id}
                     onMove={(s) => move(c.id, s)}
-                    onDraft={() => draft(c)}
+                    onDraft={(nudge) => draft(c, nudge)}
                   />
                 ))
               }
@@ -498,6 +556,7 @@ export function ReferralBoard({
           ))}
         </div>
       </div>
+      )}
     </>
   );
 }

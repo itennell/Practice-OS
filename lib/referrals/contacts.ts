@@ -13,7 +13,7 @@ import { db } from "../db";
 import { CONTACT_KINDS, type ContactKind } from "./contact-kinds";
 import type { Stage } from "./stages";
 
-export { CONTACT_KINDS, CONTACT_LABEL, REFERRED_NOTE, type ContactKind } from "./contact-kinds";
+export { CONTACT_KINDS, CONTACT_LABEL, REFERRED_NOTE, REFERRED_OUT_NOTE, type ContactKind } from "./contact-kinds";
 
 /** Reaching out: sets "last contacted" and, unless she picks a date, a follow-up a week out. */
 const OUTREACH: ContactKind[] = ["called", "emailed", "sent_letter"];
@@ -27,6 +27,8 @@ export type Contact = {
   note: string | null;
   created_by: "clinician" | "aeon";
   is_sample: boolean;
+  /** referred_out only: how many people she referred to them. Never who. */
+  people_count?: number | null;
 };
 
 
@@ -39,6 +41,8 @@ export type LogInput = {
   /** YYYY-MM-DD for the next follow-up; null clears it; left out uses the default for the kind. */
   followUpOn?: string | null;
   by: "clinician" | "aeon";
+  /** referred_out only: how many people (1 to 20). Nothing else about them is ever kept. */
+  count?: number | null;
 };
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -77,7 +81,12 @@ export async function logContact(
   if (!isDay(happenedOn)) throw notADay(happenedOn, "when it happened");
   if (happenedOn > today) throw new Error("Pick a date that isn't in the future.");
   let note = input.note?.trim() || null;
-  if (input.kind === "referred") note = null; // a date only, never who
+  if (input.kind === "referred" || input.kind === "referred_out") note = null; // a date only, never who
+  let count: number | null = null;
+  if (input.kind === "referred_out") {
+    count = input.count ?? 1;
+    if (!Number.isInteger(count) || count < 1 || count > 20) throw new Error("Say how many people, from 1 to 20.");
+  }
   if (note) {
     if (note.length > 500) throw new Error("Keep the note under 500 characters.");
     const refused = await checkNote(note, check);
@@ -104,9 +113,9 @@ export async function logContact(
 
   const contact = await sql.begin(async (tx) => {
     const [row] = await tx<Contact[]>`
-      insert into practice_os.referral_contacts (source_id, kind, happened_on, note, created_by)
-      values (${sourceId}, ${input.kind}, ${happenedOn}, ${note}, ${input.by})
-      returning id, source_id, kind, happened_on::text as happened_on, note, created_by, is_sample`;
+      insert into practice_os.referral_contacts (source_id, kind, happened_on, note, created_by, people_count)
+      values (${sourceId}, ${input.kind}, ${happenedOn}, ${note}, ${input.by}, ${count})
+      returning id, source_id, kind, happened_on::text as happened_on, note, created_by, is_sample, people_count`;
     await tx`
       update practice_os.referral_sources
          set stage = ${stage}, next_follow_up_on = ${next},
@@ -118,7 +127,7 @@ export async function logContact(
   });
   // The audit keeps the kind and date, never the note's words.
   await audit(
-    { actor: input.by, action: "referral_contact_logged", subjectType: "referral_source", subjectId: sourceId, details: { kind: input.kind, on: happenedOn, stage, next } },
+    { actor: input.by, action: "referral_contact_logged", subjectType: "referral_source", subjectId: sourceId, details: { kind: input.kind, on: happenedOn, stage, next, ...(count ? { count } : {}) } },
     sql,
   );
   return { contact, stage, nextFollowUpOn: next };
@@ -127,7 +136,7 @@ export async function logContact(
 export async function contactsFor(sourceIds: string[], sql: postgres.Sql = db()): Promise<Record<string, Contact[]>> {
   if (sourceIds.length === 0) return {};
   const rows = await sql<Contact[]>`
-    select id, source_id, kind, happened_on::text as happened_on, note, created_by, is_sample
+    select id, source_id, kind, happened_on::text as happened_on, note, created_by, is_sample, people_count
       from practice_os.referral_contacts where source_id in ${sql(sourceIds)}
      order by happened_on desc, created_at desc`;
   const out: Record<string, Contact[]> = {};

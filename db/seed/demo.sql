@@ -271,3 +271,18 @@ insert into practice_os.referral_contacts (source_id, kind, happened_on, note, c
   ('00000000-0000-4000-8000-000000000203', 'called', current_date - 20, '[Sample] Left a message with the office manager.', 'clinician', true),
   ('00000000-0000-4000-8000-000000000204', 'met', current_date - 35, '[Sample] Coffee near the office.', 'clinician', true),
   ('00000000-0000-4000-8000-000000000204', 'referred', current_date - 12, null, 'clinician', true);
+
+-- Keeping in touch (migration 046): a psychologist Dana refers teens to, with her notes about
+-- them, last seen 100 days ago so the card shows "Going cold"; and the pediatrics office she
+-- has referred two people to. Dates and counts only, never who.
+insert into practice_os.referral_sources
+  (id, name, organization, taxonomy, specialty, npi_type, city, state, email, stage, last_contacted_at, distance_miles, score_version, notes, is_sample,
+   refer_out_availability, refer_out_fees, refer_out_insurance) values
+  ('00000000-0000-4000-8000-000000000207', '[Sample] Dr. Robin Example, PsyD', '[Sample] Clark Street Psychology',
+   '103T00000X', 'Psychologist', 'individual', 'Chicago', 'IL', 'robin@example.com', 'connected', now() - interval '100 days', 1.2, 0,
+   '[Sample] Sees teens and young adults.', true,
+   '[Sample] Openings on Tuesday evenings', '[Sample] $160 a session, sliding scale', '[Sample] BCBS PPO and Aetna');
+insert into practice_os.referral_contacts (source_id, kind, happened_on, note, created_by, is_sample, people_count) values
+  ('00000000-0000-4000-8000-000000000207', 'met', current_date - 100, null, 'clinician', true, null),
+  ('00000000-0000-4000-8000-000000000207', 'referred_out', current_date - 100, null, 'clinician', true, 1),
+  ('00000000-0000-4000-8000-000000000204', 'referred_out', current_date - 12, null, 'clinician', true, 2);
