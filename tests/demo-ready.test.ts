@@ -320,6 +320,20 @@ describe.skipIf(!local)("the demo on the built-in database", () => {
     // 208's letter is approved and marked sent; 205 (the debrief target) has an empty profile.
     const letters = await latestLetters(sql);
     expect(letters["00000000-0000-4000-8000-000000000208"]).toMatchObject({ status: "done", sent: true });
+    // That letter is in the current letter style: the niche, her plans, phone and email, the demo sign-off, and the letter rules pass.
+    const { checkLetter } = await import("../lib/referrals/outreach");
+    const [sample] = await sql<{ letter: string; body: string }[]>`
+      select payload ->> 'letter' as letter, preview ->> 'body' as body from practice_os.approvals where id = '00000000-0000-4000-8000-000000000910'`;
+    for (const text of [sample.letter, sample.body]) {
+      expect(text).toMatch(/^\[Sample\] Dear Marrowpine Grief Center team,/);
+      expect(text).toMatch(/cancer, serious illness and the end of life/);
+      expect(text).toMatch(/Aetna/);
+      expect(text).toMatch(/BCBSIL application is pending/);
+      expect(text).toContain("(312) 555-0142");
+      expect(text).toContain("dana@example.com");
+      expect(text).toContain("Dana Reyes, LCPC (fictional demo practice)");
+      expect(checkLetter(text)).toEqual({ ok: true });
+    }
     const [target] = await sql`
       select name, refers_via, referral_contact, populations, needs_from_therapist, waitlist, payer_mix, best_time, last_meeting_summary, connection_points, profile_updated_at
         from practice_os.referral_sources where id = '00000000-0000-4000-8000-000000000205'`;

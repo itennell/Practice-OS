@@ -48,6 +48,7 @@ import {
 import { blockedReason, checkFacts, checkLetter, finishLetter, letterFacts, pendingLetter, valueOffered, type LetterFacts } from "./outreach";
 import { cardView } from "./plan";
 import { getSource, type ReferralSource } from "./store";
+import { valueOffered as valueCheck } from "./value-check";
 
 export * from "./debrief-shape";
 
@@ -231,7 +232,9 @@ const CARE_ROLE = new RegExp(CARE_ROLE_SRC, "gi");
 const INTRO_VERB =
   "meet\\w*|talk\\s+(?:to|with)|speak\\s+(?:to|with)|reach\\s+out\\s+to|get\\s+in\\s+touch\\s+with|contact|connect\\s+with|call|e-?mail|look\\s+forward\\s+to\\s+(?:meet\\w*|talk\\w*|work\\w*)";
 const GAVE_A_NAME = "\\bgave\\s+(?:me|us)\\s+(?:a|the|one|another|her|his|their)\\s+(?:name|names|contact|contacts)\\b";
-const TOLD_TO_MEET = new RegExp(`\\b(?:I|me|you|we|us)\\b(?:\\s+[\\w’']+){0,3}?\\s+(?:${INTRO_VERB})\\b|\\bintroduc\\w*\\s+(?:me|us)\\s+to\\b|${GAVE_A_NAME}`, "i");
+const NEXT_STEP = `\\bnext\\s+step\\s*(?::|is|was)\\s*(?:to\\s+)?(?:${INTRO_VERB})\\b|\\b(?:top|first|main|best|one)\\s+(?:suggestion|recommendation|name|contact)\\s+(?:was|is)\\b`;
+const INTRODUCTION = "\\b(?:make|do)\\s+(?:an\\s+|the\\s+)?introductions?\\b|\\bintroduce\\s+(?:us|me|you)\\b|\\bput\\s+(?:us|me|you)\\s+in\\s+touch\\b|\\bconnect\\s+(?:us|me|you)\\b";
+const TOLD_TO_MEET = new RegExp(`\\b(?:I|me|you|we|us)\\b(?:\\s+[\\w’']+){0,3}?\\s+(?:${INTRO_VERB})\\b|\\bintroduc\\w*\\s+(?:me|us)\\s+to\\b|${GAVE_A_NAME}|${NEXT_STEP}`, "i");
 // "Marisol Quint, she's the hospice social worker at Orrindale Hospice, she told me to call her."
 // The job is tied to a named person ("Marisol Quint, the hospice social worker", "Marisol Quint is the
 // hospice social worker", "the hospice social worker at Orrindale Hospice, Marisol Quint", "hospice social
@@ -244,6 +247,10 @@ const NAMED_ROLE = new RegExp(
   "u",
 );
 const POINTED_BACK = new RegExp(
+  // "... and said she'd make an introduction", "... would be good to meet"
+  `${INTRODUCTION}|\\b(?:would\\s+be\\s+|is\\s+)?(?:good|great|worth|nice|helpful)\\s+to\\s+(?:${INTRO_VERB})\\b|` +
+  // "... takes a lot of referrals and is the person to ask for there"
+  `\\b(?:is|'s|’s)\\s+the\\s+(?:person|one)\\s+to\\s+(?:ask\\s+for|talk\\s+to|call|contact|reach)\\b|` +
   `\\b(?:I|me|you|we|us)\\b(?:\\s+[\\w’']+){0,3}?\\s+(?:${INTRO_VERB})\\s+(?:with\\s+|to\\s+)?(?:her|him|them)\\b|\\bis\\s+(?:someone|somebody|a\\s+person|the\\s+person|the\\s+one)\\s+(?:I|we|you)\\s+(?:[\\w’']+\\s+){0,2}?(?:${INTRO_VERB})\\b`,
   "i",
 );
@@ -258,11 +265,13 @@ const ROLE_HANDLES_REFERRALS = new RegExp(
 );
 // "She said ..." at the start (or ", she told me." at the end) is the partner speaking, not a patient.
 const SAID_LEAD =
-  /^\s*(?:and\s+|so\s+|also\s+)?(?:she|he)\s+(?:also\s+)?(?:said|says|told\s+(?:me|us)|mentioned|suggested|recommended|thinks|wants\s+(?:me|us)|asked\s+(?:me|us)|introduc\w*\s+(?:me|us)\s+to)\b(?:\s+that\b)?\s*/i;
-const SAID_TAIL = /,\s*(?:she|he)\s+(?:told\s+(?:me|us)|said)\s*([.!]?)\s*$/i;
+  /^\s*(?:(?:and|so|also)\s*,?\s+)?(?:she|he)\s+(?:also\s+)?(?:said|says|told\s+(?:me|us)|mentioned|suggested|recommended|thinks|wants\s+(?:me|us)|asked\s+(?:me|us)|introduc\w*\s+(?:me|us)\s+to)\b(?:\s+that\b)?\s*/i;
+const SAID_TAIL = /,\s*(?:she|he)\s+(?:told\s+(?:me|us)|said|says|thinks|mentioned)\s*([.!]?)\s*$/i;
+/** "Also," / "And" / "So" opening a sentence. */
+const LEAD_WORD = /^\s*(?:also|and|so|plus)\s*,?\s+/i;
 /** The sentence without the partner's own "She said ..." around it. */
 function unsaid(s: string): string {
-  return s.replace(SAID_LEAD, "").replace(SAID_TAIL, "$1");
+  return s.replace(LEAD_WORD, "").replace(SAID_LEAD, "").replace(SAID_TAIL, "$1");
 }
 
 // Health words are allowed in two places only (an allow-list; anywhere else they drop the sentence):
@@ -298,7 +307,7 @@ const ONE_REFERRAL = new RegExp(
     // ("talk with her" right after a meeting word is the professional she is pointed to; namedAndPointedBack decides.)
     "\\b(?:for|about)\\s+(?:her|him|them|someone|somebody|one\\s+of\\s+them)\\b|(?<!\\b(?:talk|speak|meet|meeting|connect|touch|up)\\s+)\\bwith\\s+(?:her|him|someone|somebody)\\b",
     // "someone who", "the one on DNR", "a person with", but not "is the one who sends them" (a staff member)
-    "(?<!\\b(?:is|'s|’s|was|need|needs|needed|want|wants|wanted|for|like)\\s+)\\b(?:some(?:one|body)|the\\s+one|a\\s+person|the\\s+person)\\s+(?:who|that|whose|with|on|in|they|she|he)\\b(?!\\s+(?:handles?|takes?|does|manages?|coordinates?|processes?|reviews?)\\s+(?:the\\s+|all\\s+|their\\s+|our\\s+)?(?:referrals?|intake)\\b)",
+    "(?<!\\b(?:is|'s|’s|was|need|needs|needed|want|wants|wanted|for|like)\\s+)\\b(?:some(?:one|body)|the\\s+one|a\\s+person|the\\s+person)(?!\\s+to\\s+(?:ask\\s+for|talk\\s+to|call|contact|reach)\\b)\\s+(?:who|that|whose|with|on|in|they|she|he)\\b(?!\\s+(?:handles?|takes?|does|manages?|coordinates?|processes?|reviews?)\\s+(?:the\\s+|all\\s+|their\\s+|our\\s+)?(?:referrals?|intake)\\b)",
     "\\bone\\s+(?:on|with|in)\\b|\\bwhose\\b",
     // "for the young adult who just moved here", "about the referral for my neighbor"
     "\\b(?:for|about)\\s+(?:the|a|an|my|our|their|this|that)\\s+(?:[\\w'’-]+\\s+){0,2}?[\\w'’-]+\\s+(?:who|that|whose)\\b",
@@ -365,9 +374,13 @@ function healthBeforeJob(s: string): boolean {
   return [...leetFold(s).matchAll(BEFORE_JOB)].some((m) => healthWord(m[1].replace(CARE_WORDS, " ")));
 }
 
-const HANDLER_PHRASE = /\b(?:the|a)\s+(?:person|one)\s+(?:who|that)\s+(?:handles?|takes?|does|manages?|coordinates?|processes?|reviews?)\s+(?:the\s+|all\s+|their\s+|our\s+)?(?:referrals?|intake)\b/gi;
+const HANDLER_PHRASE =
+  /\b(?:the|a)\s+(?:person|one)\s+(?:who|that)\s+(?:handles?|takes?|does|manages?|coordinates?|processes?|reviews?)\s+(?:the\s+|all\s+|their\s+|our\s+)?(?:referrals?|intake)\b|\b(?:the|a)\s+(?:person|one)\s+to\s+(?:ask\s+for|talk\s+to|call|contact|reach)\b/gi;
 // A masked vetted name in apposition (", the colleague," or "intake coordinator the colleague") is taken out
 // before the guard: the name-finder reads "Intake Coordinator The Colleague" as a stranger.
+// The guard's title-cased second read takes "Handles Intake" / "Handles Referrals" for a person's name;
+// "handles the intake" reads as the work it is. Only the guard's copy is rewritten.
+const BARE_WORK = /\b(handles?|coordinates?|takes?|manages?|reviews?|processes?|runs?|does|covers)\s+(intake|referrals?|admissions|scheduling)\b/gi;
 const MASKED_APPOSITIVE = new RegExp(`,\\s*the colleague\\s*(?=[,.;!?]|$)|(?<=\\b(?:${ROLE})\\b)\\s+the colleague\\b`, "gi");
 
 /**
@@ -397,7 +410,7 @@ const HEALTH_ALL = new RegExp(`${HEALTH.source}|${MEDICAL.source}`, "gi");
 const BUSINESS = new RegExp(
   [
     // referral process
-    "\\brefer\\w*|\\bfax\\w*|\\bportal\\b|\\bintake\\s+(?:line|form|coordinator)|\\bsend\\s+(?:people|patients|clients|them|folks|families|parents|moms)\\b|\\bfront\\s+desk\\b|\\be-?mail\\b",
+    "\\brefer\\w*|\\bfax\\w*|\\bportal\\b|\\bintake\\b|\\bask\\s+for\\b|\\bthe\\s+(?:person|one)\\s+to\\s+ask\\s+for\\b|\\bsend\\s+(?:people|patients|clients|them|folks|families|parents|moms)\\b|\\bfront\\s+desk\\b|\\be-?mail\\b",
     // scheduling
     "\\bhours\\b|\\bwait\\s*-?\\s*list\\w*|\\bwait(?:s|ing)?\\b|\\bbest\\s+time\\b|\\bcall(?:s|ed|ing)?\\b|\\bmornings?\\b|\\bafternoons?\\b|\\bevenings?\\b|\\bopenings?\\b|\\bavailab\\w*|\\bschedul\\w*|\\bweekends?\\b|\\btelehealth\\b|\\bin[- ]person\\b",
     // payer mix
@@ -407,7 +420,7 @@ const BUSINESS = new RegExp(
     // what they need from a therapist
     "\\b(?:need|needs|want|wants|looking\\s+for|wish)\\b[^.]{0,40}\\b(?:therapists?|counsel(?:l)?ors?|clinicians?|someone\\s+who)\\b|\\btherapists?\\s+who\\b|\\bspeaks?\\s+\\p{Lu}",
     // meeting or reaching a professional: "talk to", "reach out to", "contact"
-    `\\b(?:${INTRO_VERB})\\b|${GAVE_A_NAME}`,
+    `\\b(?:${INTRO_VERB})\\b|${GAVE_A_NAME}|${NEXT_STEP}|${INTRODUCTION}`,
     // meeting logistics and what they have in common
     "\\b(?:wants?|would\\s+like|like|love)\\s+to\\s+meet\\b|\\bmeet\\b|\\bcoffee\\b|\\bone-?pager\\b|\\bflyers?\\b|\\bbrochures?\\b|\\bfollow[- ]?up\\b|\\bintroduc\\w*|\\bin\\s+common\\b|\\bboth\\b|\\btrained\\s+at\\b|\\bconnection\\b",
   ].join("|"),
@@ -439,6 +452,13 @@ const APPOSITIVE_BEFORE = new RegExp(`\\b(?:the|our|their|her|his)\\s+(?:[\\w-]+
 // "Marisol Quint, she's the hospice social worker", "Rosa Diaz, she's their referral coordinator".
 const SHE_IS_ROLE_AFTER = new RegExp(`^,\\s*(?:she|he)(?:'s|’s|\\s+is)\\s+(?:the|our|their|a|an)\\s+(?:[\\w-]+\\s+){0,2}?(?:${ROLE})(?!['’\\w])`, "i");
 // A staff member's full name doing the referral work: "Rosa Diaz handles referrals", "Rosa Diaz at the front desk is the one who sends them".
+// "Marisol Quint, she runs social work at Orrindale Hospice", "Rosa Diaz handles intake there", "Talk to Rosa Diaz, she coordinates intake".
+const NAME_RUNS_AFTER =
+  /^\s*,?\s*(?:(?:she|he|who)(?:'s|’s|\s+is)?\s+)?(?:runs|leads|heads|directs|manages|handles|coordinates|oversees|does|covers)\s+(?:the\s+|their\s+|all\s+|our\s+)?(?:social\s+work|intake|referrals?|admissions|chaplaincy|spiritual\s+care|bereavement(?:\s+services)?|care\s+coordination|outreach|scheduling)\b/i;
+// "Ask for Rosa Diaz in intake", "Rosa Diaz at intake is the person to ask for".
+const NAME_IN_DEPT_AFTER = /^\s+(?:in|at|from)\s+(?:intake|admissions|scheduling|the\s+front\s+desk)\b|^\s+(?:is|'s|’s)\s+(?:the\s+)?(?:person|one)\s+to\s+(?:ask\s+for|talk\s+to|call|contact)\b/i;
+// A job with no "the" at the start of a clause: "Intake coordinator Rosa Diaz", "Also, hospice social worker Marisol Quint".
+const BARE_ROLE_BEFORE = new RegExp(`(?:^|[.;:!?]\\s*|,\\s*|\\b(?:also|and|plus)\\s*,?\\s+)(?:[\\w-]+\\s+){0,2}?(?:${ROLE})\\s*$`, "i");
 const NAME_HANDLES_REFERRALS =
   /^\s+(?:at\s+the\s+front\s+desk\s+|from\s+intake\s+)?(?:(?:is|'s|’s)\s+(?:the\s+one\s+who\s+)?)?(?:handles?|coordinates?|manages?|processes?|takes?|reviews?|sends?)\s+(?:(?:all|the|their|our|new)\s+)?(?:referrals?|intake|them)\b/i;
 
@@ -466,7 +486,7 @@ export function professionalNames(text: string, names: string[]): string[] {
         APPOSITIVE_BEFORE.test(before) ||
         SHE_IS_ROLE_AFTER.test(after) ||
         (fullName && (IS_ROLE_AFTER.test(after) || HANDLER_BEFORE.test(before))) ||
-        (fullName && NAME_HANDLES_REFERRALS.test(after))
+        (fullName && (NAME_HANDLES_REFERRALS.test(after) || NAME_RUNS_AFTER.test(after) || NAME_IN_DEPT_AFTER.test(after) || BARE_ROLE_BEFORE.test(before)))
       );
     });
     if (ok) out.add(name);
@@ -566,7 +586,8 @@ export async function cleanTranscript(
     // (", the colleague,") is taken out: the name-finder reads "intake coordinator, the colleague," as a stranger.
     const forGuard = maskKnown(withoutCareRoles(s), known)
       .replace(CARE_SERVICE, " a service")
-      .replace(MASKED_APPOSITIVE, "");
+      .replace(MASKED_APPOSITIVE, "")
+      .replace(BARE_WORK, "$1 the $2");
     const r = await check(forGuard, allow);
     if (r.ok) kept.push(s);
   }
@@ -852,6 +873,14 @@ export function fieldViews(field: keyof DebriefFields, value: string): FieldView
   return { person: value, guard: value };
 }
 
+/**
+ * What a field offers of value tied to referrals. "What to follow up on" is her own plan ("send my
+ * flyer"), so it gets her strict rules (speaker "her"); every other field describes the office.
+ */
+function fieldValue(field: keyof DebriefFields, value: string): string | null {
+  return field === "follow_up_points" ? valueCheck(value, { speaker: "her" }) : valueOffered(value);
+}
+
 /** Reasons that only mean "she didn't say it": the field stays empty, and the card doesn't list it as a refusal. */
 const NOT_SAID = new Set(["you didn't say that in the debrief", "it has a number you didn't say", "you didn't say how they refer", "you didn't mention a waitlist"]);
 
@@ -881,7 +910,7 @@ export async function checkFields(
   const reject = (field: keyof DebriefFields, why: string) => (NOT_SAID.has(why) ? unsupported : rejected).push({ field: FIELD_LABEL[field], why });
 
   async function textOk(field: keyof DebriefFields, value: string, need = SUPPORT_NEEDED[field] ?? NEEDED, views: FieldViews = fieldViews(field, value)): Promise<boolean> {
-    const fee = valueOffered(value) ?? valueOffered(views.guard);
+    const fee = fieldValue(field, value) ?? fieldValue(field, views.guard);
     let why: string | null = null;
     if (fee) why = `it mentions ${fee}, and nothing of value can be tied to referrals`;
     else if (aboutAPatient(views.person) || nameWithNeed(views.person)) why = "it may be about one person, not the office";
@@ -1066,7 +1095,7 @@ export async function writeFollowUp(
     };
     let held = false;
     for (const line of sentences(finished.replace(/^\s*(?:dear|hello|hi)\b[^\n]*$/gim, " "))) {
-      const t = maskKnown(line, known).replace(MASKED_APPOSITIVE, "").trim();
+      const t = maskKnown(line, known).replace(MASKED_APPOSITIVE, "").replace(BARE_WORK, "$1 the $2").trim();
       if (t && !(await check(t, letterAllow)).ok) {
         held = true;
         break;
@@ -1326,7 +1355,7 @@ export async function saveDebrief(sourceId: string, body: unknown, opts: { by?: 
     if (personalRole(w.role, w.organization)) throw new DebriefRefused(`"${FIELD_LABEL.who_else}" may describe a person's health or life. Remove them and save again.`);
   }
   for (const [key, { person, guard: value }] of views) {
-    const fee = valueOffered(value);
+    const fee = fieldValue(key, value);
     if (fee) throw new DebriefRefused(`"${FIELD_LABEL[key]}" mentions ${fee}. Nothing of value can be tied to referrals; take it out and save again.`);
     if (aboutAPatient(person) || nameWithNeed(person) || (CLINICAL_CHECKED.includes(key) && clinicalForMemory(value)) || (key === "populations" && !genericGroup(value))) {
       throw new DebriefRefused(`"${FIELD_LABEL[key]}" may be about one person or hold clinical details. Keep it about the office and save again.`);

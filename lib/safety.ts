@@ -389,12 +389,70 @@ function checkOne(text: string): CrisisResult {
   return { crisis: false };
 }
 
-export function checkCrisis(text: string): CrisisResult {
+// A note on a referral card describes the partner's office. There, a crisis word naming one of
+// their services ("a suicide prevention program", "a self-harm IOP") can be a fact about the office.
+// Default refuse: the service words are read as a fact ONLY when the note also has an office-fact
+// word (runs, offers, meets, has a, waitlist, takes, refers, fax, staff, weekly, training, "for
+// teens"...) AND no person cue at all (a name, my/I/me, needs, for <name>, a time like tonight or
+// again, an attempt, a family word, a client or patient). Otherwise every word is read and it routes.
+const NOTE_SERVICE =
+  /\b(?:suicide|suicidal|self ?harm|self ?injury|self ?injurious|nssi)(?: and (?:suicide|suicidal|self ?harm|self ?injury))?(?: (?:prevention|loss|attempt|awareness|risk|and grief|bereavement))?(?: survivors?)? (?:program|programs|iop|iops|php|php s|clinic|clinics|training|trainings|group|groups|support group|support groups|services|service|team|track|curriculum|workshop|workshops|class|classes|specialists?|coordinator|counselors?)\b/g;
+// An office phrase about who they serve: "refers families after a suicide loss".
+const NOTE_OFFICE_PHRASE = /\b(?:after|following) (?:a |the )?suicide loss(?:es)?\b/g;
+const NOTE_OFFICE_FACT =
+  /\b(?:runs?|running|offers?|offering|meets?|meeting|has an?|have an?|waitlist|wait list|takes?|refer\w*|fax|staff|weekly|monthly|quarterly|free|training|trainings|for (?:teens|adults|families|staff|nurses|schools|kids|parents|caregivers|veterans|students|clinicians))\b/;
+const NOTE_PERSON =
+  /\b(?:client|clients|patient|patients|kid|kids|son|daughter|someone|somebody|man|woman|boy|girl|teen|caller|referral)\b|\b(?:she|he|they|her|him|them)( s)? (?:is|was|are|were|went|got|has been|have been|is being|been)\b/;
+// Person cues, read on the note as typed (lower-cased words).
+const NOTE_PERSON_WORDS =
+  /\b(?:my \w+|i|i m|im|me|needs?|tonight|today|asap|now|right now|again|yesterday|last night|tried|sister|brother|husband|wife|mom|mother|dad|father|nephew|niece|friend|neighbou?r|veteran|student|his|hers)\b|\battempt(?!(?: survivors?)? (?:program|programs|group|groups|support group|support groups|team|services?|iop|php|clinic|track)\b)\w*/;
+// Words that can be capitalized mid-sentence without being a person.
+const NOTE_PLAIN_CAPS = new Set(
+  "Monday Mondays Tuesday Tuesdays Wednesday Wednesdays Thursday Thursdays Friday Fridays Saturday Saturdays Sunday Sundays January February March April May June July August September October November December Medicaid Medicare Aetna Cigna BlueCross Blue Cross Shield Hospice Center Centre Hospital Clinic Health Healthcare Institute House Program Group Services Network Practice Care Society Foundation Alliance Counseling Wellness University College School Church".split(" "),
+);
+const NOTE_ORG = /\b(?:[A-Z][\w'’&.-]*\s+){1,5}(?:Center|Centre|Hospital|Clinic|Health|Healthcare|Institute|House|Program|Group|Associates|Partners|Services|Network|Practice|Care|Hospice|Society|Foundation|Alliance|Counseling|Wellness|University|College|Church|School)\b/g;
+// Read in every note, whatever else it says.
+const NOTE_ALWAYS = /\b(?:cutting again|tried again|(?:has|had|have) (?:\w+ )?(?:pills|meds|medication) saved|saved (?:up )?(?:pills|meds))\b/;
+
+/** A capitalized word that isn't the first of its sentence, a day, a month, a payer, an org word or an acronym: someone's name. */
+function namedInNote(text: string): boolean {
+  for (const sentence of text.replace(NOTE_ORG, " org ").split(/[.;:!?\n]+/)) {
+    const words = sentence.trim().split(/\s+/).filter(Boolean);
+    for (const w of words.slice(1)) {
+      const bare = w.replace(/[^A-Za-z'’-]/g, "").replace(/['’]s$/, "");
+      if (!/^[A-Z][a-z]/.test(bare) || NOTE_PLAIN_CAPS.has(bare)) continue;
+      return true;
+    }
+  }
+  return false;
+}
+
+/** The note is plainly about the office's own service: an office-fact word and no person cue. */
+function officeFactNote(text: string): boolean {
+  const plain = text.toLowerCase().replace(/[’']/g, " ").replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ");
+  if (!NOTE_OFFICE_FACT.test(plain)) return false;
+  if (NOTE_PERSON.test(plain) || NOTE_PERSON_WORDS.test(plain) || /\bfor [A-Z][a-z]+/.test(text) || namedInNote(text)) return false;
+  return true;
+}
+
+function crisisIn(text: string, note: boolean): CrisisResult {
+  const exempt = note && officeFactNote(text);
   for (const spaced of normalize(text)) {
-    const result = checkOne(spaced);
+    if (note && NOTE_ALWAYS.test(spaced)) return { crisis: true, category: "self_harm" };
+    const read = exempt ? spaced.replace(NOTE_OFFICE_PHRASE, " ").replace(NOTE_SERVICE, " a program ") : spaced;
+    const result = checkOne(read);
     if (result.crisis) return result;
   }
   return { crisis: false };
+}
+
+export function checkCrisis(text: string): CrisisResult {
+  return crisisIn(text, false);
+}
+
+/** The crisis check for a note on a referral card (lib/referrals/contacts.ts checkNote): the office's own services are facts. */
+export function checkNoteCrisis(text: string): CrisisResult {
+  return crisisIn(text, true);
 }
 
 /**
@@ -404,7 +462,9 @@ export function checkCrisis(text: string): CrisisResult {
  * approvals). Never includes the words that triggered it. Front Desk has its own
  * caller-facing version (lib/frontdesk/crisis.ts) and shares the alert phone.
  */
-export async function alertCrisis(input: { source: "chat" | "upload" | "media"; category: CrisisCategory; by: string }): Promise<{ alerted: boolean }> {
+export type CrisisSource = "chat" | "upload" | "media" | "referral_note";
+
+export async function alertCrisis(input: { source: CrisisSource; category: CrisisCategory; by: string }): Promise<{ alerted: boolean }> {
   const { audit } = await import("./audit");
   const { alertPhone } = await import("./frontdesk/crisis");
   const { sendText } = await import("./frontdesk/store");
@@ -421,7 +481,13 @@ export async function alertCrisis(input: { source: "chat" | "upload" | "media"; 
     return { alerted: false };
   }
   const what =
-    input.source === "chat" ? "A message in your chat with Aeon" : input.source === "upload" ? "A file added in your chat with Aeon" : "Something typed on the Media page";
+    input.source === "chat"
+      ? "A message in your chat with Aeon"
+      : input.source === "upload"
+        ? "A file added in your chat with Aeon"
+        : input.source === "referral_note"
+          ? "A note typed on your Referrals board"
+          : "Something typed on the Media page";
   try {
     await sendText({
       to,
