@@ -176,10 +176,13 @@ export function honestReply(text: string, attempts: Attempt[]): string {
   return out;
 }
 
-function approvalIdsOf(result: ToolResult): string[] {
+/** The approvals a tool queued: `approval_id`, `approval_ids[]` ("letters for my top 3") or an id in its text. */
+export function approvalIdsOf(result: ToolResult): string[] {
   const ids = new Set<string>();
   const structured = result.structuredContent?.approval_id;
   if (typeof structured === "string") ids.add(structured);
+  const many = result.structuredContent?.approval_ids;
+  if (Array.isArray(many)) for (const id of many) if (typeof id === "string" && /^[0-9a-f-]{36}$/i.test(id)) ids.add(id);
   for (const block of result.content) {
     for (const m of block.text.matchAll(/"?approval_id"?:\s*"?([0-9a-f-]{36})/g)) ids.add(m[1]);
   }

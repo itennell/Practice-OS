@@ -10,6 +10,8 @@ import { guard, REFUSAL } from "../aeon/guard";
 import { audit } from "../audit";
 import { practiceToday } from "../compliance/store";
 import { db } from "../db";
+import { checkCrisis, CRISIS_REPLY } from "../safety";
+import { valueOffered } from "./value-check";
 import { CONTACT_KINDS, type ContactKind } from "./contact-kinds";
 import { keyMatches, orgKeyOf, type OrgKey, type Suppressed } from "./dnc-key";
 import type { Stage } from "./stages";
@@ -58,8 +60,22 @@ export function isDay(v: string): boolean {
 
 const notADay = (v: string, what: string) => new Error(`"${v.slice(0, 40)}" isn't a date I can read. Pick a real day for ${what}, written like 2026-11-09.`);
 
-/** A plain-words error for her, or null when the note may be saved. */
+/** Said when a note mentions danger or self-harm: never saved, and the 988 line. */
+export const CRISIS_NOTE = `I didn't save that note because it mentions danger or self-harm. ${CRISIS_REPLY}`;
+
+/**
+ * A plain-words error for her, or null when the note may be saved. Plain code first: the crisis
+ * check (lib/safety.ts) and the referral-value check (nothing of value for referrals), then the
+ * privacy check.
+ */
 export async function checkNote(note: string, check = (t: string) => guard(t, "message")): Promise<string | null> {
+  const crisis = checkCrisis(note);
+  if (crisis.crisis) {
+    await audit({ actor: "safety", action: "crisis_note_refused", subjectType: "referral_note", details: { category: crisis.category } }).catch(() => undefined);
+    return CRISIS_NOTE;
+  }
+  const value = valueOffered(note);
+  if (value) return `I didn't save that note because it mentions ${value} tied to referrals. Nothing of value can be offered or taken for a referral.`;
   const r = await check(note);
   return r.ok ? null : REFUSAL[r.kind];
 }
@@ -76,7 +92,7 @@ export async function logContact(
   input: LogInput,
   sql: postgres.Sql = db(),
   check?: (t: string) => ReturnType<typeof guard>,
-): Promise<{ contact: Contact; stage: Stage; nextFollowUpOn: string | null }> {
+): Promise<{ contact: Contact; stage: Stage; nextFollowUpOn: string | null; already?: boolean }> {
   if (!CONTACT_KINDS.includes(input.kind)) throw new Error("Unknown kind of contact.");
   const today = await practiceToday(sql);
   const happenedOn = input.happenedOn ?? today;
@@ -113,7 +129,25 @@ export async function logContact(
   else if (OUTREACH.includes(input.kind)) next = addDays(happenedOn, FOLLOW_UP_DAYS);
   else if (input.kind === "replied" || input.kind === "met") next = null;
 
-  const contact = await sql.begin(async (tx) => {
+  const logged = await sql.begin(async (tx) => {
+    if (input.kind === "sent_letter") {
+      // "I sent it" once per letter: a second press (or a double tap) returns the row already logged.
+      // Per approved letter when there is one, otherwise per day. The lock makes two presses at once wait in line.
+      await tx`select pg_advisory_xact_lock(hashtext(${`sent_letter:${sourceId}`}))`;
+      const [dup] = await tx<Contact[]>`
+        select c.id, c.source_id, c.kind, c.happened_on::text as happened_on, c.note, c.created_by, c.is_sample, c.people_count
+          from practice_os.referral_contacts c
+         cross join (select max(a.decided_at) as decided_at from practice_os.approvals a
+                      where a.kind = 'referral_letter' and a.status = 'done' and a.payload ->> 'referral_source_id' = ${sourceId}::text) l
+         where c.source_id = ${sourceId} and c.kind = 'sent_letter'
+           and case when l.decided_at is not null then c.created_at >= l.decided_at else c.happened_on = ${happenedOn}::date end
+         order by c.created_at desc limit 1`;
+      if (dup) {
+        const [now] = await tx<{ stage: Stage; next_follow_up_on: string | null }[]>`
+          select stage, next_follow_up_on::text as next_follow_up_on from practice_os.referral_sources where id = ${sourceId}`;
+        return { row: dup, already: true, card: now ?? card };
+      }
+    }
     const [row] = await tx<Contact[]>`
       insert into practice_os.referral_contacts (source_id, kind, happened_on, note, created_by, people_count)
       values (${sourceId}, ${input.kind}, ${happenedOn}, ${note}, ${input.by}, ${count})
@@ -125,8 +159,10 @@ export async function logContact(
                then greatest(coalesce(last_contacted_at, ${happenedOn}::timestamptz), ${happenedOn}::timestamptz) else last_contacted_at end,
              updated_at = now()
        where id = ${sourceId}`;
-    return row;
+    return { row, already: false, card };
   });
+  if (logged.already) return { contact: logged.row, stage: logged.card.stage, nextFollowUpOn: logged.card.next_follow_up_on, already: true };
+  const contact = logged.row;
   // The audit keeps the kind and date, never the note's words.
   await audit(
     { actor: input.by, action: "referral_contact_logged", subjectType: "referral_source", subjectId: sourceId, details: { kind: input.kind, on: happenedOn, stage, next, ...(count ? { count } : {}) } },

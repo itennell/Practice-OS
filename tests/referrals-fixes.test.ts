@@ -150,7 +150,8 @@ describe("letters", () => {
       phone: "312-555-0142",
       email: "dana@example.com",
     });
-    expect(out.startsWith("Dear Kathleen Sheehan, NP,")).toBe(true);
+    // Not a doctor: the full name without credentials (2026-11-03: never "Dear Kathleen Sheehan, NP,").
+    expect(out.startsWith("Dear Kathleen Sheehan,")).toBe(true);
     expect(out).toContain("312-555-0142");
     expect(out.endsWith("dana@example.com")).toBe(true);
     // Already there: not added twice.
@@ -268,9 +269,9 @@ async function makeCard(name: string, taxonomy = "207V00000X") {
 }
 
 const LETTER =
-  "Dear [Sample] Tess Komorowski, MD,\n\nI'm Dana Reyes, a licensed clinical professional counselor in Lincoln Park. I work with new and " +
+  "Dear Dr. Komorowski,\n\nI'm Dana Reyes, a licensed clinical professional counselor in Lincoln Park. I work with new and " +
   "expecting parents. Since your OB/GYN practice is close by, I'd love to introduce myself. Would you be open to a 15-minute call " +
-  "in the next few weeks to talk about how we might work together?\n\nWarmly,\nDana Reyes, LCPC\nReyes Counseling PLLC";
+  "in the next few weeks to talk about how we might work together?\n\nWarmly,\nDana Reyes, LCPC (fictional demo practice)\nReyes Counseling PLLC";
 
 function fakeChat(letters: string[], seen: unknown[] = []) {
   let i = 0;

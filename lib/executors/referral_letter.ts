@@ -1,5 +1,5 @@
 import { audit } from "../audit";
-import { blockedReason, checkLetter } from "../referrals/outreach";
+import { blockedReason, checkLetter, valueOffered } from "../referrals/outreach";
 import { getSource } from "../referrals/store";
 import type { Executor } from "./types";
 
@@ -17,6 +17,8 @@ export const referralLetter: Executor = async (approval, { dryRun }) => {
   }
   const check = checkLetter(letter);
   if (!check.ok) throw new Error(check.reason);
+  const inSubject = valueOffered(subject);
+  if (inSubject) throw new Error(`The subject line mentions ${inSubject}. Referral letters can't offer or discuss anything of value.`);
   const source = await getSource(sourceId);
   if (!source) throw new Error("That referral source is no longer on the board.");
   // Marked do-not-contact or Not a fit after the letter was drafted: it never becomes ready.
