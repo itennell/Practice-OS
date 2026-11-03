@@ -1,6 +1,7 @@
 import { audit } from "../audit";
 import { practiceTimeZone } from "../compliance/store";
-import { createMeeting, MEETING_KINDS, MEETING_LABEL, meetingBlocked, meetingLabel, type MeetingKind } from "../referrals/meetings";
+import { db } from "../db";
+import { createMeeting, MEETING_KINDS, MEETING_LABEL, meetingBlocked, meetingLabel, PAST_TIME, type MeetingKind } from "../referrals/meetings";
 import { getSource } from "../referrals/store";
 import type { Executor } from "./types";
 
@@ -24,6 +25,10 @@ export const referralMeeting: Executor = async (approval, { dryRun }) => {
   // Marked do-not-contact or Not a fit after Aeon planned it: it never goes on the calendar.
   const blocked = await meetingBlocked(source);
   if (blocked) throw new Error(blocked);
+  // Approved after the proposed time went by: never saved in the past. createMeeting also re-checks
+  // the place and note and, under the booking lock, refuses a clash with a meeting planned since.
+  const [had] = await db()<{ id: string }[]>`select id from practice_os.referral_meetings where approval_id = ${approval.id}`;
+  if (!had && new Date(p.starts_at).getTime() <= Date.now()) throw new Error(PAST_TIME);
 
   const { meeting, already } = await createMeeting({
     sourceId,

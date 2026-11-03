@@ -1,5 +1,6 @@
 import { canChange } from "@/lib/referrals/http";
-import { createMeeting, listMeetings, MEETING_KINDS, MeetingError, toInstant, type MeetingKind } from "@/lib/referrals/meetings";
+import { createMeeting, listMeetings, MEETING_KINDS, meetingBlocked, MeetingError, toInstant, type MeetingKind } from "@/lib/referrals/meetings";
+import { getSource } from "@/lib/referrals/store";
 import { isUuid } from "../../approvals/responses";
 
 // The Referrals calendar. GET ?from&to (ISO instants): the meetings in that range.
@@ -22,6 +23,11 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
   if (typeof body.source_id !== "string" || !isUuid(body.source_id)) return Response.json({ error: "Pick who the meeting is with." }, { status: 400 });
   if (!MEETING_KINDS.includes(body.kind as MeetingKind)) return Response.json({ error: "Pick coffee, call, meeting, lunch talk or other." }, { status: 400 });
+  const source = await getSource(body.source_id);
+  if (!source) return Response.json({ error: "That referral source is no longer on the board." }, { status: 404 });
+  // Do-not-contact and Not a fit: no meeting is planned with them.
+  const blocked = await meetingBlocked(source);
+  if (blocked) return Response.json({ error: blocked }, { status: 409 });
   try {
     const { meeting } = await createMeeting({
       sourceId: body.source_id,

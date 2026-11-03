@@ -219,7 +219,7 @@ describe.skipIf(!local)("db:reset and the crisis item (built-in database only)",
     const rows = await db()<{ kind: string; status: string; is_sample: boolean; name: string; local_day: string; local_start: string; dow: number; days_out: number }[]>`
       select m.kind, m.status, m.is_sample, s.name,
              to_char(m.starts_at at time zone z.tz, 'YYYY-MM-DD') as local_day, to_char(m.starts_at at time zone z.tz, 'HH24:MI') as local_start,
-             extract(isodow from m.starts_at at time zone z.tz)::int as dow, ((m.starts_at at time zone z.tz)::date - current_date) as days_out
+             extract(isodow from m.starts_at at time zone z.tz)::int as dow, ((m.starts_at at time zone z.tz)::date - (now() at time zone z.tz)::date) as days_out
         from practice_os.referral_meetings m join practice_os.referral_sources s on s.id = m.source_id,
              (select coalesce((select timezone from practice_os.settings limit 1), 'America/Chicago') as tz) z
        order by m.starts_at`;

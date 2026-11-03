@@ -30,7 +30,7 @@ const { suppress } = await import("../lib/referrals/contacts");
 const listRoute = await import("../app/api/referrals/meetings/route");
 const oneRoute = await import("../app/api/referrals/meetings/[id]/route");
 
-const { createMeeting, listMeetings, updateMeeting, cancelMeeting, findOpenSlots, daysRange, getMeeting, meetingLabel } = meetings;
+const { createMeeting, listMeetings, updateMeeting, cancelMeeting, findOpenSlots, daysRange, getMeeting, meetingLabel, PAST_TIME } = meetings;
 
 const CHI = "America/Chicago";
 const made: string[] = [];
@@ -252,5 +252,104 @@ describe.skipIf(!local)("referral meetings (built-in database only)", () => {
     const del = await oneRoute.DELETE(json({}, "DELETE", url), params(meeting.id));
     expect((await del.json()).meeting.status).toBe("canceled");
     expect((await oneRoute.DELETE(json({}, "DELETE", url), params("00000000-0000-4000-8000-00000000dead"))).status).toBe(404);
+  });
+
+  it("refuses a time that has passed (a fixed now), in createMeeting, updateMeeting and the executor", async () => {
+    const card = await makeCard("[Sample] Meetingtest Past Clinic");
+    const now = new Date("2030-04-10T17:00:00Z");
+    await expect(createMeeting({ sourceId: card, kind: "call", startsAt: "2030-04-10T16:00:00Z", by: "clinician" }, undefined, undefined, now)).rejects.toThrow(PAST_TIME);
+    await expect(createMeeting({ sourceId: card, kind: "call", startsAt: "2030-04-10T17:00:00Z", by: "clinician" }, undefined, undefined, now)).rejects.toThrow(PAST_TIME);
+    await expect(createMeeting({ sourceId: card, kind: "call", startsAt: "2020-01-06T15:00:00Z", by: "clinician" })).rejects.toThrow(PAST_TIME);
+    const { meeting } = await createMeeting({ sourceId: card, kind: "call", startsAt: "2030-04-10T18:00:00Z", by: "clinician" }, undefined, undefined, now);
+    await expect(updateMeeting(meeting.id, { startsAt: "2030-04-10T16:30:00Z", by: "clinician" }, undefined, undefined, now)).rejects.toThrow(PAST_TIME);
+    // Marking a meeting done after it happened is fine.
+    expect((await updateMeeting(meeting.id, { status: "done", by: "clinician" }, undefined, undefined, new Date("2030-04-11T00:00:00Z"))).status).toBe("done");
+    // findOpenSlots never offers a time before now.
+    const { slots } = await findOpenSlots(daysRange("2030-04-08", "2030-04-12", CHI), 30, undefined, { limit: 200, now });
+    expect(slots.every((s) => s.start > now)).toBe(true);
+    expect(meetingLabel(slots[0].start, CHI)).toBe("Wed Apr 10, 12:30 pm"); // 12:00 pm CDT is now
+
+    // Approved after the proposed time went by: the executor refuses and saves nothing.
+    const r = JSON.parse((await runTool("plan_referral_meeting", { partner: card, kind: "call", from: "2030-04-15", to: "2030-04-19" }, { by: "chat:vitest" })).content[0].text);
+    approvals.push(r.approval_id);
+    await db()`update practice_os.approvals set payload = payload || ${db().json({ starts_at: "2020-01-06T15:00:00.000Z", ends_at: "2020-01-06T15:20:00.000Z" } as never)} where id = ${r.approval_id}`;
+    const res = await approve(r.approval_id, { by: "clinician" });
+    expect(res.ok && res.approval.status).toBe("failed");
+    expect(res.ok && res.approval.error).toBe(PAST_TIME);
+    expect((await db()`select id from practice_os.referral_meetings where approval_id = ${r.approval_id}`).length).toBe(0);
+  });
+
+  it("refuses an overlap in createMeeting, updateMeeting and the executor", async () => {
+    const card = await makeCard("[Sample] Meetingtest Clash Clinic");
+    const { meeting: a } = await createMeeting({ sourceId: card, kind: "meeting", startsAt: "2030-04-22T15:00:00Z", by: "clinician" }); // 10 to 11 CDT
+    await expect(createMeeting({ sourceId: card, kind: "call", startsAt: "2030-04-22T15:30:00Z", by: "clinician" })).rejects.toThrow(/already planned/);
+    const { meeting: b } = await createMeeting({ sourceId: card, kind: "call", startsAt: "2030-04-22T16:00:00Z", by: "clinician" }); // back to back is fine
+    await expect(updateMeeting(b.id, { startsAt: "2030-04-22T15:45:00Z", by: "clinician" })).rejects.toThrow(/already planned/);
+    // Canceled, its time is free; restoring it onto a taken time is refused.
+    await cancelMeeting(a.id, "clinician");
+    await createMeeting({ sourceId: card, kind: "coffee", startsAt: "2030-04-22T15:00:00Z", by: "clinician" });
+    await expect(updateMeeting(a.id, { status: "planned", by: "clinician" })).rejects.toThrow(/already planned/);
+    // Two saves at once for the same time: the booking lock lets exactly one through.
+    const both = await Promise.allSettled([
+      createMeeting({ sourceId: card, kind: "call", startsAt: "2030-04-23T15:00:00Z", by: "clinician" }),
+      createMeeting({ sourceId: card, kind: "call", startsAt: "2030-04-23T15:05:00Z", by: "clinician" }),
+    ]);
+    expect(both.filter((x) => x.status === "fulfilled")).toHaveLength(1);
+
+    // Queued, then she books that time herself: approving fails and nothing doubles up.
+    const r = JSON.parse((await runTool("plan_referral_meeting", { partner: card, kind: "call", from: "2030-04-24", to: "2030-04-24" }, { by: "chat:vitest" })).content[0].text);
+    approvals.push(r.approval_id);
+    const [p] = await db()<{ starts_at: string }[]>`select payload ->> 'starts_at' as starts_at from practice_os.approvals where id = ${r.approval_id}`;
+    await createMeeting({ sourceId: card, kind: "coffee", startsAt: p.starts_at, by: "clinician" });
+    const res = await approve(r.approval_id, { by: "clinician" });
+    expect(res.ok && res.approval.status).toBe("failed");
+    expect(res.ok && res.approval.error).toMatch(/already planned/);
+  });
+
+  it("screens the place like the note: on save, in the tool, and when listed", async () => {
+    const card = await makeCard("[Sample] Meetingtest Place Clinic");
+    await expect(createMeeting({ sourceId: card, kind: "coffee", startsAt: "2030-04-29T15:00:00Z", location: `${CLIENT}'s house`, by: "clinician" })).rejects.toThrow(/person's name/);
+    const { meeting } = await createMeeting({ sourceId: card, kind: "coffee", startsAt: "2030-04-29T15:00:00Z", location: "[Sample] Cafe", by: "clinician" });
+    await expect(updateMeeting(meeting.id, { location: `Near ${CLIENT}`, by: "clinician" })).rejects.toThrow(/person's name/);
+    const tool = JSON.parse((await runTool("plan_referral_meeting", { partner: card, kind: "call", from: "2030-04-29", to: "2030-04-30", location: `${CLIENT} home` }, { by: "chat:vitest" })).content[0].text);
+    expect(tool.queued).toBe(false);
+    expect(tool.why).toMatch(/person's name/);
+    // A place saved some other way is held back when listed.
+    await db()`update practice_os.referral_meetings set location = ${`${CLIENT} home`} where id = ${meeting.id}`;
+    const listed = JSON.parse((await runTool("list_referral_meetings", { from: "2030-04-29", to: "2030-04-29", partner: card }, { by: "chat:vitest" })).content[0].text);
+    expect(listed.meetings[0].location).toBeNull();
+  });
+
+  it("POST and PATCH refuse a planned meeting with a do-not-contact or Not a fit card", async () => {
+    const card = await makeCard("[Sample] Meetingtest Blocked Clinic");
+    const { meeting } = await createMeeting({ sourceId: card, kind: "call", startsAt: "2030-05-06T15:00:00Z", by: "clinician" });
+    await db()`update practice_os.referral_sources set stage = 'not_a_fit' where id = ${card}`;
+    const posted = await listRoute.POST(json({ source_id: card, kind: "call", starts_at: "2030-05-07T15:00:00Z" }));
+    expect(posted.status).toBe(409);
+    expect((await posted.json()).error).toMatch(/Not a fit/);
+    const url = `http://localhost:3000/api/referrals/meetings/${meeting.id}`;
+    expect((await oneRoute.PATCH(json({ starts_at: "2030-05-06T16:00:00Z" }, "PATCH", url), params(meeting.id))).status).toBe(409);
+    // Canceling or marking done still works.
+    expect((await (await oneRoute.PATCH(json({ status: "canceled" }, "PATCH", url), params(meeting.id))).json()).meeting.status).toBe("canceled");
+    await db()`update practice_os.referral_sources set stage = 'connected' where id = ${card}`;
+    await suppress(card, "asked_not_to");
+    const dnc = await listRoute.POST(json({ source_id: card, kind: "call", starts_at: "2030-05-07T15:00:00Z" }));
+    expect(dnc.status).toBe(409);
+    expect((await dnc.json()).error).toMatch(/do-not-contact/);
+  });
+
+  it("workHours reads saved start and end hours, falls back to 9 to 5, and doesn't hide a database error", async () => {
+    const set = (oh: Record<string, unknown>) => db()`update practice_os.clinician_profile set office_hours = ${db().json({ weekdays: [1, 2, 3, 4, 5], closed_on: [], close_federal_holidays: true, ...oh } as never)}`;
+    try {
+      await set({ start_hour: "10:00", end_hour: 15 });
+      expect(await meetings.workHours()).toMatchObject({ startHour: 10, endHour: 15 });
+      await set({ start_hour: 16, end_hour: 9 });
+      expect(await meetings.workHours()).toMatchObject({ startHour: 9, endHour: 17 });
+    } finally {
+      await set({});
+    }
+    expect(await meetings.workHours()).toMatchObject({ weekdays: [1, 2, 3, 4, 5], startHour: 9, endHour: 17 });
+    const broken = (() => Promise.reject(new Error("database is down"))) as never;
+    await expect(meetings.workHours(broken)).rejects.toThrow(/database is down/);
   });
 });

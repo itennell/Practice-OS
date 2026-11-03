@@ -107,10 +107,25 @@ function checkTimes(starts: Date, ends: Date) {
   if (ends.getTime() - starts.getTime() > MAX_MINUTES * 60_000) throw new MeetingError("Keep a meeting to 8 hours or less.");
 }
 
+/** The place and the note are her free text: both go through the crisis, referral-value and privacy checks. */
 async function screenNotes(notes: string | null, check?: Check, by?: string): Promise<void> {
   if (!notes) return;
   const refused = await checkNote(notes, check, { by });
   if (refused) throw new MeetingError(refused);
+}
+
+export const PAST_TIME = "That time has passed. Ask Aeon for a new one.";
+
+/** One lock for every write that books time, so two saves can't take the same slot at once. */
+const BOOKING_LOCK = "practice_os.referral_meetings:booking";
+
+/** Throws when a planned meeting (other than `except`) overlaps the time. Run inside the booking lock. */
+async function refuseClash(tx: postgres.TransactionSql, starts: Date, ends: Date, except: string | null): Promise<void> {
+  const [clash] = await tx<{ id: string }[]>`
+    select id from practice_os.referral_meetings
+     where status = 'planned' and starts_at < ${ends} and ends_at > ${starts} and (${except}::uuid is null or id <> ${except}::uuid)
+     limit 1`;
+  if (clash) throw new MeetingError("Something is already planned at that time. Pick another time.");
 }
 
 /** Why Aeon may not plan a meeting with this card (do-not-contact, Not a fit), or null. */
@@ -151,31 +166,40 @@ export type CreateInput = {
 };
 
 /** Saves one planned meeting. Throws MeetingError in plain words. A second call for the same approval returns the first row. */
-export async function createMeeting(input: CreateInput, sql: postgres.Sql = db(), check?: Check): Promise<{ meeting: Meeting; already: boolean }> {
+export async function createMeeting(input: CreateInput, sql: postgres.Sql = db(), check?: Check, now?: Date): Promise<{ meeting: Meeting; already: boolean }> {
   if (!MEETING_KINDS.includes(input.kind)) throw new MeetingError("Pick coffee, call, meeting, lunch talk or other.");
   const starts = toInstant(input.startsAt, "when it starts");
   const ends = input.endsAt ? toInstant(input.endsAt, "when it ends") : new Date(starts.getTime() + DEFAULT_MINUTES[input.kind] * 60_000);
   checkTimes(starts, ends);
   const location = cleanText(input.location, 200, "The place");
   const notes = cleanText(input.notes, 500, "The note");
-  await screenNotes(notes, check, input.by);
-  const [card] = await sql<{ id: string }[]>`select id from practice_os.referral_sources where id = ${input.sourceId}`;
-  if (!card) throw new MeetingError("That referral source is no longer on the board.");
-
   const approvalId = input.approvalId ?? null;
+  // A retried approval returns the meeting it already made, before any other check.
   if (approvalId) {
     const [had] = await sql<{ id: string }[]>`select id from practice_os.referral_meetings where approval_id = ${approvalId}`;
     if (had) return { meeting: (await getMeeting(had.id, sql))!, already: true };
   }
-  const [row] = await sql<{ id: string }[]>`
-    insert into practice_os.referral_meetings (source_id, kind, starts_at, ends_at, location, notes, approval_id, created_by)
-    values (${input.sourceId}, ${input.kind}, ${starts}, ${ends}, ${location}, ${notes}, ${approvalId}, ${input.by})
-    on conflict (approval_id) do nothing
-    returning id`;
-  if (!row) {
-    const [had] = await sql<{ id: string }[]>`select id from practice_os.referral_meetings where approval_id = ${approvalId}`;
-    return { meeting: (await getMeeting(had.id, sql))!, already: true };
-  }
+  if (starts.getTime() <= (now ?? new Date()).getTime()) throw new MeetingError(PAST_TIME);
+  await screenNotes(location, check, input.by);
+  await screenNotes(notes, check, input.by);
+  const [card] = await sql<{ id: string }[]>`select id from practice_os.referral_sources where id = ${input.sourceId}`;
+  if (!card) throw new MeetingError("That referral source is no longer on the board.");
+
+  const saved = (await sql.begin(async (tx) => {
+    await tx`select pg_advisory_xact_lock(hashtext(${BOOKING_LOCK}))`;
+    if (approvalId) {
+      const [had] = await tx<{ id: string }[]>`select id from practice_os.referral_meetings where approval_id = ${approvalId}`;
+      if (had) return { id: had.id, already: true };
+    }
+    await refuseClash(tx, starts, ends, null);
+    const [inserted] = await tx<{ id: string }[]>`
+      insert into practice_os.referral_meetings (source_id, kind, starts_at, ends_at, location, notes, approval_id, created_by)
+      values (${input.sourceId}, ${input.kind}, ${starts}, ${ends}, ${location}, ${notes}, ${approvalId}, ${input.by})
+      returning id`;
+    return { id: inserted.id, already: false };
+  })) as { id: string; already: boolean };
+  if (saved.already) return { meeting: (await getMeeting(saved.id, sql))!, already: true };
+  const row = { id: saved.id };
   // The audit keeps the kind and time, never the note's words.
   await audit(
     { actor: input.by, action: "referral_meeting_planned", approvalId, subjectType: "referral_source", subjectId: input.sourceId, details: { meeting_id: row.id, kind: input.kind, starts_at: starts.toISOString(), ends_at: ends.toISOString() } },
@@ -195,7 +219,7 @@ export type UpdateInput = {
 };
 
 /** Changes a meeting. Only what is given changes. Null clears the place or the note. */
-export async function updateMeeting(id: string, input: UpdateInput, sql: postgres.Sql = db(), check?: Check): Promise<Meeting> {
+export async function updateMeeting(id: string, input: UpdateInput, sql: postgres.Sql = db(), check?: Check, now?: Date): Promise<Meeting> {
   const had = await getMeeting(id, sql);
   if (!had) throw new MeetingError("That meeting isn't on your calendar any more.");
   if (input.kind !== undefined && !MEETING_KINDS.includes(input.kind)) throw new MeetingError("Pick coffee, call, meeting, lunch talk or other.");
@@ -210,14 +234,24 @@ export async function updateMeeting(id: string, input: UpdateInput, sql: postgre
         ? new Date(starts.getTime() + (new Date(had.ends_at).getTime() - new Date(had.starts_at).getTime()))
         : new Date(had.ends_at);
   checkTimes(starts, ends);
+  const status = input.status ?? had.status;
+  const moved = input.startsAt !== undefined || input.endsAt !== undefined;
+  // Moving a meeting needs a time still ahead (marking a past one done or canceled is fine).
+  if (moved && status === "planned" && starts.getTime() <= (now ?? new Date()).getTime()) throw new MeetingError(PAST_TIME);
   const location = input.location !== undefined ? cleanText(input.location, 200, "The place") : had.location;
   const notes = input.notes !== undefined ? cleanText(input.notes, 500, "The note") : had.notes;
+  if (input.location !== undefined) await screenNotes(location, check, input.by);
   if (input.notes !== undefined) await screenNotes(notes, check, input.by);
-  const status = input.status ?? had.status;
-  await sql`
-    update practice_os.referral_meetings
-       set kind = ${kind}, starts_at = ${starts}, ends_at = ${ends}, location = ${location}, notes = ${notes}, status = ${status}, updated_at = now()
-     where id = ${id}`;
+  // A planned meeting that moved, or came back from canceled or done, must not overlap another.
+  const recheck = status === "planned" && (moved || had.status !== "planned");
+  await sql.begin(async (tx) => {
+    await tx`select pg_advisory_xact_lock(hashtext(${BOOKING_LOCK}))`;
+    if (recheck) await refuseClash(tx, starts, ends, id);
+    await tx`
+      update practice_os.referral_meetings
+         set kind = ${kind}, starts_at = ${starts}, ends_at = ${ends}, location = ${location}, notes = ${notes}, status = ${status}, updated_at = now()
+       where id = ${id}`;
+  });
   const changed = (["kind", "startsAt", "endsAt", "location", "notes", "status"] as const).filter((k) => input[k] !== undefined);
   await audit(
     { actor: input.by, action: status === "canceled" && had.status !== "canceled" ? "referral_meeting_canceled" : "referral_meeting_updated", subjectType: "referral_source", subjectId: had.source_id, details: { meeting_id: id, changed, status } },
@@ -231,14 +265,30 @@ export function cancelMeeting(id: string, by: Who, sql: postgres.Sql = db()): Pr
   return updateMeeting(id, { status: "canceled", by }, sql);
 }
 
-/** Her open days from clinician_profile.office_hours (9 to 5 on them), else Mon to Fri 9 to 5. */
+/** An hour of the day from office_hours: 9, 9.5 or "09:30". Null when missing or unreadable. */
+export function hourOf(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  const m = typeof v === "string" ? v.trim().match(/^(\d{1,2}):(\d{2})$/) : null;
+  if (!m || Number(m[2]) > 59) return null;
+  return Number(m[1]) + Number(m[2]) / 60;
+}
+
+/**
+ * Her hours from clinician_profile.office_hours: the open days and closed dates, and her start and
+ * end time when saved (start_hour / end_hour, as 9 or "09:00"), else 9 to 5. No profile: Mon to Fri,
+ * 9 to 5. A database error is not hidden: it throws.
+ */
 export async function workHours(sql: postgres.Sql = db()): Promise<WorkHours> {
-  const [row] = await sql<{ office_hours: { weekdays?: unknown; closed_on?: unknown } | null }[]>`
-    select office_hours from practice_os.clinician_profile limit 1`.catch(() => []);
-  const oh = row?.office_hours;
-  const weekdays = Array.isArray(oh?.weekdays) && oh.weekdays.length && oh.weekdays.every((d) => Number.isInteger(d) && (d as number) >= 0 && (d as number) <= 6) ? (oh.weekdays as number[]) : DEFAULT_WORK_HOURS.weekdays;
-  const closedOn = Array.isArray(oh?.closed_on) ? oh.closed_on.filter((d): d is string => typeof d === "string") : [];
-  return { ...DEFAULT_WORK_HOURS, weekdays, closedOn };
+  const [row] = await sql<{ office_hours: Record<string, unknown> | null }[]>`
+    select office_hours from practice_os.clinician_profile limit 1`;
+  const oh = row?.office_hours ?? null;
+  const days = oh?.weekdays;
+  const weekdays = Array.isArray(days) && days.length && days.every((d) => Number.isInteger(d) && (d as number) >= 0 && (d as number) <= 6) ? (days as number[]) : DEFAULT_WORK_HOURS.weekdays;
+  const closedOn = Array.isArray(oh?.closed_on) ? (oh.closed_on as unknown[]).filter((d): d is string => typeof d === "string") : [];
+  const start = hourOf(oh?.start_hour);
+  const end = hourOf(oh?.end_hour);
+  const ok = start !== null && end !== null && start >= 0 && end <= 24 && start < end;
+  return { weekdays, closedOn, startHour: ok ? start : DEFAULT_WORK_HOURS.startHour, endHour: ok ? end : DEFAULT_WORK_HOURS.endHour };
 }
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -248,7 +298,16 @@ const pad = (n: number) => String(n).padStart(2, "0");
  * that overlap nothing in `busy`. Each day's slots are built from that day's wall-clock date in
  * `timeZone` (zonedTime), never by adding hours to an instant, so a DST change can't shift them.
  */
-export function openSlots(range: Range, durationMin: number, hours: WorkHours, timeZone: string, busy: Array<{ start: Date; end: Date }> = [], limit = 50): Slot[] {
+export function openSlots(
+  range: Range,
+  durationMin: number,
+  hours: WorkHours,
+  timeZone: string,
+  busy: Array<{ start: Date; end: Date }> = [],
+  limit = 50,
+  /** Nothing at or before this instant is offered. */
+  now: Date = new Date(),
+): Slot[] {
   checkRange(range);
   if (!Number.isInteger(durationMin) || durationMin < 5 || durationMin > MAX_MINUTES) throw new MeetingError("Pick a length from 5 minutes to 8 hours.");
   const out: Slot[] = [];
@@ -262,11 +321,11 @@ export function openSlots(range: Range, durationMin: number, hours: WorkHours, t
     const weekday = noonUtc.getUTCDay();
     if (!hours.weekdays.includes(weekday)) continue;
     if (hours.closedOn.includes(`${y}-${pad(mo)}-${pad(d)}`)) continue;
-    for (let m = hours.startHour * 60; m + durationMin <= hours.endHour * 60; m += SLOT_STEP_MINUTES) {
+    for (let m = Math.round(hours.startHour * 60); m + durationMin <= Math.round(hours.endHour * 60); m += SLOT_STEP_MINUTES) {
       const start = zonedTime(y, mo, d, Math.floor(m / 60), m % 60, timeZone);
       const endWall = m + durationMin;
       const end = zonedTime(y, mo, d, Math.floor(endWall / 60), endWall % 60, timeZone);
-      if (start < range.from || end > range.to) continue;
+      if (start < range.from || end > range.to || start.getTime() <= now.getTime()) continue;
       if (busy.some((b) => start < b.end && b.start < end)) continue;
       out.push({ start, end });
       if (out.length >= limit) return out;
@@ -280,11 +339,11 @@ export async function findOpenSlots(
   range: Range,
   durationMin: number,
   sql: postgres.Sql = db(),
-  opts: { limit?: number; alsoBusy?: Array<{ start: Date; end: Date }> } = {},
+  opts: { limit?: number; alsoBusy?: Array<{ start: Date; end: Date }>; now?: Date } = {},
 ): Promise<{ slots: Slot[]; timeZone: string; hours: WorkHours }> {
   checkRange(range);
   const [timeZone, hours, booked] = await Promise.all([practiceTimeZone(sql), workHours(sql), busyBetween(range, sql)]);
-  return { slots: openSlots(range, durationMin, hours, timeZone, [...booked, ...(opts.alsoBusy ?? [])], opts.limit), timeZone, hours };
+  return { slots: openSlots(range, durationMin, hours, timeZone, [...booked, ...(opts.alsoBusy ?? [])], opts.limit, opts.now ?? new Date()), timeZone, hours };
 }
 
 /** Planned meetings that overlap the range, as busy times. */

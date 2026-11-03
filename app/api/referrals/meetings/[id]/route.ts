@@ -1,5 +1,6 @@
 import { canChange } from "@/lib/referrals/http";
-import { cancelMeeting, getMeeting, MEETING_KINDS, MEETING_STATUSES, MeetingError, updateMeeting, type MeetingKind, type MeetingStatus, type UpdateInput } from "@/lib/referrals/meetings";
+import { cancelMeeting, getMeeting, MEETING_KINDS, MEETING_STATUSES, meetingBlocked, MeetingError, updateMeeting, type MeetingKind, type MeetingStatus, type UpdateInput } from "@/lib/referrals/meetings";
+import { getSource } from "@/lib/referrals/store";
 import { isUuid } from "../../../approvals/responses";
 
 // One meeting on her Referrals calendar. PATCH: move it, change its kind, place,
@@ -8,8 +9,16 @@ import { isUuid } from "../../../approvals/responses";
 export async function PATCH(request: Request, ctx: RouteContext<"/api/referrals/meetings/[id]">) {
   if (!canChange(request)) return Response.json({ error: "Not allowed to change this here." }, { status: 403 });
   const { id } = await ctx.params;
-  if (!isUuid(id) || !(await getMeeting(id))) return Response.json({ error: "Unknown meeting." }, { status: 404 });
+  const had = isUuid(id) ? await getMeeting(id) : null;
+  if (!had) return Response.json({ error: "Unknown meeting." }, { status: 404 });
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+  // A meeting that stays (or becomes) planned needs a card she may still meet: not do-not-contact, not Not a fit.
+  // Marking it done or canceled is always allowed.
+  if ((body.status ?? had.status) === "planned") {
+    const source = await getSource(had.source_id);
+    const blocked = source ? await meetingBlocked(source) : "That referral source is no longer on the board.";
+    if (blocked) return Response.json({ error: blocked }, { status: 409 });
+  }
   const input: UpdateInput = { by: "clinician" };
   if ("kind" in body) {
     if (!MEETING_KINDS.includes(body.kind as MeetingKind)) return Response.json({ error: "Pick coffee, call, meeting, lunch talk or other." }, { status: 400 });

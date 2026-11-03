@@ -20,6 +20,7 @@ import {
   meetingBlocked,
   meetingLabel,
   MeetingError,
+  PAST_TIME,
   pendingPlans,
   type MeetingKind,
 } from "../referrals/meetings";
@@ -63,8 +64,8 @@ export const MEETING_TOOLS: AeonTool[] = [
     title: "Plan a meeting with a referral partner",
     description:
       "When she wants to set up a coffee, call, meeting or lunch talk with someone on her Referrals board ('set up coffee with Quillmere next " +
-      "week'): finds the card, picks the first open time in her office hours (her open days, 9 to 5, in her time zone, skipping meetings already " +
-      "planned) or checks the time she named, and puts it in her approvals. Nothing goes on her calendar until she approves, and nothing is sent: " +
+      "week'): finds the card, picks the first open time still ahead in her office hours (her open days, 9 to 5 unless she saved other hours, in her " +
+      "time zone, skipping meetings already planned) or checks the time she named, and puts it in her approvals. Nothing goes on her calendar until she approves, and nothing is sent: " +
       "she tells the partner herself. Pass starts_at only for a time she said (ISO with offset, like 2026-11-05T10:00:00-06:00); otherwise pass " +
       "from/to days if she named them. Tell her the proposed time and the other open times in `also_open`. Notes are about the meeting (where, " +
       "what to bring), never about a client. Name the card as she said it or pass its id; several matches come back as ask_which: list them and ask which.",
@@ -89,11 +90,14 @@ export const MEETING_TOOLS: AeonTool[] = [
       const card = found.card;
       const blocked = await meetingBlocked(card);
       if (blocked) return refuse(blocked);
-      if (input.notes) {
-        const refused = await checkNote(input.notes, undefined, { by: "aeon" });
+      // The place and the note are free text: both pass the crisis, referral-value and privacy checks.
+      for (const said of [input.location, input.notes]) {
+        if (!said) continue;
+        const refused = await checkNote(said, undefined, { by: "aeon" });
         if (refused) return refuse(refused);
       }
       const minutes = input.minutes ?? DEFAULT_MINUTES[input.kind];
+      const now = new Date();
       let look;
       try {
         look = await lookIn(input);
@@ -101,14 +105,14 @@ export const MEETING_TOOLS: AeonTool[] = [
         return refuse(e instanceof Error ? e.message : String(e));
       }
       const pending = await pendingPlans(look.range);
-      const { slots } = await findOpenSlots(look.range, minutes, undefined, { limit: 4, alsoBusy: pending });
+      const { slots } = await findOpenSlots(look.range, minutes, undefined, { limit: 4, alsoBusy: pending, now });
 
       let start: Date;
       let end: Date;
       if (input.starts_at) {
         start = new Date(input.starts_at);
         if (Number.isNaN(start.getTime()) || !/(?:Z|[+-]\d{2}:?\d{2})$/i.test(input.starts_at)) return refuse("I couldn't read that time. Pass it with its offset, like 2026-11-05T10:00:00-06:00.");
-        if (start.getTime() <= Date.now()) return refuse("That time has already passed. Pick a later one.");
+        if (start.getTime() <= now.getTime()) return refuse(PAST_TIME, { also_open: slots.map((s) => meetingLabel(s.start, look.tz)) });
         end = new Date(start.getTime() + minutes * 60_000);
         const near = { from: new Date(start.getTime() - 86_400_000), to: new Date(end.getTime() + 86_400_000) };
         const busy = [...(await busyBetween(near)), ...(await pendingPlans(near))];
@@ -193,8 +197,8 @@ export const MEETING_TOOLS: AeonTool[] = [
           kind: MEETING_LABEL[m.kind],
           when: meetingLabel(m.starts_at, tz),
           minutes: Math.round((new Date(m.ends_at).getTime() - new Date(m.starts_at).getTime()) / 60_000),
-          location: m.location,
-          // Her note, screened again before it reaches the model.
+          // Her place and note, screened again before they reach the model.
+          location: await screenedNote(m.location),
           notes: await screenedNote(m.notes),
           status: m.status,
           is_sample: m.is_sample,
