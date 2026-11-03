@@ -25,7 +25,7 @@ describe("avatar tone", () => {
   });
 
   it("spreads names across the tones", () => {
-    const names = ["Sam Example", "Lakeview Family Medicine", "Jordan Lee", "Priya Patel", "Alex Kim", "Chris Moore", "Taylor Diaz", "Morgan Fox"];
+    const names = ["Sam Example", "Juniper Row Family Medicine", "Jordan Lee", "Priya Patel", "Alex Kim", "Chris Moore", "Taylor Diaz", "Morgan Fox"];
     expect(new Set(names.map(toneFor)).size).toBeGreaterThanOrEqual(3);
   });
 });

@@ -225,7 +225,7 @@ export function MemoryList({ initial }: { initial: MemoryView[] }) {
             type="button"
             aria-pressed={filter === k.id}
             onClick={() => setFilter(k.id)}
-            className={chipClass(filter === k.id)}
+            className={chipClass(filter === k.id, true)}
           >
             {k.label}
           </button>

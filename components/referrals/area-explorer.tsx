@@ -258,6 +258,11 @@ export function AreaExplorer({
     setBoard(initialBoard);
   }
   const started = useRef(false);
+  // The 30-kind picker folds to one line ("6 picked · Change") once kinds are set,
+  // so the map shows on the first screen after Search (wave 4 UI test).
+  const [pickerOpen, setPickerOpen] = useState(initialSpecialties.length === 0);
+  const resultsRef = useRef<HTMLDivElement>(null);
+  const scrollToResults = useRef(false);
 
   const search = useCallback(
     async (what: string) => {
@@ -278,9 +283,11 @@ export function AreaExplorer({
         if (!res.ok) throw new Error(data.error ?? "The search didn't work. Try again.");
         setResult(data);
         setSelected(null);
+        setPickerOpen(false);
         const first = data.providers.filter((p) => p.tier.tier === "first").length;
         setAnnounce(`Found ${data.providers.length} in ${data.label}. ${first} to reach out to first.`);
       } catch (err) {
+        scrollToResults.current = false; // nothing new to scroll to
         const msg = err instanceof Error ? err.message : "The search didn't work. Try again.";
         setError(msg);
         setAnnounce(msg);
@@ -297,6 +304,24 @@ export function AreaExplorer({
     started.current = true;
     void search(defaultArea);
   }, [defaultArea, search]);
+
+  // "Change" opens the picker and puts focus on its first choice (an open group's first kind, else the first group).
+  function openPicker() {
+    setPickerOpen(true);
+    requestAnimationFrame(() => {
+      const box = document.getElementById("who-to-look-for");
+      const first = box?.querySelector<HTMLElement>("details[open] button[aria-pressed]") ?? box?.querySelector<HTMLElement>("summary");
+      first?.focus();
+    });
+  }
+
+  // After a search she ran (not the first one on opening), bring the results and map into view.
+  useEffect(() => {
+    if (!result || !scrollToResults.current) return;
+    scrollToResults.current = false;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    resultsRef.current?.scrollIntoView({ block: "start", behavior: reduce ? "auto" : "smooth" });
+  }, [result]);
 
   // One catalog category at a time on the list and the map, or all.
   const categories = useMemo(() => categoriesIn((result?.providers ?? []).map((p) => p.tier)), [result]);
@@ -364,6 +389,7 @@ export function AreaExplorer({
       <form
         onSubmit={(e) => {
           e.preventDefault();
+          scrollToResults.current = true;
           void search(area);
         }}
         className="flex flex-col gap-4 rounded-[var(--radius-card-sm)] border border-[var(--line)] bg-[var(--glass)] p-4 md:p-5"
@@ -393,6 +419,7 @@ export function AreaExplorer({
               className={FOCUS}
               onClick={() => {
                 setArea("All of Chicagoland");
+                scrollToResults.current = true;
                 void search("All of Chicagoland");
               }}
             >
@@ -420,12 +447,18 @@ export function AreaExplorer({
               <span className="text-small text-[var(--fg-muted)]" aria-live="polite">
                 {picked.length} picked
               </span>
-              <Button type="button" variant="quiet" disabled={picked.length === 0} onClick={() => setPicked([])} className={FOCUS}>
-                Clear
-              </Button>
+              {pickerOpen ? (
+                <Button type="button" variant="quiet" disabled={picked.length === 0} onClick={() => setPicked([])} className={FOCUS}>
+                  Clear
+                </Button>
+              ) : (
+                <Button type="button" variant="quiet" aria-expanded={false} aria-controls="who-to-look-for" onClick={openPicker} className={FOCUS}>
+                  Change
+                </Button>
+              )}
             </div>
           </div>
-          <div className="flex flex-col divide-y divide-[var(--line)] rounded-[var(--radius-card-sm)] border border-[var(--line)]">
+          <div id="who-to-look-for" hidden={!pickerOpen} className="flex flex-col divide-y divide-[var(--line)] rounded-[var(--radius-card-sm)] border border-[var(--line)]">
             {GROUPS.map((g) => {
               const count = g.items.filter((s) => picked.includes(s.id)).length;
               const open = openGroups.has(g.category);
@@ -484,7 +517,7 @@ export function AreaExplorer({
 
       {result && (
         <>
-          <div className="flex flex-col gap-1">
+          <div ref={resultsRef} className="flex scroll-mt-4 flex-col gap-1">
             <p className="font-semibold">
               {result.providers.length} in {result.label}
               <span className="font-normal text-[var(--fg-muted)]">

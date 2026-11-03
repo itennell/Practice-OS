@@ -466,10 +466,24 @@ textarea {
 }
 .referral-map .maplibregl-ctrl-attrib {
   font-size: 12px;
-  color: #1f1e1d;
-  background: rgb(255 255 255 / 0.85);
+  color: var(--fg);
+  background: color-mix(in srgb, var(--toast-bg) 85%, transparent);
 }
 .referral-map .maplibregl-ctrl-attrib a {
-  color: #1f1e1d;
+  color: var(--fg);
   text-decoration: underline;
+}
+/* The zoom buttons and attribution follow the app's colours, so they aren't white on the dark map. */
+.referral-map .maplibregl-ctrl-group {
+  background: var(--toast-bg);
+  box-shadow: 0 0 0 1px var(--line-strong);
+}
+.referral-map .maplibregl-ctrl-group button + button {
+  border-top-color: var(--line);
+}
+@media (prefers-color-scheme: dark) {
+  /* MapLibre draws its +/- glyphs dark; flip them for the dark buttons. */
+  .referral-map .maplibregl-ctrl-group .maplibregl-ctrl-icon {
+    filter: invert(1);
+  }
 }

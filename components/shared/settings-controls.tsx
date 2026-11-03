@@ -77,19 +77,27 @@ export function SettingSwitch({ label, description, checked, onCheckedChange, di
         onCheckedChange={change}
         disabled={disabled}
         aria-describedby={description ? `${id}-d` : undefined}
+        // The button itself is the 44px touch target; the 48x28 track sits inside it.
         className={cn(
-          "relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border-2 border-[var(--fg-muted)] bg-transparent p-0.5 transition-colors duration-150",
-          "data-[checked]:border-[var(--accent-fg)] data-[checked]:bg-[var(--accent-fg)] data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50",
-          "before:absolute before:-inset-2 before:content-['']",
+          "group inline-flex h-11 w-14 shrink-0 cursor-pointer items-center justify-center rounded-full bg-transparent",
+          "data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50",
           FOCUS,
         )}
       >
-        <Switch.Thumb
+        <span
+          aria-hidden
           className={cn(
-            "block size-[18px] rounded-full bg-[var(--fg-muted)] shadow-sm transition-transform duration-150 ease-[var(--ease-soft-out)] motion-reduce:transition-none",
-            "data-[checked]:translate-x-5 data-[checked]:bg-[var(--primary-fg)]",
+            "inline-flex h-7 w-12 items-center rounded-full border-2 border-[var(--fg-muted)] bg-transparent p-0.5 transition-colors duration-150",
+            "group-data-[checked]:border-[var(--accent-fg)] group-data-[checked]:bg-[var(--accent-fg)]",
           )}
-        />
+        >
+          <Switch.Thumb
+            className={cn(
+              "block size-[18px] rounded-full bg-[var(--fg-muted)] shadow-sm transition-transform duration-150 ease-[var(--ease-soft-out)] motion-reduce:transition-none",
+              "data-[checked]:translate-x-5 data-[checked]:bg-[var(--primary-fg)]",
+            )}
+          />
+        </span>
       </Switch.Root>
       {confirmOn && (
         <ConfirmDialog

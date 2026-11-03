@@ -7,7 +7,7 @@ import { SpringCheck } from "../spring-check";
 const STEPS = [
   "[Sample] Log 3 CE hours for the license renewal",
   "[Sample] Re-attest CAQH",
-  "[Sample] Follow up with Lakeview Family Medicine",
+  "[Sample] Follow up with Juniper Row Family Medicine",
   "[Sample] Pay Q4 estimated tax",
 ];
 

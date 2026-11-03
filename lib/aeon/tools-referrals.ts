@@ -131,7 +131,7 @@ export function searchCards(query: string, cards: ReferralSource[]): ReferralSou
     const kind = c.taxonomy ? specialtyForCode(c.taxonomy)?.id : undefined;
     if (kind && kinds.has(kind)) return true;
     if (words.length >= 4 && c.city && squash(c.city) === words) return true;
-    // A part of a name or practice ("Gordon", "Lakeview"), or the specialty's own words.
+    // A part of a name or practice ("Gordon", "Fernhollow"), or the specialty's own words.
     if (words.length >= 4 && [c.name, c.organization, c.specialty].some((v) => v && squash(v).includes(words))) return true;
     return false;
   });
@@ -194,7 +194,7 @@ export const REFERRAL_TOOLS: AeonTool[] = [
     name: "find_referral_cards",
     title: "Find a card on the Referrals board",
     description:
-      "Searches EVERY card on her Referrals board (not just the top ones) by a name or practice ('Dr. Gordon', 'Lakeview Pediatrics'), " +
+      "Searches EVERY card on her Referrals board (not just the top ones) by a name or practice ('Dr. Gordon', 'Fernhollow Pediatrics'), " +
       "a kind of provider ('pediatricians', 'OB-GYN'), a ZIP code or a city, and returns each match's id, column, specialty, address, " +
       "phone, email (hers or the one Aeon found, and where it came from), follow-up date and her latest log entry. Use this whenever she " +
       "asks about a particular provider or a kind of provider on her board, before saying someone isn't there. Call providers by name " +
