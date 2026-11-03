@@ -80,6 +80,26 @@ const PATIENTS: [string, string[]][] = [
   ["You should meet the hospice and palliative care team at Northside Hospital, someone there is terminal.", ["terminal"]],
   ["You should meet the bereavement coordinator, whose son passed away in May.", ["passed away"]],
   ["The hospice social worker said they have a person on a ventilator who wants a therapist.", ["ventilator"]],
+  // Round 2. Health words are allowed only right after a group ("adults in cancer treatment") or inside a vetted job.
+  ["They just went on hospice and want to meet a therapist.", ["went on hospice"]],
+  ["They are actively dying and want to meet a therapist.", ["actively dying"]],
+  ["They relapsed and need a therapist this week.", ["relapsed"]],
+  ["Their team lost a nurse to cancer and wants a grief therapist.", ["lost a nurse"]],
+  ["Their families are grieving a death this week and want a therapist.", ["grieving a death"]],
+  ["The latest referral has metastatic cancer and wants a therapist.", ["metastatic"]],
+  ["The caller has pancreatic cancer and wants a therapist.", ["pancreatic"]],
+  ["Referral number two is dying and needs a therapist.", ["number two"]],
+  ["You should meet the hospice medical director, who is dying.", ["who is dying"]],
+  ["They are recovering from surgery and want to meet a therapist.", ["surgery"]],
+  ["Their newest referral just got out of rehab and needs a therapist.", ["rehab"]],
+  ["The referral they sent last week is on comfort care now and wants to meet.", ["comfort care"]],
+  // One identifiable referral, no health word.
+  ["She wants me to call about the referral for my neighbor.", ["neighbor"]],
+  ["She has a referral for the young adult who just moved here with no insurance.", ["young adult"]],
+  ["She wants to refer her coworker to me.", ["coworker"]],
+  ["They want to send me the one they mentioned on Tuesday.", ["the one they mentioned"]],
+  ["She told me about someone who needs a therapist this week.", ["told me about someone"]],
+  ["She wants to refer the roommate of a patient to me.", ["roommate"]],
 ];
 
 // Professionals she was pointed to, or a role that handles referrals. Each must pass.
@@ -92,6 +112,34 @@ const PROFESSIONALS: [string, string[]][] = [
   ["She introduced me to the grief counselor at Hope House.", ["grief counselor"]],
   ["I should reach out to the bereavement coordinator at Orrindale Hospice about referrals.", ["bereavement coordinator"]],
   ["You should talk to the hospice and palliative care team at Northside Hospital about their referrals.", ["hospice and palliative care team"]],
+  // Round 2: the demo's natural phrasings of the scripted hospice contact (and the staff around it).
+  ["Their intake coordinator, Rosa Diaz, handles the referrals.", ["Rosa Diaz"]],
+  ["Rosa Diaz at the front desk is the one who sends them.", ["Rosa Diaz"]],
+  ["And she said I should meet the hospice social worker at Orrindale Hospice, Marisol Quint.", ["Marisol Quint"]],
+  ["She wants me to meet Marisol Quint, the hospice social worker at Orrindale Hospice, because they get a lot of families asking about grief counseling.", ["Marisol Quint", "grief counseling"]],
+  ["She said I should talk to Marisol Quint, the hospice social worker at Orrindale Hospice.", ["Marisol Quint"]],
+  ["She also said their palliative care team handles referrals by fax.", ["palliative care team"]],
+  ["You should meet Marisol Quint, the hospice social worker at Orrindale Hospice, she told me.", ["Marisol Quint"]],
+  ["She said I should meet Marisol Quint, the hospice social worker at Orrindale Hospice, since they see a lot of patients in cancer treatment and their families.", ["Marisol Quint"]],
+  ["She said I should reach out to Marisol Quint, the hospice social worker at Orrindale Hospice.", ["Marisol Quint"]],
+  ["Rosa Diaz handles referrals, she's their referral coordinator.", ["Rosa Diaz"]],
+  ["Marisol Quint, she's the hospice social worker at Orrindale Hospice, she told me to call her.", ["Marisol Quint"]],
+  ["You should meet Marisol Quint, the hospice social worker at Orrindale Hospice.", ["Marisol Quint"]],
+  ["Their palliative care nurse handles the referrals.", ["palliative care nurse"]],
+];
+
+// Names each demo phrasing must find as a professional (so the card can suggest them).
+const DEMO_PROFESSIONALS: [string, string][] = [
+  ["Their intake coordinator, Rosa Diaz, handles the referrals.", "Rosa Diaz"],
+  ["Rosa Diaz at the front desk is the one who sends them.", "Rosa Diaz"],
+  ["And she said I should meet the hospice social worker at Orrindale Hospice, Marisol Quint.", "Marisol Quint"],
+  ["She wants me to meet Marisol Quint, the hospice social worker at Orrindale Hospice, because they get a lot of families asking about grief counseling.", "Marisol Quint"],
+  ["She said I should talk to Marisol Quint, the hospice social worker at Orrindale Hospice.", "Marisol Quint"],
+  ["You should meet Marisol Quint, the hospice social worker at Orrindale Hospice, she told me.", "Marisol Quint"],
+  ["She said I should meet Marisol Quint, the hospice social worker at Orrindale Hospice, since they see a lot of patients in cancer treatment and their families.", "Marisol Quint"],
+  ["She said I should reach out to Marisol Quint, the hospice social worker at Orrindale Hospice.", "Marisol Quint"],
+  ["Rosa Diaz handles referrals, she's their referral coordinator.", "Rosa Diaz"],
+  ["Marisol Quint, she's the hospice social worker at Orrindale Hospice, she told me to call her.", "Marisol Quint"],
 ];
 
 describe("hospice and oncology words in the privacy pass (real guard and name-finder)", () => {
@@ -115,6 +163,12 @@ describe("hospice and oncology words in the privacy pass (real guard and name-fi
     const c = await cleanTranscript(`${BASE} ${s}`, SRC);
     expect(c.text).toContain(s);
     for (const t of toks) expect(c.text).toContain(t);
+  }, 120_000);
+
+  it.each(DEMO_PROFESSIONALS)("finds the professional in: %s", async (s, name) => {
+    const { cleanTranscript } = await import("../lib/referrals/debrief");
+    const c = await cleanTranscript(`${BASE} ${s}`, SRC);
+    expect(c.professionals).toContain(name);
   }, 120_000);
 
   it("a named hospice professional is found as a professional, so the card can suggest them", async () => {
@@ -162,6 +216,22 @@ describe("hospice professionals in the field checks", () => {
     expect(r.fields.who_else.map((w) => w.name)).toEqual(["Marisol Quint"]);
     expect(r.fields.populations).toEqual(["adults in active treatment", "their families"]);
     expect(r.fields.referral_contact).toBe("Marisol Quint, the hospice social worker");
+  }, 120_000);
+
+  it("keeps their palliative care nurse as the contact and the grief counselor at Hope House", async () => {
+    const { cleanTranscript, checkFields, debriefAllowlist } = await import("../lib/referrals/debrief");
+    const t = `${BASE} Their palliative care nurse handles the referrals. She introduced me to the grief counselor at Hope House.`;
+    const c = await cleanTranscript(t, SRC);
+    const allow = await debriefAllowlist(SRC, c.professionals);
+    const r = await checkFields(
+      { ...empty, referral_contact: "their palliative care nurse", who_else: [{ name: null, role: "grief counselor", organization: "Hope House" }] } as never,
+      c.text,
+      allow,
+      { professionals: c.professionals, sourceId: "x" },
+    );
+    expect(r.rejected).toEqual([]);
+    expect(r.fields.referral_contact).toBe("their palliative care nurse");
+    expect(r.fields.who_else.map((w) => w.role)).toEqual(["grief counselor"]);
   }, 120_000);
 
   const REFUSED: [string, Record<string, unknown>][] = [
@@ -219,10 +289,22 @@ describe("the follow-up letter is read sentence by sentence", () => {
     "I'd be glad to help your patient with metastatic cancer.",
     "I'm glad Marisol Quint is coping with her diagnosis.",
     "I can see someone with a brain bleed soon.",
+    // Round 2.
+    "Please tell Marisol Quint I hope her recovery goes well.",
+    "I can see the one they mentioned this week.",
+    "I hope everyone there is healing and feeling better.",
+    "Please tell them I hope they get well soon.",
+    "I'm sorry your team lost a nurse to cancer.",
+    "I hope the caller with pancreatic cancer finds help.",
   ];
   it.each(BAD)("refuses a letter with: %s", async (line) => {
     const { letterAboutAPerson } = await import("../lib/referrals/debrief");
     expect(letterAboutAPerson(wrap(line), SRC, facts, cleaned)).not.toBeNull();
+  });
+  it("passes a letter that looks forward to meeting the hospice social worker she was told to meet", async () => {
+    const { letterAboutAPerson } = await import("../lib/referrals/debrief");
+    const line = "I look forward to meeting Marisol Quint, the hospice social worker at Orrindale Hospice.";
+    expect(letterAboutAPerson(wrap(line), SRC, facts, cleaned, ["Marisol Quint"])).toBeNull();
   });
   it("passes a plain thank-you built from the debrief", async () => {
     const { letterAboutAPerson } = await import("../lib/referrals/debrief");
@@ -269,8 +351,9 @@ describe("the whole debrief: hospice contact end to end, and the two Muse calls 
     payer_mix: "Mostly Medicare",
   };
   const LETTER =
-    "Dear Amara Okafor, MD,\n\nThank you for meeting me for coffee. It was good to hear that your office sends referrals by fax. As I said, I will " +
-    "send my openings and a flyer next week.\n\nWarmly,\nDana Reyes, LCPC\nReyes Counseling PLLC";
+    "Dear Amara Okafor, MD,\n\nThank you for meeting me for coffee. It was good to hear that your office sends referrals by fax, and that you mostly see " +
+    "adults in active treatment and their families. I look forward to meeting Marisol Quint, the hospice social worker at Orrindale Hospice. " +
+    "As I said, I will send my openings and a flyer next week.\n\nWarmly,\nDana Reyes, LCPC\nReyes Counseling PLLC";
   const cleanup = async () => {
     await sql`delete from practice_os.approvals where payload ->> 'referral_source_id' = ${ID}`;
     await sql`delete from practice_os.memories where source = 'referral_debrief'`;
