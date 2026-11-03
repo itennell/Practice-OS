@@ -5,6 +5,7 @@
 // topic gate, facts lint, critic) and nothing is posted: she approves, downloads
 // and posts it herself.
 import { z } from "zod";
+import { approvalOutcome } from "../approvals";
 import { db } from "../db";
 import { revisePost } from "../instagram/revise";
 import { makeProject, type MakeEvent } from "../studio/store";
@@ -62,6 +63,8 @@ export const MEDIA_TOOLS: AeonTool[] = [
       if (!project) return text({ made: false, why: stop?.type === "stop" ? stop.why : "Aeon couldn't make that. Try again." });
       const research = events.find((e) => e.type === "research");
       const doc = project.doc;
+      // Her mode may have approved it already (Bypass): say ready, never "waiting".
+      const ready = project.approvalId ? (await approvalOutcome(project.approvalId))?.status === "done" : false;
       return text({
         made: true,
         kind: doc.kind,
@@ -71,7 +74,9 @@ export const MEDIA_TOOLS: AeonTool[] = [
         what_therapists_post: research?.type === "research" ? research.summary : undefined,
         approval_id: project.approvalId,
         open: STUDIO_PAGE,
-        next: "It's in the studio, ready to change, and waiting in Approvals. Nothing is posted; she approves it, downloads it and posts it herself.",
+        next: ready
+          ? "It's in the studio, and her approval mode already approved it: it is ready to download, not waiting in Approvals. Nothing is posted; she downloads it and posts it herself."
+          : "It's in the studio, ready to change, and waiting in Approvals. Nothing is posted; she approves it, downloads it and posts it herself.",
       });
     },
   }),

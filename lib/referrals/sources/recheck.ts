@@ -265,7 +265,7 @@ function cut(s: string, max = UNTRUSTED_MAX): string {
  * license status) never reach the model as-is; the few that matter are cut
  * short and fenced under `untrusted`.
  */
-export function recheckSummary(card: { name: string }, ev: Evidence, r: RecheckResult) {
+export function recheckSummary(card: { name: string; website?: string | null }, ev: Evidence, r: RecheckResult) {
   const kinds: string[] = [];
   const npi = ev.fields.npi_status?.value;
   if (npi === "not_found" || npi === "deactivated") kinds.push("npi_registry");
@@ -284,7 +284,12 @@ export function recheckSummary(card: { name: string }, ev: Evidence, r: RecheckR
     email_found: Boolean(email),
     email_from: email ? ORIGIN_LABEL[email.origins[0]] : null,
     email_unconfirmed: Boolean(email?.fact.detail?.unconfirmed),
+    // Only the sources that answered this time: a source that was down is never "checked".
+    checked_sources: [...new Set(r.checked.map((o) => ORIGIN_LABEL[o]))],
     did_not_answer: r.unavailable,
+    ...(r.checked.includes("website") ? {} : { website: ev.fields.website || card.website ? "not read this time" : "no website on file" }),
+    about_sources:
+      "Say only checked_sources were checked. Name each of did_not_answer as down or not answering this time; never say it was checked.",
     notes: r.notes,
     untrusted: {
       note: UNTRUSTED_NOTE,

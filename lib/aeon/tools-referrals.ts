@@ -5,12 +5,15 @@
 // the sensitive-info guard on the result).
 import { z } from "zod";
 import type { chat } from "../meta";
-import { contactsFor, CONTACT_LABEL, NoNpiToList, screenedNote, suppress, suppressionFor, unsuppress } from "../referrals/contacts";
+import { contactsFor, CONTACT_LABEL, isSuppressed, NoNpiToList, screenedNote, suppress, suppressedList, suppressionFor, unsuppress } from "../referrals/contacts";
+import { buildCallScript, SCRIPT_VARIANTS, type ScriptVariant } from "../referrals/call-script";
+import { scriptFacts } from "../referrals/crm";
+import { isSensitiveSource, PUBLIC_LINE_ONLY } from "../referrals/sensitive";
 import { evidenceFor } from "../referrals/evidence/store";
 import { isNichePreset, NICHE_PRESET_BY_ID, NICHE_PRESETS } from "../referrals/catalog";
 import { SPECIALTY_BY_ID, specialtyForCode } from "../referrals/nppes";
 import { saveReferralSettings, specialtiesForNiche } from "../referrals/settings";
-import { LetterNotWaiting, pendingLetter, reviseLetter } from "../referrals/outreach";
+import { LetterNotWaiting, pendingLetter, reviseLetter, salutationFor } from "../referrals/outreach";
 import { normalizeName, normalizeOrg } from "../referrals/evidence/normalize";
 import { cardsNamed } from "../referrals/plan";
 import { listSources, STAGE_LABEL, STAGES, type ReferralSource } from "../referrals/store";
@@ -46,6 +49,13 @@ export const ABOUT_ORGS =
   "based, not where it serves. Never offer anything in return for a referral.";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** On her do-not-contact list or set aside as Not a fit: no call script. */
+async function callBlocked(card: ReferralSource): Promise<string | null> {
+  if (isSuppressed(card, await suppressedList())) return `${card.name} is on your do-not-contact list, so there's no call script for them.`;
+  if (card.stage === "not_a_fit") return `${card.name} is in Not a fit. Move the card back first if that changed.`;
+  return null;
+}
 
 /** One card she has to choose from: enough to tell four Dr. Millers apart. */
 export function choiceOf(c: ReferralSource) {
@@ -315,6 +325,53 @@ export const REFERRAL_TOOLS: AeonTool[] = [
         never_suggested_again: true,
         ...(declined.length ? { letters_declined: declined.length, letters_note: "The letter to them that was waiting in Approvals was declined, so it's gone from there." } : {}),
         ...(ready ? { letter_already_approved: "A letter to them was already approved and is ready to copy on the card; tell her not to send it." } : {}),
+      });
+    },
+  }),
+
+  tool({
+    name: "referral_call_script",
+    title: "Call script for a referral partner",
+    description:
+      "When she asks for a call script, what to say when she phones someone on her Referrals board, or a voicemail to leave: returns the " +
+      "built-in Call script (the same as Partners › Call script), from fixed templates and her own settings (her name, practice, real phone " +
+      "and email, who she helps, insurance). Every line passed the value check: nothing is offered for a referral. A sensitive organization " +
+      "(public_line_only) is called on its public line only. Never write a script " +
+      "yourself and never leave blanks like [say your number]: quote the lines exactly as returned, in their sections, and add no lines. " +
+      "If phone_on_file is false, tell her to add her practice phone in Settings. variant: front_desk (default), provider or voicemail; " +
+      "leave it out to get all three. Name the card as she said it or pass its id; several matches come back as ask_which. Sends nothing.",
+    input: {
+      partner: z.string().trim().min(2).max(160).describe("The card's name as she said it, or its id."),
+      variant: z.enum(SCRIPT_VARIANTS.map((v) => v.id) as [ScriptVariant, ...ScriptVariant[]]).optional().describe("Who she expects to reach. Leave out for all three."),
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+    label: "Got the call script",
+    changesData: false,
+    run: async ({ partner, variant }) => {
+      const found = resolveCard(partner, await listSources());
+      if ("none" in found) return text({ written: false, why: noCard(partner) });
+      if ("ask_which" in found) return text({ written: false, why: ASK_WHICH, ask_which: found.ask_which.map(choiceOf) });
+      const card = found.card;
+      const blocked = await callBlocked(card);
+      if (blocked) return text({ written: false, why: blocked });
+      const facts = await scriptFacts();
+      const who = { name: card.name, greeting: salutationFor(card), organization: card.npi_type === "organization" };
+      const scripts = (variant ? [variant] : SCRIPT_VARIANTS.map((v) => v.id)).map((v) => {
+        const s = buildCallScript(facts, who, v);
+        return { variant: SCRIPT_VARIANTS.find((x) => x.id === v)!.label, sections: s.sections.map((x) => ({ title: x.title, lines: x.lines })) };
+      });
+      return text({
+        written: true,
+        from: "the built-in Call script (Partners › Call script)",
+        // Never an address, theirs or hers: the script names her neighborhood only, and the card's phone is all she needs to call.
+        to: { card_name: card.name, ...(card.phone ? { office_phone: card.phone } : {}) },
+        ...(card.sensitive || isSensitiveSource(card) ? { public_line_only: PUBLIC_LINE_ONLY } : {}),
+        phone_on_file: Boolean(facts.phone),
+        scripts,
+        about:
+          "Quote these lines exactly, section by section; don't reword, add lines or leave blanks. The Write down lines are for her notes during the call. " +
+          "Tell her the same script is on the card under Call script, where she can log the call.",
+        about_names: ABOUT_NAMES,
       });
     },
   }),

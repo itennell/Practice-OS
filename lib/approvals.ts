@@ -243,3 +243,48 @@ export async function queueApprovalOnce(
   if (result.created) await finishQueuedApproval(result.id, input);
   return result;
 }
+
+/**
+ * What really happened to an approval a tool just queued. In Auto or Bypass the
+ * kind may have run on its own inside queueApproval (finishQueuedApproval), so a
+ * tool never says "waiting for your OK" without reading this first.
+ */
+export type ApprovalOutcome = {
+  approval_id: string;
+  status: ApprovalRow["status"];
+  /** True only while it waits for her tap. */
+  waiting_for_her: boolean;
+  /** It ran without her tap, under her mode (decided_by "auto:<mode>"). */
+  ran_on_its_own: boolean;
+  /** The executor's own note ("… is on your Referrals calendar for …"), when it ran. */
+  result_note: string | null;
+  error: string | null;
+};
+
+export function outcomeOfRow(r: Pick<ApprovalRow, "id" | "status" | "decided_by" | "result" | "error">): ApprovalOutcome {
+  const note = typeof r.result?.note === "string" ? r.result.note : null;
+  return {
+    approval_id: r.id,
+    status: r.status,
+    waiting_for_her: r.status === "pending",
+    ran_on_its_own: Boolean(r.decided_by?.startsWith("auto:")),
+    result_note: note ? note.slice(0, 300) : null,
+    error: r.error ? String(r.error).slice(0, 300) : null,
+  };
+}
+
+/** The outcomes of these approvals, in the order given (missing ids left out). */
+export async function approvalOutcomes(ids: string[]): Promise<ApprovalOutcome[]> {
+  if (!ids.length) return [];
+  const rows = await db()<Pick<ApprovalRow, "id" | "status" | "decided_by" | "result" | "error">[]>`
+    select id, status, decided_by, result, error from practice_os.approvals where id in ${db()(ids)}`;
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  return ids.flatMap((id) => {
+    const r = byId.get(id);
+    return r ? [outcomeOfRow(r)] : [];
+  });
+}
+
+export async function approvalOutcome(id: string): Promise<ApprovalOutcome | null> {
+  return (await approvalOutcomes([id]))[0] ?? null;
+}
