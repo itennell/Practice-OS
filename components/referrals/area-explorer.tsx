@@ -104,13 +104,15 @@ function ProviderRow({
         </dt>
         <dd className="text-[var(--fg-muted)]">
           <span className="sr-only">Location: </span>
-          {p.homeAddress
+          {p.sensitive
+            ? `${p.city}. Contact through their public line only.`
+            : p.homeAddress
             ? `${HOME_ADDRESS} (${p.city} ${p.zip})`
             : p.address
               ? `${p.address}, ${p.city} ${p.zip}`
               : `Address not listed in NPPES (${p.zip})`}
           {p.distanceMiles !== null && ` · ${milesLabel(p.distanceMiles, approximate)}`}
-          {approximate && !p.homeAddress && (
+          {approximate && !p.homeAddress && !p.sensitive && (
             <span className="block">Pin is at the ZIP code&rsquo;s center; the street address wasn&rsquo;t found on the map.</span>
           )}
         </dd>
@@ -131,9 +133,11 @@ function ProviderRow({
         </ul>
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button variant="quiet" onClick={onSelect} aria-label={`Show on map: ${p.name}`} aria-pressed={selected} className={FOCUS}>
-          Show on map
-        </Button>
+        {!p.sensitive && (
+          <Button variant="quiet" onClick={onSelect} aria-label={`Show on map: ${p.name}`} aria-pressed={selected} className={FOCUS}>
+            Show on map
+          </Button>
+        )}
         {onBoard ? (
           <span
             id={`onboard-${p.npi}`}
@@ -297,7 +301,11 @@ export function AreaExplorer({
     for (const p of result?.providers ?? []) out[p.tier.tier].push(p);
     return out;
   }, [result]);
-  const pins = useMemo(() => (result?.providers ?? []).map((p) => ({ npi: p.npi, name: p.name, lat: p.lat, lon: p.lon, tier: p.tier.tier })), [result]);
+  // A sensitive provider (DV/SA agency, shelter) has no point and is never pinned.
+  const pins = useMemo(
+    () => (result?.providers ?? []).flatMap((p) => (p.lat === null || p.lon === null ? [] : [{ npi: p.npi, name: p.name, lat: p.lat, lon: p.lon, tier: p.tier.tier }])),
+    [result],
+  );
 
   const select = useCallback((npi: string) => {
     setSelected(npi);

@@ -11,9 +11,11 @@ import { audit } from "../audit";
 import { practiceToday } from "../compliance/store";
 import { db } from "../db";
 import { CONTACT_KINDS, type ContactKind } from "./contact-kinds";
+import { keyMatches, orgKeyOf, type OrgKey, type Suppressed } from "./dnc-key";
 import type { Stage } from "./stages";
 
-export { CONTACT_KINDS, CONTACT_LABEL, REFERRED_NOTE, type ContactKind } from "./contact-kinds";
+export { CONTACT_KINDS, CONTACT_LABEL, REFERRED_NOTE, REFERRED_OUT_NOTE, type ContactKind } from "./contact-kinds";
+export { isSuppressed, type Suppressed } from "./dnc-key";
 
 /** Reaching out: sets "last contacted" and, unless she picks a date, a follow-up a week out. */
 const OUTREACH: ContactKind[] = ["called", "emailed", "sent_letter"];
@@ -27,6 +29,8 @@ export type Contact = {
   note: string | null;
   created_by: "clinician" | "aeon";
   is_sample: boolean;
+  /** referred_out only: how many people she referred to them. Never who. */
+  people_count?: number | null;
 };
 
 
@@ -39,6 +43,8 @@ export type LogInput = {
   /** YYYY-MM-DD for the next follow-up; null clears it; left out uses the default for the kind. */
   followUpOn?: string | null;
   by: "clinician" | "aeon";
+  /** referred_out only: how many people (1 to 20). Nothing else about them is ever kept. */
+  count?: number | null;
 };
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -77,7 +83,12 @@ export async function logContact(
   if (!isDay(happenedOn)) throw notADay(happenedOn, "when it happened");
   if (happenedOn > today) throw new Error("Pick a date that isn't in the future.");
   let note = input.note?.trim() || null;
-  if (input.kind === "referred") note = null; // a date only, never who
+  if (input.kind === "referred" || input.kind === "referred_out") note = null; // a date only, never who
+  let count: number | null = null;
+  if (input.kind === "referred_out") {
+    count = input.count ?? 1;
+    if (!Number.isInteger(count) || count < 1 || count > 20) throw new Error("Say how many people, from 1 to 20.");
+  }
   if (note) {
     if (note.length > 500) throw new Error("Keep the note under 500 characters.");
     const refused = await checkNote(note, check);
@@ -104,9 +115,9 @@ export async function logContact(
 
   const contact = await sql.begin(async (tx) => {
     const [row] = await tx<Contact[]>`
-      insert into practice_os.referral_contacts (source_id, kind, happened_on, note, created_by)
-      values (${sourceId}, ${input.kind}, ${happenedOn}, ${note}, ${input.by})
-      returning id, source_id, kind, happened_on::text as happened_on, note, created_by, is_sample`;
+      insert into practice_os.referral_contacts (source_id, kind, happened_on, note, created_by, people_count)
+      values (${sourceId}, ${input.kind}, ${happenedOn}, ${note}, ${input.by}, ${count})
+      returning id, source_id, kind, happened_on::text as happened_on, note, created_by, is_sample, people_count`;
     await tx`
       update practice_os.referral_sources
          set stage = ${stage}, next_follow_up_on = ${next},
@@ -118,7 +129,7 @@ export async function logContact(
   });
   // The audit keeps the kind and date, never the note's words.
   await audit(
-    { actor: input.by, action: "referral_contact_logged", subjectType: "referral_source", subjectId: sourceId, details: { kind: input.kind, on: happenedOn, stage, next } },
+    { actor: input.by, action: "referral_contact_logged", subjectType: "referral_source", subjectId: sourceId, details: { kind: input.kind, on: happenedOn, stage, next, ...(count ? { count } : {}) } },
     sql,
   );
   return { contact, stage, nextFollowUpOn: next };
@@ -127,7 +138,7 @@ export async function logContact(
 export async function contactsFor(sourceIds: string[], sql: postgres.Sql = db()): Promise<Record<string, Contact[]>> {
   if (sourceIds.length === 0) return {};
   const rows = await sql<Contact[]>`
-    select id, source_id, kind, happened_on::text as happened_on, note, created_by, is_sample
+    select id, source_id, kind, happened_on::text as happened_on, note, created_by, is_sample, people_count
       from practice_os.referral_contacts where source_id in ${sql(sourceIds)}
      order by happened_on desc, created_at desc`;
   const out: Record<string, Contact[]> = {};
@@ -188,23 +199,38 @@ export function relationshipFrom(contacts: Pick<Contact, "kind" | "happened_on">
 
 export type SuppressReason = "asked_not_to" | "not_interested";
 
+type DncCard = { npi: string | null; name: string; organization: string | null; npi_type: "individual" | "organization" | null; address: string | null; city: string | null; zip: string | null };
+
+async function dncCard(sourceId: string, sql: postgres.Sql): Promise<DncCard | undefined> {
+  const [card] = await sql<DncCard[]>`
+    select npi, name, organization, npi_type, address, city, zip from practice_os.referral_sources where id = ${sourceId}`;
+  return card;
+}
+
 /**
- * Never suggest this NPI again, and move its card to Not a fit. The list is kept
- * by NPI (so a new search skips them); a card with no NPI can't be listed, so it
- * is refused in plain words and nothing changes.
+ * Never suggest this provider again, and move its card to Not a fit. A card
+ * with an NPI is listed by NPI (so a new search skips them); one without (a
+ * hospice, a church, someone she added by hand) by its org key: the
+ * normalized name and street, or city (lib/referrals/dnc-key.ts, migration 045).
  */
 export async function suppress(sourceId: string, reason: SuppressReason, sql: postgres.Sql = db(), by: "clinician" | "aeon" = "clinician") {
-  const [found] = await sql<{ npi: string | null }[]>`select npi from practice_os.referral_sources where id = ${sourceId}`;
+  const found = await dncCard(sourceId, sql);
   if (!found) throw new Error("That referral source is no longer on the board.");
-  if (!found.npi) {
-    throw new NoNpiToList(
-      "This card has no NPI, so I can't add it to your do-not-contact list. Move it to Not a fit yourself, or delete the card.",
-    );
+  const key = found.npi ? null : orgKeyOf(found);
+  if (!found.npi && !key) {
+    throw new NoNpiToList("This card has no name I can list, so I can't add it to your do-not-contact list. Move it to Not a fit yourself, or delete the card.");
   }
   // A letter to them still waiting for her approval is declined with it, so Approvals never offers to write to someone on the list.
   const declined = (await sql.begin(async (tx) => {
     await tx`update practice_os.referral_sources set stage = 'not_a_fit', next_follow_up_on = null, updated_at = now() where id = ${sourceId}`;
-    await tx`insert into practice_os.referral_suppressions (npi, reason) values (${found.npi}, ${reason}) on conflict (npi) do update set reason = excluded.reason`;
+    if (found.npi) {
+      await tx`insert into practice_os.referral_suppressions (npi, reason) values (${found.npi}, ${reason}) on conflict (npi) do update set reason = excluded.reason`;
+    } else if (key) {
+      await tx`
+        insert into practice_os.referral_suppressions_org (org_key, name_key, street_key, city_key, reason)
+        values (${key.org_key}, ${key.name_key}, ${key.street_key}, ${key.city_key}, ${reason})
+        on conflict (org_key) do update set reason = excluded.reason`;
+    }
     const rows = await tx<{ id: string }[]>`
       update practice_os.approvals
          set status = 'rejected', decided_at = now(), decided_by = ${by === "aeon" ? "aeon:do_not_contact" : "clinician:do_not_contact"}
@@ -212,27 +238,52 @@ export async function suppress(sourceId: string, reason: SuppressReason, sql: po
       returning id`;
     return rows.map((r) => r.id);
   })) as string[];
-  await audit({ actor: by, action: "referral_suppressed", subjectType: "referral_source", subjectId: sourceId, details: { reason, letters_declined: declined.length } }, sql);
+  await audit(
+    { actor: by, action: "referral_suppressed", subjectType: "referral_source", subjectId: sourceId, details: { reason, by: found.npi ? "npi" : "org_key", letters_declined: declined.length } },
+    sql,
+  );
   for (const id of declined) {
     await audit({ actor: by, action: "approval_declined", approvalId: id, subjectType: "referral_letter", subjectId: sourceId, details: { why: "do_not_contact", reason } }, sql);
   }
   return { declined };
 }
 
+/** Kept so callers that catch it still compile; only a card with no usable name throws it now. */
 export class NoNpiToList extends Error {}
+
+async function orgRows(sql: postgres.Sql): Promise<(OrgKey & { reason: SuppressReason })[]> {
+  return sql<(OrgKey & { reason: SuppressReason })[]>`
+    select org_key, name_key, street_key, city_key, reason from practice_os.referral_suppressions_org`;
+}
 
 /** Why this card is on her do-not-contact list, or null when it isn't. */
 export async function suppressionFor(sourceId: string, sql: postgres.Sql = db()): Promise<SuppressReason | null> {
-  const [row] = await sql<{ reason: SuppressReason }[]>`
-    select s.reason from practice_os.referral_suppressions s
-      join practice_os.referral_sources c on c.npi = s.npi where c.id = ${sourceId}`;
-  return row?.reason ?? null;
+  const card = await dncCard(sourceId, sql);
+  if (!card) return null;
+  if (card.npi) {
+    const [row] = await sql<{ reason: SuppressReason }[]>`select reason from practice_os.referral_suppressions where npi = ${card.npi}`;
+    if (row) return row.reason;
+  }
+  const key = orgKeyOf(card);
+  if (!key) return null;
+  return (await orgRows(sql)).find((o) => keyMatches(key, o))?.reason ?? null;
 }
 
 export async function unsuppress(sourceId: string, sql: postgres.Sql = db(), by: "clinician" | "aeon" = "clinician") {
-  const [card] = await sql<{ npi: string | null }[]>`select npi from practice_os.referral_sources where id = ${sourceId}`;
+  const card = await dncCard(sourceId, sql);
   if (card?.npi) await sql`delete from practice_os.referral_suppressions where npi = ${card.npi}`;
+  const key = card ? orgKeyOf(card) : null;
+  if (key) {
+    const gone = (await orgRows(sql)).filter((o) => keyMatches(key, o)).map((o) => o.org_key);
+    if (gone.length) await sql`delete from practice_os.referral_suppressions_org where org_key in ${sql(gone)}`;
+  }
   await audit({ actor: by, action: "referral_unsuppressed", subjectType: "referral_source", subjectId: sourceId }, sql);
+}
+
+/** Her whole do-not-contact list: NPIs and org keys. Every search, the plan, letters and the debrief use it. */
+export async function suppressedList(sql: postgres.Sql = db()): Promise<Suppressed> {
+  const [npis, orgs] = await Promise.all([suppressedNpis(sql), orgRows(sql).catch(() => [] as OrgKey[])]);
+  return { npis, orgs: orgs.map(({ org_key, name_key, street_key, city_key }) => ({ org_key, name_key, street_key, city_key })) };
 }
 
 /** A note from her log, screened again with the chat's full privacy check before it reaches the model or a tool result. Null when held back. */

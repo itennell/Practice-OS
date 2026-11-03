@@ -3,7 +3,7 @@ import { notify } from "@/components/shared/toaster";
 import { DateField } from "@/components/shared/date-field";
 import { SettingSelect, TextField } from "@/components/shared/settings-controls";
 import { Button } from "@/components/ui";
-import { CONTACT_KINDS, CONTACT_LABEL, REFERRED_NOTE, type ContactKind } from "@/lib/referrals/contact-kinds";
+import { CONTACT_LABEL, LOGGABLE_KINDS, REFERRED_NOTE, type ContactKind } from "@/lib/referrals/contact-kinds";
 import type { Contact } from "@/lib/referrals/contacts";
 import type { ReferralSource } from "@/lib/referrals/store";
 import type { TierResult } from "@/lib/referrals/tier";
@@ -14,7 +14,7 @@ import type { TierResult } from "@/lib/referrals/tier";
 
 export type CardView = { card: ReferralSource; tier: TierResult; contacts: Contact[] };
 
-const KIND_OPTIONS = CONTACT_KINDS.map((k) => ({ value: k, label: CONTACT_LABEL[k] }));
+const KIND_OPTIONS = LOGGABLE_KINDS.map((k) => ({ value: k, label: CONTACT_LABEL[k] }));
 
 function localToday(): string {
   const d = new Date();
@@ -87,7 +87,7 @@ export function ContactLog({ card, contacts, onUpdate }: { card: ReferralSource;
           <ul className="flex flex-col gap-1" aria-label={`Contact log for ${card.name}`}>
             {contacts.slice(0, 4).map((c) => (
               <li key={c.id}>
-                <span className="font-medium">{shortDate(c.happened_on)}</span> {CONTACT_LABEL[c.kind]}
+                <span className="font-medium">{shortDate(c.happened_on)}</span> {CONTACT_LABEL[c.kind]}{c.kind === "referred_out" && c.people_count ? ` (${c.people_count})` : ""}
                 {c.note && <span className="text-[var(--fg-muted)]">: {c.note}</span>}
               </li>
             ))}

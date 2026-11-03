@@ -397,15 +397,17 @@ describe.skipIf(!hasDb)("review fixes against the database", () => {
   const tools = async () => (await import("../lib/aeon/tools-referrals")).REFERRAL_TOOLS;
   const run = async (name: string, input: unknown) => JSON.parse((await (await tools()).find((t) => t.name === name)!.run(input as never, { by: "test" })).content[0].text);
 
-  it("a card with no NPI is refused plainly, and never claims to be blocked", async () => {
+  it("a card with no NPI is listed by its name and place (migration 045), and undo takes it off", async () => {
     const { db } = await import("../lib/db");
     const [row] = await db()`
       insert into practice_os.referral_sources (npi, name, city, state, zip) values (null, '[Sample] Noel Npiless, LCSW', 'Chicago', 'IL', '60614') returning id`;
     made.push(row.id);
     const out = await run("set_do_not_contact", { source: row.id });
-    expect(out).toMatchObject({ done: false, never_suggested_again: false });
-    expect(out.why).toMatch(/no NPI/);
-    expect((await db()`select stage from practice_os.referral_sources where id = ${row.id}`)[0].stage).toBe("found");
+    expect(out).toMatchObject({ done: true, never_suggested_again: true });
+    expect((await db()`select stage from practice_os.referral_sources where id = ${row.id}`)[0].stage).toBe("not_a_fit");
+    expect((await db()`select count(*)::int as n from practice_os.referral_suppressions_org where name_key like 'noel npiless%'`)[0].n).toBe(1);
+    expect(await run("set_do_not_contact", { source: row.id, undo: true })).toMatchObject({ done: true, do_not_contact: false });
+    expect((await db()`select count(*)::int as n from practice_os.referral_suppressions_org where name_key like 'noel npiless%'`)[0].n).toBe(0);
   });
 
   it("undoing 'asked not to be contacted' needs her confirmation, and the audit names Aeon", async () => {

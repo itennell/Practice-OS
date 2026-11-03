@@ -1467,6 +1467,8 @@
       "category": 6,
       "why_they_refer": "Residents and families face moves, loss and decline.",
       "findable_via": "public_list",
+      "also_findable_via": ["osm_tags"],
+      "osm_tags": { "social_facility": ["assisted_living", "nursing_home"] },
       "default_points": 16,
       "points_basis": "judgment",
       "why_basis": "judgment",

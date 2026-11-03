@@ -31,7 +31,7 @@ import { audit } from "../audit";
 import { db } from "../db";
 import { chat, readToolCalls, transcribeBytes, transcriptText, type ChatParams } from "../meta";
 import { alertCrisis, checkCrisis, CRISIS_REPLY } from "../safety";
-import { logContact } from "./contacts";
+import { isSuppressed, logContact, suppressedList } from "./contacts";
 import {
   EMPTY_FIELDS,
   FIELD_LABEL,
@@ -987,12 +987,18 @@ export async function saveDebrief(sourceId: string, body: unknown, opts: { by?: 
   const suggested: { id: string; name: string }[] = [];
   const existing = await sql<{ name: string }[]>`select lower(name) as name from practice_os.referral_sources`;
   const taken = new Set(existing.map((r) => r.name));
+  // Someone on her do-not-contact list (by NPI or org key, migration 045) is never suggested again.
+  const blockedList = await suppressedList(sql);
   const introducedBy = shortName(source.name, source.credential).slice(0, 120);
   for (const w of confirmedWho) {
     const plain = w.name ?? `${w.role}${w.organization ? `, ${w.organization}` : ""}`;
     // The fictional demo practice labels everything it makes as [Sample].
     const name = `${source.is_sample ? "[Sample] " : ""}${plain}`.slice(0, 160);
     if (taken.has(name.toLowerCase())) continue;
+    if (isSuppressed({ name: w.name ?? w.organization ?? w.role, organization: w.organization, npi_type: w.name ? "individual" : "organization" }, blockedList)) {
+      notes.push(`${plain} is on your do-not-contact list, so no card was made.`);
+      continue;
+    }
     taken.add(name.toLowerCase());
     const [row] = await sql<{ id: string }[]>`
       insert into practice_os.referral_sources (name, organization, specialty, stage, introduced_by, suggested_from, suggestion_confirmed_at, notes, is_sample)

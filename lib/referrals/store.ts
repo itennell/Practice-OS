@@ -7,10 +7,12 @@ import { practiceToday } from "../compliance/store";
 import { db } from "../db";
 import { nearbyZips, zipCenters, zipDistance } from "./geo";
 import { fetchProviders, looksResidential, providerByNpi, SPECIALTY_BY_ID, type Provider, type SpecialtyId } from "./nppes";
-import { suppressedNpis } from "./contacts";
+import { isSuppressed, suppressedList } from "./contacts";
+import { providerKeyCard } from "./area";
 import { nppesFacts, saveFacts } from "./evidence/store";
 import { focusFrom, providerTier, SCORE_VERSION, tierFor, type Focus } from "./tier";
 import { STAGES, STAGE_LABEL, type Stage } from "./stages";
+import { isSensitiveSource } from "./sensitive";
 
 export { STAGES, STAGE_LABEL, type Stage };
 
@@ -40,6 +42,14 @@ export type ReferralSource = {
   website?: string | null;
   introduced_by?: string | null;
   confidence?: "confirmed" | "partly" | "unconfirmed" | null;
+  /** The catalog type (docs/research/referral-sources.json) for cards found by CMS, OpenStreetMap or added by her (migration 045). */
+  source_type?: string | null;
+  /** How the card was found; "manual" cards show "Added by you". */
+  found_via?: "nppes" | "cms_provider_data" | "osm" | "manual" | null;
+  ccn?: string | null;
+  osm_ref?: string | null;
+  /** A DV/SA agency or shelter: no street address, no map pin, contact through their public line only. */
+  sensitive?: boolean;
 } & Partial<PartnerProfile> & {
   /** A card Aeon suggested from a debrief with this partner: labelled, never contacted on its own (migration 044). */
   suggested_from?: string | null;
@@ -68,8 +78,9 @@ export async function findReferralSources(
   const centers = await zipCenters();
   if (!centers[opts.zip]) throw new Error(`I don't know ZIP ${opts.zip}. Check it and try again.`);
   const zips = nearbyZips(centers, opts.zip, opts.radiusMiles ?? 3, 5);
-  const blocked = await suppressedNpis(sql);
-  const providers = (await fetchProviders(opts.specialties, zips, opts.fetcher)).filter((p) => !blocked.has(p.npi));
+  const blocked = await suppressedList(sql);
+  // Her do-not-contact list, by NPI and by org key (a group she listed from a card with no NPI).
+  const providers = (await fetchProviders(opts.specialties, zips, opts.fetcher)).filter((p) => !isSuppressed(providerKeyCard(p), blocked));
   const { focus, state } = await practiceFacts(sql);
   const scored = providers
     .map((p) => {
@@ -108,18 +119,18 @@ export async function addToBoard(
   lookup: (npi: string) => Promise<Provider | null> = (npi) => providerByNpi(npi),
 ): Promise<{ added: FoundSource[]; missing: string[] }> {
   const { focus, state } = await practiceFacts(sql);
-  const blocked = await suppressedNpis(sql);
+  const blocked = await suppressedList(sql);
   const added: FoundSource[] = [];
   const missing: string[] = [];
   // Each one is saved as soon as NPPES answers for it, so one slow lookup doesn't lose the rest.
   for (const npi of new Set(items.map((i) => i.npi))) {
-    if (blocked.has(npi)) {
+    if (blocked.npis.has(npi)) {
       missing.push(npi);
       continue;
     }
     const item = items.find((i) => i.npi === npi)!;
     const p = await lookup(npi).catch(() => null);
-    if (!p) {
+    if (!p || isSuppressed(providerKeyCard(p), blocked)) {
       missing.push(npi);
       continue;
     }
@@ -155,7 +166,10 @@ export function interleave(found: FoundSource[], count: number): FoundSource[] {
 
 export async function saveSources(found: FoundSource[], sql: postgres.Sql = db()): Promise<number> {
   if (found.length === 0) return 0;
-  const rows = found.map((p) => ({
+  const rows = found.map((p) => {
+    // A DV/SA agency or shelter (by NUCC code or name cue, lib/referrals/sensitive.ts) keeps its city only.
+    const sensitive = isSensitiveSource({ taxonomy: p.taxonomy, name: p.name, organization: p.organization });
+    return {
     npi: p.npi,
     name: p.name,
     organization: p.organization,
@@ -163,24 +177,27 @@ export async function saveSources(found: FoundSource[], sql: postgres.Sql = db()
     specialty: p.specialtyLabel,
     npi_type: p.npiType,
     credential: p.credential,
-    address: p.address,
+    address: sensitive ? null : p.address,
     city: p.city,
     state: p.state,
-    zip: p.zip,
+    zip: sensitive ? null : p.zip,
     phone: p.phone,
-    distance_miles: p.distanceMiles,
+    sensitive,
+    distance_miles: sensitive ? null : p.distanceMiles,
     fit_score: p.fitScore,
     score_version: SCORE_VERSION,
-  }));
+    };
+  });
   const result = await sql`
     insert into practice_os.referral_sources ${sql(rows)}
     on conflict (npi) do update set
       name = excluded.name, organization = excluded.organization, taxonomy = excluded.taxonomy,
       specialty = excluded.specialty, npi_type = excluded.npi_type, credential = excluded.credential,
-      address = excluded.address, city = excluded.city, state = excluded.state, zip = excluded.zip,
-      phone = excluded.phone,
+      address = case when excluded.sensitive or referral_sources.sensitive then null else excluded.address end, city = excluded.city, state = excluded.state,
+      zip = case when excluded.sensitive or referral_sources.sensitive then null else excluded.zip end,
+      phone = excluded.phone, sensitive = excluded.sensitive or referral_sources.sensitive,
       -- A search that doesn't know the distance never wipes the one the card has.
-      distance_miles = coalesce(excluded.distance_miles, referral_sources.distance_miles), fit_score = excluded.fit_score,
+      distance_miles = case when excluded.sensitive or referral_sources.sensitive then null else coalesce(excluded.distance_miles, referral_sources.distance_miles) end, fit_score = excluded.fit_score,
       score_version = excluded.score_version,
       updated_at = now()
     returning id, npi`;
@@ -245,13 +262,15 @@ export async function moveDueFollowUps(sql: postgres.Sql = db()): Promise<number
 // The column as she should see it: a Contacted card whose follow-up day has
 // come reads as Follow up, computed here so reading the board never writes
 // (the view-only copy can read it too). `$1` is today in her time zone.
-const COLUMNS = `id, npi, name, organization, taxonomy, specialty, npi_type, credential, address, city, state, zip,
+// A sensitive card (DV/SA agency, shelter; migration 045) never gives out a street, ZIP or distance, whoever reads it.
+const COLUMNS = `id, npi, name, organization, taxonomy, specialty, npi_type, credential,
+  case when sensitive then null else address end as address, city, state, case when sensitive then null else zip end as zip,
   phone, email,
   case when stage = 'contacted' and next_follow_up_on <= $1::date then 'follow_up' else stage end as stage,
-  distance_miles::float8 as distance_miles, fit_score, score_version, last_contacted_at, next_follow_up_on::text as next_follow_up_on,
+  case when sensitive then null else distance_miles::float8 end as distance_miles, fit_score, score_version, last_contacted_at, next_follow_up_on::text as next_follow_up_on,
   notes, is_sample, website, introduced_by, confidence,
   refers_via, referral_contact, populations, needs_from_therapist, waitlist, payer_mix, best_time,
-  last_meeting_summary, connection_points, suggested_from`;
+  last_meeting_summary, connection_points, suggested_from, source_type, found_via, ccn, osm_ref, sensitive`;
 
 /** Every card, best fit first. Read-only: due follow-ups show as Follow up without being moved. */
 export async function listSources(sql: postgres.Sql = db()): Promise<ReferralSource[]> {

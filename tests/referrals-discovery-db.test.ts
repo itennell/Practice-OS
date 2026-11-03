@@ -1,0 +1,189 @@
+// Migration 045 and the discovery cards against a database: organisations with
+// no NPI on the do-not-contact list (left out of the plan, searches, letters
+// and a debrief's "who else"), sensitive cards saved without a street, the CSV
+// import's matching, and referred_out keeping a date and a count only. It runs
+// DDL, so it runs ONLY against the built-in throwaway database on this
+// computer (like tests/demo-reset.test.ts), never a shared one named in .env.
+import { readFile } from "node:fs/promises";
+import { afterAll, describe, expect, it } from "vitest";
+import hospice from "./fixtures/referrals/sources/cms-hospice.json" with { type: "json" };
+import { loadEnv } from "../lib/env";
+import { projectRefOf } from "../lib/demo-reset";
+
+loadEnv();
+const dbUrl = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL) : null;
+const local = Boolean(dbUrl && ["localhost", "127.0.0.1", "::1"].includes(dbUrl.hostname) && projectRefOf(dbUrl.toString()) === "local");
+
+const { closeDb, db } = await import("../lib/db");
+const okGuard = async (t: string) => ({ ok: true as const, text: t });
+
+describe.skipIf(!local)("migration 045 and discovery cards (built-in database only)", async () => {
+  const { addManual, commitImport, previewImport, saveOrgCard, orgToCard } = await import("../lib/referrals/org-store");
+  const { readManual } = await import("../lib/referrals/manual");
+  const { suppress, unsuppress, suppressionFor, suppressedList, isSuppressed, logContact, contactsFor } = await import("../lib/referrals/contacts");
+  const { outreachPlan } = await import("../lib/referrals/plan");
+  const { blockedReason } = await import("../lib/referrals/outreach");
+  const { discoverOrgs } = await import("../lib/referrals/orgs");
+  const { parsePdc } = await import("../lib/referrals/sources/cms-agencies");
+  const ids: string[] = [];
+  const track = (id: string) => (ids.push(id), id);
+
+  afterAll(async () => {
+    if (ids.length) await db()`delete from practice_os.referral_sources where id in ${db()(ids)}`;
+    await db()`delete from practice_os.referral_sources where name like '[Test045]%'`;
+    await db()`delete from practice_os.referral_suppressions_org where name_key like 'test045%'`;
+    await closeDb();
+  });
+
+  const manual = (raw: Record<string, unknown>) => {
+    const r = readManual(raw);
+    if (!r.ok) throw new Error(r.error);
+    return r.input;
+  };
+
+  async function shape() {
+    const q = (t: string) => db()<{ conname: string; def: string }[]>`
+      select conname, pg_get_constraintdef(oid) as def from pg_constraint where conrelid = ${`practice_os.${t}`}::regclass order by conname`;
+    return { contacts: await q("referral_contacts"), sources: await q("referral_sources"), facts: await q("referral_facts"), dnc: await q("referral_suppressions_org") };
+  }
+
+  it("applies again without changing anything, keeps every earlier kind and origin, and turns RLS on", async () => {
+    const before = await shape();
+    const body = await readFile(new URL("../db/migrations/045_referral_dnc_org.sql", import.meta.url), "utf8");
+    await db().unsafe(body);
+    expect(await shape()).toEqual(before);
+    const kind = before.contacts.find((c) => c.conname === "referral_contacts_kind_check")!.def;
+    for (const k of ["called", "emailed", "met", "sent_letter", "replied", "note", "referred", "referred_out"]) expect(kind).toContain(`'${k}'`);
+    const origin = before.facts.find((c) => c.conname === "referral_facts_origin_check")!.def;
+    for (const o of ["nppes", "cms_dac", "cms_order_referring", "cms_opt_out", "state_license", "osm", "website", "clinician", "cms_pdc"]) expect(origin).toContain(`'${o}'`);
+    const [rls] = await db()<{ relrowsecurity: boolean }[]>`select relrowsecurity from pg_class where oid = 'practice_os.referral_suppressions_org'::regclass`;
+    expect(rls.relrowsecurity).toBe(true);
+  });
+
+  it("referred_out keeps a date and a count only: no note, and no column for anything about a client", async () => {
+    const r = await addManual(manual({ name: "[Test045] Out Referral Group", type: "therapists", city: "Chicago" }), { check: okGuard });
+    const id = track(r.id);
+    const logged = await logContact(id, { kind: "referred_out", note: "Referred Jane, 34, for grief", count: 2, by: "clinician" }, db(), okGuard);
+    expect(logged.contact).toMatchObject({ kind: "referred_out", note: null, people_count: 2 });
+    expect((await contactsFor([id]))[id][0]).toMatchObject({ note: null, people_count: 2 });
+    await expect(db()`insert into practice_os.referral_contacts (source_id, kind, happened_on, note, created_by, people_count) values (${id}, 'referred_out', current_date, 'a name', 'clinician', 1)`).rejects.toThrow(/referred_out_date_and_count/);
+    await expect(db()`insert into practice_os.referral_contacts (source_id, kind, happened_on, created_by, people_count) values (${id}, 'called', current_date, 'clinician', 3)`).rejects.toThrow(/count_only_referred_out/);
+    const cols = await db()<{ column_name: string }[]>`select column_name from information_schema.columns where table_schema = 'practice_os' and table_name = 'referral_contacts' order by column_name`;
+    expect(cols.map((c) => c.column_name)).toEqual(["created_at", "created_by", "happened_on", "id", "is_sample", "kind", "note", "people_count", "source_id"]);
+    await expect(logContact(id, { kind: "referred_out", count: 0, by: "clinician" }, db(), okGuard)).rejects.toThrow(/from 1 to 20/);
+  });
+
+  it("a sensitive card is saved with its city only, whatever the caller sent; the database refuses a street", async () => {
+    const card = orgToCard(
+      { key: "x", type: "dv_sa_agencies", name: "[Test045] Safe Harbor", street: "100 Hidden St", city: "Chicago", state: "IL", zip: "60614", phone: "312-555-0111", website: null, ccn: null, osmRef: null, lat: 41.9, lon: -87.6, precision: "address", origin: "osm", originUrl: "https://www.openstreetmap.org/node/1", checkedAt: new Date().toISOString() },
+      0.5,
+    );
+    const r = await saveOrgCard({ ...card, foundVia: "manual" });
+    track(r.id);
+    const [row] = await db()<{ address: string | null; zip: string | null; city: string | null; sensitive: boolean }[]>`select address, zip, city, sensitive from practice_os.referral_sources where id = ${r.id}`;
+    expect(row).toEqual({ address: null, zip: null, city: "Chicago", sensitive: true });
+    const facts = await db()<{ field: string }[]>`select field from practice_os.referral_facts where source_id = ${r.id}`;
+    expect(facts.map((f) => f.field)).not.toContain("address");
+    await expect(db()`update practice_os.referral_sources set address = '100 Hidden St' where id = ${r.id}`).rejects.toThrow(/sensitive_no_street/);
+  });
+
+  it("the CSV import matches existing cards and never adds them twice", async () => {
+    const first = await addManual(manual({ name: "[Test045] Lakeside Cancer Support", type: "disease_orgs", city: "Chicago", phone: "312-555-0142" }), { check: okGuard });
+    track(first.id);
+    const csv = [
+      "name,type,city,phone,street,zip",
+      "[Test045] Lakeside Cancer Support,disease_orgs,Chicago,,,",
+      "[Test045] Riverside Grief Center,grief_centers,Chicago,312-555-0150,,",
+      "[Test045] Riverside Grief Center,grief_centers,Chicago,312-555-0150,,",
+      "[Test045] Broken Row,not_a_kind,Chicago,,,",
+    ].join("\n");
+    const preview = await previewImport(csv);
+    expect(preview.rows.map((r) => r.status)).toEqual(["matched", "new", "matched", "error"]);
+    expect(preview.rows[0].matched).toMatchObject({ id: first.id, label: "same name in the same city" });
+    const done = await commitImport(csv, [], { check: okGuard });
+    expect(done.added.map((a) => a.name)).toEqual(["[Test045] Riverside Grief Center"]);
+    done.added.forEach((a) => track(a.id));
+    const again = await commitImport(csv, [], { check: okGuard });
+    expect(again.added).toEqual([]);
+    const [{ n }] = await db()<{ n: number }[]>`select count(*)::int as n from practice_os.referral_sources where name = '[Test045] Riverside Grief Center'`;
+    expect(n).toBe(1);
+    const [manualCard] = await db()<{ found_via: string }[]>`select found_via from practice_os.referral_sources where id = ${done.added[0].id}`;
+    expect(manualCard.found_via).toBe("manual");
+  });
+
+  it("do-not-contact without an NPI: kept by org key, and left out of the plan, searches, letters and a debrief's who-else", async () => {
+    const [row] = await db()<{ id: string }[]>`
+      insert into practice_os.referral_sources (name, organization, taxonomy, specialty, npi_type, address, city, state, zip, distance_miles, fit_score, score_version, found_via)
+      values ('[Test045] Northside Family Clinic', '[Test045] Northside Family Clinic', '207Q00000X', 'Family medicine', 'organization', '2401 N Lincoln Ave', 'Chicago', 'IL', '60614', 0.1, 95, 3, 'manual')
+      returning id`;
+    const id = track(row.id);
+    const before = await outreachPlan(db(), 50, { specialties: ["family_medicine"] });
+    expect(before.reach_out.map((r) => r.id)).toContain(id);
+
+    await suppress(id, "asked_not_to");
+    expect(await suppressionFor(id)).toBe("asked_not_to");
+    const [dnc] = await db()<{ org_key: string; street_key: string }[]>`select org_key, street_key from practice_os.referral_suppressions_org where name_key = 'test045 northside family clinic'`;
+    expect(dnc).toMatchObject({ street_key: "2401 n lincoln ave 60614" });
+
+    // The plan.
+    await db()`update practice_os.referral_sources set stage = 'found' where id = ${id}`;
+    const after = await outreachPlan(db(), 50, { specialties: ["family_medicine"] });
+    expect(after.reach_out.map((r) => r.id)).not.toContain(id);
+    // Letters.
+    const [card] = await db()`select name, npi, stage, organization, npi_type, address, city, zip from practice_os.referral_sources where id = ${id}`;
+    expect(await blockedReason(card as never)).toMatch(/do-not-contact list/);
+    // A search finding the same place, written differently.
+    const list = await suppressedList();
+    const found = parsePdc("hospice", hospice, new Date().toISOString()).map((o, i) => (i === 0 ? { ...o, name: "[Test045] NORTHSIDE FAMILY CLINIC", street: "2401 North Lincoln Avenue", zip: "60614" } : o));
+    const r = await discoverOrgs(
+      { area: { kind: "zips", zips: ["60614"] }, radiusMiles: 1, types: ["hospice"] },
+      { office: null, officeZip: "60614", state: "IL", suppressed: list },
+      { cms: async () => ({ orgs: found, unavailable: [] }), centers: { "60614": [41.9224, -87.6533] } },
+    );
+    expect(r.orgs.some((o) => /northside family clinic/i.test(o.name))).toBe(false);
+    expect(r.orgs.length).toBe(1);
+    // A debrief's who-else naming only the organisation, as the debrief checks it.
+    expect(isSuppressed({ name: "[Test045] Northside Family Clinic", organization: "[Test045] Northside Family Clinic", npi_type: "organization" }, list)).toBe(true);
+    // Adding it again by hand is refused.
+    const again = await addManual(manual({ name: "[Test045] Northside Family Clinic", type: "family_medicine", city: "Chicago" }), { check: okGuard });
+    expect(again.refused).toMatch(/do-not-contact/);
+
+    await unsuppress(id);
+    expect(await suppressionFor(id)).toBeNull();
+    expect((await suppressedList()).orgs.some((o) => o.name_key === "test045 northside family clinic")).toBe(false);
+  });
+
+  it("a sensitive card never gives out a street, ZIP, point or distance: board, evidence, tiers, chat tools", async () => {
+    const { saveSources, listSources, getSource } = await import("../lib/referrals/store");
+    const { evidenceFor } = await import("../lib/referrals/evidence/store");
+    const { tiersWithLog, cardView } = await import("../lib/referrals/plan");
+    const { REFERRAL_TOOLS } = await import("../lib/referrals/../aeon/tools-referrals");
+    const p = {
+      npi: "1999999992", name: "[Test045] Harbor Domestic Violence Services", organization: "[Test045] Harbor Domestic Violence Services", practiceName: null,
+      npiType: "organization" as const, credential: null, taxonomy: "251S00000X", taxonomyLabel: "Community Behavioral Health", specialty: "therapists" as const,
+      specialtyLabel: "Therapists", address: "100 Hidden Way", city: "Chicago", state: "IL", zip: "60614", phone: "312-555-0177", homeAddress: false, fax: null,
+      distanceMiles: 0.3, fitScore: 60,
+    };
+    await saveSources([p as never]);
+    const card = (await listSources()).find((c) => c.npi === "1999999992")!;
+    track(card.id);
+    const [raw] = await db()<{ address: string | null; zip: string | null; sensitive: boolean; distance_miles: number | null }[]>`
+      select address, zip, sensitive, distance_miles::float8 as distance_miles from practice_os.referral_sources where id = ${card.id}`;
+    expect(raw).toEqual({ address: null, zip: null, sensitive: true, distance_miles: null });
+    expect(card).toMatchObject({ address: null, zip: null, distance_miles: null, sensitive: true, city: "Chicago" });
+    expect(await getSource(card.id)).toMatchObject({ address: null, zip: null, distance_miles: null });
+    const ev = (await evidenceFor([card]))[card.id];
+    expect(ev.fields.address).toBeUndefined();
+    const tier = tiersWithLog([card], {}, { focus: [], clinicianState: "IL" })[card.id];
+    expect(tier.reasons.join(" ")).not.toMatch(/\bmi\b|from your office|on your block|in your ZIP/i);
+    expect(JSON.stringify(await cardView(card.id))).not.toMatch(/Hidden|60614/);
+    const run = async (name: string, input: unknown) => (await REFERRAL_TOOLS.find((t) => t.name === name)!.run(input as never, { by: "test" } as never)).content[0].text;
+    const found = await run("find_referral_cards", { query: "Harbor Domestic Violence" });
+    expect(found).toContain("public line only");
+    expect(found).not.toMatch(/Hidden|60614|"miles"/);
+    // Even a later NPPES refresh can't put the street back.
+    await saveSources([{ ...p, name: "[Test045] Harbor Services" } as never]);
+    const [again] = await db()<{ address: string | null; sensitive: boolean }[]>`select address, sensitive from practice_os.referral_sources where id = ${card.id}`;
+    expect(again).toEqual({ address: null, sensitive: true });
+  });
+});

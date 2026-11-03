@@ -16,7 +16,7 @@ import { chat } from "../meta";
 import { getProfile } from "../profile";
 import { allPayers } from "../payers/catalog";
 import { listPayerApplications, WAITING } from "../payers/store";
-import { CONTACT_LABEL, contactsFor, screenedNote, suppressedNpis } from "./contacts";
+import { CONTACT_LABEL, contactsFor, isSuppressed, screenedNote, suppressedList } from "./contacts";
 import { getSource, latestLetters, practiceFacts, type ReferralSource } from "./store";
 import { focusFrom, FOCUS_WORDS, type Focus } from "./tier";
 
@@ -487,8 +487,11 @@ export async function pendingLetter(sourceId: string): Promise<PendingLetter | n
 }
 
 /** On her do-not-contact list or set aside as Not a fit: no letter is written or approved. */
-export async function blockedReason(source: Pick<ReferralSource, "name" | "npi" | "stage">): Promise<string | null> {
-  if (source.npi && (await suppressedNpis()).has(source.npi)) return `${source.name} is on your do-not-contact list, so I won't write to them.`;
+export async function blockedReason(
+  source: Pick<ReferralSource, "name" | "npi" | "stage"> & Partial<Pick<ReferralSource, "organization" | "npi_type" | "address" | "city" | "zip">>,
+): Promise<string | null> {
+  // By NPI, or for a card with no NPI (a hospice, a church, someone she added) by its org key.
+  if (isSuppressed(source, await suppressedList())) return `${source.name} is on your do-not-contact list, so I won't write to them.`;
   if (source.stage === "not_a_fit") return `${source.name} is in Not a fit, so I won't write to them. Move the card back first if that changed.`;
   return null;
 }
