@@ -94,7 +94,7 @@ test("Draft email waits for approval; once approved, Copy puts the subject and l
   );
   await page.goto("/referrals");
   const card = page.getByRole("region", { name: "Follow up" }).getByRole("listitem", { name: "[Sample] Thistlewood OB-GYN" });
-  await card.getByRole("button", { name: "Draft a check-in email" }).click();
+  await card.getByRole("button", { name: "Draft check-in" }).click();
   await expect(card).toContainText("Email draft");
   await expect(card).toContainText("Then a Copy button shows here");
   await expect(card.getByRole("button", { name: /^Copy email/ })).toHaveCount(0);

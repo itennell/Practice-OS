@@ -5,6 +5,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { parse } from "dotenv";
 import type postgres from "postgres";
+import { MODE_INFO } from "./approval-modes";
 import { poolerSafeClient } from "./db";
 import { DEMO_NICHE, DEMO_ZIP, resetRefusal } from "./demo-reset";
 import { SPECIALTY_CATEGORY } from "./referrals/categories";
@@ -94,8 +95,10 @@ export function cardCategory(c: { source_type: string | null; taxonomy: string |
 }
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-const MODE_LABEL: Record<string, string> = { manual: "Ask", auto: "Auto", bypass: "Bypass" };
-const modeLabel = (m: string | null) => MODE_LABEL[m ?? "auto"] ?? m ?? "Auto";
+// The app's own words for the modes (Manual, Auto, Bypass), the ones she sees in Settings and under the message box.
+const MODE_LABEL: Record<string, string> = Object.fromEntries(Object.entries(MODE_INFO).map(([k, v]) => [k, v.label]));
+const MANUAL = MODE_INFO.manual.label;
+const modeLabel = (m: string | null) => MODE_LABEL[m ?? "auto"] ?? m ?? MODE_INFO.auto.label;
 const hoursAgo = (now: Date, at: Date) => Math.round((now.getTime() - at.getTime()) / 3_600_000);
 
 /** The checks, in plain code, on a snapshot. */
@@ -132,16 +135,16 @@ export function evaluateDemo(s: DemoSnapshot): CheckLine[] {
     `${plural(leaky.length, "sensitive card")} ${leaky.length === 1 ? "shows" : "show"} an address: ${leaky.map((c) => c.name).slice(0, 5).join(", ")}. Mark them sensitive or remove them before recording.`,
   );
 
-  // The recording needs every change to wait for an approval on screen: Ask (manual) only.
+  // The recording needs every change to wait for an approval on screen: Manual only.
   line(
     s.approvalMode === "manual",
-    "New chats start in Ask: every change waits for her approval.",
-    `New chats start in ${modeLabel(s.approvalMode)}, not Ask. Set Ask under the message box before recording.`,
+    `New chats start in ${MANUAL}: every change waits for her approval.`,
+    `New chats start in ${modeLabel(s.approvalMode)}, not ${MANUAL}. Set ${MANUAL} in Settings or under the message box before recording.`,
     true,
   );
   if (s.latestChat) {
     const mode = s.latestChat.mode ?? s.approvalMode;
-    line(mode === "manual", "The latest chat is in Ask.", `The latest chat is in ${modeLabel(mode)}, not Ask. Switch it to Ask, or start a new chat.`, true);
+    line(mode === "manual", `The latest chat is in ${MANUAL}.`, `The latest chat is in ${modeLabel(mode)}, not ${MANUAL}. Switch it to ${MANUAL}, or start a new chat.`, true);
   }
 
   // Read from the env files, not the running app's environment (restart the app after a change).

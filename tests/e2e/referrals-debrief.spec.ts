@@ -33,7 +33,8 @@ test("debrief a coffee meeting: record, review, save", async ({ page }) => {
   const card = page.getByRole("region", { name: "Connected" }).getByRole("listitem", { name: PARTNER });
   await card.getByRole("button", { name: "Debrief" }).click();
 
-  const box = card.getByRole("region", { name: `Debrief with ${PARTNER}` });
+  // On a wide screen the debrief opens in a side panel, outside the card.
+  const box = page.getByRole("region", { name: `Debrief with ${PARTNER}` });
   await expect(box).toContainText("Up to 3 minutes");
   await box.getByRole("button", { name: "Record your debrief" }).click();
   await expect(box).toContainText("stops at 3:00");
