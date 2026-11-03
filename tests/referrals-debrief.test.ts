@@ -261,19 +261,19 @@ describe.skipIf(!hasDb)("the debrief against the database", async () => {
     expect(letters).toBe(0);
   });
 
-  it("fields she never said are rejected, with the reason", async () => {
+  it("fields she never said stay empty and are counted, not listed as refusals; privacy refusals are listed", async () => {
     const r = await analyzeDebrief(ID, { transcript: PHI_TRANSCRIPT }, { chat: fakeChat(LEAKY_FIELDS) });
     if (r.status !== "ready") throw new Error(r.status);
     const fields = r.draft.fields;
     expect(fields.payer_mix).toBeNull();
     expect(fields.connection_points).toBeNull();
     expect(fields.who_else.map((w) => w.name)).toEqual(["Jenna Cho"]);
-    expect(r.draft.rejected).toEqual(
-      expect.arrayContaining([
-        { field: "Insurance and private pay", why: "it has a number you didn't say" },
-        { field: "What you have in common", why: "you didn't say that in the debrief" },
-      ]),
-    );
+    // "About 40% Medicaid" and "hiking in Colorado" were never said: left empty, counted.
+    expect(r.draft.not_said).toBeGreaterThanOrEqual(2);
+    expect(r.draft.rejected.map((x) => x.why)).not.toContain("you didn't say that in the debrief");
+    expect(r.draft.rejected.map((x) => x.why)).not.toContain("it has a number you didn't say");
+    // The patient in the summary and the populations is still a listed refusal.
+    expect(r.draft.rejected).toEqual(expect.arrayContaining([{ field: "Who they serve", why: "it may be about one person, not the office" }]));
   }, 120_000);
 
   it("a crisis in the transcript stops everything: the fixed reply, no model call, nothing saved", async () => {
