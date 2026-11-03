@@ -35,6 +35,8 @@ export const KIND_POLICY: Record<ApprovalKind, { helper: Helper; tier: Tier }> =
   // Grow: public words and ad budgets wait for her tap in every mode.
   ads_campaign: { helper: "instagram", tier: "clinician_only" },
   website: { helper: "instagram", tier: "clinician_only" },
+  // A meeting Aeon planned goes on her Referrals calendar; nothing is sent.
+  referral_meeting: { helper: "referrals", tier: "sensitive" },
 };
 
 // text_missed_callers: a missed caller gets a text with open consult times.
