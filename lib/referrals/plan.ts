@@ -4,7 +4,8 @@
 // and an NPI on the do-not-contact list is never suggested.
 import type postgres from "postgres";
 import research from "../../docs/research/referral-tiers.json" with { type: "json" };
-import { practiceToday } from "../compliance/store";
+import { todayIn } from "../compliance/dates";
+import { practiceTimeZone, practiceToday } from "../compliance/store";
 import { db } from "../db";
 import { orgNameScore } from "./evidence/match";
 import { jaroWinkler, normalizeName, normalizeOrg } from "./evidence/normalize";
@@ -215,12 +216,14 @@ export type LetterReady = { id: string; name: string; approved_on: string; days:
 
 /** For the morning brief: approved letters she hasn't marked sent, 2 or more days after approving. */
 export async function lettersReady(sql: postgres.Sql = db(), days = LETTER_READY_DAYS): Promise<LetterReady[]> {
-  const [letters, cards, today] = await Promise.all([latestLetters(sql), listSources(sql), practiceToday(sql)]);
+  const [letters, cards, tz] = await Promise.all([latestLetters(sql), listSources(sql), practiceTimeZone(sql)]);
+  const today = todayIn(tz);
   const out: LetterReady[] = [];
   for (const c of cards) {
     const l = letters[c.id];
     if (!l || l.status !== "done" || l.sent || !l.decidedAt || c.stage === "not_a_fit") continue;
-    const on = l.decidedAt.slice(0, 10);
+    // The approval day where the practice is, not the UTC date (evenings in Chicago are already tomorrow in UTC).
+    const on = todayIn(tz, new Date(l.decidedAt));
     const age = daysBetween(on, today);
     if (age >= days) out.push({ id: c.id, name: c.name, approved_on: on, days: age });
   }
