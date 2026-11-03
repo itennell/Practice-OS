@@ -2,19 +2,15 @@
 
 // Ask Aeon, pinned under every Referrals tab: the same message box as the chat (Prompt
 // Bar, UI-011). It sends to the normal chat (/api/chat, the same as Home) with the tab
-// she is on and the partners she picked, then opens that chat for Aeon's answer.
+// she is on and the partners she picked (lib/referrals/ask-context.ts; never a sensitive
+// organization), then opens that chat for Aeon's answer.
 // The crisis check and the privacy guard run on the server before any model call.
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { PromptBar } from "@/components/shared/prompt-bar";
 import { Orb } from "@/components/ui";
-
-/** Her words plus one plain line of where she asked from. Partner names only, never a client. */
-export function withContext(text: string, tab: string, picked: { id: string; name: string }[]): string {
-  const who = picked.length ? ` Partners I picked: ${picked.map((p) => `${p.name} (card ${p.id})`).join("; ")}.` : "";
-  return `${text}\n\n(Asked from Referrals › ${tab}.${who})`;
-}
+import { withContext } from "@/lib/referrals/ask-context";
 
 export function AskAeonBar({ tab, picked }: { tab: string; picked: { id: string; name: string }[] }) {
   const router = useRouter();
@@ -28,7 +24,7 @@ export function AskAeonBar({ tab, picked }: { tab: string; picked: { id: string;
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ conversationId: null, text: withContext(text, tab, picked).slice(0, 4000) }),
+        body: JSON.stringify({ conversationId: null, text: withContext(text, tab, picked) }),
       });
       const data = (await res.json().catch(() => ({}))) as { conversationId?: string | null; reply?: { kind: string; text: string }; error?: string };
       if (!res.ok || !data.reply) throw new Error(data.error ?? "Aeon couldn't answer just now. Try again in a minute.");

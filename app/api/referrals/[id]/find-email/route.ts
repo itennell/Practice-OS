@@ -1,4 +1,4 @@
-import { canSearch } from "@/lib/referrals/http";
+import { canChange } from "@/lib/referrals/http";
 import { limited } from "@/lib/referrals/rate-limit";
 import { suppressionFor } from "@/lib/referrals/contacts";
 import { evidenceFor } from "@/lib/referrals/evidence/store";
@@ -11,11 +11,13 @@ import { isUuid } from "../../../approvals/responses";
 // directories or social sites, nothing from a site that asks not to be solicited, only an
 // address on the practice's own domain, never a guess). Refused before any lookup for a
 // sensitive organization (a DV/SA agency: their public line only) and for anyone on her
-// do-not-contact list.
+// do-not-contact list. It saves what it finds to the card, so it uses the board's change check.
+// Too soon: 423 with code "card_cooldown" (this card was checked in the last two minutes),
+// 429 with code "busy" (too many checks this minute across all cards).
 export const maxDuration = 60;
 
 export async function POST(request: Request, ctx: RouteContext<"/api/referrals/[id]/find-email">) {
-  if (!canSearch(request)) return Response.json({ error: "Not allowed to check this here." }, { status: 403 });
+  if (!canChange(request)) return Response.json({ error: "Not allowed to check this here." }, { status: 403 });
   const tooMany = limited(request, "recheck", 10);
   if (tooMany) return tooMany;
   const { id } = await ctx.params;
@@ -30,7 +32,11 @@ export async function POST(request: Request, ctx: RouteContext<"/api/referrals/[
   try {
     result = await recheckSource(id, recheckDeps());
   } catch (err) {
-    if (err instanceof RecheckTooSoon) return Response.json({ error: err.message }, { status: 429 });
+    if (err instanceof RecheckTooSoon) {
+      return err.kind === "card"
+        ? Response.json({ error: err.message, code: "card_cooldown" }, { status: 423 })
+        : Response.json({ error: err.message, code: "busy" }, { status: 429 });
+    }
     throw err;
   }
   const evidence = (await evidenceFor([{ id, npi_type: card.npi_type }]))[id];

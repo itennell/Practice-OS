@@ -62,6 +62,17 @@ export type PartnersData = {
 
 type FindState = "working" | "none" | "error";
 
+/** Bulk Find emails and Draft emails work through at most this many partners per click. */
+export const BULK_MAX = 10;
+
+/** Why a "Find email" was refused for coming too soon, in her words (the route's 423 and 429). */
+function tooSoon(err: unknown): string | null {
+  const e = err as { status?: number; code?: string };
+  if (e.status === 423 || e.code === "card_cooldown") return "Aeon checked this partner a moment ago. Try again in a couple of minutes.";
+  if (e.status === 429 || e.code === "busy") return "Aeon has checked a lot of websites this minute. Wait a minute and try again.";
+  return null;
+}
+
 const MENU_ITEM =
   "flex min-h-touch cursor-pointer items-center justify-between gap-3 rounded-[10px] px-3 text-body text-[var(--fg)] outline-none select-none data-[highlighted]:bg-[var(--hairline)] data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50";
 const MENU_POPUP = "tile min-w-[13rem] bg-[var(--toast-bg)]! p-1.5 outline-none";
@@ -73,8 +84,8 @@ function localToday(): string {
 
 async function postJson<T>(url: string, body: unknown): Promise<T> {
   const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-  const data = (await res.json().catch(() => ({}))) as T & { error?: string };
-  if (!res.ok) throw Object.assign(new Error(data.error ?? "That didn't work. Try again."), { status: res.status });
+  const data = (await res.json().catch(() => ({}))) as T & { error?: string; code?: string };
+  if (!res.ok) throw Object.assign(new Error(data.error ?? "That didn't work. Try again."), { status: res.status, code: data.code });
   return data;
 }
 
@@ -133,7 +144,9 @@ export function PartnersTab({
   const pickedShown = shown.filter((r) => picked.has(r.card.id));
   const pickedKey = pickedShown.map((r) => r.card.id).join(",");
   useEffect(() => {
-    onSelectionChange(pickedKey ? pickedKey.split(",").map((id) => ({ id, name: byId.get(id)?.name ?? "" })) : []);
+    // A sensitive (DV/SA) organization never goes to the chat, not even its name.
+    const ids = pickedKey ? pickedKey.split(",").filter((id) => byId.get(id) && !byId.get(id)!.sensitive) : [];
+    onSelectionChange(ids.map((id) => ({ id, name: byId.get(id)!.name })));
   }, [pickedKey, byId, onSelectionChange]);
 
   function say(msg: string, kind: "success" | "error" | "info" = "success") {
@@ -172,7 +185,7 @@ export function PartnersTab({
   }
 
   /** Muse writes it; it waits in Approvals. Returns false when it didn't work. */
-  async function draft(card: ReferralSource, opts: { nudge?: boolean; quiet?: boolean } = {}): Promise<boolean> {
+  async function draft(card: ReferralSource, opts: { nudge?: boolean; quiet?: boolean } = {}): Promise<true | { error: string }> {
     setDrafting((s) => new Set(s).add(card.id));
     try {
       const d = await postJson<{ approval_id?: string; subject?: string; letter?: string }>(`/api/referrals/${card.id}/draft`, opts.nudge ? { nudge: true } : {});
@@ -181,8 +194,9 @@ export function PartnersTab({
       if (!opts.quiet) say(`The email to ${card.name} is waiting in Approvals. Approve it, then copy it and send it yourself.`);
       return true;
     } catch (err) {
-      if (!opts.quiet) say(err instanceof Error ? err.message : "I couldn't write the letter. Try again.", "error");
-      return false;
+      const msg = err instanceof Error ? err.message : "I couldn't write the letter. Try again.";
+      if (!opts.quiet) say(msg, "error");
+      return { error: msg };
     } finally {
       setDrafting((s) => {
         const n = new Set(s);
@@ -193,7 +207,7 @@ export function PartnersTab({
   }
 
   /** Reads their own website for a public practice email (the "Check again" rules). */
-  async function findEmail(card: ReferralSource, opts: { quiet?: boolean } = {}): Promise<"found" | "none" | "stop"> {
+  async function findEmail(card: ReferralSource, opts: { quiet?: boolean } = {}): Promise<"found" | "none" | { error: string }> {
     setFinding((f) => ({ ...f, [card.id]: "working" }));
     try {
       const d = await postJson<{ email: string | null; evidence?: Evidence; card?: ReferralSource; notes?: string[] }>(`/api/referrals/${card.id}/find-email`, {});
@@ -212,9 +226,9 @@ export function PartnersTab({
       return "none";
     } catch (err) {
       setFinding((f) => ({ ...f, [card.id]: "error" }));
-      const msg = err instanceof Error ? err.message : "Aeon couldn't check right now.";
-      if (!opts.quiet) say(msg, "error");
-      return (err as { status?: number }).status === 429 ? "stop" : "none";
+      const msg = tooSoon(err) ?? (err instanceof Error ? err.message : "Aeon couldn't check right now.");
+      if (!opts.quiet) say(msg, tooSoon(err) ? "info" : "error");
+      return { error: msg };
     }
   }
 
@@ -245,36 +259,53 @@ export function PartnersTab({
     logged(view, `${card.name} moved to Not a fit. Aeon won't suggest them again.`);
   }
 
-  const canDraftRow = (c: ReferralSource) => c.stage !== "not_a_fit" && !letterIsWaiting(letters[c.id]);
+  // A sensitive (DV/SA) organization is reached through its public line only: never a letter (the server refuses too).
+  const canDraftRow = (c: ReferralSource) => !c.sensitive && c.stage !== "not_a_fit" && !letterIsWaiting(letters[c.id]);
+  const draftBlocked = (c: ReferralSource): string | undefined =>
+    c.sensitive ? "Public line only: no letters" : c.stage === "not_a_fit" ? "Set aside" : letterIsWaiting(letters[c.id]) ? "A letter is already waiting in Approvals" : undefined;
   const canFindRow = (c: ReferralSource) => !emails[c.id] && !c.sensitive && c.stage !== "not_a_fit";
 
   async function bulkFind() {
-    const todo = pickedShown.map((r) => r.card).filter(canFindRow);
-    if (!todo.length) return say("Everyone you picked has an email already, or Aeon doesn't look one up for them.", "info");
+    const all = pickedShown.map((r) => r.card).filter(canFindRow);
+    if (!all.length) return say("Everyone you picked has an email already, or Aeon doesn't look one up for them.", "info");
+    const todo = all.slice(0, BULK_MAX);
+    const rest = all.length - todo.length;
     let found = 0;
     for (const [i, c] of todo.entries()) {
       setBulk(`Finding emails: ${i + 1} of ${todo.length}…`);
       const r = await findEmail(c, { quiet: true });
       if (r === "found") found++;
-      if (r === "stop") {
+      // Stop at the first problem, and say where it stopped.
+      if (typeof r === "object") {
         setBulk(null);
-        return say(`Found ${found} so far. Aeon has checked a lot of websites this minute: wait a minute and try again.`, "info");
+        return say(`Found ${found} so far, then stopped at ${c.name}: ${r.error}`, "info");
       }
     }
     setBulk(null);
-    say(`Found ${found} of ${todo.length} ${todo.length === 1 ? "email" : "emails"}.`);
+    say(`Found ${found} of ${todo.length} ${todo.length === 1 ? "email" : "emails"}.${rest ? ` ${rest} more picked: press Find emails again for the next ${Math.min(rest, BULK_MAX)}.` : ""}`);
   }
 
   async function bulkDraft() {
-    const todo = pickedShown.map((r) => r.card).filter(canDraftRow);
-    if (!todo.length) return say("Everyone you picked already has a letter waiting, or is set aside.", "info");
+    const all = pickedShown.map((r) => r.card).filter(canDraftRow);
+    if (!all.length) return say("Everyone you picked already has a letter waiting, is set aside, or is reached by their public line only.", "info");
+    const todo = all.slice(0, BULK_MAX);
+    const rest = all.length - todo.length;
     let done = 0;
     for (const [i, c] of todo.entries()) {
       setBulk(`Drafting emails: ${i + 1} of ${todo.length}…`);
-      if (await draft(c, { quiet: true })) done++;
+      const r = await draft(c, { quiet: true });
+      if (r !== true) {
+        // Stop at the first problem: the rest wait for her.
+        setBulk(null);
+        say(`${done} waiting in Approvals, then stopped at ${c.name}: ${r.error}`, "error");
+        return onChanged();
+      }
+      done++;
     }
     setBulk(null);
-    say(`${done} ${done === 1 ? "email is" : "emails are"} waiting in Approvals. Nothing is sent until you approve and send it yourself.`);
+    say(
+      `${done} ${done === 1 ? "email is" : "emails are"} waiting in Approvals. Nothing is sent until you approve and send it yourself.${rest ? ` ${rest} more picked: press Draft emails again for the next ${Math.min(rest, BULK_MAX)}.` : ""}`,
+    );
     onChanged();
   }
 
@@ -298,6 +329,7 @@ export function PartnersTab({
       email={emails[c.id]}
       drafting={drafting.has(c.id)}
       canDraft={canDraftRow(c)}
+      draftReason={draftBlocked(c)}
       onCopy={() => copyEmail(c)}
       onDraft={() => draft(c, { nudge: Boolean(cold[c.id]) && c.stage !== "found" && c.stage !== "follow_up" })}
       onScript={() => setScriptFor(c.id)}
@@ -353,6 +385,7 @@ export function PartnersTab({
       {(pickedShown.length > 0 || bulk) && (
         <div role="region" aria-label="Picked partners" className="flex flex-wrap items-center gap-2 rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--glass)] p-2 pl-4">
           <span className="text-small font-semibold">{bulk ?? `${pickedShown.length} picked`}</span>
+          {!bulk && <span className="text-small text-[var(--fg-muted)]">Up to {BULK_MAX} at a time</span>}
           <span className="flex-1" />
           <Button variant="quiet" onClick={bulkFind} disabled={Boolean(bulk)}>
             <Search aria-hidden size={16} />
@@ -583,6 +616,7 @@ function RowActions({
   email,
   drafting,
   canDraft,
+  draftReason,
   onCopy,
   onDraft,
   onScript,
@@ -596,6 +630,8 @@ function RowActions({
   email: string | null;
   drafting: boolean;
   canDraft: boolean;
+  /** Why Draft email is off, said on hover and to screen readers. */
+  draftReason?: string;
   onCopy: () => void;
   onDraft: () => void;
   onScript: () => void;
@@ -608,15 +644,16 @@ function RowActions({
   const out = card.stage === "not_a_fit";
   return (
     <div role="group" aria-label={`Actions for ${card.name}`} className="-ml-2 flex items-center justify-start md:ml-0 md:justify-end">
-      <IconButton label={`Copy email for ${card.name}`} icon={<Copy aria-hidden size={16} />} onClick={onCopy} disabled={!email} />
+      <IconButton label={`Copy email for ${card.name}`} icon={<Copy aria-hidden size={16} />} onClick={onCopy} disabled={!email} reason="No email yet" />
       <IconButton
         label={drafting ? `Writing an email to ${card.name}` : `Draft email to ${card.name}`}
         icon={drafting ? <Loader2 aria-hidden size={16} className="animate-spin motion-reduce:animate-none" /> : <Mail aria-hidden size={16} />}
         onClick={onDraft}
         disabled={!canDraft || drafting}
+        reason={drafting ? "Aeon is writing it" : draftReason}
       />
-      <IconButton label={`Call script for ${card.name}`} icon={<Phone aria-hidden size={16} />} onClick={onScript} disabled={out} />
-      <IconButton label={`Log a referral from ${card.name}`} icon={<HandHeart aria-hidden size={16} />} onClick={onReferral} disabled={out} />
+      <IconButton label={`Call script for ${card.name}`} icon={<Phone aria-hidden size={16} />} onClick={onScript} disabled={out} reason="Set aside" />
+      <IconButton label={`Log a referral from ${card.name}`} icon={<HandHeart aria-hidden size={16} />} onClick={onReferral} disabled={out} reason="Set aside" />
       <MoreMenu card={card} onDebrief={onDebrief} onPlan={onPlan} onMove={onMove} onDnc={onDnc} />
     </div>
   );

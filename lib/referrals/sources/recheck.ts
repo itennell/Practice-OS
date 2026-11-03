@@ -67,9 +67,12 @@ export const RECHECKS_PER_MINUTE = 12;
 
 /** Thrown when a re-check is refused for coming too soon; `message` is in plain words. */
 export class RecheckTooSoon extends Error {
-  constructor(message: string) {
+  /** "card": this card was checked in the last two minutes. "busy": too many checks this minute across all cards. */
+  readonly kind: "card" | "busy";
+  constructor(message: string, kind: "card" | "busy" = "busy") {
     super(message);
     this.name = "RecheckTooSoon";
+    this.kind = kind;
   }
 }
 
@@ -88,12 +91,12 @@ async function claimRecheck(id: string, sql: postgres.Sql): Promise<void> {
              count(*) filter (where at > now() - interval '1 minute')::int as total
         from practice_os.audit_log
        where action = 'referral_recheck_started' and at > now() - ${Math.max(RECHECK_COOLDOWN_MS, 60_000) / 1000}::int * interval '1 second'`;
-    if (row.card > 0) return "Aeon checked this card a moment ago. Give it a couple of minutes before checking again.";
-    if (row.total >= RECHECKS_PER_MINUTE) return "Aeon has checked a lot of cards in the last minute. Wait a minute and try again.";
+    if (row.card > 0) return { kind: "card" as const, message: "Aeon checked this card a moment ago. Give it a couple of minutes before checking again." };
+    if (row.total >= RECHECKS_PER_MINUTE) return { kind: "busy" as const, message: "Aeon has checked a lot of cards in the last minute. Wait a minute and try again." };
     await audit({ actor: "aeon", action: "referral_recheck_started", subjectType: "referral_source", subjectId: id }, tx as unknown as postgres.Sql);
     return null;
   });
-  if (refused) throw new RecheckTooSoon(refused);
+  if (refused) throw new RecheckTooSoon(refused.message, refused.kind);
 }
 
 /** The registry's answer in one shape, whatever the dependency returned. */

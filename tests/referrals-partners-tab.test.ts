@@ -114,3 +114,34 @@ describe("call script", () => {
     expect(listWords(["a", "b", "c"])).toBe("a, b and c");
   });
 });
+
+describe("Ask Aeon context", async () => {
+  const { withContext, contextSuffix, CHAT_MAX, NAME_MAX } = await import("../lib/referrals/ask-context");
+  it("sends the picked partners as a quoted JSON list, control characters out, names capped", () => {
+    const long = "[Sample] " + "A".repeat(200);
+    const out = withContext("Who first?", "Partners", [
+      { id: "c1", name: "[Sample] Juniper\nRow\u0000 Family Medicine" },
+      { id: "c2", name: long },
+    ]);
+    expect(out.startsWith("Who first?\n\n(Asked from Referrals › Partners. Partners I picked: [")).toBe(true);
+    const list = JSON.parse(out.slice(out.indexOf("["), out.lastIndexOf("]") + 1)) as { id: string; name: string }[];
+    expect(list[0]).toEqual({ id: "c1", name: "[Sample] Juniper Row Family Medicine" });
+    expect(list[1].name.length).toBe(NAME_MAX);
+    expect(out).not.toMatch(/\u0000/);
+  });
+
+  it("cuts her words, never the context, to fit the chat's limit", () => {
+    const picked = [{ id: "c1", name: "[Sample] Juniper Row Family Medicine" }];
+    const out = withContext("x".repeat(5000), "Partners", picked);
+    expect(out.length).toBe(CHAT_MAX);
+    expect(out.endsWith(contextSuffix("Partners", picked))).toBe(true);
+    expect(withContext("Hi", "Board", [])).toBe("Hi\n\n(Asked from Referrals › Board.)");
+  });
+});
+
+describe("sensitive partners", async () => {
+  const { blockedReason } = await import("../lib/referrals/outreach");
+  it("a DV/SA organization never gets a letter, before any database lookup", async () => {
+    expect(await blockedReason({ name: "[Sample] Safe Harbor Shelter", npi: null, stage: "found", sensitive: true })).toMatch(/public line only/);
+  });
+});
