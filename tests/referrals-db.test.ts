@@ -30,7 +30,19 @@ const sources: string[] = [];
 const approvals: string[] = [];
 let savedDryRun: string | undefined;
 let savedInbox: string | undefined;
-let savedSetup: { home_zip: string | null; specialties: string[] } | null | undefined;
+let savedSetup: { home_zip: string | null; specialties: string[]; niche_preset: string | null } | null | undefined;
+// The setup test deletes and rewrites referral_settings (home ZIP 60610, specialties). Only on the
+// throwaway test database (tests/setup/database.ts), never on a database someone exported.
+const throwawayDb = (process.env.PRACTICE_OS_DATA_DIR ?? "").includes("practice-os-test-");
+async function restoreSetup() {
+  if (savedSetup === undefined) return;
+  if (savedSetup === null) await db()`delete from practice_os.referral_settings`;
+  else
+    await db()`insert into practice_os.referral_settings (id, home_zip, specialties, niche_preset)
+      values (true, ${savedSetup.home_zip}, ${savedSetup.specialties}, ${savedSetup.niche_preset})
+      on conflict (id) do update set home_zip = excluded.home_zip, specialties = excluded.specialties, niche_preset = excluded.niche_preset`;
+  savedSetup = undefined;
+}
 
 async function makeSource() {
   const npi = `19${String(Date.now() + sources.length).slice(-8)}`;
@@ -58,9 +70,8 @@ afterAll(async () => {
   process.env.DRY_RUN = savedDryRun;
   process.env.TEST_INBOX_EMAIL = savedInbox;
   if (!hasDb) return;
-  // Put her Referrals setup back exactly as it was.
-  if (savedSetup === null) await db()`delete from practice_os.referral_settings`;
-  else if (savedSetup) await db()`update practice_os.referral_settings set home_zip = ${savedSetup.home_zip}, specialties = ${savedSetup.specialties}`;
+  // Put her Referrals setup back exactly as it was (the test also does, as soon as it ends).
+  await restoreSetup();
   if (approvals.length) await db()`delete from practice_os.approvals where id in ${db()(approvals)}`;
   if (sources.length) await db()`delete from practice_os.referral_sources where id in ${db()(sources)}`;
   await closeDb();
@@ -196,28 +207,32 @@ describe.skipIf(!hasDb)("score versions", () => {
   });
 });
 
-describe.skipIf(!hasDb)("Referrals setup (onboarding)", () => {
+describe.skipIf(!hasDb || !throwawayDb)("Referrals setup (onboarding)", () => {
   it("asks the ZIP only without an office ZIP, prefills, saves, and the search falls back to it", async () => {
-    const [row] = await db()`select home_zip, specialties from practice_os.referral_settings`;
-    savedSetup = row ? { home_zip: row.home_zip, specialties: row.specialties } : null;
+    const [row] = await db()`select home_zip, specialties, niche_preset from practice_os.referral_settings`;
+    savedSetup = row ? { home_zip: row.home_zip, specialties: row.specialties, niche_preset: row.niche_preset } : null;
+    try {
 
-    const zipQ = referralsQuestions.questions.find((q) => q.id === "home_zip")!;
-    const basics = (officeZip: string | null) => ({ state: "IL", credential: "LCPC", practiceStage: "beginning", officeZip, telehealth: false }) as const;
-    expect(zipQ.appliesWhen!(basics("60614"))).toBe(false);
-    expect(Object.keys(zipQ)).not.toContain("appliesWhen"); // functions can't reach the onboarding page's client component
-    expect(zipQ.appliesWhen!(basics(null))).toBe(true);
+      const zipQ = referralsQuestions.questions.find((q) => q.id === "home_zip")!;
+      const basics = (officeZip: string | null) => ({ state: "IL", credential: "LCPC", practiceStage: "beginning", officeZip, telehealth: false }) as const;
+      expect(zipQ.appliesWhen!(basics("60614"))).toBe(false);
+      expect(Object.keys(zipQ)).not.toContain("appliesWhen"); // functions can't reach the onboarding page's client component
+      expect(zipQ.appliesWhen!(basics(null))).toBe(true);
 
-    await db()`delete from practice_os.referral_settings`;
-    expect(await referralsQuestions.load(basics("60657"))).toEqual({ home_zip: "60657", specialties: ["family_medicine", "internal_medicine"] });
+      await db()`delete from practice_os.referral_settings`;
+      expect(await referralsQuestions.load(basics("60657"))).toEqual({ home_zip: "60657", specialties: ["family_medicine", "internal_medicine"] });
 
-    await referralsQuestions.save({ specialties: ["oncology", "pediatrics"] });
-    await referralsQuestions.save({ home_zip: "60610" });
-    const setup = await getReferralSettings();
-    expect(setup).toMatchObject({ homeZip: "60610", searchZip: "60610", specialties: ["oncology", "pediatrics"] });
+      await referralsQuestions.save({ specialties: ["oncology", "pediatrics"] });
+      await referralsQuestions.save({ home_zip: "60610" });
+      const setup = await getReferralSettings();
+      expect(setup).toMatchObject({ homeZip: "60610", searchZip: "60610", specialties: ["oncology", "pediatrics"] });
 
-    await expect(referralsQuestions.save({ home_zip: "6061" })).rejects.toThrow("Type your 5-digit ZIP code.");
-    await expect(referralsQuestions.save({ specialties: ["dentists"] })).rejects.toThrow("Pick from the list.");
-    await saveReferralSettings({ homeZip: null });
-    expect((await getReferralSettings()).homeZip).toBeNull();
+      await expect(referralsQuestions.save({ home_zip: "6061" })).rejects.toThrow("Type your 5-digit ZIP code.");
+      await expect(referralsQuestions.save({ specialties: ["dentists"] })).rejects.toThrow("Pick from the list.");
+      await saveReferralSettings({ homeZip: null });
+      expect((await getReferralSettings()).homeZip).toBeNull();
+    } finally {
+      await restoreSetup();
+    }
   });
 });

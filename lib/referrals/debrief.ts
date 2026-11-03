@@ -214,8 +214,10 @@ const ROLE =
   "nurse|navigator|coordinator|social\\s+worker|psychiatrist|psychologist|therapist|counsel(?:l)?or|doctor|physician|director|manager|midwife|doula|dietitian|nutritionist|chaplain|case\\s+manager|front\\s+desk|receptionist|scheduler|administrator|pediatrician|ob-?gyn|oncologist|cardiologist|surgeon|internist|lactation\\s+consultant|educator|supervisor|liaison|practitioner|biller|referral\\s+specialist|volunteer\\s+coordinator";
 
 /** The sentence without organization names, so "Lakeshore Cancer Center" isn't read as someone's cancer. */
+// "at Orrindale hospice": a transcript may write the place word in lower case. Only after at/from/of, never after a determiner.
+const ORG_LOWER = /\b(at|from|of|with)\s+(?!(?:the|a|an|her|his|their|our|your|my|home)\b)\p{Lu}[\p{L}'’&.-]*(?:\s+\p{Lu}[\p{L}'’&.-]*){0,3}\s+(?:hospice|hospital|clinic|cancer\s+center|center|centre|health)\b/gu;
 export function withoutOrgs(s: string): string {
-  return s.replace(ORG_NAME, " the org ");
+  return s.replace(ORG_NAME, " the org ").replace(ORG_LOWER, "$1 the org ");
 }
 
 // A care setting a professional works in. These words are also in HEALTH and
@@ -439,7 +441,7 @@ const CREDENTIAL = "MD|DO|RN|NP|PA|PA-C|APRN|CNM|LCSW|LICSW|LCPC|LPC|LMFT|LMHC|P
 const TITLE_BEFORE = /\b(?:Dr|Doctor)\.?\s+$/;
 const CREDENTIAL_AFTER = new RegExp(`^,?\\s*(?:${CREDENTIAL})\\b(?!['’])`);
 const APPOSITIVE_AFTER = new RegExp(
-  `^,\\s*(?:who(?:'s|’s|\\s+is)\\s+)?(?:the|our|their|her|his|a|an)\\s+(?:[\\w-]+\\s+){0,2}?(?:${ROLE})(?!['’\\w])\\s*(?:[,.;:]|$|\\s+(?:at|from|in|for|with|on|over\\s+at|there)\\b)`,
+  `^,?\\s*(?:who(?:'s|’s|\\s+is)\\s+)?(?:the|our|their|her|his|a|an)\\s+(?:[\\w-]+\\s+){0,2}?(?:${ROLE})(?!['’\\w])\\s*(?:[,.;:]|$|\\s+(?:at|from|in|for|with|on|over\\s+at|there)\\b)`,
   "i",
 );
 // "Rosa Diaz is the referral coordinator", "Marisol Quint is the hospice social worker at Orrindale Hospice".
@@ -450,7 +452,7 @@ const HANDLER_BEFORE = /\b(?:person|one)\s+who\s+(?:handles?|takes?|does|manages
 // With or without the comma: "their intake coordinator Rosa Diaz".
 const APPOSITIVE_BEFORE = new RegExp(`\\b(?:the|our|their|her|his)\\s+(?:[\\w-]+\\s+){0,2}?(?:${ROLE})(?:\\s+(?:at|from)\\s+(?:\\p{Lu}[\\p{L}'’&.-]*\\s*){1,5})?\\s*[,:]?\\s*$`, "iu");
 // "Marisol Quint, she's the hospice social worker", "Rosa Diaz, she's their referral coordinator".
-const SHE_IS_ROLE_AFTER = new RegExp(`^,\\s*(?:she|he)(?:'s|’s|\\s+is)\\s+(?:the|our|their|a|an)\\s+(?:[\\w-]+\\s+){0,2}?(?:${ROLE})(?!['’\\w])`, "i");
+const SHE_IS_ROLE_AFTER = new RegExp(`^[,.;]\\s*(?:she|he)(?:'s|’s|\\s+is)\\s+(?:the|our|their|a|an)\\s+(?:[\\w-]+\\s+){0,2}?(?:${ROLE})(?!['’\\w])`, "i");
 // A staff member's full name doing the referral work: "Rosa Diaz handles referrals", "Rosa Diaz at the front desk is the one who sends them".
 // "Marisol Quint, she runs social work at Orrindale Hospice", "Rosa Diaz handles intake there", "Talk to Rosa Diaz, she coordinates intake".
 const NAME_RUNS_AFTER =
@@ -473,23 +475,27 @@ export function professionalNames(text: string, names: string[]): string[] {
     if (hasInitials(name) || name.replace(/\./g, "").trim().length < 3) continue;
     const spots = [...text.matchAll(new RegExp(`(?<![\\p{L}])${escapeRe(name)}(?![\\p{L}])`, "gu"))].map((m) => m.index ?? 0);
     if (spots.length === 0) continue;
-    const ok = spots.every((at) => {
+    // Positive evidence at one place at least ("You should meet Marisol Quint, the hospice social worker"),
+    // and every place she is named is clean: never about a patient, never a need of hers ("Marisol Quint
+    // needs a therapist"). A later plain mention ("I'll email Marisol Quint next week") no longer undoes it.
+    const evidence = spots.map((at) => {
       const before = text.slice(Math.max(0, at - 90), at);
       const after = text.slice(at + name.length, at + name.length + 80);
       const sentence = sentenceAt(text, at);
-      if (aboutAPatient(sentence) || notEnglish(sentence)) return false;
+      if (aboutAPatient(sentence) || notEnglish(sentence)) return "refused";
       const fullName = /\s/.test(name.trim());
-      return (
+      const shown =
         TITLE_BEFORE.test(before) ||
         CREDENTIAL_AFTER.test(after) ||
         APPOSITIVE_AFTER.test(after) ||
         APPOSITIVE_BEFORE.test(before) ||
         SHE_IS_ROLE_AFTER.test(after) ||
         (fullName && (IS_ROLE_AFTER.test(after) || HANDLER_BEFORE.test(before))) ||
-        (fullName && (NAME_HANDLES_REFERRALS.test(after) || NAME_RUNS_AFTER.test(after) || NAME_IN_DEPT_AFTER.test(after) || BARE_ROLE_BEFORE.test(before)))
-      );
+        (fullName && (NAME_HANDLES_REFERRALS.test(after) || NAME_RUNS_AFTER.test(after) || NAME_IN_DEPT_AFTER.test(after) || BARE_ROLE_BEFORE.test(before)));
+      if (shown) return "shown";
+      return nameWithNeed(sentence) ? "refused" : "plain";
     });
-    if (ok) out.add(name);
+    if (evidence.includes("shown") && !evidence.includes("refused")) out.add(name);
   }
   return [...out];
 }
@@ -544,6 +550,21 @@ function joinInitials(text: string): string {
   return text.replace(/(?<![\p{L}])((?:\p{Lu}\.\s?){2,3})/gu, (m) => m.replace(/[.\s]/g, "") + " ");
 }
 
+// "You should meet Marisol Quint. She's the hospice social worker at Orrindale Hospice." A transcript
+// often cuts the appositive into its own sentence; read the two as one ("..., she's the ..."), so the
+// job is tied to the name she was pointed to. Only a bare "She's/He's the <job> (at <place>)." is joined.
+const ROLE_ONLY_SENTENCE = new RegExp(`^(?:she|he)(?:'s|’s|\\s+is)\\s+(?:the|their|our)\\s+(?:[\\w-]+\\s+){0,3}?(?:${ROLE}|team)(?:\\s+(?:at|from|over\\s+at)\\s+[^,;.!?]{1,60})?\\s*[.!]?$`, "i");
+const ENDS_ON_A_NAME = /(?:meet|call|contact|email|e-mail|to|was|is)\s+(?:Dr\.?\s+)?\p{Lu}\p{Ll}+\s+\p{Lu}\p{Ll}+[.!]$/u;
+function joinRoleSentences(list: string[]): string[] {
+  const out: string[] = [];
+  for (const s of list) {
+    const prev = out[out.length - 1];
+    if (prev && ENDS_ON_A_NAME.test(prev) && ROLE_ONLY_SENTENCE.test(s)) out[out.length - 1] = `${prev.replace(/[.!]$/, "")}, ${s.charAt(0).toLowerCase()}${s.slice(1)}`;
+    else out.push(s);
+  }
+  return out;
+}
+
 /** Why a sentence doesn't go to Muse, or null when it may. */
 export function dropReason(s: string): "fee" | "not_english" | "one_person" | "not_business" | null {
   if (valueOffered(s)) return "fee";
@@ -564,9 +585,11 @@ export async function cleanTranscript(
 ): Promise<Cleaned> {
   const check = deps.check ?? strictGuard;
   const names = deps.names ?? ((t: string) => findNames(t, { failWhenCapped: false }));
-  const all = sentences(joinInitials(transcript.replace(/\s+/g, " ").trim()))
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const all = joinRoleSentences(
+    sentences(joinInitials(transcript.replace(/\s+/g, " ").trim()))
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
   let fee: string | null = null;
   const candidates = all.filter((s) => {
     const why = dropReason(s);
@@ -809,7 +832,8 @@ const CLINICAL_CHECKED: (keyof DebriefFields)[] = ["last_meeting_summary", "need
 export function personalRole(role: string, organization: string | null): boolean {
   // A care-setting job ("hospice social worker") or place ("Orrindale Hospice", "the local hospice") is work, not someone's health.
   const job = isCareRole(role) ? "professional" : role;
-  const org = organization ? withoutOrgs(organization) : "";
+  // Read as "at <org>" so a lower-case place word ("Orrindale hospice") is an org too.
+  const org = organization ? withoutOrgs(`at ${organization}`).replace(/^at\s+/, "").trim() : "";
   const place = CARE_PLACE.test(org) ? "the org" : org;
   for (const t of [job, place]) {
     if (!t) continue;

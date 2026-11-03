@@ -320,6 +320,11 @@ describe.skipIf(!local)("the demo on the built-in database", () => {
     // 208's letter is approved and marked sent; 205 (the debrief target) has an empty profile.
     const letters = await latestLetters(sql);
     expect(letters["00000000-0000-4000-8000-000000000208"]).toMatchObject({ status: "done", sent: true });
+    // The follow-up due soonest is in her niche (the hospice bereavement coordinator), not the OB-GYN.
+    const { outreachPlan } = await import("../lib/referrals/plan");
+    const plan = await outreachPlan(sql);
+    expect(plan.follow_ups[0]?.name).toBe("[Sample] Hollis Vance");
+    expect(plan.follow_ups.map((f) => f.name)).toContain("[Sample] Thistlewood OB-GYN");
     // That letter is in the current letter style: the niche, her plans, phone and email, the demo sign-off, and the letter rules pass.
     const { checkLetter } = await import("../lib/referrals/outreach");
     const [sample] = await sql<{ letter: string; body: string }[]>`
