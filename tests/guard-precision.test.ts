@@ -4,7 +4,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { blankNames, guard, titleCase } from "../lib/aeon/guard";
+import { PART_LEFT_OUT, blankNames, guard, titleCase } from "../lib/aeon/guard";
 import { OFFICIAL_PHONES, checkIdentity } from "../lib/aeon/identity-filter";
 import { NER_MODEL, isNameLike, modelCacheDir } from "../lib/aeon/phi-classifier";
 import { FREE_TEXT_TOOLS, TOOLS_BY_NAME } from "../lib/aeon/tools";
@@ -173,9 +173,11 @@ describe.skipIf(!haveModel)("guard with the local name-finder", () => {
     expect(await guard("My client Sam, a tech worker, has anxiety", "message", LEAK_ALLOWED)).toEqual({ ok: false, kind: "diagnosis" });
   });
 
-  it("a stranger's phone in a reply is refused; a board phone isn't", async () => {
+  it("a stranger's phone in a reply is left out; a board phone isn't", async () => {
     const reply = "Your board has a provider near you: Gary Bucher, LCPC. His office phone is (312) 555-0188.";
-    expect(await guard(reply, "reply", LEAK_ALLOWED)).toEqual({ ok: false, kind: "contact" });
+    // Only the sentence with the phone goes (Nov 3: one part shouldn't blank the whole reply).
+    expect(await guard(reply, "reply", LEAK_ALLOWED)).toEqual({ ok: true, text: `Your board has a provider near you: Gary Bucher, LCPC. ${PART_LEFT_OUT}` });
+    expect(await guard("His office phone is (312) 555-0188.", "reply", LEAK_ALLOWED)).toEqual({ ok: false, kind: "contact" });
     const allow = { ...LEAK_ALLOWED, contacts: [...LEAK_ALLOWED.contacts, "(312) 555-0188"] };
     expect(await guard(reply, "reply", allow)).toEqual({ ok: true, text: reply });
   });

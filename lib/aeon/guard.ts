@@ -10,12 +10,15 @@ import {
   clientLike,
   clinicalForMemory,
   colleagueAt,
+  foldTypos,
+  mentionsMedical,
   mentionsDiagnosis,
   namedCondition,
   ownContext,
   personalDetail,
   referralContext,
   sentenceAt,
+  sentenceSpans,
   type Allowlist,
   type PhiKind,
 } from "./identity-filter";
@@ -34,6 +37,8 @@ export const REFUSAL: Record<GuardKind, string> = {
   identifier: "That looks like an ID number (SSN, member or record number). I can't keep those. Ask again without it.",
   contact: "That looks like someone's email or phone number. I can't keep client contact details yet. Ask again without it.",
   address: "That looks like someone's home address. I can't keep client details yet. Ask again without it.",
+  identifying:
+    "That describes one client closely enough to pick them out (an age, a job, a place or a health detail). I can't keep client details yet. Ask again without those details.",
   unavailable: "My privacy check isn't working right now, so I can't read messages. Try again in a minute.",
   too_long: "That's too long for my privacy check to read in full, so I left its text out. Ask about a shorter part, or open it on the Files page.",
 };
@@ -41,6 +46,8 @@ export const REFUSAL: Record<GuardKind, string> = {
 /** What a model sees in place of a tool result the rules refused. */
 export const WITHHELD = "[withheld: this result may contain a client detail]";
 const NAME_WITHHELD = "[name withheld]";
+/** What stands in Aeon's reply for one line or card the guard left out. */
+export const PART_LEFT_OUT = "[left out: this part may hold a client detail]";
 
 function escape(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -51,9 +58,14 @@ function wholeWord(name: string, flags: string): RegExp {
   return new RegExp(`(?<![\\p{L}\\p{N}])${escape(name)}(?![\\p{L}\\p{N}])`, `${flags}u`);
 }
 
-// Titles and credentials are not part of a name when names are compared ("Dr. Carin Gordon, LCSW" is "carin gordon").
+// Titles, credentials and sample labels are not part of a name when names are
+// compared ("Dr. Carin Gordon, LCSW" is "carin gordon", "[Sample] Rev. Tobias
+// Wren" is "tobias wren", "Brittany Keiser, MS, CGC" is "brittany keiser").
 const TITLE_WORDS = new Set(
-  "dr doctor mr mrs ms mx miss prof professor md do phd psyd edd lcsw licsw lcpc lpc lpcc lmhc lmft mft np pmhnp aprn rn".split(" "),
+  (
+    "dr doctor mr mrs ms mx miss prof professor rev reverend fr pastor chaplain md do phd psyd edd dnp lcsw licsw lsw msw lcpc lpc lpcc lmhc lmft mft " +
+    "np fnp pmhnp aprn rn bsn msn pa-c cgc msgc ma cns bcc mdiv sample test"
+  ).split(" "),
 );
 
 const wordsOf = (name: string) =>
@@ -61,6 +73,7 @@ const wordsOf = (name: string) =>
     .toLowerCase()
     .replace(/['’]s?$/u, "")
     .split(/[\s.,]+/)
+    .map((w) => w.replace(/^[[(]+|[\])]+$/g, ""))
     .filter((w) => w && !TITLE_WORDS.has(w));
 
 /** Every word of the name is in one entry ("Dana" in "Dana Reyes"). */
@@ -81,6 +94,21 @@ function wholeOf(words: string[], list: string[]): boolean {
 
 const TITLE_BEFORE = /\b(?:Dr|Doctor)\.?\s+$/i;
 
+const COMMANDS =
+  "mark|move|log|draft|e-?mail|call|text|add|find|show|remove|archive|message|remind|schedule|send|write|open|update|edit|invite|ask|tell|contact|check|follow\\s+up\\s+with";
+const COMMAND_AT_START = new RegExp(`^\\s*(?:please\\s+)?(?:${COMMANDS})\\b`, "i");
+const COMMAND_BEFORE_NAME =
+  /^(?:mark|move|log|draft|e-?mail|call|text|add|find|show|remove|archive|message|remind|schedule|send|write|open|update|edit|invite|ask|tell|contact|check|follow\s+up\s+with)\s+(.+)$/i;
+const STAFF_AFTER =
+  /^\s*(?:(?:at|from|on|in)\s+(?:the|their|our)\s+front\s+desk|,?\s*(?:their|the|our)\s+(?:office|practice|clinic)\s+manager|(?:in|from)\s+(?:their|the)\s+(?:billing|scheduling|referrals?|intake)\s+(?:office|team|department|desk))\b/i;
+const STAFF_BEFORE =
+  /\b(?:their|the)\s+(?:receptionist|scheduler|office\s+manager|practice\s+manager|front\s+desk(?:\s+person)?|referral\s+coordinator|intake\s+coordinator)\s*,?\s*$/i;
+
+/** A first name introduced as a partner office's staff: "Jen at the front desk", "their office manager, Jen". */
+function staffAt(text: string, at: number, name: string): boolean {
+  return STAFF_AFTER.test(text.slice(at + name.length, at + name.length + 40)) || STAFF_BEFORE.test(text.slice(Math.max(0, at - 40), at));
+}
+
 export type PersonVerdict = { verdict: "ok" } | { verdict: "blank" } | { verdict: "refuse"; kind: PhiKind };
 
 /**
@@ -100,7 +128,13 @@ export type PersonVerdict = { verdict: "ok" } | { verdict: "blank" } | { verdict
  * (a visit, a bill, a condition), otherwise blanked where blanking is allowed.
  */
 export function judgePerson(name: string, text: string, allow: Allowlist): PersonVerdict {
+  // "Mark Brittany Keiser as contacted": the name-finder can take the command
+  // word as a first name. When the rest is a whole name on her list, judge that.
+  const command = COMMAND_BEFORE_NAME.exec(name);
+  if (command && wholeOf(wordsOf(command[1]), allow.names)) return judgePerson(command[1], text, allow);
   const words = wordsOf(name);
+  // Only titles or a sample label ("Rev.", "[Sample]"): no one is named.
+  if (words.length === 0) return { verdict: "ok" };
   const directory = allow.directory ?? [];
   const own = allow.names.filter((n) => !directory.includes(n));
   const ownWhole = wholeOf(words, own);
@@ -117,8 +151,13 @@ export function judgePerson(name: string, text: string, allow: Allowlist): Perso
     if (clean && ownWhole) continue;
     if (clean && ownPart && ownContext(s)) continue;
     const titled = at >= 0 && TITLE_BEFORE.test(text.slice(Math.max(0, at - 8), at));
-    if (clean && (boardWhole || boardPart) && (referralContext(s) || (boardPart && titled))) continue;
+    // A command to her about a board name ("Text Brittany Keiser to confirm coffee") is referral work.
+    const command = COMMAND_AT_START.test(s) && !clientLike(s);
+    if (clean && (boardWhole || boardPart) && (referralContext(s) || command || (boardPart && titled))) continue;
     if (at >= 0 && colleagueAt(text, at, name) && !condition) continue;
+    // A partner's staff by first name ("Jen at the front desk handles it"), outside any client sentence.
+    // Never with a health word or diagnosis in the sentence ("Jen at the front desk is pregnant").
+    if (at >= 0 && words.length === 1 && staffAt(text, at, name) && !condition && !clientLike(s) && !MY_CLIENT.test(s) && !mentionsDiagnosis(s) && !mentionsMedical(s)) continue;
     if (condition || clientLike(s)) return { verdict: "refuse", kind: mentionsDiagnosis(s) ? "diagnosis" : "client_name" };
     blank = true;
   }
@@ -189,7 +228,46 @@ function joinSpacedLetters(text: string): string {
  * name. Used for checking only; what is saved is unchanged.
  */
 export function normalizeForCheck(text: string): string {
-  return joinSpacedLetters(foldLookalikes(text.normalize("NFKD").replace(/[\p{M}\p{Cf}]/gu, "").normalize("NFKC")));
+  return foldTypos(joinSpacedLetters(foldLookalikes(text.normalize("NFKD").replace(/[\p{M}\p{Cf}]/gu, "").normalize("NFKC"))));
+}
+
+// Digits and symbols written for letters ("cl1ent S4rah K1ein", "p@tient",
+// "k!ll"). "1" and "|" can be i or l, so there are two readings. Only inside a
+// word with at least two letters, never a plain number, a time or an ordinal
+// ("4pm", "1st", "90837"): those are checked as written.
+const LEET: Record<string, [string, string]> = {
+  "1": ["i", "l"], "|": ["i", "l"], "!": ["i", "i"], "4": ["a", "a"], "@": ["a", "a"],
+  "3": ["e", "e"], "0": ["o", "o"], "5": ["s", "s"], $: ["s", "s"], "7": ["t", "t"],
+};
+const LEET_CHAR = /[\p{L}013457@$!|]/u;
+const LEET_TOKEN = /[\p{L}013457@$!|]+/gu;
+const NUMBER_WITH_UNIT = /^\d+(?:st|nd|rd|th|am|pm|s|k|x|yo|mg|ml|mi|hrs?|min|mins|f|m)$/i;
+
+function foldLeetWith(text: string, pick: 0 | 1): string {
+  return text.replace(LEET_TOKEN, (t) => {
+    if ((t.match(/\p{L}/gu)?.length ?? 0) < 2 || NUMBER_WITH_UNIT.test(t)) return t;
+    const chars = [...t];
+    return chars
+      .map((c, i) => {
+        const swap = LEET[c];
+        if (!swap) return c;
+        const before = i > 0 && LEET_CHAR.test(chars[i - 1]);
+        const after = i + 1 < chars.length && LEET_CHAR.test(chars[i + 1]);
+        // Inside a word ("S4rah", "k!ll"), or starting one before a letter ("$arah", "5arah").
+        return after && (before || /\p{L}/u.test(chars[i + 1])) ? swap[pick] : c;
+      })
+      .join("");
+  });
+}
+
+/** The leet readings of text already cleaned by normalizeForCheck that differ from it. */
+export function leetVariants(plain: string): string[] {
+  const out = new Set<string>();
+  for (const pick of [0, 1] as const) {
+    const v = foldTypos(foldLeetWith(plain, pick));
+    if (v !== plain) out.add(v);
+  }
+  return [...out];
 }
 
 export type GuardOptions = {
@@ -210,7 +288,115 @@ export async function guard(text: string, at: GuardPoint, allow?: Allowlist, opt
     names: raw.names.map(normalizeForCheck),
     contacts: raw.contacts.map(normalizeForCheck),
     ...(raw.directory ? { directory: raw.directory.map(normalizeForCheck) } : {}),
+    ...(raw.places ? { places: raw.places.map(normalizeForCheck) } : {}),
   };
+  const whole = await checkWithVariants(text, at, list, opts);
+  if (whole.ok || at !== "reply" || whole.kind === "unavailable" || whole.kind === "too_long") return whole;
+  // One card or line shouldn't blank Aeon's whole answer: leave out only the parts
+  // that are refused on their own. Anything less clear-cut refuses the whole reply.
+  return (await withoutRefusedParts(text, list, opts)) ?? whole;
+}
+
+/** The text as written, then each leet reading of it ("cl1ent S4rah K1ein"). */
+async function checkWithVariants(text: string, at: GuardPoint, list: Allowlist, opts: GuardOptions): Promise<GuardResult> {
+  const first = await checkOnce(text, at, list, opts);
+  if (!first.ok) return first;
+  // Public directory and rule text (a light tool result) is read as written.
+  if (at === "tool_result" && !opts.fullRules) return first;
+  for (const variant of leetVariants(normalizeForCheck(text))) {
+    const r = await checkOnce(variant, at, list, opts);
+    if (!r.ok) return r;
+    // A name that only shows up when the digits are read as letters can't be
+    // blanked where it stands, so it is refused.
+    if (r.text !== variant) return { ok: false, kind: "client_name" };
+  }
+  return first;
+}
+
+/**
+ * Aeon's reply split into lines or cards (or sentences when it is one
+ * paragraph). The parts the guard refuses on their own are replaced with
+ * PART_LEFT_OUT, and the rest is checked again as a whole. Null (refuse the
+ * whole reply) when no single part is at fault, when more than half would go,
+ * or when what is left still fails.
+ */
+const PERSON_HINT = /\b(?:she|he|her|hers|his|him|they|them|client|patient|caller)\b/i;
+const NO_SUBJECT =
+  /^(?:and|but|also|or|plus|started|starting|finished|has|had|is|was|were|got|went|just|recently|lives|living|works|working|wants|needs|who|which|whose|diagnosed|turned|turns)\b/i;
+
+function leansOnNeighbour(part: string): boolean {
+  const body = part.replace(/^\s*(?:(?:[-*•]|\d+[.)])\s+)?/, "");
+  return PERSON_HINT.test(body) || NO_SUBJECT.test(body) || /^\p{Ll}/u.test(body) || mentionsMedical(body) || mentionsDiagnosis(body);
+}
+
+async function withoutRefusedParts(text: string, list: Allowlist, opts: GuardOptions): Promise<GuardResult | null> {
+  const isContent = (p: string) => p.trim() !== "";
+  let parts = text.split(/(\n+)/);
+  if (parts.filter(isContent).length < 2) parts = sentenceSpans(text).map(([s, e]) => text.slice(s, e));
+  const content = parts.filter(isContent);
+  if (content.length < 2) return null;
+  const checked: (string | null)[] = [];
+  for (const p of parts) {
+    if (!isContent(p)) {
+      checked.push(p);
+      continue;
+    }
+    const r = await checkWithVariants(p, "reply", list, opts);
+    if (r.ok) {
+      checked.push(r.text);
+      continue;
+    }
+    // A health detail or a client pinned down by details is spread over the
+    // sentences around it ("Your client is 61. She lives in ... She has ..."):
+    // never kept in part.
+    if (r.kind === "unavailable" || r.kind === "too_long" || r.kind === "diagnosis" || r.kind === "identifying") return null;
+    checked.push(null);
+  }
+  // A part next to one left out goes too when it leans on it: a person word
+  // ("she", "the client"), no subject of its own ("Started chemo last week"),
+  // or a health word.
+  const contentAt = parts.map((p, i) => (isContent(p) ? i : -1)).filter((i) => i >= 0);
+  const out = new Set(contentAt.filter((i) => checked[i] === null));
+  for (const i of [...out]) {
+    const k = contentAt.indexOf(i);
+    for (const j of [contentAt[k - 1], contentAt[k + 1]]) {
+      if (j !== undefined && !out.has(j) && leansOnNeighbour(parts[j])) out.add(j);
+    }
+  }
+  if (out.size === 0 || out.size * 2 > content.length) return null;
+  const dropped = [...out].map((i) => parts[i]);
+  const kept = parts.map((p, i) => {
+    if (!out.has(i)) return checked[i] ?? p;
+    // Keep the list marker and spacing, so a numbered plan still reads as one.
+    const lead = /^\s*(?:(?:[-*•]|\d+[.)])\s+)?/.exec(p)?.[0] ?? "";
+    const trail = /\s*$/.exec(p)?.[0] ?? "";
+    return `${lead}${PART_LEFT_OUT}${trail}`;
+  });
+  const rest = kept.join("");
+  // A person named in a part that was left out is tied to a client detail there,
+  // so their name anywhere else in the reply says too much: hold it all back.
+  try {
+    const restPlain = normalizeForCheck(rest);
+    for (const p of dropped) {
+      const plain = normalizeForCheck(p);
+      const found = [...(await findNames(plain)), ...(await findNames(titleCase(plain), { secondReads: false }))];
+      for (const n of found.filter(isNameLike)) {
+        if (wordsOf(n).some((w) => w.length > 1 && wholeWord(w, "i").test(restPlain))) return null;
+      }
+    }
+  } catch {
+    return null;
+  }
+  const again = await checkWithVariants(rest, "reply", list, opts);
+  return again.ok ? again : null;
+}
+
+/** Joins a line break that splits a sentence: the line before doesn't end one, and the next isn't a list item. */
+function joinBrokenLines(text: string): string {
+  return text.replace(/([^.!?:;\s])[ \t]*\n+[ \t]*(?!(?:[-*•]|\d+[.)])\s)/g, "$1 ");
+}
+
+async function checkOnce(text: string, at: GuardPoint, list: Allowlist, opts: GuardOptions): Promise<GuardResult> {
   const plain = normalizeForCheck(text);
   const light = at === "tool_result" && !opts.fullRules;
   const rules = light ? checkIdentity(plain, list, TOOL_RESULT_RULES) : checkIdentity(plain, list);
@@ -218,7 +404,20 @@ export async function guard(text: string, at: GuardPoint, allow?: Allowlist, opt
   const detail = light ? personalDetail(plain, list) : null;
   if (detail) return { ok: false, kind: detail };
   // Memory holds practice-business facts only: no clinical content, even with no name.
-  if (at === "memory" && clinicalForMemory(plain)) return { ok: false, kind: "diagnosis" };
+  if (at === "memory" && clinicalForMemory(plain, list.places)) return { ok: false, kind: "diagnosis" };
+  // A line break can split one sentence ("My client has\nPTSD"), so the rules
+  // also read a copy with every line joined; names are also judged in a copy
+  // where only lines broken mid-sentence are joined (a list stays a list).
+  const joined = light ? plain : joinBrokenLines(plain);
+  if (!light) {
+    // List markers go too, so "My client has\n1. PTSD" reads as one sentence.
+    const flat = plain.replace(/[ \t]*\n+[ \t]*(?:(?:[-*•]|\d+[.)])\s+)?/g, " ");
+    if (flat !== plain) {
+      const again = checkIdentity(flat, list);
+      if (!again.ok) return { ok: false, kind: again.kind };
+      if (at === "memory" && clinicalForMemory(flat, list.places)) return { ok: false, kind: "diagnosis" };
+    }
+  }
 
   let names: string[];
   let cased: string[];
@@ -237,7 +436,9 @@ export async function guard(text: string, at: GuardPoint, allow?: Allowlist, opt
   for (const n of names.filter(isNameLike)) {
     const v = judgePerson(n, plain, list);
     if (v.verdict === "refuse") return { ok: false, kind: v.kind };
-    if (v.verdict === "blank") strangers.push(n);
+    const w = joined === plain ? v : judgePerson(n, joined, list);
+    if (w.verdict === "refuse") return { ok: false, kind: w.kind };
+    if (v.verdict === "blank" || w.verdict === "blank") strangers.push(n);
   }
   // A name found only in the capitalized copy is judged as written, the same
   // way. A one-word hit there ("hope", "will") is often an everyday word, so it
@@ -246,6 +447,10 @@ export async function guard(text: string, at: GuardPoint, allow?: Allowlist, opt
     for (const m of titled.matchAll(wholeWord(n, "g"))) {
       const asWritten = plain.slice(m.index ?? 0, (m.index ?? 0) + n.length);
       if (asWritten === n) continue;
+      // "Dr. Tellez treats" read as one name in the capitalized copy: when the
+      // capitalized words are her own or a board name, that name was judged above.
+      const capital = asWritten.split(/\s+/).filter((w) => /^\p{Lu}/u.test(w));
+      if (capital.length > 0 && capital.length < asWritten.split(/\s+/).length && partOf(wordsOf(capital.join(" ")), list.names)) continue;
       const v = judgePerson(asWritten, plain, list);
       if (v.verdict === "refuse") return { ok: false, kind: v.kind };
       if (v.verdict === "blank" && /\s/.test(n.trim())) strangers.push(asWritten);
@@ -284,8 +489,8 @@ export async function practiceAllowlist(): Promise<Allowlist> {
   if (!process.env.DATABASE_URL) return { names: [], contacts: [] };
   if (cached && Date.now() - cached.at < CACHE_MS) return cached.list;
   const sql = db();
-  const [profile] = await sql<{ full_name: string; practice_name: string }[]>`
-    select full_name, practice_name from practice_os.clinician_profile limit 1`;
+  const [profile] = await sql<{ full_name: string; practice_name: string; city: string | null; neighborhood: string | null }[]>`
+    select full_name, practice_name, city, neighborhood from practice_os.clinician_profile limit 1`;
   const [cred] = await sql<{ identity: Record<string, string>; practice_location: Record<string, unknown> }[]>`
     select identity, practice_location from practice_os.credentialing_profile limit 1`.catch(() => []);
   const sources = await sql<{ name: string; organization: string | null; email: string | null; phone: string | null; address: string | null }[]>`
@@ -302,6 +507,7 @@ export async function practiceAllowlist(): Promise<Allowlist> {
   ];
   const present = (v: string | null | undefined): v is string => Boolean(v);
   const directory = sources.flatMap((s) => [s.name, s.organization]).filter(present);
-  cached = { at: Date.now(), list: { names: names.filter(present), contacts: contacts.filter(present), directory } };
+  const places = [profile?.city, profile?.neighborhood].filter(present);
+  cached = { at: Date.now(), list: { names: names.filter(present), contacts: contacts.filter(present), directory, places } };
   return cached.list;
 }
