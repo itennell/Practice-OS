@@ -31,7 +31,7 @@ Every UI piece Isaiah picked for Practice-OS, where it goes, and how to build it
 | CHT | Chat with Aeon | Message input, bubbles, Aeon thinking, approval cards inside the chat. | UI-005, UI-006, UI-011, UI-014, UI-015, UI-027 |
 | APR | Approvals | The approvals inbox. Uses the global Status Mark (UI-010); no screen-only elements yet. | none yet |
 | DLN | Deadlines | Compliance calendar and its month view. | UI-030 |
-| REF | Referrals | Referral pipeline. No screen-only elements yet; uses the global pieces. | none yet |
+| REF | Referrals | Referral pipeline. No screen-only elements yet; uses the global pieces (the coffee Debrief on a card, components/referrals/debrief.tsx, is the Voice Pill UI-015 plus Thought Line UI-014). | none yet |
 | IGM | Instagram | Post composer and content calendar. | UI-023 |
 | FDK | Front Desk | Inquiries queue and consult schedule. | UI-025 |
 | SET | Settings | Auto-approve, connections, practice details. | UI-007, UI-032 |

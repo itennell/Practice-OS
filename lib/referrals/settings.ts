@@ -4,6 +4,7 @@
 import type postgres from "postgres";
 import { audit } from "../audit";
 import { db } from "../db";
+import { isNichePreset, SOURCE_TYPE_BY_ID } from "./catalog";
 import { SPECIALTY_BY_ID, type SpecialtyId } from "./nppes";
 
 export type ReferralSettings = {
@@ -33,10 +34,16 @@ export async function getReferralSettings(sql: postgres.Sql = db()): Promise<Ref
 }
 
 /** Saves what she gave; a field left out keeps its saved value. Throws in plain words on bad input. */
-export async function saveReferralSettings(input: { homeZip?: string | null; specialties?: string[] }, sql: postgres.Sql = db()) {
+export async function saveReferralSettings(
+  input: { homeZip?: string | null; specialties?: string[]; nichePreset?: string | null },
+  sql: postgres.Sql = db(),
+) {
   const zip = input.homeZip?.trim() || null;
   if (zip !== null && !/^\d{5}$/.test(zip)) throw new Error("Type your 5-digit ZIP code.");
-  if (input.specialties?.some((s) => !SPECIALTY_BY_ID.has(s as SpecialtyId))) throw new Error("Pick from the list.");
+  // The database only checks an id's shape (migration 043); the list itself is checked here, against the catalog.
+  if (input.specialties?.some((s) => !SPECIALTY_BY_ID.has(s as SpecialtyId) || (SOURCE_TYPE_BY_ID.size > 0 && !SOURCE_TYPE_BY_ID.has(s)))) throw new Error("Pick from the list.");
+  const niche = input.nichePreset ?? null;
+  if (niche !== null && !isNichePreset(niche)) throw new Error("Pick a niche from the list.");
   const specialties = input.specialties ? [...new Set(input.specialties)] : null;
   await sql`
     insert into practice_os.referral_settings (id, home_zip, specialties)
@@ -45,5 +52,15 @@ export async function saveReferralSettings(input: { homeZip?: string | null; spe
       home_zip = ${input.homeZip === undefined ? sql`referral_settings.home_zip` : sql`excluded.home_zip`},
       specialties = ${specialties === null ? sql`referral_settings.specialties` : sql`excluded.specialties`},
       updated_at = now()`;
-  await audit({ actor: "clinician", action: "referral_settings_saved", subjectType: "referral_settings", details: { homeZip: zip, specialties } }, sql);
+  // Only when she gave one, so a database without migration 043 still saves the rest.
+  if (input.nichePreset !== undefined) await sql`update practice_os.referral_settings set niche_preset = ${niche}, updated_at = now() where id`;
+  await audit(
+    {
+      actor: "clinician",
+      action: "referral_settings_saved",
+      subjectType: "referral_settings",
+      details: { homeZip: zip, specialties, ...(input.nichePreset !== undefined ? { nichePreset: niche } : {}) },
+    },
+    sql,
+  );
 }

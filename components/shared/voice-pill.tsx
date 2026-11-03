@@ -31,6 +31,11 @@ export type VoicePillProps = {
   onError?: (message: string) => void;
   disabled?: boolean;
   className?: string;
+  /** The mic button's name before and during recording (dictation: "Dictate" / "Stop and turn into text"). */
+  startLabel?: string;
+  stopLabel?: string;
+  /** Called with true when recording starts and false when it ends. */
+  onRecordingChange?: (recording: boolean) => void;
 };
 
 type Live = {
@@ -44,7 +49,15 @@ type Live = {
   keep: boolean;
 };
 
-export function VoicePill({ onRecorded, onError, disabled = false, className }: VoicePillProps) {
+export function VoicePill({
+  onRecorded,
+  onError,
+  disabled = false,
+  className,
+  startLabel = "Dictate",
+  stopLabel = "Stop and turn into text",
+  onRecordingChange,
+}: VoicePillProps) {
   const reduce = useReducedMotion();
   const [recording, setRecording] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -62,6 +75,7 @@ export function VoicePill({ onRecorded, onError, disabled = false, className }: 
     void l.ctx.close();
     live.current = null;
     setRecording(false);
+    onRecordingChange?.(false);
   };
 
   const draw = () => {
@@ -137,6 +151,7 @@ export function VoicePill({ onRecorded, onError, disabled = false, className }: 
       recorder.start(250);
       setElapsed(0);
       setRecording(true);
+      onRecordingChange?.(true);
       l.raf = requestAnimationFrame(draw);
     } catch {
       onError?.("The microphone is blocked. Allow it in your browser's site settings, or type instead.");
@@ -216,7 +231,7 @@ export function VoicePill({ onRecorded, onError, disabled = false, className }: 
         // Not disabled while the mic starts: a disabled button drops keyboard focus.
         disabled={disabled}
         aria-busy={starting || undefined}
-        aria-label={recording ? "Stop and turn into text" : "Dictate"}
+        aria-label={recording ? stopLabel : startLabel}
         aria-pressed={recording}
         className={cn(
           "inline-flex size-11 shrink-0 items-center justify-center rounded-full transition-colors duration-150 disabled:opacity-50",

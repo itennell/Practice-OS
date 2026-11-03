@@ -55,6 +55,7 @@ import { GROWTH_ALWAYS_RUNS, GROWTH_TOOLS } from "./tools-growth";
 import { fileTools } from "./tools-files";
 import { forget, MEMORY_KINDS, MemoryRefused, recentChanges, remember } from "./memory";
 import { ABOUT_NAMES, ASK_WHICH, choiceOf, noCard, REFERRAL_TOOLS, whatItSays } from "./tools-referrals";
+import { DEBRIEF_TOOLS } from "./tools-debrief";
 import { outOfStateWarning } from "../referrals/states";
 import { RULES_TOOLS } from "./tools-rules";
 import { SETTINGS_TOOLS } from "./tools-settings";
@@ -1402,6 +1403,7 @@ export const TOOLS: AeonTool[] = [
 
   // Find any card, do-not-contact, and change a waiting letter (lib/aeon/tools-referrals.ts).
   ...REFERRAL_TOOLS,
+  ...DEBRIEF_TOOLS,
 
   // ---- Instagram (Instagram session) ---------------------------------------------------------
   tool({
