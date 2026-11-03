@@ -418,6 +418,7 @@ const KIND_WORDS: Record<DocumentKind, string[]> = {
   guide: ["how", "guide", "steps"],
   uploaded: ["uploaded", "added", "contract", "letter", "certificate", "w9", "malpractice", "fee", "schedule"],
   referral_letter: ["referral", "referrals", "letter", "letters", "intro", "introduction", "outreach"],
+  referral_debrief: ["debrief", "coffee", "meeting", "met", "referral", "partner"],
   instagram_post: ["instagram", "post", "posts", "caption", "picture", "social"],
 };
 

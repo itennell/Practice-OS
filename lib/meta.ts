@@ -390,6 +390,22 @@ export async function transcribe(
   if (audio.length > MAX_AUDIO_BYTES) {
     throw new MetaApiError(`${wavPath} is over the 32 MB limit.`, null, null);
   }
+  return transcribeBytes(feature, audio, path.basename(wavPath), options);
+}
+
+/**
+ * The same call from bytes in memory, so audio that must never touch the disk
+ * (a coffee debrief, lib/referrals/debrief.ts) is sent straight from the request.
+ */
+export async function transcribeBytes(
+  feature: string,
+  audio: Buffer,
+  filename = "audio.wav",
+  options: { mode?: "PUSH_TO_TALK" | "ENDPOINTING" | "DIARIZATION"; keywords?: string[] } = {},
+) {
+  if (audio.length > MAX_AUDIO_BYTES) {
+    throw new MetaApiError(`${filename} is over the 32 MB limit.`, null, null);
+  }
   const request: Record<string, unknown> = {
     mode: options.mode ?? "PUSH_TO_TALK",
     model: MODELS.transcribe,
@@ -403,7 +419,7 @@ export async function transcribe(
     async () => {
       const form = new FormData();
       form.append("request", new Blob([JSON.stringify(request)], { type: "application/json" }));
-      form.append("audio", new Blob([audio]), path.basename(wavPath));
+      form.append("audio", new Blob([new Uint8Array(audio)]), filename);
       const res = await fetch(TRANSCRIBE_URL, {
         method: "POST",
         headers: { Authorization: `Bearer ${requireEnv("MODEL_API_KEY")}` },

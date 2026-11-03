@@ -40,6 +40,22 @@ export type ReferralSource = {
   website?: string | null;
   introduced_by?: string | null;
   confidence?: "confirmed" | "partly" | "unconfirmed" | null;
+} & Partial<PartnerProfile> & {
+  /** A card Aeon suggested from a debrief with this partner: labelled, never contacted on its own (migration 044). */
+  suggested_from?: string | null;
+};
+
+/** What she learned over coffee and confirmed (lib/referrals/debrief.ts, migration 044). Practice-business facts only. */
+export type PartnerProfile = {
+  refers_via: "fax" | "portal" | "email" | "phone" | null;
+  referral_contact: string | null;
+  populations: string[] | null;
+  needs_from_therapist: string | null;
+  waitlist: boolean | null;
+  payer_mix: string | null;
+  best_time: string | null;
+  last_meeting_summary: string | null;
+  connection_points: string | null;
 };
 
 export type FoundSource = Provider & { distanceMiles: number | null; fitScore: number; id?: string };
@@ -233,7 +249,9 @@ const COLUMNS = `id, npi, name, organization, taxonomy, specialty, npi_type, cre
   phone, email,
   case when stage = 'contacted' and next_follow_up_on <= $1::date then 'follow_up' else stage end as stage,
   distance_miles::float8 as distance_miles, fit_score, score_version, last_contacted_at, next_follow_up_on::text as next_follow_up_on,
-  notes, is_sample, website, introduced_by, confidence`;
+  notes, is_sample, website, introduced_by, confidence,
+  refers_via, referral_contact, populations, needs_from_therapist, waitlist, payer_mix, best_time,
+  last_meeting_summary, connection_points, suggested_from`;
 
 /** Every card, best fit first. Read-only: due follow-ups show as Follow up without being moved. */
 export async function listSources(sql: postgres.Sql = db()): Promise<ReferralSource[]> {
