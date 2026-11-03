@@ -282,7 +282,7 @@ function unsaid(s: string): string {
 //  2. inside a vetted care-setting job or service ("the hospice social worker", "grief counseling").
 const GROUP_NOUN =
   "patients|clients|adults|families|people|parents|kids|children|teens|teenagers|women|men|moms|dads|mothers|fathers|seniors|veterans|students|couples|folks|caregivers|survivors|youth|members|spouses|widows|widowers";
-const GROUP_LINK = "with|in|facing|after|going\\s+through|dealing\\s+with|coping\\s+with|living\\s+with|affected\\s+by|navigating|recovering\\s+from|who\\s+have|who\\s+are|who've";
+const GROUP_LINK = "with|in|facing|after|going\\s+through|dealing\\s+with|coping\\s+with|living\\s+with|(?:often\\s+|usually\\s+|mostly\\s+)?(?:deal|cope|live|face|go\\s+through)(?:\\s+with)?|affected\\s+by|navigating|recovering\\s+from|who\\s+have|who\\s+are|who've";
 // Never after a count ("both patients with", "two families after") and never with someone's word in it.
 const GROUP_SPAN = new RegExp(
   `(?<!\\b(?:both|two|three|four|five|six|seven|eight|nine|ten|these|those|this|that|either|neither|\\d+)\\s+(?:of\\s+(?:the|their|our|her|his)\\s+)?(?:[\\w'’-]+\\s+)?)\\b(?:${GROUP_NOUN})\\s+(?:${GROUP_LINK})\\s+(?:(?!(?:and|but|or|who|whose|because|since|so|while|when|that|which|she|he|they|his|her|him|their|them|its)\\b)[\\w'’-]+\\s*){1,6}`,
@@ -298,7 +298,7 @@ const CARE_SERVICE = new RegExp(
 /** The sentence with the two allowed places for health words masked. */
 function healthAllowed(s: string): string {
   const once = WEEKDAY.test(s) || A_DATE.test(s) || /\b(?:yesterday|tonight|last\s+(?:night|week|month))\b/i.test(s);
-  const groups = once ? s : s.replace(GROUP_SPAN, (m) => (WHEN_OR_WHERE.test(m) ? m : " group "));
+  const groups = once ? s : s.replace(DIAGNOSED_GROUP, " patients ").replace(GROUP_SPAN, (m) => (WHEN_OR_WHERE.test(m) ? m : " group "));
   return groups.replace(CARE_SERVICE, " service ");
 }
 
@@ -376,6 +376,8 @@ function healthBeforeJob(s: string): boolean {
   return [...leetFold(s).matchAll(BEFORE_JOB)].some((m) => healthWord(m[1].replace(CARE_WORDS, " ")));
 }
 
+// "Newly diagnosed patients' families": who they serve, a group.
+const DIAGNOSED_GROUP = /\b(?:newly|recently)\s+diagnosed\s+(?:\w+\s+)?(?:patients|adults|people|families|women|men|kids|children|teens|clients|parents)\b/gi;
 const HANDLER_PHRASE =
   /\b(?:the|a)\s+(?:person|one)\s+(?:who|that)\s+(?:handles?|takes?|does|manages?|coordinates?|processes?|reviews?)\s+(?:the\s+|all\s+|their\s+|our\s+)?(?:referrals?|intake)\b|\b(?:the|a)\s+(?:person|one)\s+to\s+(?:ask\s+for|talk\s+to|call|contact|reach)\b/gi;
 // A masked vetted name in apposition (", the colleague," or "intake coordinator the colleague") is taken out
@@ -398,7 +400,7 @@ export function aboutAPatient(s: string): boolean {
   const folded = leetFold(s);
   // "The person who handles referrals" is a staff role, not one person's story.
   const residue = leetFold(withoutOrgs(withoutCareRoles(s))).replace(HANDLER_PHRASE, "the staff");
-  if (ONE_PATIENT.test(s) || POSSESSIVE_PATIENT.test(s) || AN_AGE.test(s) || DIAGNOSED.test(folded) || ROOM.test(s)) return true;
+  if (ONE_PATIENT.test(s) || POSSESSIVE_PATIENT.test(s) || AN_AGE.test(s) || DIAGNOSED.test(folded.replace(DIAGNOSED_GROUP, " patients ")) || ROOM.test(s)) return true;
   if (FAMILY.test(residue) || ONE_PERSON.test(residue) || HONORIFIC.test(s) || hasInitials(s)) return true;
   if ((A_DATE.test(s) || WEEKDAY.test(s)) && PRONOUN.test(s) && VISIT.test(s)) return true;
   if (A_DATE.test(s) && VISIT.test(s)) return true;
@@ -441,9 +443,18 @@ const CREDENTIAL = "MD|DO|RN|NP|PA|PA-C|APRN|CNM|LCSW|LICSW|LCPC|LPC|LMFT|LMHC|P
 const TITLE_BEFORE = /\b(?:Dr|Doctor)\.?\s+$/;
 const CREDENTIAL_AFTER = new RegExp(`^,?\\s*(?:${CREDENTIAL})\\b(?!['’])`);
 const APPOSITIVE_AFTER = new RegExp(
-  `^,?\\s*(?:who(?:'s|’s|\\s+is)\\s+)?(?:the|our|their|her|his|a|an)\\s+(?:[\\w-]+\\s+){0,2}?(?:${ROLE})(?!['’\\w])\\s*(?:[,.;:]|$|\\s+(?:at|from|in|for|with|on|over\\s+at|there)\\b)`,
+  `^,?\\s*(?:who(?:'s|’s|\\s+is)\\s+)?(?:the|our|their|her|his|a|an)\\s+(?:[\\w-]+\\s+){0,2}?(?:${ROLE})(?!['’\\w])\\s*(?:[,.;:]|$|\\s+(?:at|from|in|for|with|on|over\\s+at|there)\\b)` +
+    // "Marisol Quint, hospice social worker at Orrindale Hospice": no "the", so the comma is required.
+    `|^,\\s*(?:[\\w-]+\\s+){0,2}?(?:${ROLE})(?!['’\\w])\\s*(?:[,.;:]|$|\\s+(?:at|from|in|for|with|on|over\\s+at|there)\\b)`,
   "i",
 );
+// Pointed to someone at a named place, with no job said: "Her top suggestion was Marisol Quint at
+// Orrindale Hospice", "I should call Marisol Quint from Orrindale hospice".
+const POINTED_BEFORE = new RegExp(
+  `(?:\\b(?:top|first|main|best)\\s+(?:suggestion|recommendation|name|contact)\\s+(?:was|is)|\\b(?:I|you|we)\\b(?:\\s+[\\w’']+){0,3}?\\s+(?:${INTRO_VERB})|${NEXT_STEP})\\s+$`,
+  "i",
+);
+const AT_PLACE_AFTER = /^\s+(?:at|from)\s+\p{Lu}\p{Ll}+/u;
 // "Rosa Diaz is the referral coordinator", "Marisol Quint is the hospice social worker at Orrindale Hospice".
 const IS_ROLE_AFTER = new RegExp(`^\\s+(?:is|'s|’s)\\s+(?:the|our|their)\\s+(?:[\\w-]+\\s+){0,2}?(?:${ROLE})(?!['’\\w])`, "i");
 // "The person who handles referrals is Rosa Diaz".
@@ -491,7 +502,8 @@ export function professionalNames(text: string, names: string[]): string[] {
         APPOSITIVE_BEFORE.test(before) ||
         SHE_IS_ROLE_AFTER.test(after) ||
         (fullName && (IS_ROLE_AFTER.test(after) || HANDLER_BEFORE.test(before))) ||
-        (fullName && (NAME_HANDLES_REFERRALS.test(after) || NAME_RUNS_AFTER.test(after) || NAME_IN_DEPT_AFTER.test(after) || BARE_ROLE_BEFORE.test(before)));
+        (fullName && (NAME_HANDLES_REFERRALS.test(after) || NAME_RUNS_AFTER.test(after) || NAME_IN_DEPT_AFTER.test(after) || BARE_ROLE_BEFORE.test(before))) ||
+        (fullName && POINTED_BEFORE.test(before) && AT_PLACE_AFTER.test(after));
       if (shown) return "shown";
       return nameWithNeed(sentence) ? "refused" : "plain";
     });
@@ -565,6 +577,29 @@ function joinRoleSentences(list: string[]): string[] {
   return out;
 }
 
+// Capitalized words that sit next to a name without being part of it.
+const NOT_NAME_WORD =
+  /^(?:The|Their|They|Our|Her|His|She|He|We|I|You|Your|My|And|But|So|Also|Plus|Then|Dr|Doctor|Mr|Mrs|Ms|Mx|Miss|Next|Ask|Call|Meet|Talk|Email|Hospice|Hospital|Clinic|Center|Centre|Health|Group|Care|Program|House|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)$/;
+/**
+ * The name-finder sometimes returns part of a name ("Quint" for "Marisol Quint", depending on the
+ * words around it). Each part is widened to the whole capitalized name it sits in, so the
+ * professional checks and the guard see the same name.
+ */
+export function wholeNames(found: string[], text: string): string[] {
+  const out = new Set<string>();
+  for (const n of found) {
+    let best = n;
+    for (const m of text.matchAll(new RegExp(`(?:(\\p{Lu}\\p{Ll}+)\\s+)?(?<![\\p{L}])${escapeRe(n)}(?![\\p{L}])(?:\\s+(\\p{Lu}\\p{Ll}+))?`, "gu"))) {
+      const before = m[1] && !NOT_NAME_WORD.test(m[1]) ? `${m[1]} ` : "";
+      const after = m[2] && !NOT_NAME_WORD.test(m[2]) ? ` ${m[2]}` : "";
+      const whole = `${before}${n}${after}`;
+      if (whole.split(/\s+/).length > best.split(/\s+/).length && whole.split(/\s+/).length <= 3) best = whole;
+    }
+    out.add(best);
+  }
+  return [...out];
+}
+
 /** Why a sentence doesn't go to Muse, or null when it may. */
 export function dropReason(s: string): "fee" | "not_english" | "one_person" | "not_business" | null {
   if (valueOffered(s)) return "fee";
@@ -596,7 +631,7 @@ export async function cleanTranscript(
     if (why === "fee") fee ??= valueOffered(s);
     return why === null;
   });
-  const found = candidates.length ? (await names(candidates.join(" "))).filter(isNameLike) : [];
+  const found = candidates.length ? wholeNames((await names(candidates.join(" "))).filter(isNameLike), candidates.join(" ")) : [];
   const professionals = professionalNames(candidates.join(" "), found);
   const allow = await debriefAllowlist(source, professionals);
   const known = [...partnerNames(source), ...professionals, ...firstNames(professionals)];

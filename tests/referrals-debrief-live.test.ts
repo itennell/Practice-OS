@@ -104,7 +104,55 @@ const SCRIPT_VARIANTS = [
   "You should meet Marisol Quint, the hospice social worker at Orrindale Hospice. I'll reach out to Marisol next week.",
 ];
 
+// Round 2 recall (#145 review). Each line keeps the contact on its own in a whole debrief.
+const RECALL_2: [string, string[]][] = [
+  ["I should reach out to Marisol Quint, hospice social worker at Orrindale Hospice.", ["Marisol Quint"]],
+  ["Her top suggestion was Marisol Quint at Orrindale Hospice.", ["Marisol Quint"]],
+  ["She said I should call Marisol Quint from Orrindale hospice, she's a good partner for families.", ["Marisol Quint"]],
+];
+// A recognised professional's patients are her caseload. Said after she was introduced.
+const INTRO = "You should meet Marisol Quint, the hospice social worker at Orrindale Hospice.";
+const CASELOAD_LINES = [
+  "Marisol's patients deal with grief a lot, so we'd be a good fit.",
+  "Newly diagnosed patients' families often end up with Marisol.",
+];
+// Must still drop, in a whole debrief, with Marisol introduced first.
+const CASELOAD_SMUGGLES: [string, string[]][] = [
+  ["My client Joe's patients deal with grief.", ["Joe"]],
+  ["Her patients deal with grief since her husband died.", ["husband"]],
+  ["Marisol's patients deal with grief, and Marisol herself has cancer.", ["herself has cancer"]],
+  ["Marisol's patient Kevin has leukemia.", ["Kevin", "leukemia"]],
+  ["Marisol's husband is in hospice now.", ["husband"]],
+  ["Newly diagnosed patients' families often end up with Marisol, like the man in room 12.", ["room 12"]],
+  ["She said I should call Marisol Quint from Orrindale hospice, she's a good partner since she was just diagnosed.", ["diagnosed"]],
+  ["Her top suggestion was Joe Banks at Orrindale Hospice, who is dying.", ["Joe Banks", "dying"]],
+  ["I should reach out to Joe Banks, hospice patient at Orrindale Hospice.", ["Joe Banks"]],
+];
+
 describe("the live debrief path: real name-finder and guard, no stubs", () => {
+  it.each(RECALL_2)("keeps, in a whole debrief (round 2): %s", async (line, toks) => {
+    const { cleanTranscript } = await import("../lib/referrals/debrief");
+    const c = await cleanTranscript(transcript(line), SRC);
+    expect(c.text).toContain(line);
+    for (const t of toks) expect(c.text).toContain(t);
+    expect(c.professionals).toContain("Marisol Quint");
+    for (const w of PATIENT) expect(c.text).not.toContain(w);
+  }, 120_000);
+
+  it.each(CASELOAD_LINES)("keeps a recognised professional's caseload: %s", async (line) => {
+    const { cleanTranscript } = await import("../lib/referrals/debrief");
+    const c = await cleanTranscript(transcript(`${INTRO} ${line}`), SRC);
+    expect(c.text).toContain(INTRO);
+    expect(c.text).toContain(line);
+  }, 120_000);
+
+  it.each(CASELOAD_SMUGGLES)("drops, with Marisol introduced first: %s", async (line, toks) => {
+    const { cleanTranscript } = await import("../lib/referrals/debrief");
+    const c = await cleanTranscript(transcript(`${INTRO} ${line}`), SRC);
+    for (const t of toks) expect(c.text).not.toContain(t);
+    for (const w of PATIENT) expect(c.text).not.toContain(w);
+  }, 120_000);
+
   it("runs on the real model", () => {
     expect(existsSync(modelCacheDir())).toBe(true);
   });
