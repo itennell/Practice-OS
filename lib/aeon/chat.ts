@@ -7,6 +7,30 @@ import { loadApprovalSettings } from "../approval-settings";
 import { db } from "../db";
 import { respond, type RespondOptions, type Reply, type Step, type Turn } from "./agent";
 import { safeTitle, shownTitle } from "./chat-title";
+import { contextSuffix, MAX_PICKED, tabLabel, type AskContext } from "../referrals/ask-context";
+import { isSuppressed, suppressedList } from "../referrals/contacts";
+import { isSensitiveSource } from "../referrals/sensitive";
+import { listSources } from "../referrals/store";
+
+/**
+ * The partners she picked, as her board has them: ids the board doesn't know, sensitive
+ * organizations and her do-not-contact list are dropped, and each name is the stored one
+ * (never the name the browser sent). In the order picked, each once.
+ */
+export async function resolvePicked(picked: { id: string }[]): Promise<{ id: string; name: string }[]> {
+  if (!picked.length) return [];
+  const [cards, blocked] = await Promise.all([listSources(), suppressedList()]);
+  const byId = new Map(cards.map((c) => [c.id, c]));
+  const out: { id: string; name: string }[] = [];
+  for (const p of picked) {
+    const c = byId.get(p.id);
+    if (!c || out.some((o) => o.id === c.id)) continue;
+    if (c.sensitive || isSensitiveSource(c) || isSuppressed(c, blocked)) continue;
+    out.push({ id: c.id, name: c.name });
+    if (out.length >= MAX_PICKED) break;
+  }
+  return out;
+}
 
 export type Conversation = {
   id: string;
@@ -68,6 +92,13 @@ export async function sendMessage(input: {
   /** The mode showing under the chat box when she sent it. */
   mode?: ApprovalMode;
   chat?: RespondOptions["chat"];
+  /**
+   * Where she asked from (the Referrals Ask Aeon box): added under her words for the model only
+   * (lib/referrals/ask-context.ts). Her saved message and the chat's title are her words alone.
+   */
+  context?: AskContext;
+  /** What Aeon is doing right now ("Checking 3 partners' public listings"), for a progress line. */
+  onProgress?: RespondOptions["onProgress"];
 }): Promise<{ conversationId: string | null; reply: Reply }> {
   const existing = input.conversationId ? await getConversation(input.conversationId) : null;
   if (input.conversationId && !existing) throw new Error("No conversation with that id.");
@@ -79,12 +110,16 @@ export async function sendMessage(input: {
     : (input.mode ?? existing?.conversation.approval_mode ?? (await loadApprovalSettings()).mode);
 
   // Tools record who asked: the conversation when there is one, "chat:new" for its first message.
+  // The context line is built here from her board, never from the names the browser sent.
+  const context = input.context ? contextSuffix(tabLabel(input.context.tab), await resolvePicked(input.context.picked)) : undefined;
   const reply = await respond(input.text, {
+    context,
     history,
     by: `chat:${existing?.conversation.id ?? "new"}`,
     viewOnly: input.viewOnly,
     mode,
     chat: input.chat,
+    onProgress: input.onProgress,
   });
   if (reply.kind !== "answer") return { conversationId: existing?.conversation.id ?? null, reply };
 

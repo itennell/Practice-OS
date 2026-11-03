@@ -26,6 +26,8 @@ export function Toaster() {
     <Sonner
       position={phone ? "top-center" : "bottom-right"}
       theme="system"
+      // Above the pinned Ask Aeon box and button (about 96px), so a toast never covers Send.
+      offset={{ bottom: 112, right: 24 }}
       gap={10}
       // Always show the whole stack, so a lasting error is never hidden behind newer toasts.
       expand

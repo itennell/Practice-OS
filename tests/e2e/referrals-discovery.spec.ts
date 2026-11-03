@@ -1,9 +1,10 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { execSync } from "node:child_process";
+import { closePanel, openPartner } from "../helpers/partners";
 
-// "Add someone yourself" at phone width (390px): add a cancer nonprofit by
-// hand and see it under Found labelled "Added by you"; then preview a CSV
+// "Add partner" at phone width (390px): add a cancer nonprofit by hand and
+// see it in Partners under Found, labelled "Added by you"; then preview a CSV
 // where one row matches a card already on the board and one is new, and add
 // the new one. A sensitive kind hides the street and ZIP fields. Axe-clean,
 // nothing wider than the phone. Saves to the built-in database only.
@@ -27,7 +28,8 @@ test("add a referral source by hand, then preview and import a CSV", async ({ pa
   const errors: string[] = [];
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
   await page.goto("/referrals");
-  const box = page.getByTestId("add-yourself");
+  await page.getByRole("button", { name: "Add partner" }).click();
+  const box = page.getByRole("dialog", { name: "Add partner" }).getByTestId("add-yourself");
   await box.scrollIntoViewIfNeeded();
 
   const form = box.getByRole("form", { name: "Add a referral source yourself" });
@@ -49,9 +51,6 @@ test("add a referral source by hand, then preview and import a CSV", async ({ pa
   const saved = page.waitForResponse((r) => r.url().endsWith("/api/referrals/manual"));
   await form.getByRole("button", { name: "Add to board" }).click();
   expect((await saved).ok()).toBe(true);
-  const card = page.getByRole("region", { name: "Found" }).getByRole("listitem", { name: "[Sample] Gilda's Club Chicago" });
-  await expect(card).toContainText("Added by you");
-  await expect(card).toContainText("312-555-0100");
 
   // From a spreadsheet: the preview says what would happen, row by row.
   await box.getByRole("button", { name: "From a spreadsheet" }).click();
@@ -71,7 +70,17 @@ test("add a referral source by hand, then preview and import a CSV", async ({ pa
   const imported = page.waitForResponse((r) => r.url().endsWith("/api/referrals/import"));
   await preview.getByRole("button", { name: "Add 1 new" }).click();
   expect((await imported).ok()).toBe(true);
-  await expect(page.getByRole("region", { name: "Found" }).getByRole("listitem", { name: "[Sample] Riverside Grief Center" })).toContainText("Added by you");
-  await expect(page.getByRole("region", { name: "Found" }).getByRole("listitem", { name: "[Sample] Juniper Row Family Medicine" })).toHaveCount(1);
+  await closePanel(page);
+
+  // Both show in Partners, under Found, marked "Added by you" in their panels.
+  const gilda = page.getByRole("listitem", { name: "[Sample] Gilda's Club Chicago", exact: true });
+  await expect(gilda).toContainText("Found");
+  await expect(gilda).toContainText("312-555-0100");
+  await expect(await openPartner(page, "[Sample] Gilda's Club Chicago")).toContainText("Added by you");
+  await closePanel(page);
+  await expect(page.getByRole("listitem", { name: "[Sample] Riverside Grief Center", exact: true })).toContainText("Found");
+  await expect(await openPartner(page, "[Sample] Riverside Grief Center")).toContainText("Added by you");
+  await closePanel(page);
+  await expect(page.getByRole("listitem", { name: "[Sample] Juniper Row Family Medicine", exact: true })).toHaveCount(1);
   expect(errors).toEqual([]);
 });

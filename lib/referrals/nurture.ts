@@ -136,7 +136,7 @@ const TIER_ORDER: Record<Tier, number> = { first: 0, next: 1, later: 2 };
  * note; one without gets the one-pager.
  */
 export function coldNudges(
-  cards: (CardBits & Pick<ReferralSource, "id" | "name" | "email">)[],
+  cards: (CardBits & Pick<ReferralSource, "id" | "name" | "email"> & Partial<Pick<ReferralSource, "sensitive">>)[],
   contacts: Record<string, LogBits[]>,
   tiers: Record<string, Pick<TierResult, "tier">>,
   today: string,
@@ -145,8 +145,9 @@ export function coldNudges(
 ): ColdNudge[] {
   const max = opts.max ?? COLD_NUDGES_PER_WEEK;
   const cold = coldCards(cards, contacts, tiers, today, timeZone);
+  // A sensitive (DV/SA) organization never gets a note or one-pager nudge: their public line only.
   return cards
-    .filter((c) => cold[c.id] && !opts.skip?.has(c.id))
+    .filter((c) => cold[c.id] && !c.sensitive && !opts.skip?.has(c.id))
     .sort((a, b) => TIER_ORDER[tiers[a.id].tier] - TIER_ORDER[tiers[b.id].tier] || cold[b.id].days - cold[a.id].days || a.name.localeCompare(b.name))
     .slice(0, Math.max(0, Math.min(max, COLD_NUDGES_PER_WEEK)))
     .map((c) => ({

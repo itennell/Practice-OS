@@ -44,7 +44,7 @@ function dateLabel(iso: string): string {
  * The drafted email on the card: subject and letter, a Copy button, and plain
  * steps. Aeon never sends; she pastes it into her own email.
  */
-function LetterBox({
+export function LetterBox({
   letter,
   cardId,
   name,
@@ -295,7 +295,7 @@ function Card({
           cardId={card.id}
           name={card.name}
           demo={demo}
-          onSent={(view) => onLogged(view, (view as CardView & { already?: boolean }).already ? "Already logged: this letter is marked sent." : `Marked the email to ${card.name} as sent. It's in Contacted now, with a follow-up a week out.`)}
+          onSent={(view) => onLogged(view, (view as CardView & { already?: boolean }).already ? "Already logged: this letter is marked sent." : `Marked the email to ${card.name} as sent. It's in Reached out now, with a follow-up a week out.`)}
         />
       )}
       <SettingSelect

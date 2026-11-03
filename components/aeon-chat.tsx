@@ -20,6 +20,7 @@ import { ApprovalsInbox } from "./approvals-inbox";
 import { ModePicker, nextMode } from "./mode-picker";
 import type { ApprovalMode } from "@/lib/approval-modes";
 import { SUGGESTIONS } from "@/lib/aeon/suggestions";
+import { withoutContext } from "@/lib/referrals/ask-context";
 import { cn } from "@/lib/utils";
 import { AeonText } from "./aeon-text";
 import { DocumentCards, cardsOf } from "./document-cards";
@@ -87,7 +88,7 @@ function Message({ entry }: { entry: ChatEntry }) {
       <li className="flex justify-end">
         <div className="max-w-[min(36rem,85%)] whitespace-pre-wrap rounded-[22px] rounded-tr-[6px] bg-[var(--primary-bg)] px-5 py-3 text-[var(--primary-fg)]">
           <span className="sr-only">You said: </span>
-          {entry.content}
+          {withoutContext(entry.content)}
         </div>
       </li>
     );

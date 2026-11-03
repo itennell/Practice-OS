@@ -28,6 +28,19 @@ export function parseTyped(text: string): string | null {
   return null;
 }
 
+/**
+ * What is wrong with a typed date, in plain words, or "" when it's fine. The Date field
+ * empties its value whenever this isn't "", so a form never submits a stale date.
+ */
+export function dateFieldError(text: string, opts: { min?: string; max?: string; required?: boolean }): string {
+  if (!text.trim()) return opts.required ? "Pick a date." : "";
+  const iso = parseTyped(text);
+  if (!iso) return "Type a date like 11/25/2026, or pick one.";
+  if (opts.min && iso < opts.min) return `Pick ${formatTyped(opts.min)} or later.`;
+  if (opts.max && iso > opts.max) return `Pick ${formatTyped(opts.max)} or earlier.`;
+  return "";
+}
+
 /** "2026-11-25" to "11/25/2026"; "" stays "". */
 export function formatTyped(iso: string): string {
   if (!iso) return "";

@@ -67,9 +67,12 @@ export const RECHECKS_PER_MINUTE = 12;
 
 /** Thrown when a re-check is refused for coming too soon; `message` is in plain words. */
 export class RecheckTooSoon extends Error {
-  constructor(message: string) {
+  /** "card": this card was checked in the last two minutes. "busy": too many checks this minute across all cards. */
+  readonly kind: "card" | "busy";
+  constructor(message: string, kind: "card" | "busy" = "busy") {
     super(message);
     this.name = "RecheckTooSoon";
+    this.kind = kind;
   }
 }
 
@@ -88,12 +91,12 @@ async function claimRecheck(id: string, sql: postgres.Sql): Promise<void> {
              count(*) filter (where at > now() - interval '1 minute')::int as total
         from practice_os.audit_log
        where action = 'referral_recheck_started' and at > now() - ${Math.max(RECHECK_COOLDOWN_MS, 60_000) / 1000}::int * interval '1 second'`;
-    if (row.card > 0) return "Aeon checked this card a moment ago. Give it a couple of minutes before checking again.";
-    if (row.total >= RECHECKS_PER_MINUTE) return "Aeon has checked a lot of cards in the last minute. Wait a minute and try again.";
+    if (row.card > 0) return { kind: "card" as const, message: "Aeon checked this card a moment ago. Give it a couple of minutes before checking again." };
+    if (row.total >= RECHECKS_PER_MINUTE) return { kind: "busy" as const, message: "Aeon has checked a lot of cards in the last minute. Wait a minute and try again." };
     await audit({ actor: "aeon", action: "referral_recheck_started", subjectType: "referral_source", subjectId: id }, tx as unknown as postgres.Sql);
     return null;
   });
-  if (refused) throw new RecheckTooSoon(refused);
+  if (refused) throw new RecheckTooSoon(refused.message, refused.kind);
 }
 
 /** The registry's answer in one shape, whatever the dependency returned. */
@@ -262,7 +265,7 @@ function cut(s: string, max = UNTRUSTED_MAX): string {
  * license status) never reach the model as-is; the few that matter are cut
  * short and fenced under `untrusted`.
  */
-export function recheckSummary(card: { name: string }, ev: Evidence, r: RecheckResult) {
+export function recheckSummary(card: { name: string; website?: string | null }, ev: Evidence, r: RecheckResult) {
   const kinds: string[] = [];
   const npi = ev.fields.npi_status?.value;
   if (npi === "not_found" || npi === "deactivated") kinds.push("npi_registry");
@@ -281,7 +284,12 @@ export function recheckSummary(card: { name: string }, ev: Evidence, r: RecheckR
     email_found: Boolean(email),
     email_from: email ? ORIGIN_LABEL[email.origins[0]] : null,
     email_unconfirmed: Boolean(email?.fact.detail?.unconfirmed),
+    // Only the sources that answered this time: a source that was down is never "checked".
+    checked_sources: [...new Set(r.checked.map((o) => ORIGIN_LABEL[o]))],
     did_not_answer: r.unavailable,
+    ...(r.checked.includes("website") ? {} : { website: ev.fields.website || card.website ? "not read this time" : "no website on file" }),
+    about_sources:
+      "Say only checked_sources were checked. Name each of did_not_answer as down or not answering this time; never say it was checked.",
     notes: r.notes,
     untrusted: {
       note: UNTRUSTED_NOTE,

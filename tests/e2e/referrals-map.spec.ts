@@ -1,8 +1,9 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { execSync } from "node:child_process";
+import { closePanel, openPartner, partnerRow } from "../helpers/partners";
 
-// The Referrals map and tiered list, against the live NPI Registry, Census
+// The Referrals map and tiered list (in the Find partners panel), against the live NPI Registry, Census
 // geocoder and OpenFreeMap tiles (so this needs the internet). The demo
 // practice's Referrals ZIP is 60614.
 
@@ -31,8 +32,17 @@ async function pinsOnScreen(page: Page) {
     return m.queryRenderedFeatures({ layers: ["pins", "clusters"] }).map((f) => {
       const p = m.project(f.geometry.coordinates);
       return { npi: f.properties.npi, name: f.properties.name, x: rect.left + p.x, y: rect.top + p.y };
-    });
+    })
+      // Only pins she can tap: in a scrolled panel some sit under its header.
+      .filter((p) => box.contains(document.elementFromPoint(p.x, p.y)));
   });
+}
+
+/** The map search lives in the Find partners panel. */
+async function openFinder(page: Page) {
+  await page.goto("/referrals");
+  await page.getByRole("button", { name: "Find partners" }).click();
+  await expect(page.getByRole("dialog", { name: "Find partners" })).toBeVisible();
 }
 
 async function waitForResults(page: Page, label: string) {
@@ -42,7 +52,7 @@ async function waitForResults(page: Page, label: string) {
 test("Referrals map: 60614 pins and a tiered list, pin and row pick each other, other ZIPs and Chicagoland", async ({ page }) => {
   const errors: string[] = [];
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
-  await page.goto("/referrals");
+  await openFinder(page);
   await waitForResults(page, "60614");
 
   const tiers = page.getByRole("region", { name: "Referral sources by tier" });
@@ -60,7 +70,9 @@ test("Referrals map: 60614 pins and a tiered list, pin and row pick each other, 
   await expect(firstRow).toHaveAttribute("aria-current", "true");
   const near = (await pinsOnScreen(page)).filter((p) => p.npi);
   expect(near.length).toBeGreaterThan(0);
-  const other = near.find((p) => p.name !== rowName) ?? near[0];
+  // A pin with no other pin under the finger (on a phone-width map, pins at one building sit close together).
+  const alone = (p: (typeof near)[number]) => near.every((q) => q === p || Math.hypot(q.x - p.x, q.y - p.y) > 24);
+  const other = near.find((p) => p.name !== rowName && alone(p)) ?? near.find((p) => p.name !== rowName) ?? near[0];
   await page.mouse.click(other.x, other.y);
   const picked = page.locator('li[aria-current="true"]');
   await expect(picked).toHaveCount(1);
@@ -93,41 +105,44 @@ test("Draft email waits for approval; once approved, Copy puts the subject and l
     route.fulfill({ json: { approval_id: "00000000-0000-4000-8000-0000000009aa", subject: "[Sample] Checking in from Reyes Counseling", letter } }),
   );
   await page.goto("/referrals");
-  const card = page.getByRole("region", { name: "Follow up" }).getByRole("listitem", { name: "[Sample] Thistlewood OB-GYN" });
+  const card = await openPartner(page, "[Sample] Thistlewood OB-GYN");
   await card.getByRole("button", { name: "Draft check-in" }).click();
   await expect(card).toContainText("Email draft");
   await expect(card).toContainText("Then a Copy button shows here");
   await expect(card.getByRole("button", { name: /^Copy email/ })).toHaveCount(0);
 
   // The seeded Lakeview letter, approved: now Copy shows, with the demo warning.
-  const lakeview = () => page.getByRole("listitem", { name: "[Sample] Juniper Row Family Medicine" });
-  await expect(lakeview().getByRole("button", { name: /^Copy email/ })).toHaveCount(0);
+  await closePanel(page);
+  let lakeview = await openPartner(page, "[Sample] Juniper Row Family Medicine");
+  await expect(lakeview.getByRole("button", { name: /^Copy email/ })).toHaveCount(0);
   const approved = await page.request.post("/api/approvals/00000000-0000-4000-8000-000000000901/approve", { headers: { origin: baseURL! } });
   expect(approved.ok()).toBe(true);
   await page.reload();
-  await expect(lakeview()).toContainText("Demo practice: don\u2019t send this to a real provider.");
-  await lakeview().getByRole("button", { name: "Copy email to [Sample] Juniper Row Family Medicine" }).click();
-  await expect(lakeview().getByRole("button", { name: "Copy email to [Sample] Juniper Row Family Medicine" })).toHaveText("Copied");
+  lakeview = await openPartner(page, "[Sample] Juniper Row Family Medicine");
+  await expect(lakeview).toContainText("Demo practice: don\u2019t send this to a real provider.");
+  await lakeview.getByRole("button", { name: "Copy email to [Sample] Juniper Row Family Medicine" }).click();
+  await expect(lakeview.getByRole("button", { name: "Copy email to [Sample] Juniper Row Family Medicine" })).toHaveText("Copied");
   const copied = await page.evaluate(() => navigator.clipboard.readText());
   expect(copied).toMatch(/^Subject: \[Sample\] Introducing Reyes Counseling in Lincoln Park\n\n\[Sample\] Dear Juniper Row Family Medicine team,/);
   expect(copied).toContain("Dana Reyes, LCPC (fictional demo practice)");
 });
 
 test("Add to board keeps keyboard focus on the row", async ({ page }) => {
-  await page.goto("/referrals");
+  await openFinder(page);
   await waitForResults(page, "60614");
   const add = page.getByRole("region", { name: "Referral sources by tier" }).getByRole("button", { name: /^Add to board: / }).first();
   const name = (await add.getAttribute("aria-label"))!.replace("Add to board: ", "");
   await add.focus();
   await page.keyboard.press("Enter");
   await expect(page.locator(":focus")).toHaveText("On your board: Found", { timeout: 30_000 });
-  await expect(page.getByRole("region", { name: "Found" }).getByRole("listitem", { name })).toBeVisible();
+  await closePanel(page);
+  await expect(partnerRow(page, name)).toContainText("Found");
 });
 
 for (const scheme of ["light", "dark"] as const) {
   test(`Referrals map page passes axe (${scheme})`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme });
-    await page.goto("/referrals");
+    await openFinder(page);
     await waitForResults(page, "60614");
     await pinsOnScreen(page);
     const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();

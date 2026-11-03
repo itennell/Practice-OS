@@ -13,7 +13,8 @@ import { withoutDistance } from "./sensitive";
 import { contactsFor, isSuppressed, relationshipFrom, suppressedList, type Contact } from "./contacts";
 import { STAGE_LABEL } from "./stages";
 import { latestLetters, listSources, practiceFacts, tierContext, type LetterState, type ReferralSource } from "./store";
-import { boardTier, compareTiers, TIER_LABEL, withRelationship, type TierContext, type TierResult } from "./tier";
+import { boardTier, compareTiers, NICHE_FIT, TIER_LABEL, withRelationship, type TierContext, type TierResult } from "./tier";
+import { CATEGORY_LABELS } from "./categories";
 import { SPECIALTY_BY_ID, specialtyForCode, type SpecialtyId } from "./nppes";
 import { coldNudges, type ColdNudge } from "./nurture";
 
@@ -23,7 +24,22 @@ const WAIT_DAYS =
   (research as { relationship_modifiers?: { suppress?: { contacted_within_days?: number } } }).relationship_modifiers?.suppress?.contacted_within_days ?? 30;
 
 export type FollowUp = { id: string; name: string; on: string; days_left: number; stage: string; last: string | null };
-export type PlanItem = { id: string; name: string; why: string; next_step: string; tier: string; score: number };
+export type PlanItem = {
+  id: string;
+  name: string;
+  /** Its place in the Partners table's Best fit order (1 = top), the same order as the board (rankCards). */
+  board_rank: number;
+  /** The card's real kind: its specialty from the NPI Registry, else its catalog group. */
+  kind: string | null;
+  /** True only when her niche names this very kind (tier.ts NICHE_FIT). Never call it a fit otherwise. */
+  fits_focus: boolean;
+  why: string;
+  next_step: string;
+  tier: string;
+  score: number;
+};
+/** A card higher in the Partners table than a pick, and why it isn't a new person to reach out to. */
+export type Skipped = { name: string; board_rank: number; why: string };
 export type OutreachPlan = {
   today: string;
   follow_ups: FollowUp[];
@@ -35,6 +51,10 @@ export type OutreachPlan = {
   kinds: string[] | null;
   /** Up to 2 people she knows who are going cold (no contact past their tier's cadence), with a suggested action. */
   going_cold: ColdNudge[];
+  /** The first 3 of the Partners table (Best fit): what she sees on screen, whatever their stage. */
+  partners_top: { id: string; name: string; board_rank: number }[];
+  /** Cards above the last pick in that order that aren't suggested as new, with why. */
+  skipped_above: Skipped[];
   summary: string;
 };
 
@@ -104,6 +124,11 @@ export function tiersWithLog(
   );
 }
 
+/** A card's real kind for the reply: its NPI Registry specialty, else its catalog group. */
+export function kindLabel(c: Pick<ReferralSource, "specialty">, t: Pick<TierResult, "category">): string | null {
+  return c.specialty?.trim() || (t.category ? (CATEGORY_LABELS[t.category] ?? null) : null);
+}
+
 /** Cards in the one order (tier.ts compareTiers): tier, "not who you help" last, niche weight, fit, score, distance. */
 export function rankCards<T extends Pick<ReferralSource, "id" | "name" | "distance_miles">>(cards: T[], tiers: Record<string, TierResult>): T[] {
   return [...cards].sort(
@@ -130,20 +155,41 @@ export async function outreachPlan(sql: postgres.Sql = db(), max = NEW_PER_WEEK,
   const letters = await latestLetters(sql);
   let waiting = 0;
   let letters_waiting = 0;
+  // Why each card isn't a new person this week (plain words), so the reply can say why the Partners table's top differs.
+  const whyNot = new Map<string, string>();
+  const skipCard = (id: string, why: string) => {
+    whyNot.set(id, why);
+    return false;
+  };
   const fresh = cards.filter((c) => {
-    if (c.stage !== "found" || due.has(c.id) || isSuppressed(c, blocked)) return false;
+    if (isSuppressed(c, blocked)) return false;
+    // A sensitive (DV/SA) organization is reached through its public line only: never a "reach out" letter.
+    if (c.sensitive) return skipCard(c.id, "a sensitive agency: reach them through their public line only");
+    if (due.has(c.id)) return skipCard(c.id, "a follow-up is due (listed under follow-ups)");
+    if (c.stage !== "found") return skipCard(c.id, `already past a first letter (${STAGE_LABEL[c.stage]})`);
     if (letterWaiting(letters[c.id])) {
       letters_waiting++;
-      return false;
+      return skipCard(c.id, "a letter to them is already waiting or ready to send");
     }
     const last = relationshipFrom(contacts[c.id] ?? [], null).lastContactOn ?? c.last_contacted_at?.slice(0, 10) ?? null;
     if (last && daysBetween(last, today) < WAIT_DAYS) {
       waiting++;
-      return false;
+      return skipCard(c.id, `you reached out in the last ${WAIT_DAYS} days`);
     }
-    return tiers[c.id].tier !== "later";
+    if (tiers[c.id].tier === "later") return skipCard(c.id, "ranked Later");
+    return true;
   });
   const { picked, kinds, missing } = pickNew(fresh, tiers, asked, max);
+  // The Partners table's Best fit order: every card but Not a fit and her do-not-contact list, in the one order.
+  const table = rankCards(cards.filter((c) => c.stage !== "not_a_fit" && !isSuppressed(c, blocked)), tiers);
+  const rankOf = new Map(table.map((c, i) => [c.id, i + 1]));
+  const pickedIds = new Set(picked.map((c) => c.id));
+  const lastRank = Math.max(0, ...picked.map((c) => rankOf.get(c.id) ?? 0));
+  const skipped_above: Skipped[] = table
+    .slice(0, lastRank)
+    .filter((c) => !pickedIds.has(c.id))
+    .map((c) => ({ name: c.name, board_rank: rankOf.get(c.id)!, why: whyNot.get(c.id) ?? (kinds ? "not one of the kinds you asked for" : "not picked this week") }))
+    .slice(0, 5);
   // People she already knows whose last contact is past their tier's cadence (referral-tiers.json touch_cadence).
   // Skipped: a due follow-up (already in the plan), her do-not-contact list (NPI or org key), and a letter waiting or ready.
   const skip = new Set([...due, ...cards.filter((c) => isSuppressed(c, blocked) || letterWaiting(letters[c.id])).map((c) => c.id)]);
@@ -153,6 +199,9 @@ export async function outreachPlan(sql: postgres.Sql = db(), max = NEW_PER_WEEK,
       return {
         id: c.id,
         name: c.name,
+        board_rank: rankOf.get(c.id) ?? 0,
+        kind: kindLabel(c, t),
+        fits_focus: t.reasons.some((r) => r.startsWith(NICHE_FIT)),
         tier: TIER_LABEL[t.tier],
         score: t.score,
         why: t.reasons.slice(1, 4).join("; "),
@@ -171,7 +220,9 @@ export async function outreachPlan(sql: postgres.Sql = db(), max = NEW_PER_WEEK,
     letters_waiting,
     kinds,
     going_cold,
-    summary: summarizePlan({ follow_ups, reach_out, waiting, kinds, missing, letters_waiting, going_cold }),
+    partners_top: table.slice(0, NEW_PER_WEEK).map((c, i) => ({ id: c.id, name: c.name, board_rank: i + 1 })),
+    skipped_above,
+    summary: summarizePlan({ follow_ups, reach_out, waiting, kinds, missing, letters_waiting, going_cold, skipped_above }),
   };
 }
 
@@ -203,6 +254,7 @@ export function summarizePlan(
     missing?: string[] | null;
     letters_waiting?: number;
     going_cold?: ColdNudge[];
+    skipped_above?: Skipped[];
   },
 ): string {
   const lines: string[] = [];
@@ -217,7 +269,11 @@ export function summarizePlan(
   }
   if (p.reach_out.length) {
     lines.push(`New this week (${p.reach_out.length}):`);
-    for (const r of p.reach_out) lines.push(`- ${r.name} (${r.tier}): ${r.why}. ${r.next_step}`);
+    for (const r of p.reach_out) lines.push(`- ${r.name} (${[r.kind, r.tier].filter(Boolean).join(", ")}${r.board_rank ? `; #${r.board_rank} on your Partners list` : ""}): ${r.why}. ${r.next_step}`);
+  }
+  if (p.skipped_above?.length) {
+    lines.push("Higher on your Partners list but not new this week:");
+    for (const k of p.skipped_above) lines.push(`- ${k.name} (#${k.board_rank}): ${k.why}`);
   }
   if (p.going_cold?.length) {
     lines.push(`Going cold (${p.going_cold.length}):`);

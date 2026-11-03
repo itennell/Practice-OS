@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatTyped, fromIso, parseTyped, toIso } from "../components/shared/date-field-parse";
+import { dateFieldError, formatTyped, fromIso, parseTyped, toIso } from "../components/shared/date-field-parse";
 
 describe("date field text", () => {
   it("reads US typing and ISO days", () => {
@@ -19,5 +19,15 @@ describe("date field text", () => {
     expect(toIso(fromIso("2026-03-08"))).toBe("2026-03-08");
     expect(formatTyped("2026-11-25")).toBe("11/25/2026");
     expect(formatTyped("")).toBe("");
+  });
+
+  it("names what is wrong with a typed date, so a form can block its submit (a past date never books)", () => {
+    const opts = { min: "2026-11-03", required: true };
+    expect(dateFieldError("11/01/2026", opts)).toBe("Pick 11/03/2026 or later.");
+    expect(dateFieldError("11/03/2026", opts)).toBe("");
+    expect(dateFieldError("11/0", opts)).toBe("Type a date like 11/25/2026, or pick one.");
+    expect(dateFieldError("", opts)).toBe("Pick a date.");
+    expect(dateFieldError("", {})).toBe("");
+    expect(dateFieldError("12/31/2027", { max: "2027-01-01" })).toBe("Pick 01/01/2027 or earlier.");
   });
 });

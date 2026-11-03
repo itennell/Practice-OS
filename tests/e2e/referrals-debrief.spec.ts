@@ -1,9 +1,10 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { execSync } from "node:child_process";
+import { closePanel, openPartner } from "../helpers/partners";
 
-// "Debrief my coffee meeting" at phone width (390px): record on a partner's
-// card with Chromium's fake microphone, watch the steps, review what Aeon filled
+// "Debrief my coffee meeting" at phone width (390px): More › Record a debrief on
+// a partner's row, record with Chromium's fake microphone, watch the steps, review what Aeon filled
 // in (the patient story is gone, an invented person is left out), save, and see
 // the profile, the suggested card and the follow-up in Approvals. Transcription
 // and Muse are the fixed stand-ins (PLAYWRIGHT_DEBRIEF_STANDIN=1,
@@ -30,10 +31,9 @@ test("debrief a coffee meeting: record, review, save", async ({ page }) => {
   const errors: string[] = [];
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
   await page.goto("/referrals");
-  const card = page.getByRole("region", { name: "Connected" }).getByRole("listitem", { name: PARTNER });
-  await card.getByRole("button", { name: "Debrief" }).click();
-
-  // On a wide screen the debrief opens in a side panel, outside the card.
+  // More › Record a debrief on the partner's row opens their panel with the recorder.
+  await page.getByRole("listitem", { name: PARTNER, exact: true }).getByRole("button", { name: `More for ${PARTNER}` }).click();
+  await page.getByRole("menuitem", { name: "Record a debrief" }).click();
   const box = page.getByRole("region", { name: `Debrief with ${PARTNER}` });
   await expect(box).toContainText("Up to 3 minutes");
   await box.getByRole("button", { name: "Record your debrief" }).click();
@@ -68,11 +68,13 @@ test("debrief a coffee meeting: record, review, save", async ({ page }) => {
   const res = await saved;
   expect(res.ok(), await res.text()).toBe(true);
 
-  const after = page.getByRole("region", { name: "Connected" }).getByRole("listitem", { name: PARTNER });
+  const after = page.getByRole("dialog", { name: PARTNER, exact: true });
   const profile = after.getByTestId("partner-profile");
   await expect(profile).toContainText("How they refer: fax");
   await expect(profile).toContainText("Tuesday mornings before 10");
-  const suggested = page.getByRole("region", { name: "Found" }).getByRole("listitem", { name: "[Sample] Jenna Cho" });
+  await closePanel(page);
+  await expect(page.getByRole("listitem", { name: "[Sample] Jenna Cho", exact: true })).toContainText("Found");
+  const suggested = await openPartner(page, "[Sample] Jenna Cho");
   await expect(suggested).toContainText("Suggested from your debrief");
   await expect(suggested).toContainText("Not contacted");
 
@@ -81,7 +83,7 @@ test("debrief a coffee meeting: record, review, save", async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test("the chat's debrief card opens the recorder on that partner's card", async ({ page }) => {
+test("the chat's debrief card opens the recorder in that partner's panel", async ({ page }) => {
   await page.goto(`/referrals?debrief=${PARTNER_ID}`);
   const box = page.getByRole("region", { name: `Debrief with ${PARTNER}` });
   await expect(box).toBeVisible();

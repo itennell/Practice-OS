@@ -13,6 +13,7 @@ import { createHash } from "node:crypto";
 import { checkCrisis } from "../safety";
 import { guard, type GuardResult } from "./guard";
 import { checkIdentity, type Allowlist } from "./identity-filter";
+import { withoutContext } from "../referrals/ask-context";
 
 export const NEUTRAL_TITLE = "New chat";
 const TITLE_CHARS = 60;
@@ -84,7 +85,10 @@ const MAX_CACHED = 500;
 const checked = new Map<string, { shown: string; at: number }>();
 
 /** A saved title as it may be shown: unchanged when it still passes the plain-code checks, else "New chat". */
-export function shownTitle(title: string, now = Date.now()): string {
+export function shownTitle(saved: string, now = Date.now()): string {
+  // A chat saved before the Ask Aeon context became its own field has it in its title, maybe cut
+  // short at 60 characters ("… (Asked from Refer…").
+  const title = withoutContext(saved).replace(/\s*\(Asked from\b[^)]*\)?…?$/, "").trim() || NEUTRAL_TITLE;
   const key = createHash("sha256").update(title).digest("hex");
   const hit = checked.get(key);
   if (hit && now - hit.at < TTL_MS) return hit.shown;
