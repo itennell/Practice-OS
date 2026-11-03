@@ -105,6 +105,25 @@ describe("NPPES on real recorded replies", () => {
     const capped = await searchProviders(["therapists"], ["60614", "60657"], { fetcher: async () => full, maxRequests: 5 });
     expect(capped.requests).toBe(5);
     expect(capped.truncated).toBe(true);
+    expect(capped.budgetCut).toBe(true);
+    expect(capped.skipped).toEqual(["therapists"]);
+    // Two kinds, a budget for only the first: the second is named as skipped.
+    const two = await searchProviders(["pediatrics", "hospice"], ["60614"], { fetcher: async () => ({ results: [] }), maxRequests: 1 });
+    expect(two.skipped).toEqual(["hospice"]);
+  });
+
+  it("names the kinds the request budget skipped and suggests fewer kinds, not a smaller radius", async () => {
+    const result = await searchArea(
+      { area: { kind: "zips", zips: ["60614"] }, radiusMiles: 1, specialties: ["pediatrics", "hospice"] },
+      { office: null, officeZip: "60614", state: "IL", focus: [] },
+      {
+        search: async () => ({ providers: [], requests: 150, truncated: true, budgetCut: true, skipped: ["hospice"], timedOut: null }),
+        geocode: async () => new Map(),
+      },
+    );
+    const note = result.notes.find((n) => n.includes("Hospice"))!;
+    expect(note).toMatch(/Pick fewer kinds/);
+    expect(note).not.toMatch(/radius/);
   });
 
   it("links a person to a group at the same address", () => {
@@ -162,7 +181,8 @@ describe("tiers (plain code, with reasons)", () => {
       score: 94,
       specialty: "pediatrics",
       reasons: [
-        "Pediatrics offices see people who need talk therapy and often have no one to send them to",
+        // The catalog's why_they_refer for pediatrics, as a card reason.
+        "child and teen behavior, ADHD follow-up and parent stress land on their desk",
         "matches your teens focus",
         "0.8 mi from your office",
         "you can write to them by name, not a front desk",
