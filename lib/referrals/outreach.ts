@@ -41,7 +41,15 @@ export function checkLetter(letter: string): LetterCheck {
   if (text.length > 2500) return { ok: false, reason: "The letter is too long for a short introduction." };
   const what = valueOffered(text);
   if (what) return { ok: false, reason: `The letter mentions ${what}. Referral letters can't offer or discuss anything of value.` };
-  if (CLINICAL.test(text)) return { ok: false, reason: "The letter mentions clinical content. Referral letters can't offer or discuss anything of value." };
+  if (CLINICAL.test(text)) return { ok: false, reason: "The letter mentions clinical content. Referral letters stay about her practice: no diagnoses, medication or treatment plans." };
+  return { ok: true };
+}
+
+/** The subject line gets the same value and clinical checks as the letter (no length rule). */
+export function checkSubject(subject: string): LetterCheck {
+  const what = valueOffered(subject);
+  if (what) return { ok: false, reason: `The subject line mentions ${what}. Referral letters can't offer or discuss anything of value.` };
+  if (CLINICAL.test(subject)) return { ok: false, reason: "The subject line mentions clinical content. Keep it about her practice." };
   return { ok: true };
 }
 
@@ -224,6 +232,8 @@ const SAMPLE = /^\[Sample\]\s*/i;
 /** Credentials that make someone "Dr.": MD, DO, PhD, PsyD. */
 const DOCTOR = new Set(["MD", "DO", "PHD", "PSYD"]);
 const SUFFIX = new Set(["jr", "sr", "ii", "iii", "iv"]);
+/** A credential written as a word: "MD", "M.D.", "PhD", "PsyD", "LCSW", "PA-C". Never a name ("Lee", "Ann"). */
+const CREDENTIAL_WORD = /^(?:[A-Z]{2,6}(?:-[A-Z])?|(?:[A-Z]\.){2,4}|Ph\.?D\.?|Psy\.?D\.?|Ed\.?D\.?|DNP|MSW|MSc)$/;
 
 /**
  * How the letter greets them: "Dr. Tellez" for an MD, DO, PhD or PsyD; otherwise the full name
@@ -234,8 +244,12 @@ export function salutationFor(source: Pick<ReferralSource, "name" | "npi_type"> 
   if (source.npi_type === "organization") return /\bteam$/i.test(name) ? name : `${name} team`;
   const [head, ...rest] = name.split(",");
   const titled = /^Dr\.?\s+/i.test(head.trim());
-  const person = head.trim().replace(/^Dr\.?\s+/i, "");
-  const creds = [...rest, source.credential ?? ""]
+  // Credentials written after the name with no comma ("Ann Lee MD") come off the end too.
+  const words = head.trim().replace(/^Dr\.?\s+/i, "").split(/\s+/);
+  const trailing: string[] = [];
+  while (words.length > 1 && CREDENTIAL_WORD.test(words[words.length - 1])) trailing.unshift(words.pop()!);
+  const person = words.join(" ");
+  const creds = [...rest, ...trailing, source.credential ?? ""]
     .join(" ")
     .split(/[\s,;/]+/)
     .map((c) => c.replace(/\./g, "").toUpperCase())
@@ -465,6 +479,43 @@ export function askedFor(instruction: string | null | undefined, facts: LetterFa
   return out;
 }
 
+/** A greeting line: "Dear ...", "Hello,", "Good morning Dr. Tellez,", "[Sample] Hi team,". */
+const GREETING = /^(?:\[Sample\]\s*)?(?:dear|hello|hi|hey|greetings|good (?:morning|afternoon|evening|day)|to whom it may concern)\b(?:[^\n]{0,60}[,:!]|[^\n!?]{0,60}(?<!\.))$/i;
+/** A closing line: "Warmly,", "Best regards,", "Thank you,", "With gratitude,". */
+const CLOSING = /^(?:warmly|warm regards|warmest regards|warm wishes|best|best regards|best wishes|all the best|kind regards|regards|sincerely|sincerely yours|yours(?: truly| sincerely)?|thank you|thanks|many thanks|with (?:gratitude|thanks|appreciation)|gratefully|respectfully|cheers|take care)\b[^\n]{0,30}$/i;
+
+/**
+ * Her signature: the name line after the last closing word ("Warmly,") is replaced by `sign`
+ * exactly. The name may come with a dash, a middle name or initial and any credential
+ * ("— Dana M. Reyes, LCPC"); any second copy of it is dropped. A body line that starts with her
+ * name ("Dana Reyes here...") is never touched: only lines after the closing count, or, with no
+ * closing, the last lines of the letter.
+ */
+function signOff(lines: string[], name: string, sign: string): string[] {
+  const parts = name.trim().split(/\s+/);
+  const firstName = escapeRe(parts[0]);
+  const lastName = escapeRe(parts[parts.length - 1]);
+  const own =
+    parts.length > 1
+      ? new RegExp(`^[-\\u2013\\u2014~\\s]*${firstName}(?:\\s+[A-Z][\\w.]*){0,2}?\\s+${lastName}\\b[^\\n]{0,60}$`, "i")
+      : new RegExp(`^[-\\u2013\\u2014~\\s]*${firstName}\\b[^\\n]{0,60}$`, "i");
+  const closing = lines.map((l, i) => (CLOSING.test(l.trim()) ? i : -1)).filter((i) => i > 0).pop();
+  // Where to look: after the closing, or the last four lines when there is none.
+  const from = closing !== undefined ? closing + 1 : Math.max(1, lines.length - 4);
+  const at: number[] = [];
+  for (let i = from; i < lines.length; i++) if (own.test(lines[i].trim())) at.push(i);
+  const out = [...lines];
+  if (at.length) {
+    out[at[0]] = sign;
+    // A second copy of her name ("Dana Reyes" then "Dana Reyes, LCPC"): dropped.
+    for (const i of at.slice(1).reverse()) out.splice(i, 1);
+    return out;
+  }
+  if (closing !== undefined) out.splice(closing + 1, 0, sign);
+  else out.push("", sign);
+  return out;
+}
+
 /**
  * Plain-code fixes after Muse: the greeting is always salutationFor ("Dear Dr. Tellez,", never
  * "Dear Claudia Tellez, MD," or a Mr./Ms.), her signature line is exact (signatureLine), a
@@ -475,19 +526,16 @@ export function finishLetter(
   source: Pick<ReferralSource, "name" | "npi_type"> & Partial<Pick<ReferralSource, "credential" | "is_sample">>,
   facts: Pick<LetterFacts, "phone" | "email"> & Partial<Pick<LetterFacts, "clinician">>,
 ): string {
-  const lines = letter.trim().split("\n");
-  const first = lines.findIndex((l) => l.trim());
+  let lines = letter.trim().split("\n");
+  // The greeting: every greeting line at the top ("Good morning Dr. Tellez," then "Hello,") becomes one.
   const greeting = `Dear ${salutationFor(source)},`;
-  if (first >= 0 && /^(?:\[Sample\]\s*)?(?:Dear|Hello|Hi)\b/i.test(lines[first].trim())) lines[first] = greeting;
+  const first = lines.findIndex((l) => l.trim());
+  let end = first;
+  while (end >= 0 && end < lines.length && (GREETING.test(lines[end].trim()) || (end > first && !lines[end].trim() && GREETING.test(lines[end + 1]?.trim() ?? "")))) end++;
+  if (first >= 0 && end > first) lines.splice(first, end - first, greeting);
   else lines.unshift(greeting, "");
   const sign = signatureLine(facts.clinician ?? null);
-  if (sign && facts.clinician) {
-    // Her name on a line of its own (the sign-off), however written: replaced by the exact line.
-    const own = new RegExp(`^${escapeRe(facts.clinician.name)}\\b[^\\n]{0,60}$`, "i");
-    const at = lines.map((l, i) => (own.test(l.trim()) ? i : -1)).filter((i) => i > Math.max(first, 0)).pop();
-    if (at !== undefined) lines[at] = sign;
-    else lines.push("", sign);
-  }
+  if (sign && facts.clinician) lines = signOff(lines, facts.clinician.name, sign);
   let out = lines.join("\n").trim();
   if (source.is_sample && !SAMPLE.test(out)) out = `[Sample] ${out}`;
   const digits = (s: string) => s.replace(/\D/g, "");
@@ -587,7 +635,8 @@ export async function writeLetter(
       continue;
     }
     const finished = finishLetter(letter, source, mine);
-    const check = checkLetter(finished);
+    const letterOk = checkLetter(finished);
+    const check = letterOk.ok ? checkSubject(subject) : letterOk;
     const factCheck: LetterCheck = !check.ok
       ? check
       : CATEGORY_LABEL.test(finished)
@@ -708,6 +757,10 @@ export async function reviseLetter(
   if (blocked) throw new LetterNotWaiting(blocked);
 
   let subject = opts.subject?.trim().slice(0, 150) || row.subject || "";
+  if (opts.subject) {
+    const subjectOk = checkSubject(subject);
+    if (!subjectOk.ok) throw new Error(subjectOk.reason);
+  }
   let letter: string;
   let included: string[] = [];
   let left_out: { what: string; why: string }[] = [];

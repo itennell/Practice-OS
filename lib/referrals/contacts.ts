@@ -19,6 +19,11 @@ import type { Stage } from "./stages";
 export { CONTACT_KINDS, CONTACT_LABEL, REFERRED_NOTE, REFERRED_OUT_NOTE, type ContactKind } from "./contact-kinds";
 export { isSuppressed, nameSuppressed, type Suppressed } from "./dnc-key";
 
+/** "I sent it" pressed again within this many minutes of the first press for the same letter logs nothing new. */
+export const SENT_DEDUPE_MINUTES = 10;
+/** The first key of the two-key advisory lock on a card's sent_letter rows. */
+const SENT_LOCK_NAMESPACE = 7301;
+
 /** Reaching out: sets "last contacted" and, unless she picks a date, a follow-up a week out. */
 const OUTREACH: ContactKind[] = ["called", "emailed", "sent_letter"];
 export const FOLLOW_UP_DAYS = 7;
@@ -68,14 +73,17 @@ export const CRISIS_NOTE = `I didn't save that note because it mentions danger o
  * check (lib/safety.ts) and the referral-value check (nothing of value for referrals), then the
  * privacy check.
  */
-export async function checkNote(note: string, check = (t: string) => guard(t, "message")): Promise<string | null> {
+export async function checkNote(note: string, check = (t: string) => guard(t, "message"), opts: { audit?: boolean } = {}): Promise<string | null> {
   const crisis = checkCrisis(note);
   if (crisis.crisis) {
-    await audit({ actor: "safety", action: "crisis_note_refused", subjectType: "referral_note", details: { category: crisis.category } }).catch(() => undefined);
+    // Audited when she types it; a saved note screened again for a letter (screenedNote) isn't a new event.
+    if (opts.audit !== false) {
+      await audit({ actor: "safety", action: "crisis_note_refused", subjectType: "referral_note", details: { category: crisis.category } }).catch(() => undefined);
+    }
     return CRISIS_NOTE;
   }
   const value = valueOffered(note);
-  if (value) return `I didn't save that note because it mentions ${value} tied to referrals. Nothing of value can be offered or taken for a referral.`;
+  if (value) return `I didn't save that note because it mentions ${value}. Nothing of value can be offered or taken for a referral.`;
   const r = await check(note);
   return r.ok ? null : REFUSAL[r.kind];
 }
@@ -131,17 +139,22 @@ export async function logContact(
 
   const logged = await sql.begin(async (tx) => {
     if (input.kind === "sent_letter") {
-      // "I sent it" once per letter: a second press (or a double tap) returns the row already logged.
-      // Per approved letter when there is one, otherwise per day. The lock makes two presses at once wait in line.
-      await tx`select pg_advisory_xact_lock(hashtext(${`sent_letter:${sourceId}`}))`;
+      // A second press (or a double tap) within SENT_DEDUPE_MINUTES of the first sent_letter for the
+      // same approved letter returns that row. Later presses are real follow-ups and log. With no
+      // approved letter, within the same minutes of the last one. The two-key lock (a constant
+      // namespace plus the card) makes two presses at once wait in line.
+      await tx`select pg_advisory_xact_lock(${SENT_LOCK_NAMESPACE}::int, hashtext(${sourceId}::text))`;
       const [dup] = await tx<Contact[]>`
-        select c.id, c.source_id, c.kind, c.happened_on::text as happened_on, c.note, c.created_by, c.is_sample, c.people_count
-          from practice_os.referral_contacts c
-         cross join (select max(a.decided_at) as decided_at from practice_os.approvals a
-                      where a.kind = 'referral_letter' and a.status = 'done' and a.payload ->> 'referral_source_id' = ${sourceId}::text) l
-         where c.source_id = ${sourceId} and c.kind = 'sent_letter'
-           and case when l.decided_at is not null then c.created_at >= l.decided_at else c.happened_on = ${happenedOn}::date end
-         order by c.created_at desc limit 1`;
+        with l as (
+          select max(a.decided_at) as decided_at from practice_os.approvals a
+           where a.kind = 'referral_letter' and a.status = 'done' and a.payload ->> 'referral_source_id' = ${sourceId}::text),
+        first_sent as (
+          select c.* from practice_os.referral_contacts c, l
+           where c.source_id = ${sourceId} and c.kind = 'sent_letter' and (l.decided_at is null or c.created_at >= l.decided_at)
+           order by case when l.decided_at is null then -extract(epoch from c.created_at) else extract(epoch from c.created_at) end
+           limit 1)
+        select id, source_id, kind, happened_on::text as happened_on, note, created_by, is_sample, people_count
+          from first_sent where created_at > now() - make_interval(mins => ${SENT_DEDUPE_MINUTES}::int)`;
       if (dup) {
         const [now] = await tx<{ stage: Stage; next_follow_up_on: string | null }[]>`
           select stage, next_follow_up_on::text as next_follow_up_on from practice_os.referral_sources where id = ${sourceId}`;
@@ -327,7 +340,7 @@ export async function suppressedList(sql: postgres.Sql = db()): Promise<Suppress
 /** A note from her log, screened again with the chat's full privacy check before it reaches the model or a tool result. Null when held back. */
 export async function screenedNote(note: string | null, check?: (t: string) => ReturnType<typeof guard>): Promise<string | null> {
   if (!note) return null;
-  return (await checkNote(note, check).catch(() => "unavailable")) === null ? note : null;
+  return (await checkNote(note, check, { audit: false }).catch(() => "unavailable")) === null ? note : null;
 }
 
 export async function suppressedNpis(sql: postgres.Sql = db()): Promise<Set<string>> {
