@@ -14,12 +14,12 @@ import { mergeEvidence, OSM_ATTRIBUTION } from "../lib/referrals/evidence/merge"
 import { discoverOrgs, discoveryTypes, DISCOVERY_IDS } from "../lib/referrals/orgs";
 import { CSV_TEMPLATE, parseCsv, readCsv, readManual } from "../lib/referrals/manual";
 import { findDuplicate } from "../lib/referrals/dedupe";
-import { isSuppressed, keyMatches, nameSuppressed, orgKeyOf, type Suppressed } from "../lib/referrals/dnc-key";
+import { compactName, isSuppressed, keyMatches, nameSuppressed, orgKeyOf, unitOf, type OrgKey, type Suppressed } from "../lib/referrals/dnc-key";
 import { manualToCard, orgToCard, stripSensitive } from "../lib/referrals/org-store";
 import { REFERRAL_DEMO_TOOLS } from "../lib/features";
 import { haversineMiles } from "../lib/referrals/geo";
 import { CONTACT_KINDS, LOGGABLE_KINDS } from "../lib/referrals/contact-kinds";
-import { isSensitiveSource, siteHashes, withoutDistance } from "../lib/referrals/sensitive";
+import { isSensitiveSource, looksSensitive, siteHashes, withoutDistance } from "../lib/referrals/sensitive";
 import { searchArea } from "../lib/referrals/area";
 import type { Provider } from "../lib/referrals/nppes";
 
@@ -290,6 +290,85 @@ describe("do not contact without an NPI", () => {
     expect(keyMatches(orgKeyOf({ name: "Fullerton Funeral Home", address: "10 W Main St", zip: "60601" })!, listed)).toBe(false);
     expect(keyMatches(orgKeyOf({ name: "Fullerton Funeral Home", city: "Evanston" })!, listed)).toBe(false);
   });
+  it("sensitive names: DV/SA cues, named Chicago agencies, initials and typos; oncology, hospice and church partners pass (PR #141 review)", () => {
+    const yes = [
+      "[Test] Survivors Healing Center", "[Test] Hope House Chicago", "Lakeview Safe Place", "Safe Haven Inc", "Sanctuary Services", "Family Justice Center",
+      "Rape Crisis Line", "H.O.P.E. House", "Lakeview Shleter", "Hope Haus", "Domestc Violence Center", "Life Span Center for Legal Services", "Sarah's Inn", "Between Friends", "Family Rescue",
+      "Mujeres Latinas en Acción", "Life Span", "KAN-WIN", "WINGS Program", "Casa de Esperanza", "[Test] Resilience Chicago", "Resilience", "Sheltr of Hope", "Northside Sheltr",
+      "Survivors of Abuse Network", "Domestic Violence Legal Clinic", "Victim Services of Cook County", "Sexual Assault Crisis Center", "Haven House Services",
+      "Refuge Ministries", "Safe Harbor Center", "Ruth's House", "Battered Women's Network",
+    ];
+    const no = [
+      "Cancer Survivors Network", "Suicide Loss Survivors Group", "Lakeview Domestic Cleaning", "Victims Legal Fund", "Safe Harbor Hospice",
+      "Sanctuary Home Health", "Haven Funeral Home", "New Hope Church", "Refuge Hospice", "Lakeview Crisis Center", "Violence Prevention Research Program",
+      "Substance Abuse Treatment Center", "Northside Oncology", "Gilda's Club Chicago", "Lifespan Health", "Resilience Counseling", "Fullerton Funeral Home",
+      "Lakeview Family Medicine", "Northwestern Medicine Lurie Cancer Center", "Safe Passage Hospice",
+      // round 2 over-flags
+      "Safe Harbor Counseling", "Sanctuary Wellness", "Hope House Hospice", "Safe Place Pediatrics", "Justice Center Pediatrics", "Wings",
+      "Resilience Inc", "Wings Program for Kids with Cancer", "Family Rescue Squad EMS", "Holocaust Survivors Center", "Kids Survivors Camp",
+      "Smelter Clinic", "Sanctuary Psychotherapy", "Shelter Insurance Agency",
+    ];
+    for (const n of yes) expect(looksSensitive(n), n).toBe(true);
+    for (const n of no) expect(looksSensitive(n), n).toBe(false);
+  });
+  // A listed key as the database gives it back: no unit, no person flag.
+  const fromDb = (k: OrgKey): OrgKey => ({ org_key: k.org_key, name_key: k.name_key, street_key: k.street_key, city_key: k.city_key, zip_key: k.zip_key });
+  it("near names and people at a listed office are blocked; other tenants and other cities are not (Nov 3, PR #141 review)", () => {
+    const listed = fromDb(orgKeyOf({ name: "[Test] Westside Oncology Partners", npi_type: "organization", address: "100 W Madison St", city: "Chicago", zip: "60602" })!);
+    const m = (c: Parameters<typeof orgKeyOf>[0]) => keyMatches(orgKeyOf(c)!, listed);
+    // Near names at the same place.
+    expect(m({ name: "[Test] West Side Oncology Partners", npi_type: "organization", address: "100 West Madison Street", city: "Chicago", zip: "60602" })).toBe(true);
+    expect(m({ name: "[Test] W Side Oncology", npi_type: "organization", address: "100 W Madison St", city: "Chicago", zip: "60602" })).toBe(true);
+    expect(m({ name: "[Test] Westside-Oncology, LLC", npi_type: "organization", city: "Chicago" })).toBe(true);
+    expect(m({ name: "[Test] Westside Oncolgy Partners", npi_type: "organization", address: "100 W Madison St", city: "Chicago", zip: "60602" })).toBe(true);
+    // Glued units, a floor, a missing directional.
+    expect(m({ name: "[Test] Westside Oncology Partners", npi_type: "organization", address: "100 W Madison St Ste210", city: "Chicago", zip: "60602" })).toBe(true);
+    expect(m({ name: "[Test] Westside Oncology Partners", npi_type: "organization", address: "100 W Madison St, 2nd Fl", city: "Chicago", zip: "60602" })).toBe(true);
+    expect(m({ name: "[Test] Westside Oncology Partners", npi_type: "organization", address: "100 Madison St", city: "Chicago", zip: "60602" })).toBe(true);
+    expect(m({ name: "[Test] Westside Oncology Partners", npi_type: "organization", address: "100 E Madison St", city: "Chicago", zip: "60602" })).toBe(false);
+    // People at the listed office.
+    expect(m({ name: "[Test] Pat Doe", organization: "[Test] Westside Oncology Partners", npi_type: "individual", address: "100 W Madison St", city: "Chicago", zip: "60602" })).toBe(true);
+    expect(m({ name: "[Test] Pat Doe", organization: "[Test] West Side Oncology", npi_type: "individual", city: "Chicago" })).toBe(true);
+    // A person with no group at the street: only against a key that knows it's an organisation (not one read back from her list).
+    const inMemory = orgKeyOf({ name: "[Test] Westside Oncology Partners", npi_type: "organization", address: "100 W Madison St", city: "Chicago", zip: "60602" })!;
+    const patNoGroup = orgKeyOf({ name: "[Test] Pat Doe", npi_type: "individual", address: "100 W Madison St, Suite 4", city: "Chicago", zip: "60602" })!;
+    expect(keyMatches(patNoGroup, inMemory)).toBe(true);
+    expect(m({ name: "[Test] Pat Doe", npi_type: "individual", address: "100 W Madison St, Suite 4", city: "Chicago", zip: "60602" })).toBe(false);
+    // Another named tenant of the building, or a person at another organisation there: allowed.
+    expect(m({ name: "[Test] Other Clinic", npi_type: "organization", address: "100 W. Madison St., Suite 4", city: "Chicago", zip: "60602" })).toBe(false);
+    expect(m({ name: "[Test] Pat Doe", organization: "[Test] Lakeside Cardiology", npi_type: "individual", address: "100 W Madison St", city: "Chicago", zip: "60602" })).toBe(false);
+    // Another city, another name, or a typo-close name somewhere else: allowed.
+    expect(m({ name: "[Test] Westside Oncology Partners", npi_type: "organization", address: "1 Main St", city: "Evanston", zip: "60201" })).toBe(false);
+    expect(m({ name: "[Test] Eastside Oncology", npi_type: "organization", city: "Chicago" })).toBe(false);
+    expect(m({ name: "[Test] Westside Oncolgy Partners", npi_type: "organization", city: "Evanston" })).toBe(false);
+    // A tail isn't dropped when only generic words would be left.
+    expect(compactName("oncology partners")).toBe("oncologypartners");
+    expect(compactName("westside oncology partners")).toBe("westsideoncology");
+    const generic = fromDb(orgKeyOf({ name: "Oncology Partners", npi_type: "organization", city: "Chicago" })!);
+    expect(keyMatches(orgKeyOf({ name: "Oncology Group", npi_type: "organization", city: "Chicago" })!, generic)).toBe(false);
+    // A hospital listed: the unrelated practices in its building stay allowed; a person with no group on another suite too.
+    const hospital = orgKeyOf({ name: "Northside Hospital", npi_type: "organization", address: "2 Oak St, Suite 100", city: "Chicago", zip: "60614" })!;
+    expect(keyMatches(orgKeyOf({ name: "Lakeview Dermatology", npi_type: "organization", address: "2 Oak St, Suite 300", city: "Chicago", zip: "60614" })!, hospital)).toBe(false);
+    expect(keyMatches(orgKeyOf({ name: "Robin Example", npi_type: "individual", address: "2 Oak St, Suite 300", city: "Chicago", zip: "60614" })!, hospital)).toBe(false);
+    expect(keyMatches(orgKeyOf({ name: "Robin Example", npi_type: "individual", address: "2 Oak St Ste100", city: "Chicago", zip: "60614" })!, hospital)).toBe(true);
+    // One listed person doesn't block everyone in their building.
+    const person = fromDb(orgKeyOf({ name: "[Test] Jordan Ellis", organization: "Northside Hospital", npi_type: "individual", address: "2 Oak St", city: "Chicago", zip: "60614" })!);
+    expect(keyMatches(orgKeyOf({ name: "Northside Hospital", npi_type: "organization", address: "2 Oak St", city: "Chicago", zip: "60614" })!, person)).toBe(false);
+    expect(keyMatches(orgKeyOf({ name: "Sam Lee", npi_type: "individual", address: "2 Oak St", city: "Chicago", zip: "60614" })!, person)).toBe(false);
+    expect(nameSuppressed({ name: "[Test] West Side Oncology", npi_type: "organization" }, { npis: new Set(), orgs: [listed] })).toBe(true);
+    expect(unitOf("100 W Madison St Ste210")).toBe("u:210");
+    expect(unitOf("100 W Madison St, 2nd Fl")).toBe("fl:2");
+    expect(unitOf("100 W Madison St, 2nd Floor Suite 210")).toBe("u:210");
+    expect(unitOf("100 W Madison St, Suite 0210")).toBe("u:210");
+  });
+  it("typo-close names only for long names, never in the first word, and only at the same place (round 2)", () => {
+    const at = (name: string, npi_type: "individual" | "organization" = "organization") => orgKeyOf({ name, npi_type, address: "5 Elm St", city: "Chicago", zip: "60614" })!;
+    expect(keyMatches(at("Smyth Counseling"), fromDb(at("Smith Counseling")))).toBe(false);
+    expect(keyMatches(at("Home Hospice"), fromDb(at("Hope Hospice")))).toBe(false);
+    expect(keyMatches(at("Ann Kym", "individual"), fromDb(at("Ann Kim", "individual")))).toBe(false);
+    expect(keyMatches(at("Lakeview Oncolgy Partners"), fromDb(at("Lakeview Oncology Partners")))).toBe(true);
+    expect(keyMatches(orgKeyOf({ name: "Lakeview Oncolgy Partners", npi_type: "organization", city: "Evanston" })!, fromDb(at("Lakeview Oncology Partners")))).toBe(false);
+  });
   it("isSuppressed checks the NPI list and the org keys; a debrief's who-else with only an organisation matches too", () => {
     const list: Suppressed = { npis: new Set(["1900000001"]), orgs: [orgKeyOf({ name: "Northside Hospice", npi_type: "organization", city: "Chicago" })!] };
     expect(isSuppressed({ npi: "1900000001", name: "Anyone" }, list)).toBe(true);
@@ -325,7 +404,7 @@ describe("sensitive kinds: no street, ZIP, point or distance anywhere", () => {
     for (const n of ["Harbor Shelters Inc", "Ruth’s House", "Ruth's House", "Safe Harbor Center", "The Safehouse Project", "Sarah's Safe House", "House of Hope Chicago",
       "Northside Sexual Abuse Program", "Family Violence Coalition", "Battered Women's Network", "Lakeview Women’s Center", "Haven House Services", "Refuge Ministries", "Sanctuary Outreach"])
       expect(isSensitiveSource({ name: n }), n).toBe(true);
-    for (const n of ["Lakeview Family Medicine", "Gilda's Club Chicago", "Fullerton Funeral Home", "Haven"]) expect(isSensitiveSource({ name: n }), n).toBe(false);
+    for (const n of ["Juniper Row Family Medicine", "Gilda's Club Chicago", "Fullerton Funeral Home", "Haven"]) expect(isSensitiveSource({ name: n }), n).toBe(false);
     // One-way site hashes match however NPPES writes the street; never the street itself.
     const [a] = siteHashes("2400 N LINCOLN AVE", "60614-1234");
     expect(siteHashes("2400 n lincoln ave", "60614")).toContain(a);

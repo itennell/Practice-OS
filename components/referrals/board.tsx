@@ -295,7 +295,7 @@ function Card({
           cardId={card.id}
           name={card.name}
           demo={demo}
-          onSent={(view) => onLogged(view, `Marked the email to ${card.name} as sent. It's in Contacted now, with a follow-up a week out.`)}
+          onSent={(view) => onLogged(view, (view as CardView & { already?: boolean }).already ? "Already logged: this letter is marked sent." : `Marked the email to ${card.name} as sent. It's in Contacted now, with a follow-up a week out.`)}
         />
       )}
       <SettingSelect
@@ -308,7 +308,7 @@ function Card({
       {card.stage !== "not_a_fit" && !card.suggested_from && <DebriefButton card={card} autoOpen={debriefOpen} />}
       {canDraft && (
         <Button variant="quiet" onClick={() => onDraft(false)} disabled={drafting} aria-describedby={headingId}>
-          {drafting ? "Aeon is writing…" : card.stage === "follow_up" ? "Draft a check-in email" : "Draft email"}
+          {drafting ? "Aeon is writing…" : card.stage === "follow_up" ? "Draft check-in" : "Draft email"}
         </Button>
       )}
       {canNudge && (

@@ -66,6 +66,14 @@ export function VoicePill({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const levels = useRef<number[]>([]);
   const micRef = useRef<HTMLButtonElement>(null);
+  // False once the pill is gone: a microphone that is granted after that is switched off at once.
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   const teardown = () => {
     const l = live.current;
@@ -128,6 +136,11 @@ export function VoicePill({
     setStarting(true);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      if (!mounted.current) {
+        // Closed (the debrief panel, a page change) while the browser was asking: never leave the mic on.
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
       const ctx = new AudioContext();
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 256;
@@ -154,9 +167,9 @@ export function VoicePill({
       onRecordingChange?.(true);
       l.raf = requestAnimationFrame(draw);
     } catch {
-      onError?.("The microphone is blocked. Allow it in your browser's site settings, or type instead.");
+      if (mounted.current) onError?.("The microphone is blocked. Allow it in your browser's site settings, or type instead.");
     } finally {
-      setStarting(false);
+      if (mounted.current) setStarting(false);
     }
   };
 

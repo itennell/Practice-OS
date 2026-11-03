@@ -35,6 +35,7 @@ export const WITHHELD_BECAUSE: Record<PhiKind, string> = {
   identifier: "an ID number",
   contact: "someone's email or phone number",
   address: "a home address",
+  identifying: "details that point to one client",
 };
 
 export const withheldText = (kind: PhiKind) =>

@@ -11,7 +11,7 @@ import { forgetAllowlist } from "../aeon/guard";
 import { audit } from "../audit";
 import { db } from "../db";
 import { SOURCE_TYPE_BY_ID } from "./catalog";
-import { isSensitiveSource } from "./sensitive";
+import { isSensitiveSource, sensitiveByKind } from "./sensitive";
 import { knownSensitiveSites, sensitiveAt } from "./sensitive-sites";
 import { checkNote, suppressedList } from "./contacts";
 import { findDuplicate, DUP_LABEL, type DupHow } from "./dedupe";
@@ -103,7 +103,7 @@ export async function saveOrgCard(input: OrgCard, opts: { sql?: postgres.Sql; ca
     values (${card.npi}, ${card.name}, ${card.organization}, ${label}, ${card.npiType}, ${card.street}, ${card.city}, ${card.state},
        ${card.zip}, ${card.phone}, ${card.email}, ${card.website}, ${card.notes}, 'found',
        ${sensitive || card.distanceMiles === null ? null : Math.max(0, Math.min(500, card.distanceMiles))}, null, ${SCORE_VERSION},
-       ${card.type}, ${card.foundVia}, ${card.ccn}, ${card.osmRef}, ${sensitive}, ${sensitive && at.hashes.length ? at.hashes : null})
+       ${card.type}, ${card.foundVia}, ${card.ccn}, ${card.osmRef}, ${sensitive}, ${sensitive && sensitiveByKind({ type: card.type }) && at.hashes.length ? at.hashes : null})
     returning id`;
   if (card.facts.length) await saveFacts(row.id, card.facts, { checked: [...new Set(card.facts.map((f) => f.origin))], sql });
   forgetAllowlist();

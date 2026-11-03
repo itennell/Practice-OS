@@ -147,7 +147,7 @@ function ApprovalItem({
         <ApprovalStatus status={busy && approval.status === "pending" ? "running" : approval.status} />
       </div>
 
-      {line && !editing && <p className="max-w-[65ch] text-[var(--fg)]">{line}</p>}
+      {line && !editing && <p className="max-w-[65ch] whitespace-pre-line text-[var(--fg)]">{line}</p>}
 
       {!editing && <RuleList preview={approval.preview} />}
 

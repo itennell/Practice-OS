@@ -4,7 +4,9 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { parse } from "dotenv";
-import postgres from "postgres";
+import type postgres from "postgres";
+import { MODE_INFO } from "./approval-modes";
+import { poolerSafeClient } from "./db";
 import { DEMO_NICHE, DEMO_ZIP, resetRefusal } from "./demo-reset";
 import { SPECIALTY_CATEGORY } from "./referrals/categories";
 import { categoryOf } from "./referrals/catalog";
@@ -20,6 +22,11 @@ export const MIN_NEAR_CARDS = 20;
 export const MIN_CATEGORIES = 5;
 /** demo:warm's answers last a day (lib/referrals/sources/stored-cache.ts). */
 export const WARM_FRESH_MS = 24 * 3600 * 1000;
+/** demo:check gives up after this long instead of waiting forever on the database. */
+export const CHECK_TIMEOUT_MS = 60_000;
+export function checkTimeoutMessage(ms: number = CHECK_TIMEOUT_MS): string {
+  return `demo:check stopped after ${Math.round(ms / 1000)} seconds without an answer from the database, so the demo wasn't checked. The check only reads, so it changed nothing. Make sure the database is reachable, then run npm run demo:check again.`;
+}
 /** The env files Next.js reads for `npm start`, highest priority first. */
 export const ENV_FILES = [".env.production.local", ".env.local", ".env.production", ".env"] as const;
 
@@ -88,8 +95,10 @@ export function cardCategory(c: { source_type: string | null; taxonomy: string |
 }
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-const MODE_LABEL: Record<string, string> = { manual: "Ask", auto: "Auto", bypass: "Bypass" };
-const modeLabel = (m: string | null) => MODE_LABEL[m ?? "auto"] ?? m ?? "Auto";
+// The app's own words for the modes (Manual, Auto, Bypass), the ones she sees in Settings and under the message box.
+const MODE_LABEL: Record<string, string> = Object.fromEntries(Object.entries(MODE_INFO).map(([k, v]) => [k, v.label]));
+const MANUAL = MODE_INFO.manual.label;
+const modeLabel = (m: string | null) => MODE_LABEL[m ?? "auto"] ?? m ?? MODE_INFO.auto.label;
 const hoursAgo = (now: Date, at: Date) => Math.round((now.getTime() - at.getTime()) / 3_600_000);
 
 /** The checks, in plain code, on a snapshot. */
@@ -126,16 +135,16 @@ export function evaluateDemo(s: DemoSnapshot): CheckLine[] {
     `${plural(leaky.length, "sensitive card")} ${leaky.length === 1 ? "shows" : "show"} an address: ${leaky.map((c) => c.name).slice(0, 5).join(", ")}. Mark them sensitive or remove them before recording.`,
   );
 
-  // The recording needs every change to wait for an approval on screen: Ask (manual) only.
+  // The recording needs every change to wait for an approval on screen: Manual only.
   line(
     s.approvalMode === "manual",
-    "New chats start in Ask: every change waits for her approval.",
-    `New chats start in ${modeLabel(s.approvalMode)}, not Ask. Set Ask under the message box before recording.`,
+    `New chats start in ${MANUAL}: every change waits for her approval.`,
+    `New chats start in ${modeLabel(s.approvalMode)}, not ${MANUAL}. Set ${MANUAL} in Settings or under the message box before recording.`,
     true,
   );
   if (s.latestChat) {
     const mode = s.latestChat.mode ?? s.approvalMode;
-    line(mode === "manual", "The latest chat is in Ask.", `The latest chat is in ${modeLabel(mode)}, not Ask. Switch it to Ask, or start a new chat.`, true);
+    line(mode === "manual", `The latest chat is in ${MANUAL}.`, `The latest chat is in ${modeLabel(mode)}, not ${MANUAL}. Switch it to ${MANUAL}, or start a new chat.`, true);
   }
 
   // Read from the env files, not the running app's environment (restart the app after a change).
@@ -268,13 +277,41 @@ export async function loadDemoSnapshot(sql: postgres.Sql, opts: { envDir?: strin
   };
 }
 
-export async function checkDemo(opts: { url: string; expectedRef?: string; envDir?: string }): Promise<CheckLine[]> {
+export async function checkDemo(opts: {
+  url: string;
+  expectedRef?: string;
+  envDir?: string;
+  /** Gives up with checkTimeoutMessage() after this long (default CHECK_TIMEOUT_MS). */
+  timeoutMs?: number;
+  /** The database client; tests pass their own. Default: poolerSafeClient (no pipelining, see lib/db.ts). */
+  client?: (url: string) => postgres.Sql;
+}): Promise<CheckLine[]> {
   const refusal = checkRefusal(opts.url, opts.expectedRef ?? process.env.SUPABASE_PROJECT_REF);
   if (refusal) throw new Error(refusal);
-  const sql = postgres(opts.url, { max: 1, prepare: false, onnotice: () => {} });
+  // max_pipeline: 0 matters here: suppressedList() reads two tables at once, and on one
+  // connection postgres.js would pipeline the second read behind the first. Supabase's
+  // transaction pooler hands the server connection back after the first reply, so the
+  // second never came and demo:check hung forever, printing nothing.
+  const sql = (opts.client ?? ((url: string) => poolerSafeClient(url, { max: 1 })))(opts.url);
+  const ms = opts.timeoutMs ?? CHECK_TIMEOUT_MS;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let timedOut = false;
+  const snapshot = loadDemoSnapshot(sql, { envDir: opts.envDir });
+  snapshot.catch(() => {}); // after a timeout its rejection (the closed connection) is not news
   try {
-    return evaluateDemo(await loadDemoSnapshot(sql, { envDir: opts.envDir }));
+    const s = await Promise.race([
+      snapshot,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          timedOut = true;
+          reject(new Error(checkTimeoutMessage(ms)));
+        }, ms);
+      }),
+    ]);
+    return evaluateDemo(s);
   } finally {
-    await sql.end();
+    clearTimeout(timer);
+    // After a timeout, drop the stuck connection at once instead of waiting on it.
+    await sql.end({ timeout: timedOut ? 0 : 5 });
   }
 }

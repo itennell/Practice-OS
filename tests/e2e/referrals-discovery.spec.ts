@@ -18,7 +18,7 @@ test.setTimeout(120_000);
 
 const CSV = [
   "name,type,city,phone",
-  "[Sample] Lakeview Family Medicine,family_medicine,Chicago,",
+  "[Sample] Juniper Row Family Medicine,family_medicine,Chicago,",
   "[Sample] Riverside Grief Center,grief_centers,Chicago,312-555-0150",
   "[Sample] No Kind,,Chicago,",
 ].join("\n");
@@ -60,7 +60,7 @@ test("add a referral source by hand, then preview and import a CSV", async ({ pa
   const preview = box.getByRole("region", { name: "Import preview" });
   // Same name, same city, no street on either: a possible duplicate, skipped unless she says "Add anyway".
   await expect(preview).toContainText("1 new, 0 matched existing cards, 1 possible duplicates, 1 with a problem");
-  await expect(preview).toContainText("Possible duplicate: [Sample] Lakeview Family Medicine");
+  await expect(preview).toContainText("Possible duplicate: [Sample] Juniper Row Family Medicine");
   await expect(preview.getByRole("button", { name: /Add row 2 anyway/ })).toHaveAttribute("aria-pressed", "false");
   await expect(preview).toContainText("Pick what kind of referral source this is.");
 
@@ -72,6 +72,6 @@ test("add a referral source by hand, then preview and import a CSV", async ({ pa
   await preview.getByRole("button", { name: "Add 1 new" }).click();
   expect((await imported).ok()).toBe(true);
   await expect(page.getByRole("region", { name: "Found" }).getByRole("listitem", { name: "[Sample] Riverside Grief Center" })).toContainText("Added by you");
-  await expect(page.getByRole("region", { name: "Found" }).getByRole("listitem", { name: "[Sample] Lakeview Family Medicine" })).toHaveCount(1);
+  await expect(page.getByRole("region", { name: "Found" }).getByRole("listitem", { name: "[Sample] Juniper Row Family Medicine" })).toHaveCount(1);
   expect(errors).toEqual([]);
 });

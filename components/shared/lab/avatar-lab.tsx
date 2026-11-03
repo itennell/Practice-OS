@@ -5,7 +5,7 @@ import { Avatar } from "../avatar";
 
 const HEADSHOT = "/demo/dana-reyes-headshot.jpg";
 
-const CALLERS = ["[Sample] Sam Example", "[Sample] Jordan Lee", "[Sample] Priya Patel", "[Sample] Lakeview Family Medicine", "(312) 555-0142"];
+const CALLERS = ["[Sample] Sam Example", "[Sample] Jordan Lee", "[Sample] Priya Patel", "[Sample] Juniper Row Family Medicine", "(312) 555-0142"];
 
 export default function AvatarLab() {
   return (

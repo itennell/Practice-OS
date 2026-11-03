@@ -33,15 +33,15 @@ describe("Overpass: sensitive places never cached, polite after trouble", () => 
     expect(JSON.stringify(cached)).not.toMatch(/Safe House|Domestic Violence|abused/);
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
-  it("after a 429 the host is left alone for a few minutes, and the failed question isn't asked again at once", async () => {
+  it("after a 429 that outlasts the retries, the host is left alone for a few minutes, and the failed question isn't asked again at once", async () => {
     clearSourceCache();
     const fetcher = vi.fn(async () => {
       throw new SourceUnavailable("OpenStreetMap (Overpass)", 429);
     });
-    await expect(searchOsmOrgs(["funeral_homes"], CENTER, 3, { fetcher })).rejects.toBeInstanceOf(SourceUnavailable);
+    await expect(searchOsmOrgs(["funeral_homes"], CENTER, 3, { fetcher, retryDelaysMs: [] })).rejects.toBeInstanceOf(SourceUnavailable);
     expect(coolingUntil("overpass-api.de")).toBeGreaterThan(Date.now() + 60_000);
-    await expect(searchOsmOrgs(["clergy"], CENTER, 3, { fetcher })).rejects.toBeInstanceOf(SourceUnavailable);
-    await expect(searchOsmOrgs(["funeral_homes"], CENTER, 3, { fetcher })).rejects.toBeInstanceOf(SourceUnavailable);
+    await expect(searchOsmOrgs(["clergy"], CENTER, 3, { fetcher, retryDelaysMs: [] })).rejects.toBeInstanceOf(SourceUnavailable);
+    await expect(searchOsmOrgs(["funeral_homes"], CENTER, 3, { fetcher, retryDelaysMs: [] })).rejects.toBeInstanceOf(SourceUnavailable);
     expect(fetcher).toHaveBeenCalledTimes(1);
     clearSourceCache();
   });

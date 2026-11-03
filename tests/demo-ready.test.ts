@@ -143,13 +143,13 @@ describe("demo:check's lines", () => {
     expect(status(evaluateDemo(cityOnly), /No domestic violence/)).toBe("PASS");
   });
 
-  it("PASSes only Ask; WARNs (never FAILs) on Auto, Bypass and chats since the reset; FAILs chats from before it", () => {
-    expect(status(evaluateDemo(ready()), /New chats start in Ask/)).toBe("PASS");
-    expect(status(evaluateDemo(ready({ approvalMode: "bypass" })), /start in Bypass, not Ask/)).toBe("WARN");
-    expect(status(evaluateDemo(ready({ approvalMode: "auto" })), /start in Auto, not Ask/)).toBe("WARN");
-    expect(status(evaluateDemo(ready({ approvalMode: null })), /start in Auto, not Ask/)).toBe("WARN");
+  it("PASSes only Manual; WARNs (never FAILs) on Auto, Bypass and chats since the reset; FAILs chats from before it", () => {
+    expect(status(evaluateDemo(ready()), /New chats start in Manual/)).toBe("PASS");
+    expect(status(evaluateDemo(ready({ approvalMode: "bypass" })), /start in Bypass, not Manual/)).toBe("WARN");
+    expect(status(evaluateDemo(ready({ approvalMode: "auto" })), /start in Auto, not Manual/)).toBe("WARN");
+    expect(status(evaluateDemo(ready({ approvalMode: null })), /start in Auto, not Manual/)).toBe("WARN");
     expect(status(evaluateDemo(ready({ latestChat: { mode: "bypass" } })), /latest chat is in Bypass/)).toBe("WARN");
-    expect(status(evaluateDemo(ready({ latestChat: { mode: null } })), /latest chat is in Ask/)).toBe("PASS");
+    expect(status(evaluateDemo(ready({ latestChat: { mode: null } })), /latest chat is in Manual/)).toBe("PASS");
     expect(status(evaluateDemo(ready({ approvalMode: "auto", latestChat: { mode: null } })), /latest chat is in Auto/)).toBe("WARN");
     expect(status(evaluateDemo(ready({ sinceReset: { conversations: 2, approvals: 1 } })), /2 chats and 1 approval since the reset/)).toBe("WARN");
     expect(status(evaluateDemo(ready({ beforeReset: { conversations: 1, approvals: 0 } })), /from before the last reset are still there/)).toBe("FAIL");
