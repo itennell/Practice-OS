@@ -20,7 +20,7 @@ const LETTER =
   "Dear Dr. Rivera,\n\nI'm Dana Reyes, a licensed clinical professional counselor in Lincoln Park. I work with adults " +
   "navigating anxiety, life transitions and stress at work, in person and by video. Since your family medicine practice " +
   "is just down the street, I'd love to introduce myself. Would you be open to a 15-minute call in the next few weeks " +
-  "to talk about how we might work together?\n\nWarmly,\nDana Reyes, LCPC\nReyes Counseling PLLC";
+  "to talk about how we might work together?\n\nWarmly,\nDana Reyes, LCPC (fictional demo practice)\nReyes Counseling PLLC";
 
 const fakeChat = (async () => ({
   choices: [{ message: { content: JSON.stringify({ subject: "Introduction from Reyes Counseling", letter: LETTER }) } }],

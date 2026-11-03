@@ -85,8 +85,8 @@ test("board: category chips show one kind at a time, and cards name the niche", 
   await filter.getByRole("button", { name: /^Medical specialists/ }).click();
   await expect(filter.getByRole("button", { name: /^Medical specialists/ })).toHaveAttribute("aria-pressed", "true");
   await expect(oncology).toBeVisible();
-  await expect(page.getByRole("listitem", { name: "[Sample] Lakeview Family Medicine" })).toHaveCount(0);
+  await expect(page.getByRole("listitem", { name: "[Sample] Juniper Row Family Medicine" })).toHaveCount(0);
   await axeClean(page);
   await filter.getByRole("button", { name: /^All/ }).click();
-  await expect(page.getByRole("listitem", { name: "[Sample] Lakeview Family Medicine" })).toBeVisible();
+  await expect(page.getByRole("listitem", { name: "[Sample] Juniper Row Family Medicine" })).toBeVisible();
 });

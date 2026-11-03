@@ -15,8 +15,8 @@ import type { ReferralSource } from "@/lib/referrals/store";
 
 const PILL: Record<CardConfidence, Status> = { confirmed: "done", partly: "pending", unconfirmed: "failed" };
 
-function checkedLabel(iso: string | null): string {
-  if (!iso) return "not checked yet";
+function checkedLabel(iso: string | null, manual = false): string {
+  if (!iso) return manual ? "no directory check yet" : "not checked yet";
   return `checked ${new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
 }
 
@@ -24,6 +24,14 @@ function emailSource(v: FieldView): string {
   const label = typeof v.fact.detail?.label === "string" ? v.fact.detail.label : null;
   if (v.origins[0] === "clinician") return "you typed it";
   return label ?? `from ${ORIGIN_LABEL[v.origins[0]]}`;
+}
+
+/** Who confirmed the card, in plain words. A card typed in by hand says so instead of "nothing yet". */
+function confirmedLabel(card: ReferralSource, ev: Evidence | undefined): string {
+  if (ev?.confirmedBy.length) return ev.confirmedBy.join(" · ");
+  if (card.found_via === "manual") return card.is_sample ? "added by hand ([Sample] card)" : "you, added by hand";
+  if (card.is_sample) return "made-up [Sample] card for the demo";
+  return "nothing yet";
 }
 
 const FIELD_ROWS: [keyof Evidence["fields"], string][] = [
@@ -92,11 +100,11 @@ export function EvidenceBox({
     <div className="flex flex-col gap-2 rounded-[16px] border border-[var(--hairline)] p-3" data-testid="evidence">
       <div className="flex flex-wrap items-center gap-2">
         {ev?.checkedAt && <StatusPill status={PILL[ev.confidence]}>{CONFIDENCE_LABEL[ev.confidence]}</StatusPill>}
-        <span className="text-small text-[var(--fg-muted)]">{checkedLabel(ev?.checkedAt ?? null)}</span>
+        <span className="text-small text-[var(--fg-muted)]">{checkedLabel(ev?.checkedAt ?? null, card.found_via === "manual")}</span>
       </div>
       <p className="text-small">
         <span className="text-[var(--fg-muted)]">Confirmed by: </span>
-        <span className="font-medium">{ev?.confirmedBy.length ? ev.confirmedBy.join(" · ") : "nothing yet"}</span>
+        <span className="font-medium">{confirmedLabel(card, ev)}</span>
       </p>
       {ev && Object.values(ev.fields).some((v) => v?.origins.includes("osm")) && (
         <p className="text-small text-[var(--fg-muted)]">
@@ -193,9 +201,10 @@ export function EvidenceBox({
           Sources: the NPI Registry, the CMS Medicare files, the CMS Provider Data Catalog, the state license list, OpenStreetMap (© OpenStreetMap contributors, ODbL) and their own website. Never Psychology Today or other directories.
         </p>
       </details>
-      <Button variant="quiet" onClick={checkAgain} disabled={checking} aria-describedby={detailsId}>
-        <RefreshCw aria-hidden size={16} className={checking ? "motion-safe:animate-spin" : ""} />
-        {checking ? "Checking every source…" : ev?.stale ? "Check again (it's been a while)" : "Check again"}
+      {ev?.stale && !checking && <p className="text-small text-[var(--fg-muted)]">It&rsquo;s been a while since the last check.</p>}
+      <Button variant="quiet" className="w-full" onClick={checkAgain} disabled={checking} aria-describedby={detailsId}>
+        <RefreshCw aria-hidden size={16} className={`shrink-0 ${checking ? "motion-safe:animate-spin" : ""}`} />
+        {checking ? "Checking…" : "Check again"}
       </Button>
     </div>
   );

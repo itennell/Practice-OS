@@ -10,9 +10,9 @@
 import ilPayers from "../../data/payers/il.json";
 import nationalPayers from "../../data/payers/national.json";
 
-export type PhiKind = "birth_date" | "client_name" | "diagnosis" | "identifier" | "contact" | "address";
+export type PhiKind = "birth_date" | "client_name" | "diagnosis" | "identifier" | "contact" | "address" | "identifying";
 export type PhiCheck = { ok: true } | { ok: false; kind: PhiKind };
-export const ALL_KINDS: readonly PhiKind[] = ["birth_date", "client_name", "diagnosis", "identifier", "contact", "address"];
+export const ALL_KINDS: readonly PhiKind[] = ["birth_date", "client_name", "diagnosis", "identifier", "contact", "address", "identifying"];
 
 /** Names and contact details that belong to the practice: her profile and her Referrals list. */
 export type Allowlist = {
@@ -20,12 +20,63 @@ export type Allowlist = {
   contacts: string[];
   /** The names in `names` that come from her Referrals board: public directory (NPPES) data, allowed only in a referral context. */
   directory?: string[];
+  /** Her practice's city and neighbourhood (profile): not a detail that narrows down a client. */
+  places?: string[];
 };
 
 // ---- sentences ---------------------------------------------------------------
 
 // A dot ends a sentence unless it belongs to a title or an initial ("Dr.", "J.R.").
-const NO_STOP_BEFORE = /(?:^|[^\p{L}])(?:\p{Lu}|Dr|Mr|Ms|Mrs|Mx|Prof|St|Ave|Av|Apt|vs|No)$/u;
+const NO_STOP_BEFORE = /(?:^|[^\p{L}])(?:\p{Lu}|Dr|Mr|Ms|Mrs|Mx|Prof|Rev|Fr|Sr|Jr|Hon|St|Ave|Av|Apt|vs|No)$/u;
+
+// ---- misspelled cue words ------------------------------------------------------
+
+// The words the rules key on, so a typo ("clinet", "depresion", "cancr") can't
+// slip past them. A word one edit away (a letter added, dropped, changed or two
+// swapped) is read as the cue word. Only words of 5 letters or more, so short
+// words don't overmatch, and never a real word that is one edit away
+// ("patent", "cancel", "addition", "dancer"): the list was checked against a
+// dictionary.
+const CUE_WORDS = (
+  "client clients patient patients therapy therapist diagnosis diagnosed depression depressed depressive anxiety anxious " +
+  "bipolar schizophrenia postpartum trauma autism autistic anorexia bulimia dementia psychosis addiction addicted insomnia " +
+  "disorder alcoholic cancer chemo chemotherapy radiation metastatic dialysis pregnant pregnancy miscarriage leukemia lymphoma " +
+  "mastectomy remission diabetes hospice"
+).split(" ");
+const REAL_WORDS = new Set(
+  (
+    "clint patent patents satient diagnose diagnoses degression repression repressed repressive degressive dipolar " +
+    "schizophrenic taruma trama autist mutism artistic mutistic bulimic psychoses addition adduction insomniac misorder " +
+    "cancel cancels caner canker canner canter chancer dancer lancer rancer hemotherapy adiation eradiation radication " +
+    "regnant pregnance regnancy mismarriage leucemia leukemic demission emission recission reomission"
+  ).split(" "),
+);
+
+/** One edit apart (insert, delete, change, or swap two neighbours). */
+function oneEdit(a: string, b: string): boolean {
+  if (a === b || Math.abs(a.length - b.length) > 1) return false;
+  if (a.length === b.length) {
+    const diff: number[] = [];
+    for (let i = 0; i < a.length && diff.length < 3; i++) if (a[i] !== b[i]) diff.push(i);
+    if (diff.length === 1) return true;
+    return diff.length === 2 && diff[1] === diff[0] + 1 && a[diff[0]] === b[diff[1]] && a[diff[1]] === b[diff[0]];
+  }
+  const [s, l] = a.length < b.length ? [a, b] : [b, a];
+  let i = 0;
+  while (i < s.length && s[i] === l[i]) i++;
+  return s.slice(i) === l.slice(i + 1);
+}
+
+/** Misspelled cue words read as the word they almost are ("my clinet" is "my client"). For checking only. */
+export function foldTypos(text: string): string {
+  return text.replace(/\p{L}{5,}/gu, (w) => {
+    const low = w.toLowerCase();
+    if (REAL_WORDS.has(low) || CUE_WORDS.includes(low)) return w;
+    const cue = CUE_WORDS.find((c) => oneEdit(low, c));
+    if (!cue) return w;
+    return /^\p{Lu}/u.test(w) ? cue[0].toUpperCase() + cue.slice(1) : cue;
+  });
+}
 
 /** [start, end) of each sentence: split at . ! ? ; line ends and between JSON fields. */
 export function sentenceSpans(text: string): [number, number][] {
@@ -175,6 +226,8 @@ const NAME_AFTER = [
   new RegExp(`\\b(?:Mr|Ms|Mrs|Miss|Mx)\\.?\\s+${NAME}`, "g"),
 ];
 const NAME_BEFORE = new RegExp(`${NAME}(?:\\s+is|,)\\s+(?:my|a|our)\\s+(?:client|patient)\\b`, "g");
+// "my client maria g.": a first name and an initial after a client word, in any case.
+const NAME_INITIAL_AFTER = /\b(?:client|patient|caller)s?\b(?:\s+(?:named|called|is))?[\s,:]+\p{L}{2,}\s+\p{L}\.(?=[\s,;:]|$)/iu;
 
 const nameWords = (n: string) => n.toLowerCase().split(/[\s,.]+/).filter(Boolean);
 
@@ -209,6 +262,7 @@ function hasClientName(text: string, allow: Allowlist): boolean {
       if (!allowed) return true;
     }
   }
+  if (NAME_INITIAL_AFTER.test(text)) return true;
   return sentences(text).some(
     (s) => (AGE.test(s) && SCHOOL.test(s)) || (NON_LATIN.test(s) && (PERSON_REF.test(s) || CLIENT_SIGNAL.test(s) || ABOUT_SOMEONE.test(s))),
   );
@@ -221,21 +275,29 @@ export const MY_CLIENT = /\b(?:my|our)\s+(?:client|patient)s?\b/i;
 // condition, scheduling. Her own name is checked against OWN_SIGNAL (so "Book a
 // first session with Dana Reyes, LCPC" passes); everyone else against CLIENT_SIGNAL.
 const OWN_SIGNAL =
-  /\b(?:my|our|this|her|his|their)\s+(?:client|patient)\b|\b(?:came|come|comes|coming)\s+in\b|\bcancel(?:s|ed|led|ing)?\b|\bresched\w*|\bno[- ]?shows?\b|\bmissed\b|\binvoices?\b|\bowes?\b|\bbalance\b|\bstruggl\w*|\bdiagnos\w*|\bdob\b|\bborn\b|\bwants?\b|\bprefers?\b|\bcall(?:s|ed)?\s+(?:\w+\s+)?back\b|\b(?:after|before)\s+\d|\b(?:her|his|their)\s+(?:\w+\s+){0,2}?(?:slot|appointment|appt|session|visit|consult|intake|therapy|therapist|treatment|meds|medication)s?\b/i;
+  /\b(?:my|our|this|her|his|their)\s+(?:client|patient)\b|\b(?:came|come|comes|coming)\s+in\b|\bcancel(?:s|ed|led|ing)?\b|\bresched\w*|\bno[- ]?shows?\b|\bmissed\b|\binvoices?\b|\bowes?\b|\bbalance\b|\bstruggl\w*|\bdiagnos\w*|\bdob\b|\bborn\b|\bwants?\b|\bprefers?\b(?!\s+to\s+(?:send|write|draft|post|batch|do|handle|mail|e-?mail|fax|text|reach|follow|block|keep|work))|\bcall(?:s|ed)?\s+(?:\w+\s+)?back\b|\b(?:after|before)\s+\d|\b(?:her|his|their)\s+(?:\w+\s+){0,2}?(?:slot|appointment|appt|session|visit|consult|intake|therapy|therapist|treatment|meds|medication)s?\b/i;
 const CLIENT_SIGNAL = new RegExp(`${OWN_SIGNAL.source}|\\b(?:visits?|appointments?|appts?|sessions?|consults?|intake|checked\\s+in|paid|late|copays?|superbills?|good faith estimates?|GFE)\\b`, "i");
 
 /** A sentence that treats someone as a client. `own`: her own name, judged more loosely. */
 export function clientLike(sentence: string, own = false): boolean {
-  if ((own ? OWN_SIGNAL : CLIENT_SIGNAL).test(sentence)) return true;
+  // A professional's work ("Emilie Blair, MS, CGC works with families after a
+  // cancer diagnosis") talks about diagnoses without anyone having one.
+  const pro = PROFESSIONAL_CREDENTIAL.test(sentence) && (PRACTICE_TOPIC.test(sentence) || PROFESSIONAL_WORK.test(sentence));
+  if ((own ? OWN_SIGNAL : CLIENT_SIGNAL).test(pro ? sentence.replace(/\bdiagnos\w*/gi, " ") : sentence)) return true;
   // A name with a past date beside it ("(3/14/2015) Jess wants Tuesdays") may be a birth date.
   if (!own && datesIn(sentence).some((d) => notFuture(d))) return true;
-  return mentionsDiagnosis(sentence) && !(own && PRACTICE_TOPIC.test(sentence));
+  if (!mentionsDiagnosis(sentence)) return false;
+  if (own && PRACTICE_TOPIC.test(sentence)) return false;
+  // A professional's work: "Delia Marchetti, LCSW runs a grief group", "Emilie Blair, MS, CGC works with families after a diagnosis".
+  return !(PROFESSIONAL_CREDENTIAL.test(sentence) && (PRACTICE_TOPIC.test(sentence) || PROFESSIONAL_WORK.test(sentence)));
 }
+
+const PROFESSIONAL_WORK = /\b(?:runs?|leads?|facilitat\w*|hosts?|co-?leads?|teach\w*|counsel\w*|coordinat\w*)\b/i;
 
 // Her own first name or surname alone passes only in a sentence clearly about
 // her: I/my, her license, fees, hours, profile, posts and letters.
 const OWN_CONTEXT =
-  /\b(I|I'm|I am|my|me|myself|licen[sc]\w*|fees?|rates?|hours|profile|practice|office|bio|headshot|website|post|caption|signature|letter|hi|hello|meet|from|LCPC|LCSW|LICSW|LPC|LMFT|PhD|PsyD|PLLC|therapist|clinician|counselor|owner|founder|credential\w*|CAQH|NPI|demo|fictional)\b/i;
+  /\b(I|I'm|I am|my|me|myself|licen[sc]\w*|fees?|rates?|hours|profile|practice|office|bio|headshot|website|posts?|captions?|signature|letters?|hi|hello|meet|from|LCPC|LCSW|LICSW|LPC|LMFT|PhD|PsyD|PLLC|therapist|clinician|counselor|owner|founder|credential\w*|CAQH|NPI|demo|fictional)\b/i;
 
 export function ownContext(sentence: string): boolean {
   return OWN_CONTEXT.test(sentence);
@@ -244,10 +306,14 @@ export function ownContext(sentence: string): boolean {
 // A sentence where a provider on her board belongs: their card, a letter,
 // outreach, their office, specialty or NPI. Only here is a board name directory data.
 const REFERRAL_CONTEXT =
-  /\b(cards?|board|letters?|referr\w*|refers?|NPI|NPPES|outreach|practice|office|address|speciali[sz]\w*|specialt\w*|accepting|e-?mail|phone|fax|follow[- ]?ups?|call log|contact\w*|providers?|directory|status|colleagues?|network|introduc\w*|reach(?:ed)?\s+out|stage|column|pipeline|do not contact|LCSW|LICSW|LCPC|LPC|LMFT|MD|PhD|PsyD)\b/i;
+  /\b(cards?|board|letters?|referr\w*|refers?|NPI|NPPES|outreach|practice|office|address|speciali[sz]\w*|specialt\w*|accepting|e-?mail|phone|fax|follow[- ]?ups?|call log|contact\w*|providers?|directory|status|colleagues?|network|introduc\w*|reach(?:ed)?\s+out|coffee|meet|meeting|confirm\w*|chat|stage|column|pipeline|do not contact|LCSW|LICSW|LCPC|LPC|LMFT|MD|PhD|PsyD|chaplains?|reverend|navigators?|genetic\s+counsel\w*|social\s+workers?|oncolog\w*|hospice|palliative|miles?\s+away|\d+(?:\.\d+)?\s*mi)\b/i;
+// A professional's credential after a name ("Brittany Keiser, MS, CGC", "Renata
+// Ostrowski, RN", "Rev. Tobias Wren"). Case-sensitive, so "do" and "ms" as words don't count.
+export const PROFESSIONAL_CREDENTIAL =
+  /\b(?:MD|DO|PhD|PsyD|EdD|DNP|RN|BSN|MSN|NP|APRN|PMHNP|FNP|PA-C|CGC|MSGC|MS|MA|MSW|LSW|LCSW|LICSW|LCPC|LPC|LPCC|LMHC|LMFT|CNS|BCC|MDiv|Rev)(?![\p{L}\p{N}-])|\bRev\.|\b(?:[Cc]haplain|[Rr]everend)\b/u;
 
 export function referralContext(sentence: string): boolean {
-  return REFERRAL_CONTEXT.test(sentence);
+  return REFERRAL_CONTEXT.test(sentence) || PROFESSIONAL_CREDENTIAL.test(sentence);
 }
 
 // "my supervisor Jenna Cho, LCSW": a colleague named with role and credential.
@@ -296,6 +362,164 @@ export function mentionsDiagnosis(text: string): boolean {
   return ICD10.test(text) || DIAGNOSIS.test(text);
 }
 
+// ---- medical conditions (only about one person) --------------------------------
+
+// Her niche is people facing cancer, serious illness and end of life, so these
+// words are everyday referral talk ("oncologists near me", "I help people with
+// cancer", "a hospice team"). They count only when they are about one client,
+// patient or a client's relative ("my client just started chemo", "her breast
+// cancer", "client's mom, 61, with metastatic cancer").
+const MEDICAL_SOURCE =
+  "(?:cancers?|carcinomas?|tumou?rs?|malignan\\w*|metasta\\w*|chemo\\w*|radiation(?!\\s+oncolog)(?:\\s+(?:therapy|treatment))?|radiotherapy|immunotherapy|" +
+  "stage\\s+(?:[1-4]|i{1,3}|iv|one|two|three|four)(?![\\p{L}\\p{N}])|terminal(?:ly)?\\s+ill\\w*|terminal\\s+(?:cancer|diagnosis|illness|condition)|is\\s+terminal|end[- ]stage|" +
+  "dialysis|kidney\\s+failure|hiv|pregnan\\w*|miscarri\\w*|post-?partum|stillbirth|infertil\\w*|ivf|mastectom\\w*|lumpectom\\w*|hysterectom\\w*|" +
+  "leuka?emia|lymphoma|melanoma|sarcoma|myeloma|glioblastoma|in\\s+remission|relapsed?|" +
+  "(?:in|on|entering|entered|into|enrolled\\s+in)\\s+hospice|hospice\\s+patient|palliative\\s+(?:care\\s+)?patient|on\\s+palliative(?:\\s+care)?|" +
+  "diabet\\w*|strokes?|heart\\s+attack|seizures?|epilep\\w*|parkinson['’]?s|alzheimer['’]?s|multiple\\s+sclerosis|transplant|amputat\\w*|" +
+  "als|copd|chf|esrd|ckd|chronic\\s+(?:pain|illness)|lupus|breast\\s+ca)(?![\\p{L}\\p{N}])";
+const MEDICAL = new RegExp(`(?<![\\p{L}\\p{N}])${MEDICAL_SOURCE}`, "iu");
+// Chart shorthand for a cancer: "breast ca", "lung Ca" (never "CA", the state).
+const WORD_CA = /\p{L}{3,}\s+(?:ca|Ca)(?![\p{L}\p{N}])/u;
+// Places, programs and roles are referral talk, not anyone's condition: "cancer
+// center", "patient navigator", "radiation oncology", "a hospice social worker".
+const MEDICAL_PLACES =
+  /\b(?:cancer|oncology|hospice|palliative|dialysis|transplant|diabetes|stroke|radiation|chemo(?:therapy)?|infusion|breast|maternity|pregnancy|fertility|HIV|surgery|surgical)\s+(?:cent(?:er|re)s?|care(?:\s+(?:cent(?:er|re)s?|teams?|programs?))?|institutes?|society|support|groups?|programs?|clinics?|hospitals?|units?|teams?|services|networks?|alliances?|foundations?|wellness|navigators?|nurses?|social\s+workers?|counselors?|specialists?|survivorship|resources?|research|ward|floor|practices?|offices?|departments?|partners?|providers?|doctors?|physicians?|surgeons?|oncologists?|experts?|advocates?|coaches?|educators?|doulas?|researchers?|patients|survivors|clients|families)\b|\bpatient\s+(?:navigators?|advocates?|care|services|portal|education|experience|relations|intake|coordinators?|liaisons?|family|families|support)\b|\b(?:radiation|surgical|medical|gynecologic|pediatric|hematology)[- ]+oncolog\w*/gi;
+const RELATIVES =
+  "mom|mother|dad|father|son|daughter|husband|wife|spouse|sister|brother|grandma|grandpa|grandmother|grandfather|aunt|uncle|niece|nephew|cousin|" +
+  "child|kid|baby|infant|toddler|teen|teenager|stepson|stepdaughter|stepmom|stepdad|fianc[eé]e?|girlfriend|boyfriend|grandson|granddaughter|parent";
+const AGE_WORDS = "\\d{1,3}\\s*(?:yo|y/o|y\\.o\\.?|yrs?\\s*old|years?[- ]old|year-old)(?![\\p{L}\\p{N}])";
+// "45F", "a 61 M": age and sex written as a chart would.
+const AGE_SEX = /\b\d{1,3}\s?[MF]\b/;
+const WEEKDAY = "(?:mon|tues|wednes|thurs|fri|satur|sun)days?";
+const TIME = "\\d{1,2}(?::\\d{2})?\\s*(?:am|pm|o['’]?clock)";
+// One person she sees, without the word "client": "my new intake", "my Tuesday
+// 4pm", "the guy I see Thursdays", "the woman I saw at 4", "the 61 year old".
+const SEEN_PERSON = new RegExp(
+  `\\b(?:my|our|your|this|that)\\s+(?:new\\s+)?(?:intake|counselee)s?\\b|` +
+    `\\b(?:my|our|your)\\s+(?:${WEEKDAY}\\s+)?${TIME}(?![\\p{L}\\p{N}])|\\b(?:my|our|your)\\s+${WEEKDAY}\\s+\\d{1,2}(?::\\d{2})?\\b|` +
+    `\\b(?:my|our|your)\\s+${WEEKDAY}\\s+(?:person|guy|lady|woman|man|girl|boy|kid|teen|couple|family)\\b|` +
+    `\\b(?:the|that|this)\\s+(?:woman|man|guy|lady|gentleman|girl|boy|kid|teen|person|couple|family|mom|dad)\\s+(?:I|we)\\s+(?:see|saw|seen|met|meet|treat|treated|work\\s+with)\\b|` +
+    `\\bI\\s+see\\s+(?:on|every)\\s+${WEEKDAY}|\\b(?:the|a|my|this|that)\\s+${AGE_WORDS}`,
+  "iu",
+);
+// "my pt", "pt is a 45F": lowercase only, so the "PT profile" (Psychology Today) is not a patient.
+const PT = /\b(?:my|our|your|this|the|a)\s+pt\b|\bpt\s+(?:is|has|was|had|just)\b|\bpt['’]s\b/;
+const MED_PERSON = new RegExp(`\\b(?:client|patient|caller|${RELATIVES})(?:['’]s)?(?![\\p{L}\\p{N}])|${AGE_WORDS}`, "iu");
+// "a patient", "each client", "any parent": a population, unless the sentence is specific.
+const GENERIC_PERSON = new RegExp(`\\b(?:a|an|any|each|every|another|the\\s+average)\\s+(?:new\\s+|typical\\s+)?(?:client|patient|person|parent|child|kid|teen|adult)\\b(?!\\s+of\\s+mine)`, "gi");
+// "her chemo", "client's breast cancer". A plural ("clients in chemo", "patients with HIV") is a population.
+const POSSESSIVE_MEDICAL = new RegExp(
+  `\\b(?:his|her|client['’]s|clients['’]|patient['’]s|patients['’]|(?:${RELATIVES})['’]s)\\s+(?:[\\p{L}-]+\\s+)?${MEDICAL_SOURCE}(?!\\s+(?:patients|clients|survivors|families|population|research|specialists?|doctors?|nurses?))`,
+  "iu",
+);
+// "she just started chemo", "he is in hospice", "she's pregnant". Her work
+// ("she treats breast cancer", "he has worked with cancer patients") is not having it.
+const PRACTICE_VERB = "(?:treat|help|work|serv|support|see|focus|speciali[sz]|train|offer|care\\s+for|car(?:e|es|ing)\\s+for)";
+const PRONOUN_MEDICAL = new RegExp(
+  `\\b(?:he|she)\\b(?:['’]s\\b|(?:\\W+(?!${PRACTICE_VERB})\\w+){0,1}?\\W+(?:${HAS}|is|was|just|recently|started|starting|finished|began|getting|undergoing|receiving|going\\s+through)\\b)(?:\\W+(?!${PRACTICE_VERB})\\w+){0,5}?\\W+${MEDICAL_SOURCE}`,
+  "iu",
+);
+
+/** A medical-condition word anywhere (places and roles left out). Not a refusal on its own. */
+export function mentionsMedical(text: string): boolean {
+  const s = text.replace(MEDICAL_PLACES, " ");
+  return MEDICAL.test(s) || WORD_CA.test(s);
+}
+
+/** One person she sees, named by a slot, a role or an age instead of "client" ("my Tuesday 4pm", "my new intake", "my pt"). */
+function seenPerson(s: string): boolean {
+  return SEEN_PERSON.test(s) || PT.test(s);
+}
+
+/**
+ * A medical condition about one person: a client, a patient, a client's
+ * relative or someone she sees ("my client has stage 3 breast cancer", "client's
+ * mom ... metastatic breast cancer", "she just started chemo", "his chemo", "the
+ * guy I see Thursdays has leukemia"). "I help people with cancer", "oncologists
+ * near me", "patients in active treatment" and "a patient with stage 3 cancer,
+ * who should they see first?" are not.
+ */
+export function medicalAboutSomeone(sentence: string): boolean {
+  const s = sentence.replace(MEDICAL_PLACES, " ");
+  if (!MEDICAL.test(s) && !WORD_CA.test(s)) return false;
+  if (POSSESSIVE_MEDICAL.test(s) || PRONOUN_MEDICAL.test(s) || AGE_SEX.test(s)) return true;
+  const named = s.replace(GENERIC_PERSON, " ");
+  if (MED_PERSON.test(named) || seenPerson(named)) return true;
+  // Only "a patient" or "each client": a question about a kind of person, unless something pins one down.
+  return named !== s && SPECIFIC.test(s) && !PRACTICE_TOPIC.test(s);
+}
+
+// ---- indirect identifiers ---------------------------------------------------------
+
+// One of her clients (or a client's relative, or someone she sees), with details
+// that narrow them down: an age, a job or employer, a place, a condition. "my
+// client's mom, a 61 yo retired CPS teacher in Lincoln Park" names no one and
+// still points at one person. One detail alone is everyday practice talk ("my
+// client in Lincoln Park wants telehealth", "my client is a veteran, who takes
+// Tricare?"), so it takes two, or one with a condition.
+const CLIENT_CUE = new RegExp(
+  `\\b(?:my|our|your|this|that)\\s+(?:(?:new|current|former|old|\\d{1,2}(?::\\d{2})?\\s*(?:am|pm))\\s+)?(?:(?:client|patient)(?:['’]s)?(?![\\p{L}\\p{N}])|(?:client|patient)s['’]?\\s+(?:${RELATIVES})\\b)|` +
+    `\\b(?:client|patient)['’]s\\s+(?:${RELATIVES})\\b|\\b(?:a|one)\\s+(?:client|patient)\\s+of\\s+mine\\b|\\bone\\s+of\\s+my\\s+(?:clients|patients)\\b`,
+  "iu",
+);
+// "she", "the woman": anyone, so it counts only with an age, or with a condition and a job or place.
+const WEAK_CUE = /\b(?:she|he)\b|\bthe\s+(?:woman|man|guy|lady|gentleman)\b/i;
+const NOT_AN_AGE =
+  "(?![\\p{N}:.]|\\s*(?:%|percent|minutes?|mins?|miles?|mi\\b|hours?|hrs?|am\\b|pm\\b|o['’]?clock|dollars|sessions?|times|days?|weeks?|months?|years?\\s+(?:in|of|since|ago)|people|clients|patients|referrals|cards|letters|pages?))";
+const AGE_Q = new RegExp(
+  `${AGE_WORDS}|\\bin\\s+(?:her|his|their)\\s+(?:early\\s+|mid\\s+|late\\s+)?(?:\\d0['’]?s|twenties|thirties|forties|fifties|sixties|seventies|eighties|nineties)\\b|` +
+    `\\baged?\\s+\\d{1,3}\\b|,\\s*\\d{2}\\s*,|,\\s*\\d{2}\\s*[.!?]?\\s*$|\\b(?:is|was|turned|turns|turning)\\s+(?:only\\s+|about\\s+|almost\\s+|nearly\\s+)?\\d{1,3}${NOT_AN_AGE}|['’]s\\s+\\d{1,3}${NOT_AN_AGE}`,
+  "iu",
+);
+const JOB_Q =
+  /\b(?:retired|works?\s+(?:at|for|as)|working\s+(?:at|for|as)|employed\s+(?:at|by)|employer|job\s+at|teachers?|nurses?|firefighters?|police|officers?|cops?|lawyers?|attorneys?|engineers?|professors?|pastors?|physicians?|surgeons?|accountants?|veterans?|soldiers?|students?|CPS|CTA|aldermen|alderman|judges?|bankers?|chefs?|pilots?|musicians?|athletes?|coach|principal|librarians?|cashiers?|drivers?|mechanics?|electricians?|plumbers?|bartenders?|servers?|waitress|waiter)\b/i;
+const US_STATES =
+  "Alabama|Alaska|Arizona|Arkansas|California|Colorado|Connecticut|Delaware|Florida|Georgia|Hawaii|Idaho|Illinois|Indiana|Iowa|Kansas|Kentucky|Louisiana|Maine|Maryland|" +
+  "Massachusetts|Michigan|Minnesota|Mississippi|Missouri|Montana|Nebraska|Nevada|New\\s+Hampshire|New\\s+Jersey|New\\s+Mexico|New\\s+York|North\\s+Carolina|North\\s+Dakota|" +
+  "Ohio|Oklahoma|Oregon|Pennsylvania|Rhode\\s+Island|South\\s+Carolina|South\\s+Dakota|Tennessee|Texas|Utah|Vermont|Virginia|Washington|West\\s+Virginia|Wisconsin|Wyoming";
+const NOT_PLACES = `(?:${US_STATES}|January|February|March|April|May|June|July|August|September|October|November|December|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|I|The|A|An|My|Our|Network|Person|Spanish|English|Polish|French|Chinese|Mandarin|Cantonese|Korean|Arabic|Russian|Hindi|Urdu|Tagalog|Vietnamese|ASL|Zoom|Telehealth|Medicare|Medicaid|Aetna|Cigna|Blue|United|Humana|Tricare|Network)\\b`;
+// "lives in", "in Lincoln Park", "from Rogers Park", "a nurse at Rush". A state is a licensing question, not a place to find someone.
+const PLACE_Q = new RegExp(`\\b(?:lives?|living|resides?|moved)\\s+(?:in|on|near|at|to)\\b|\\b(?:in|from|near|at)\\s+(?:the\\s+)?(?!${NOT_PLACES})\\p{Lu}\\p{Ll}+`, "u");
+
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * One client (or a client's relative, or someone she sees) with two details
+ * (age, job, place), or one and a condition. "she" or "the woman" alone counts
+ * only with an age, or with a condition and a job or place. Her own city and
+ * neighbourhood (`places`, from her profile) are not a detail.
+ */
+export function indirectIdentifiers(sentence: string, places: readonly string[] = []): boolean {
+  return identifyingDetails(sentence, places, 2);
+}
+
+/** In memory one detail is enough: "My client is 61, Tuesdays work best" keeps a fact about one client. */
+export function pinnedClientForMemory(sentence: string, places: readonly string[] = []): boolean {
+  return identifyingDetails(sentence, places, 1);
+}
+
+function identifyingDetails(sentence: string, places: readonly string[], needed: number): boolean {
+  const strong = CLIENT_CUE.test(sentence) || seenPerson(sentence);
+  if (!strong && !WEAK_CUE.test(sentence)) return false;
+  let s = sentence;
+  for (const p of places) if (p.trim()) s = s.replace(new RegExp(`(?<![\\p{L}\\p{N}])${escapeRe(p.trim())}(?![\\p{L}\\p{N}])`, "giu"), "here");
+  const age = AGE_Q.test(s) || AGE_SEX.test(s);
+  const job = JOB_Q.test(s);
+  const place = PLACE_Q.test(s);
+  const condition = DIAGNOSIS.test(s) || mentionsMedical(s);
+  const details = Number(age) + Number(job) + Number(place);
+  if (strong) return details >= needed || (details >= 1 && condition);
+  if (age) return job || place || condition;
+  return condition && (job || place) && !PRACTICE_TOPIC.test(s) && !PROFESSIONAL_CREDENTIAL.test(s);
+}
+
+// "Tuesday 4pm client", "my 3pm patient": a time slot that points at one client, in memory.
+const TIMESLOT_CLIENT =
+  /\b(?:\d{1,2}(?::\d{2})?\s*(?:am|pm)|mondays?|tuesdays?|wednesdays?|thursdays?|fridays?|saturdays?|sundays?)\s+(?:client|patient)\b(?!\s+(?:sessions?|slots?|hours?|intakes?|forms?|calls?|appointments?|times?|days?|availability))/i;
+const TIME_CUE = /\b(?:mondays?|tuesdays?|wednesdays?|thursdays?|fridays?|saturdays?|sundays?|\d{1,2}(?::\d{2})?\s*(?:am|pm)|today|tonight|yesterday|tomorrow|(?:last|next|this)\s+(?:week|month|session))\b/i;
+
 /**
  * A named person who has a condition: "Gary Bucher has bipolar disorder",
  * "Gary Bucher's PTSD". A provider's work ("Gary Bucher sees adults with
@@ -305,13 +529,19 @@ export function namedCondition(name: string, text: string): boolean {
   const who = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const has = new RegExp(`(?<![\\p{L}\\p{N}])${who}(?:'s|’s)?\\b(?:\\W+\\w+){0,2}?\\W+${HAS}\\b(?:\\W+\\w+){0,3}?\\W+${DIAGNOSIS.source}`, "iu");
   const owns = new RegExp(`(?<![\\p{L}\\p{N}])${who}(?:'s|’s)\\s+(?:\\w+\\s+)?${DIAGNOSIS.source}`, "iu");
-  return has.test(text) || owns.test(text) || (DIAGNOSED.test(text) && new RegExp(`(?<![\\p{L}\\p{N}])${who}`, "iu").test(text));
+  // "Gordon is in hospice", "Tellez just started chemo", "Gordon's breast cancer".
+  const plain = text.replace(MEDICAL_PLACES, " ");
+  const medical =
+    new RegExp(`(?<![\\p{L}\\p{N}])${who}(?:'s|’s)?\\b(?:\\W+(?!${PRACTICE_VERB})\\w+){0,3}?\\W+(?:${HAS}|is|was|just|recently|started|starting|finished|began|getting|undergoing|receiving|going\\s+through)\\b(?:\\W+(?!${PRACTICE_VERB})\\w+){0,2}?\\W+${MEDICAL_SOURCE}`, "iu").test(plain) ||
+    new RegExp(`(?<![\\p{L}\\p{N}])${who}(?:'s|’s)\\s+(?:[\\p{L}-]+\\s+)?${MEDICAL_SOURCE}`, "iu").test(plain);
+  return medical || has.test(text) || owns.test(text) || (DIAGNOSED.test(text) && new RegExp(`(?<![\\p{L}\\p{N}])${who}`, "iu").test(text));
 }
 
 function hasDiagnosis(text: string): boolean {
   return sentences(text).some((sentence) => {
     const population = populationSentence(sentence);
     if (ICD10.test(sentence) || DIAGNOSED.test(sentence)) return !population || ICD10.test(sentence);
+    if (medicalAboutSomeone(sentence)) return true;
     if (!DIAGNOSIS.test(sentence) || population) return false;
     if (HAS_CONDITION.test(sentence) || OWNS_CONDITION.test(sentence) || initialsCondition(sentence)) return true;
     return ONE_CLIENT.test(sentence) || (PRONOUN.test(sentence) && !PRACTICE_TOPIC.test(sentence));
@@ -323,9 +553,16 @@ function hasDiagnosis(text: string): boolean {
  * rescheduling"): fine to ask about in the chat, never kept in memory, which
  * holds practice-business facts only. Her niche ("I specialize in anxiety") is one.
  */
-export function clinicalForMemory(text: string): boolean {
+export function clinicalForMemory(text: string, places: readonly string[] = []): boolean {
   return sentences(text).some(
-    (s) => (mentionsDiagnosis(s) || DIAGNOSED.test(s)) && !populationSentence(s) && !(PRACTICE_TOPIC.test(s) && !SPECIFIC.test(s)),
+    (s) =>
+      ((mentionsDiagnosis(s) || DIAGNOSED.test(s)) && !populationSentence(s) && !(PRACTICE_TOPIC.test(s) && !SPECIFIC.test(s))) ||
+      // A medical condition about one person, a client pinned down by details, a
+      // "Tuesday 4pm client", or a condition tied to a day or time ("chemo Tuesdays at 4").
+      medicalAboutSomeone(s) ||
+      pinnedClientForMemory(s, places) ||
+      TIMESLOT_CLIENT.test(s) ||
+      (mentionsMedical(s) && TIME_CUE.test(s) && !populationSentence(s)),
   );
 }
 
@@ -458,7 +695,7 @@ export function personalDetail(text: string, allow: Allowlist = { names: [], con
   const words = keysAsWords(text);
   for (const s of sentences(words)) {
     if (BIRTH_WORDS.test(s) && (datesIn(s).length > 0 || MONTH_WORD.test(s))) return "birth_date";
-    if (HAS_CONDITION.test(s) || OWNS_CONDITION.test(s) || initialsCondition(s) || (DIAGNOSED.test(s) && DIAGNOSIS.test(s))) {
+    if (HAS_CONDITION.test(s) || OWNS_CONDITION.test(s) || initialsCondition(s) || (DIAGNOSED.test(s) && DIAGNOSIS.test(s)) || medicalAboutSomeone(s)) {
       if (!populationSentence(s)) return "diagnosis";
     }
     if ((PERSON_REF.test(s) || /\b(cell|mobile)\b/i.test(s)) && hasForeignContact(s, allow)) return "contact";
@@ -485,6 +722,7 @@ export function checkIdentity(
     ["contact", () => hasForeignContact(text, allow)],
     ["address", () => hasClientAddress(text, allow)],
     ["client_name", () => hasClientName(text, allow)],
+    ["identifying", () => sentences(text).some((s) => indirectIdentifiers(s, allow.places))],
   ];
   for (const [kind, found] of checks) if (only.includes(kind) && found()) return { ok: false, kind };
   return { ok: true };
