@@ -504,7 +504,12 @@ describe.skipIf(!process.env.DATABASE_URL)("the page cache in the database", asy
       select u, 200, 'x', ${new Date(t - 3600_000)}::timestamptz from unnest(${urls}::text[]) as u`;
     const { fetcher } = fakeFetch(() => html("<p>new</p>"));
     await politeFetch("https://prune-new.example/", { fetcher, lookup: publicDns, sleep: noSleep, now: () => t, sql: db() });
-    const [{ n }] = await db()`select count(*)::int as n from practice_os.referral_fetch_cache`;
+    // NPI Registry pages and map points (lib/referrals/sources/stored-cache.ts) prune themselves and aren't counted.
+    const { STORED_KEY_PREFIXES } = await import("../lib/referrals/sources/stored-keys");
+    const [nppes, census] = STORED_KEY_PREFIXES;
+    const [{ n }] = await db()`
+      select count(*)::int as n from practice_os.referral_fetch_cache
+       where left(url, ${nppes.length}) <> ${nppes} and left(url, ${census.length}) <> ${census}`;
     expect(n).toBeLessThanOrEqual(CACHE_MAX_ROWS);
     expect(await db()`select 1 from practice_os.referral_fetch_cache where url = 'https://prune-old.example/'`).toHaveLength(0);
     expect(await db()`select 1 from practice_os.referral_fetch_cache where url = 'https://prune-new.example/'`).toHaveLength(1);

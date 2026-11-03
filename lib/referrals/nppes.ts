@@ -331,9 +331,10 @@ export function npiUrl(npi: string): string {
   return `${NPPES_URL}?${new URLSearchParams({ version: "2.1", number: npi })}`;
 }
 
-type Fetcher = (url: string) => Promise<NppesResponse>;
+export type Fetcher = (url: string) => Promise<NppesResponse>;
 
-const defaultFetch: Fetcher = async (url) => {
+/** One question to the NPI Registry, no cache (lib/referrals/sources/stored-cache.ts keeps search pages in the database). */
+export const fetchNppes: Fetcher = async (url) => {
   const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
   if (!res.ok) throw new Error(`The NPI Registry answered ${res.status}.`);
   return (await res.json()) as NppesResponse;
@@ -346,7 +347,7 @@ const CACHE_MS = 6 * 3600 * 1000;
 export const CACHE_MAX = 200;
 const cache = new Map<string, { at: number; value: Promise<NppesResponse> }>();
 
-export function cachedFetch(fetcher: Fetcher = defaultFetch, now = () => Date.now()): Fetcher {
+export function cachedFetch(fetcher: Fetcher = fetchNppes, now = () => Date.now()): Fetcher {
   return (url) => {
     const hit = cache.get(url);
     if (hit && now() - hit.at < CACHE_MS) {

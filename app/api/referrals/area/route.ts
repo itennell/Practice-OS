@@ -1,10 +1,12 @@
+import { db } from "@/lib/db";
 import { AreaError, parseArea, practiceContext, RADII, searchArea } from "@/lib/referrals/area";
 import { canSearch } from "@/lib/referrals/http";
 import { limited } from "@/lib/referrals/rate-limit";
 import { SPECIALTIES, type SpecialtyId } from "@/lib/referrals/nppes";
 
 // The map's search. Read only: it asks the NPI Registry (and the free Census and
-// OpenStreetMap geocoders) about an area, and saves nothing. It answers within
+// OpenStreetMap geocoders) about an area, and saves no card. Their answers are
+// kept a while in referral_fetch_cache (lib/referrals/sources/stored-cache.ts). It answers within
 // two minutes, with what it has so far if the services are slow.
 export const maxDuration = 120;
 
@@ -18,7 +20,7 @@ export async function POST(request: Request) {
   const ids = new Set(SPECIALTIES.map((s) => s.id));
   const specialties = Array.isArray(body.specialties) ? (body.specialties.filter((s) => ids.has(s)) as SpecialtyId[]) : [];
   try {
-    const result = await searchArea({ area, radiusMiles, specialties }, await practiceContext());
+    const result = await searchArea({ area, radiusMiles, specialties }, await practiceContext(), { sql: db() });
     return Response.json(result);
   } catch (err) {
     if (err instanceof AreaError) return Response.json({ error: err.message }, { status: 400 });
