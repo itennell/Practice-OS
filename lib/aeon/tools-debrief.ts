@@ -22,7 +22,7 @@ export const DEBRIEF_TOOLS: AeonTool[] = [
       "before anything is saved. Then a follow-up email waits in her approvals; she sends it herself. Say the card is under your answer; don't " +
       "ask her to tell you the details in the chat. Name the card as she said it or pass its id; several matches come back as ask_which: list " +
       "them (name, address) and ask which. Sends nothing.",
-    input: { partner: z.string().trim().min(2).max(160).describe("The card's name as she said it ('Dr. Okafor', 'Lakeview Pediatrics'), or its id.") },
+    input: { partner: z.string().trim().min(2).max(160).describe("The card's name as she said it ('Dr. Okafor', 'Fernhollow Pediatrics'), or its id.") },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     label: "Opened a debrief",
     changesData: true,

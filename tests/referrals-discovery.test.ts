@@ -325,7 +325,7 @@ describe("sensitive kinds: no street, ZIP, point or distance anywhere", () => {
     for (const n of ["Harbor Shelters Inc", "Ruth’s House", "Ruth's House", "Safe Harbor Center", "The Safehouse Project", "Sarah's Safe House", "House of Hope Chicago",
       "Northside Sexual Abuse Program", "Family Violence Coalition", "Battered Women's Network", "Lakeview Women’s Center", "Haven House Services", "Refuge Ministries", "Sanctuary Outreach"])
       expect(isSensitiveSource({ name: n }), n).toBe(true);
-    for (const n of ["Lakeview Family Medicine", "Gilda's Club Chicago", "Fullerton Funeral Home", "Haven"]) expect(isSensitiveSource({ name: n }), n).toBe(false);
+    for (const n of ["Juniper Row Family Medicine", "Gilda's Club Chicago", "Fullerton Funeral Home", "Haven"]) expect(isSensitiveSource({ name: n }), n).toBe(false);
     // One-way site hashes match however NPPES writes the street; never the street itself.
     const [a] = siteHashes("2400 N LINCOLN AVE", "60614-1234");
     expect(siteHashes("2400 n lincoln ave", "60614")).toContain(a);

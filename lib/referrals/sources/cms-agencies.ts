@@ -135,7 +135,13 @@ export function pdcFacts(org: FoundOrg): Fact[] {
   return facts;
 }
 
-type Deps = { fetcher?: JsonFetcher; sql?: postgres.Sql | null; now?: () => Date };
+type Deps = {
+  fetcher?: JsonFetcher;
+  sql?: postgres.Sql | null;
+  now?: () => Date;
+  /** Told when an answer couldn't be kept in referral_fetch_cache (it is still used). */
+  onStoreError?: (err: unknown) => void;
+};
 
 async function ask(url: string, deps: Deps): Promise<unknown> {
   const fetcher = deps.fetcher ?? jsonFetcher("CMS Provider Data Catalog (data.cms.gov)", 20_000);
@@ -145,7 +151,7 @@ async function ask(url: string, deps: Deps): Promise<unknown> {
       await waitTurn("data.cms.gov", SPACING_MS);
       return fetcher(url);
     },
-    { sql: deps.sql, host: "data.cms.gov", source: "CMS Provider Data Catalog" },
+    { sql: deps.sql, host: "data.cms.gov", source: "CMS Provider Data Catalog", onStoreError: deps.onStoreError },
   );
 }
 

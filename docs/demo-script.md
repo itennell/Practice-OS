@@ -9,7 +9,7 @@ A walk-through of Aeon's Referrals helper for the hackathon video, about 3 minut
 3. Run `npm run demo:warm` so the public directories for 60614 are cached and the map fills at once.
 4. Run `npm run demo:check`. Every line should pass; fix anything it flags before recording.
 5. Use a production build (`npm run build && npm start`) so the developer badge doesn't show.
-6. Under the message box, set the mode to **Ask**, so every change waits for an approval on screen.
+6. Under the message box, set the mode to **Manual** ("Ask me before doing anything"), so every change waits for an approval on screen.
 7. Close other tabs, turn on Do Not Disturb, and set the browser to phone width for the debrief scene.
 
 ## The story

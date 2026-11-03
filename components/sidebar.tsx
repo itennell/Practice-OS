@@ -177,12 +177,11 @@ function MenuBody({ data, chatId, onNavigate }: { data: MenuData; chatId: string
         {data.clinician && (
           <Link href="/settings" onClick={onNavigate} className={cn(row(false), "mt-1 py-2")}>
             <Avatar name={data.clinician.name} tone="lilac" size="sm" />
-            <span className="flex min-w-0 flex-col">
-              <span className="truncate text-small font-semibold text-[var(--menu-fg)]">
-                {data.clinician.name}
-                {data.clinician.credential && `, ${data.clinician.credential}`}
-              </span>
-              {data.clinician.isSample && <span className="truncate text-label">Fictional demo practice</span>}
+            {/* One string, so the fictional demo reads exactly "Dana Reyes, LCPC (fictional demo practice)" (AGENTS.md). */}
+            <span className="min-w-0 text-small font-semibold text-[var(--menu-fg)]">
+              {data.clinician.name}
+              {data.clinician.credential && `, ${data.clinician.credential}`}
+              {data.clinician.isSample && <span className="font-normal text-[var(--menu-muted)]"> (fictional demo practice)</span>}
             </span>
           </Link>
         )}
