@@ -16,6 +16,10 @@ Practice-OS is built by **Caseload** (a sole proprietorship).
 - [Terms & Conditions](docs/terms.md)
 - [How SMS opt-in works](docs/sms-opt-in.md)
 
+## The hackathon demo: Referrals
+
+The demo shows one helper end to end: **Referrals**, a relationship engine for the professionals who send a therapist clients (oncologists, hospice and palliative teams, funeral homes, clergy, cancer nonprofits and more). It finds them from public sources, ranks them for her niche with the reasons shown, drafts intro letters she copies and sends herself, and turns a spoken coffee-meeting debrief into a partner profile and a follow-up. Turn it on with `REFERRALS_ONLY_DEMO` in `lib/features.ts`; turn it off to get the full app. The walk-through is in [docs/demo-script.md](docs/demo-script.md).
+
 ## Three helpers
 
 - **Admin**: everything in one place. A compliance calendar with sourced rules, practice settings she changes by talking to Aeon, client forms, Good Faith Estimates, superbills, an insurance hub by license, credentialing prep, and a Files page with every upload and every document Aeon made.
