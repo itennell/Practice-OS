@@ -10,12 +10,14 @@ import {
   clientLike,
   clinicalForMemory,
   colleagueAt,
+  foldTypos,
   mentionsDiagnosis,
   namedCondition,
   ownContext,
   personalDetail,
   referralContext,
   sentenceAt,
+  sentenceSpans,
   type Allowlist,
   type PhiKind,
 } from "./identity-filter";
@@ -34,6 +36,8 @@ export const REFUSAL: Record<GuardKind, string> = {
   identifier: "That looks like an ID number (SSN, member or record number). I can't keep those. Ask again without it.",
   contact: "That looks like someone's email or phone number. I can't keep client contact details yet. Ask again without it.",
   address: "That looks like someone's home address. I can't keep client details yet. Ask again without it.",
+  identifying:
+    "That describes one client closely enough to pick them out (an age, a job, a place or a health detail). I can't keep client details yet. Ask again without those details.",
   unavailable: "My privacy check isn't working right now, so I can't read messages. Try again in a minute.",
   too_long: "That's too long for my privacy check to read in full, so I left its text out. Ask about a shorter part, or open it on the Files page.",
 };
@@ -41,6 +45,8 @@ export const REFUSAL: Record<GuardKind, string> = {
 /** What a model sees in place of a tool result the rules refused. */
 export const WITHHELD = "[withheld: this result may contain a client detail]";
 const NAME_WITHHELD = "[name withheld]";
+/** What stands in Aeon's reply for one line or card the guard left out. */
+export const PART_LEFT_OUT = "[left out: this part may hold a client detail]";
 
 function escape(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -51,9 +57,14 @@ function wholeWord(name: string, flags: string): RegExp {
   return new RegExp(`(?<![\\p{L}\\p{N}])${escape(name)}(?![\\p{L}\\p{N}])`, `${flags}u`);
 }
 
-// Titles and credentials are not part of a name when names are compared ("Dr. Carin Gordon, LCSW" is "carin gordon").
+// Titles, credentials and sample labels are not part of a name when names are
+// compared ("Dr. Carin Gordon, LCSW" is "carin gordon", "[Sample] Rev. Tobias
+// Wren" is "tobias wren", "Brittany Keiser, MS, CGC" is "brittany keiser").
 const TITLE_WORDS = new Set(
-  "dr doctor mr mrs ms mx miss prof professor md do phd psyd edd lcsw licsw lcpc lpc lpcc lmhc lmft mft np pmhnp aprn rn".split(" "),
+  (
+    "dr doctor mr mrs ms mx miss prof professor rev reverend fr pastor chaplain md do phd psyd edd dnp lcsw licsw lsw msw lcpc lpc lpcc lmhc lmft mft " +
+    "np fnp pmhnp aprn rn bsn msn pa-c cgc msgc ma cns bcc mdiv sample test"
+  ).split(" "),
 );
 
 const wordsOf = (name: string) =>
@@ -61,6 +72,7 @@ const wordsOf = (name: string) =>
     .toLowerCase()
     .replace(/['’]s?$/u, "")
     .split(/[\s.,]+/)
+    .map((w) => w.replace(/^[[(]+|[\])]+$/g, ""))
     .filter((w) => w && !TITLE_WORDS.has(w));
 
 /** Every word of the name is in one entry ("Dana" in "Dana Reyes"). */
@@ -101,6 +113,8 @@ export type PersonVerdict = { verdict: "ok" } | { verdict: "blank" } | { verdict
  */
 export function judgePerson(name: string, text: string, allow: Allowlist): PersonVerdict {
   const words = wordsOf(name);
+  // Only titles or a sample label ("Rev.", "[Sample]"): no one is named.
+  if (words.length === 0) return { verdict: "ok" };
   const directory = allow.directory ?? [];
   const own = allow.names.filter((n) => !directory.includes(n));
   const ownWhole = wholeOf(words, own);
@@ -189,7 +203,46 @@ function joinSpacedLetters(text: string): string {
  * name. Used for checking only; what is saved is unchanged.
  */
 export function normalizeForCheck(text: string): string {
-  return joinSpacedLetters(foldLookalikes(text.normalize("NFKD").replace(/[\p{M}\p{Cf}]/gu, "").normalize("NFKC")));
+  return foldTypos(joinSpacedLetters(foldLookalikes(text.normalize("NFKD").replace(/[\p{M}\p{Cf}]/gu, "").normalize("NFKC"))));
+}
+
+// Digits and symbols written for letters ("cl1ent S4rah K1ein", "p@tient",
+// "k!ll"). "1" and "|" can be i or l, so there are two readings. Only inside a
+// word with at least two letters, never a plain number, a time or an ordinal
+// ("4pm", "1st", "90837"): those are checked as written.
+const LEET: Record<string, [string, string]> = {
+  "1": ["i", "l"], "|": ["i", "l"], "!": ["i", "i"], "4": ["a", "a"], "@": ["a", "a"],
+  "3": ["e", "e"], "0": ["o", "o"], "5": ["s", "s"], $: ["s", "s"], "7": ["t", "t"],
+};
+const LEET_CHAR = /[\p{L}013457@$!|]/u;
+const LEET_TOKEN = /[\p{L}013457@$!|]+/gu;
+const NUMBER_WITH_UNIT = /^\d+(?:st|nd|rd|th|am|pm|s|k|x|yo|mg|ml|mi|hrs?|min|mins|f|m)$/i;
+
+function foldLeetWith(text: string, pick: 0 | 1): string {
+  return text.replace(LEET_TOKEN, (t) => {
+    if ((t.match(/\p{L}/gu)?.length ?? 0) < 2 || NUMBER_WITH_UNIT.test(t)) return t;
+    const chars = [...t];
+    return chars
+      .map((c, i) => {
+        const swap = LEET[c];
+        if (!swap) return c;
+        const before = i > 0 && LEET_CHAR.test(chars[i - 1]);
+        const after = i + 1 < chars.length && LEET_CHAR.test(chars[i + 1]);
+        // Inside a word ("S4rah", "k!ll"), or starting one before a letter ("$arah", "5arah").
+        return after && (before || /\p{L}/u.test(chars[i + 1])) ? swap[pick] : c;
+      })
+      .join("");
+  });
+}
+
+/** The leet readings of text already cleaned by normalizeForCheck that differ from it. */
+export function leetVariants(plain: string): string[] {
+  const out = new Set<string>();
+  for (const pick of [0, 1] as const) {
+    const v = foldTypos(foldLeetWith(plain, pick));
+    if (v !== plain) out.add(v);
+  }
+  return [...out];
 }
 
 export type GuardOptions = {
@@ -211,6 +264,82 @@ export async function guard(text: string, at: GuardPoint, allow?: Allowlist, opt
     contacts: raw.contacts.map(normalizeForCheck),
     ...(raw.directory ? { directory: raw.directory.map(normalizeForCheck) } : {}),
   };
+  const whole = await checkWithVariants(text, at, list, opts);
+  if (whole.ok || at !== "reply" || whole.kind === "unavailable" || whole.kind === "too_long") return whole;
+  // One card or line shouldn't blank Aeon's whole answer: leave out only the parts
+  // that are refused on their own. Anything less clear-cut refuses the whole reply.
+  return (await withoutRefusedParts(text, list, opts)) ?? whole;
+}
+
+/** The text as written, then each leet reading of it ("cl1ent S4rah K1ein"). */
+async function checkWithVariants(text: string, at: GuardPoint, list: Allowlist, opts: GuardOptions): Promise<GuardResult> {
+  const first = await checkOnce(text, at, list, opts);
+  if (!first.ok) return first;
+  // Public directory and rule text (a light tool result) is read as written.
+  if (at === "tool_result" && !opts.fullRules) return first;
+  for (const variant of leetVariants(normalizeForCheck(text))) {
+    const r = await checkOnce(variant, at, list, opts);
+    if (!r.ok) return r;
+    // A name that only shows up when the digits are read as letters can't be
+    // blanked where it stands, so it is refused.
+    if (r.text !== variant) return { ok: false, kind: "client_name" };
+  }
+  return first;
+}
+
+/**
+ * Aeon's reply split into lines or cards (or sentences when it is one
+ * paragraph). The parts the guard refuses on their own are replaced with
+ * PART_LEFT_OUT, and the rest is checked again as a whole. Null (refuse the
+ * whole reply) when no single part is at fault, when more than half would go,
+ * or when what is left still fails.
+ */
+async function withoutRefusedParts(text: string, list: Allowlist, opts: GuardOptions): Promise<GuardResult | null> {
+  const isContent = (p: string) => p.trim() !== "";
+  let parts = text.split(/(\n+)/);
+  if (parts.filter(isContent).length < 2) parts = sentenceSpans(text).map(([s, e]) => text.slice(s, e));
+  const content = parts.filter(isContent);
+  if (content.length < 2) return null;
+  const dropped: string[] = [];
+  const kept: string[] = [];
+  for (const p of parts) {
+    if (!isContent(p)) {
+      kept.push(p);
+      continue;
+    }
+    const r = await checkWithVariants(p, "reply", list, opts);
+    if (r.ok) {
+      kept.push(r.text);
+      continue;
+    }
+    if (r.kind === "unavailable" || r.kind === "too_long") return null;
+    dropped.push(p);
+    // Keep the list marker and spacing, so a numbered plan still reads as one.
+    const lead = /^\s*(?:(?:[-*•]|\d+[.)])\s+)?/.exec(p)?.[0] ?? "";
+    const trail = /\s*$/.exec(p)?.[0] ?? "";
+    kept.push(`${lead}${PART_LEFT_OUT}${trail}`);
+  }
+  if (dropped.length === 0 || dropped.length * 2 > content.length) return null;
+  const rest = kept.join("");
+  // A person named in a part that was left out is tied to a client detail there,
+  // so their name anywhere else in the reply says too much: hold it all back.
+  try {
+    const restPlain = normalizeForCheck(rest);
+    for (const p of dropped) {
+      const plain = normalizeForCheck(p);
+      const found = [...(await findNames(plain)), ...(await findNames(titleCase(plain), { secondReads: false }))];
+      for (const n of found.filter(isNameLike)) {
+        if (wordsOf(n).some((w) => w.length > 1 && wholeWord(w, "i").test(restPlain))) return null;
+      }
+    }
+  } catch {
+    return null;
+  }
+  const again = await checkWithVariants(rest, "reply", list, opts);
+  return again.ok ? again : null;
+}
+
+async function checkOnce(text: string, at: GuardPoint, list: Allowlist, opts: GuardOptions): Promise<GuardResult> {
   const plain = normalizeForCheck(text);
   const light = at === "tool_result" && !opts.fullRules;
   const rules = light ? checkIdentity(plain, list, TOOL_RESULT_RULES) : checkIdentity(plain, list);
