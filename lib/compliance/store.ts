@@ -34,9 +34,14 @@ export async function loadFacts(sql: postgres.Sql = db()): Promise<Facts | null>
   } satisfies Record<string, unknown>);
 }
 
-export async function practiceToday(sql: postgres.Sql = db()): Promise<ISODate> {
+/** The practice's time zone (settings.timezone, default America/Chicago). */
+export async function practiceTimeZone(sql: postgres.Sql = db()): Promise<string> {
   const [s] = await sql`select timezone from practice_os.settings limit 1`;
-  return todayIn(s?.timezone ?? "America/Chicago");
+  return s?.timezone ?? "America/Chicago";
+}
+
+export async function practiceToday(sql: postgres.Sql = db()): Promise<ISODate> {
+  return todayIn(await practiceTimeZone(sql));
 }
 
 type Row = {
