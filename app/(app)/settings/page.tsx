@@ -13,7 +13,9 @@ import { SOUL_PATH, soul } from "@/lib/aeon/soul";
 import { loadPracticeSettings } from "@/lib/gfe/store";
 import { DefaultModeSetting, FrontDeskRules } from "@/components/approval-settings";
 import { FRONT_DESK_ENABLED, PHONE_ALERTS_ENABLED, REFERRALS_ONLY_DEMO } from "@/lib/features";
-import { getReferralSettings } from "@/lib/referrals/settings";
+import { getReferralSettings, NICHE_OPTIONS, specialtiesForNiche } from "@/lib/referrals/settings";
+import { SPECIALTY_BY_ID } from "@/lib/referrals/nppes";
+import { ReferralNicheSetting, type NicheChoice } from "@/components/referral-niche-setting";
 import { alertPhone } from "@/lib/frontdesk/crisis";
 import { loadApprovalSettings } from "@/lib/approval-settings";
 
@@ -103,11 +105,14 @@ async function Alerts() {
   );
 }
 
-// Settings > Referrals: her home ZIP. The niche picker (who she'd like to hear from) goes in
-// the slot below in a later PR.
+// Settings > Referrals: her home ZIP and her niche (who she'd like to hear from first).
 async function Referrals() {
   await connection(); // read the database per request, never at build time
   const saved = await getReferralSettings().catch(() => null);
+  const choices: NicheChoice[] = NICHE_OPTIONS.map((o) => ({
+    ...o,
+    kinds: specialtiesForNiche(o.value).map((id) => ({ id, label: SPECIALTY_BY_ID.get(id)!.label })),
+  }));
   return (
     <GlassCard aria-labelledby="referrals-heading" className="flex max-w-3xl flex-col gap-4 p-6 md:p-8">
       <div className="flex flex-col gap-1">
@@ -117,7 +122,7 @@ async function Referrals() {
         <p className="max-w-[60ch] text-[var(--fg-muted)]">Where Aeon looks for doctors and others who could send you clients.</p>
       </div>
       <ReferralZipSetting initial={saved?.searchZip ?? null} />
-      {/* REFERRAL_NICHE_PICKER_SLOT: the niche picker goes here (later PR). */}
+      <ReferralNicheSetting initial={saved?.nichePreset ?? null} choices={choices} />
     </GlassCard>
   );
 }

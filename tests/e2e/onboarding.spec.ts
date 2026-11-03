@@ -252,7 +252,11 @@ test("Referrals-only demo: the short path, ending on the employer reminder, then
   });
   await step(page, /Who do you help/, none, "skip");
   await step(page, /What ZIP code should Aeon search around/, () => page.getByLabel("ZIP code").fill("60614"));
-  await step(page, /Who would you like to hear from/, none, "skip");
+  // Her niche pre-selects that niche's top kinds on the next screen.
+  await step(page, /closest to your niche/, () => radio(page, /Oncology \/ serious illness/));
+  await expect(heading(page)).toHaveText(/Who would you like to hear from/);
+  for (const kind of ["Oncology", "Hospice", "Palliative care"]) await expect(page.getByRole("button", { name: kind, exact: true })).toHaveAttribute("aria-pressed", "true");
+  await step(page, /Who would you like to hear from/, none);
   await expect(heading(page)).toHaveText(/Are you also employed somewhere/);
   await expect(page.getByText(/conflicts of interest/)).toBeVisible();
   expect(await seriousViolations(page)).toEqual([]);

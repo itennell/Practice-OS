@@ -1,13 +1,15 @@
 // More Referrals tools for Aeon (chat and MCP), spread into TOOLS in tools.ts:
 // find a card anywhere on the board by name, specialty or ZIP; mark someone
-// do-not-contact; and change a letter that is still waiting for her approval.
+// do-not-contact; change a letter that is still waiting for her approval; and save her niche.
 // They go through runTool like every other tool (input check, view-only rule,
 // the sensitive-info guard on the result).
 import { z } from "zod";
 import type { chat } from "../meta";
 import { contactsFor, CONTACT_LABEL, NoNpiToList, screenedNote, suppress, suppressionFor, unsuppress } from "../referrals/contacts";
 import { evidenceFor } from "../referrals/evidence/store";
-import { specialtyForCode } from "../referrals/nppes";
+import { isNichePreset, NICHE_PRESET_BY_ID, NICHE_PRESETS } from "../referrals/catalog";
+import { SPECIALTY_BY_ID, specialtyForCode } from "../referrals/nppes";
+import { saveReferralSettings, specialtiesForNiche } from "../referrals/settings";
 import { LetterNotWaiting, pendingLetter, reviseLetter } from "../referrals/outreach";
 import { normalizeName, normalizeOrg } from "../referrals/evidence/normalize";
 import { cardsNamed } from "../referrals/plan";
@@ -137,6 +139,46 @@ export function whatItSays(included: string[], leftOut: { what: string; why: str
 }
 
 export const REFERRAL_TOOLS: AeonTool[] = [
+  tool({
+    name: "set_referral_niche",
+    title: "Set your referral niche",
+    description:
+      "When she tells Aeon her niche or asks to rank referral sources for it ('I focus on oncology and end of life', 'rank for grief " +
+      "and loss', 'no niche'): saves one of the catalog niches (Settings › Referrals). The map, the board and the weekly plan rank " +
+      "by it from now on. Her saved kinds of provider stay as they are (keep_kinds true, the default); pass keep_kinds: false only " +
+      "when she asks to switch her searches to the niche's kinds too. Pass the niche id from the list in the input; 'none' clears " +
+      "it. Only pick a niche she named or clearly described; if her words fit two, ask which. Sends nothing.",
+    input: {
+      niche: z
+        .enum(["none", ...NICHE_PRESETS.map((p) => p.id)] as [string, ...string[]])
+        .describe(`One of: ${NICHE_PRESETS.map((p) => `${p.id} (${p.label})`).join(", ")}; or none.`),
+      keep_kinds: z
+        .boolean()
+        .optional()
+        .describe("Default true: keep her saved kinds of provider. False only when she asked to also switch them to the niche's top kinds."),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+    label: "Saved your referral niche",
+    changesData: true,
+    // Her settings: an MCP caller's change waits for her approval.
+    queuesOverMcp: true,
+    run: async ({ niche, keep_kinds = true }) => {
+      const preset = niche === "none" ? null : niche;
+      // Checked against the catalog again in saveReferralSettings, whatever the model sent.
+      if (preset !== null && !isNichePreset(preset)) return text({ saved: false, why: "That isn't one of the niches. Ask her which one fits." });
+      const kinds = preset && !keep_kinds ? specialtiesForNiche(preset) : [];
+      await saveReferralSettings({ nichePreset: preset, ...(kinds.length ? { specialties: kinds } : {}) }, undefined, "aeon");
+      return text({
+        saved: true,
+        niche: preset ? NICHE_PRESET_BY_ID.get(preset)!.label : null,
+        ...(kinds.length ? { looks_for_first: kinds.map((k) => SPECIALTY_BY_ID.get(k)!.label) } : {}),
+        note: preset
+          ? "Her map, board and weekly plan now rank by this niche. She can change it in Settings › Referrals."
+          : "No niche: everyone is ranked the plain way again. She can pick one in Settings › Referrals.",
+      });
+    },
+  }),
+
   tool({
     name: "find_referral_cards",
     title: "Find a card on the Referrals board",

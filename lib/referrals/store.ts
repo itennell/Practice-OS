@@ -9,7 +9,8 @@ import { nearbyZips, zipCenters, zipDistance } from "./geo";
 import { fetchProviders, looksResidential, providerByNpi, SPECIALTY_BY_ID, type Provider, type SpecialtyId } from "./nppes";
 import { suppressedNpis } from "./contacts";
 import { nppesFacts, saveFacts } from "./evidence/store";
-import { focusFrom, providerTier, SCORE_VERSION, tierFor, type Focus } from "./tier";
+import { compareTiers, focusFrom, providerTier, SCORE_VERSION, scoreVersionFor, selfPayFrom, tierFor, type Focus } from "./tier";
+import { isNichePreset } from "./catalog";
 import { STAGES, STAGE_LABEL, type Stage } from "./stages";
 
 export { STAGES, STAGE_LABEL, type Stage };
@@ -58,7 +59,13 @@ export type PartnerProfile = {
   connection_points: string | null;
 };
 
-export type FoundSource = Provider & { distanceMiles: number | null; fitScore: number; id?: string };
+export type FoundSource = Provider & {
+  distanceMiles: number | null;
+  fitScore: number;
+  id?: string;
+  /** The score_version for the niche this score was weighted for (tier.ts scoreVersionFor). */
+  scoreVersion?: number;
+};
 
 /** Searches NPPES around a ZIP, scores each provider and saves them. Best fit first. */
 export async function findReferralSources(
@@ -70,13 +77,16 @@ export async function findReferralSources(
   const zips = nearbyZips(centers, opts.zip, opts.radiusMiles ?? 3, 5);
   const blocked = await suppressedNpis(sql);
   const providers = (await fetchProviders(opts.specialties, zips, opts.fetcher)).filter((p) => !blocked.has(p.npi));
-  const { focus, state } = await practiceFacts(sql);
-  const scored = providers
+  const facts = await practiceFacts(sql);
+  const scoreVersion = scoreVersionFor(facts.niche);
+  // The same order as everywhere else (tier.ts compareTiers), before each kind's best few are kept.
+  const ranked = providers
     .map((p) => {
       const distanceMiles = zipDistance(centers, opts.zip, p.zip);
-      return { ...p, distanceMiles, fitScore: providerTier(p, { miles: distanceMiles, focus, clinicianState: state }).score };
+      return { p, miles: distanceMiles, tier: providerTier(p, { miles: distanceMiles, ...tierContext(facts) }) };
     })
-    .sort((a, b) => b.fitScore - a.fitScore || (a.distanceMiles ?? 99) - (b.distanceMiles ?? 99) || a.name.localeCompare(b.name));
+    .sort((a, b) => compareTiers(a, b) || a.p.name.localeCompare(b.p.name));
+  const scored: FoundSource[] = ranked.map(({ p, miles, tier }) => ({ ...p, distanceMiles: miles, fitScore: tier.score, scoreVersion }));
   // A city ZIP has thousands; the board keeps the best few of each kind.
   const perKind = opts.perSpecialty ?? PER_SPECIALTY;
   const found = opts.specialties.flatMap((s) => scored.filter((p) => p.specialty === s).slice(0, perKind));
@@ -90,11 +100,38 @@ export async function findReferralSources(
 
 const PER_SPECIALTY = 20;
 
-/** Who she helps (onboarding), as the groups the tiers match on, and her state. */
-export async function practiceFacts(sql: postgres.Sql = db()): Promise<{ focus: Focus[]; state: string | null }> {
-  const [row] = await sql<{ who: string | null; state: string | null }[]>`
-    select onboarding_answers ->> 'who_i_help' as who, state from practice_os.clinician_profile limit 1`.catch(() => []);
-  return { focus: focusFrom(row?.who), state: row?.state ?? null };
+export type PracticeFacts = {
+  focus: Focus[];
+  state: string | null;
+  /** Her niche preset (Settings › Referrals), checked against the catalog. */
+  niche: string | null;
+  /** Her clients pay her themselves: no in-network payer, a fee schedule or a self-pay answer (tier.ts selfPayFrom). */
+  selfPay: boolean;
+};
+
+/** Her niche preset as saved, checked against the catalog. Its own query: a database without migration 043 still works. */
+export async function currentNiche(sql: postgres.Sql = db()): Promise<string | null> {
+  const [setting] = await sql<{ niche: string | null }[]>`select niche_preset as niche from practice_os.referral_settings where id`.catch(() => []);
+  return setting?.niche && isNichePreset(setting.niche) ? setting.niche : null;
+}
+
+/** Who she helps (onboarding), as the groups the tiers match on, her state, her niche and whether she is self-pay. */
+export async function practiceFacts(sql: postgres.Sql = db()): Promise<PracticeFacts> {
+  const [row] = await sql<{ who: string | null; state: string | null; insurance: string | null; fees: number | null }[]>`
+    select onboarding_answers ->> 'who_i_help' as who, state, onboarding_answers ->> 'insurance' as insurance,
+           case when jsonb_typeof(fee_schedule) = 'array' then jsonb_array_length(fee_schedule) else 0 end as fees
+      from practice_os.clinician_profile limit 1`.catch(() => []);
+  // Her real payer panels (Insurance): any approved application means she is in network.
+  const [payers] = await sql<{ n: number }[]>`
+    select count(*)::int as n from practice_os.payer_applications where status = 'approved'`.catch(() => [{ n: 0 }]);
+  const niche = await currentNiche(sql);
+  const selfPay = selfPayFrom({ inNetwork: payers?.n ?? 0, insurance: row?.insurance, hasFees: (row?.fees ?? 0) > 0 });
+  return { focus: focusFrom(row?.who), state: row?.state ?? null, niche, selfPay };
+}
+
+/** The tier context from her practice facts (everything but the distance). */
+export function tierContext(f: Pick<PracticeFacts, "focus" | "state" | "niche" | "selfPay">) {
+  return { focus: f.focus, clinicianState: f.state, niche: f.niche, selfPay: f.selfPay };
 }
 
 /**
@@ -107,7 +144,7 @@ export async function addToBoard(
   sql: postgres.Sql = db(),
   lookup: (npi: string) => Promise<Provider | null> = (npi) => providerByNpi(npi),
 ): Promise<{ added: FoundSource[]; missing: string[] }> {
-  const { focus, state } = await practiceFacts(sql);
+  const { focus, state, niche, selfPay } = await practiceFacts(sql);
   const blocked = await suppressedNpis(sql);
   const added: FoundSource[] = [];
   const missing: string[] = [];
@@ -126,7 +163,7 @@ export async function addToBoard(
     const sent = item.distanceMiles === null || !Number.isFinite(item.distanceMiles) ? null : Math.max(0, Math.min(500, item.distanceMiles));
     // Added again without a distance: keep (and score with) the one the card already has.
     const miles = sent ?? (await knownMiles(npi, sql));
-    const one: FoundSource = { ...p, distanceMiles: miles, fitScore: providerTier(p, { miles, focus, clinicianState: state }).score };
+    const one: FoundSource = { ...p, distanceMiles: miles, fitScore: providerTier(p, { miles, focus, clinicianState: state, niche, selfPay }).score, scoreVersion: scoreVersionFor(niche) };
     await saveSources([one], sql);
     added.push(one);
   }
@@ -155,6 +192,9 @@ export function interleave(found: FoundSource[], count: number): FoundSource[] {
 
 export async function saveSources(found: FoundSource[], sql: postgres.Sql = db()): Promise<number> {
   if (found.length === 0) return 0;
+  // A score weighted for a niche she has since changed is not saved as current: a new card
+  // gets version 0 (scored again), a card she has keeps its score (rescoreOldCards fixes it).
+  const current = scoreVersionFor(await currentNiche(sql));
   const rows = found.map((p) => ({
     npi: p.npi,
     name: p.name,
@@ -170,7 +210,7 @@ export async function saveSources(found: FoundSource[], sql: postgres.Sql = db()
     phone: p.phone,
     distance_miles: p.distanceMiles,
     fit_score: p.fitScore,
-    score_version: SCORE_VERSION,
+    score_version: (p.scoreVersion ?? SCORE_VERSION) === current ? current : 0,
   }));
   const result = await sql`
     insert into practice_os.referral_sources ${sql(rows)}
@@ -180,8 +220,9 @@ export async function saveSources(found: FoundSource[], sql: postgres.Sql = db()
       address = excluded.address, city = excluded.city, state = excluded.state, zip = excluded.zip,
       phone = excluded.phone,
       -- A search that doesn't know the distance never wipes the one the card has.
-      distance_miles = coalesce(excluded.distance_miles, referral_sources.distance_miles), fit_score = excluded.fit_score,
-      score_version = excluded.score_version,
+      distance_miles = coalesce(excluded.distance_miles, referral_sources.distance_miles),
+      fit_score = case when excluded.score_version = 0 then referral_sources.fit_score else excluded.fit_score end,
+      score_version = case when excluded.score_version = 0 then referral_sources.score_version else excluded.score_version end,
       updated_at = now()
     returning id, npi`;
   const ids = new Map(result.map((r) => [r.npi as string, r.id as string]));
@@ -197,31 +238,51 @@ export async function saveSources(found: FoundSource[], sql: postgres.Sql = db()
 /**
  * Cards scored by an older formula get today's score: from NPPES by NPI when
  * the card has one (the full record: fax, named contact, record age), else from
- * what the card keeps. A few at a time, after the page is sent.
+ * what the card keeps. A few at a time, after the page is sent; 4 NPPES lookups
+ * at once, and a second call while one runs waits for that one instead of starting another.
  */
-export async function rescoreOldCards(
+export const RESCORE_CONCURRENCY = 4;
+let rescoring: Promise<number> | null = null;
+
+export function rescoreOldCards(
   sql: postgres.Sql = db(),
   lookup: (npi: string) => Promise<Provider | null> = (npi) => providerByNpi(npi),
   max = 25,
 ): Promise<number> {
+  if (rescoring) return rescoring;
+  rescoring = rescoreNow(sql, lookup, max).finally(() => {
+    rescoring = null;
+  });
+  return rescoring;
+}
+
+async function rescoreNow(sql: postgres.Sql, lookup: (npi: string) => Promise<Provider | null>, max: number): Promise<number> {
+  const facts = await practiceFacts(sql);
+  const version = scoreVersionFor(facts.niche);
   const rows = await sql<
     { id: string; npi: string | null; taxonomy: string | null; npi_type: "individual" | "organization" | null; phone: string | null; state: string | null; address: string | null; distance_miles: number | null }[]
   >`
     select id, npi, taxonomy, npi_type, phone, state, address, distance_miles::float8 as distance_miles
-      from practice_os.referral_sources where score_version <> ${SCORE_VERSION} limit ${max}`;
-  if (rows.length === 0) return 0;
-  const { focus, state } = await practiceFacts(sql);
-  for (const row of rows) {
-    const ctx = { miles: row.distance_miles, focus, clinicianState: state };
-    const p = row.npi ? await lookup(row.npi).catch(() => null) : null;
-    const score = p
-      ? providerTier(p, ctx).score
-      : tierFor(
-          { taxonomy: row.taxonomy, npiType: row.npi_type, phone: row.phone, state: row.state, homeAddress: row.npi_type !== "organization" && looksResidential(row.address) },
-          ctx,
-        ).score;
-    await sql`update practice_os.referral_sources set fit_score = ${score}, score_version = ${SCORE_VERSION} where id = ${row.id}`;
+      from practice_os.referral_sources where score_version <> ${version} limit ${max}`;
+  const queue = [...rows];
+  async function worker() {
+    for (let row = queue.shift(); row; row = queue.shift()) {
+      const ctx = { miles: row.distance_miles, ...tierContext(facts) };
+      const p = row.npi ? await lookup(row.npi).catch(() => null) : null;
+      const score = p
+        ? providerTier(p, ctx).score
+        : tierFor(
+            { taxonomy: row.taxonomy, npiType: row.npi_type, phone: row.phone, state: row.state, homeAddress: row.npi_type !== "organization" && looksResidential(row.address) },
+            ctx,
+          ).score;
+      // Ignored if she changed her niche while this ran: the next page load scores it for the new one.
+      await sql`
+        update practice_os.referral_sources set fit_score = ${score}, score_version = ${version}
+         where id = ${row.id}
+           and (select niche_preset from practice_os.referral_settings where id) is not distinct from ${facts.niche}::text`;
+    }
   }
+  await Promise.all(Array.from({ length: Math.min(RESCORE_CONCURRENCY, queue.length) }, worker));
   return rows.length;
 }
 
@@ -253,7 +314,7 @@ const COLUMNS = `id, npi, name, organization, taxonomy, specialty, npi_type, cre
   refers_via, referral_contact, populations, needs_from_therapist, waitlist, payer_mix, best_time,
   last_meeting_summary, connection_points, suggested_from`;
 
-/** Every card, best fit first. Read-only: due follow-ups show as Follow up without being moved. */
+/** Every card, best saved score first (the board and the plan then order them by tier.ts compareTiers, plan.ts rankCards). Read-only: due follow-ups show as Follow up without being moved. */
 export async function listSources(sql: postgres.Sql = db()): Promise<ReferralSource[]> {
   const today = await practiceToday(sql);
   return sql.unsafe<ReferralSource[]>(

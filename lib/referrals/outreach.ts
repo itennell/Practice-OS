@@ -129,7 +129,7 @@ export async function letterFacts(
     loadMediaFacts().catch(() => null),
     contactsFor([source.id]).catch(() => ({}) as Awaited<ReturnType<typeof contactsFor>>),
     listPayerApplications().catch(() => []),
-    practiceFacts().catch(() => ({ focus: [] as Focus[], state: null })),
+    practiceFacts().catch(() => ({ focus: [] as Focus[], state: null, niche: null, selfPay: false })),
   ]);
   const inNetwork = media?.inNetwork ?? [];
   const focus = focusGroups(opts.focus, practice.focus);

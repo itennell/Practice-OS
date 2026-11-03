@@ -13,7 +13,8 @@ import { isKnownPlace } from "./places";
 import { searchProviders, SPECIALTY_BY_ID, type Provider, type SpecialtyId } from "./nppes";
 import { getReferralSettings } from "./settings";
 import { outOfStateWarning, stateCode, stateName } from "./states";
-import { capFirst, focusFrom, providerTier, TIERS, type Focus, type TierResult } from "./tier";
+import { capFirst, compareTiers, focusFrom, providerTier, type Focus, type TierResult } from "./tier";
+import { practiceFacts } from "./store";
 
 type Centers = Record<string, Point>;
 
@@ -85,7 +86,7 @@ export type AreaResult = {
 };
 
 /** `suppressed`: NPIs on her do-not-contact list, left out of every search. */
-export type PracticeContext = { office: Point | null; officeZip: string | null; state: string; focus: Focus[]; suppressed?: Set<string> };
+export type PracticeContext = { office: Point | null; officeZip: string | null; state: string; focus: Focus[]; suppressed?: Set<string>; niche?: string | null; selfPay?: boolean };
 
 type Deps = {
   search?: typeof searchProviders;
@@ -229,7 +230,7 @@ export async function searchArea(
   const rough = (p: Provider) => {
     const c = centers[p.zip];
     const miles = officePoint && c ? haversineMiles(officePoint, c) : null;
-    return providerTier(p, { miles, focus: ctx.focus, clinicianState: ctx.state }).score;
+    return providerTier(p, { miles, focus: ctx.focus, clinicianState: ctx.state, niche: ctx.niche, selfPay: ctx.selfPay }).score;
   };
   const byPromise = [...providers].sort((a, b) => rough(b) - rough(a));
   const located = await (deps.geocode ?? geocodeAddresses)(
@@ -252,14 +253,12 @@ export async function searchArea(
       precision: exact ? "address" : "zip",
       distanceMiles,
       worksAt,
-      tier: providerTier(p, { miles: distanceMiles, focus: ctx.focus, approximate: !exact || !ctx.office, clinicianState: ctx.state }, worksAt),
+      tier: providerTier(p, { miles: distanceMiles, focus: ctx.focus, approximate: !exact || !ctx.office, clinicianState: ctx.state, niche: ctx.niche, selfPay: ctx.selfPay }, worksAt),
     });
   }
+  // The one order (tier.ts compareTiers): tier, "not who you help" last, niche weight, fit, score, distance.
   const order = (a: AreaProvider, b: AreaProvider) =>
-    TIERS.indexOf(a.tier.tier) - TIERS.indexOf(b.tier.tier) ||
-    b.tier.score - a.tier.score ||
-    (a.distanceMiles ?? 99) - (b.distanceMiles ?? 99) ||
-    a.name.localeCompare(b.name);
+    compareTiers({ tier: a.tier, miles: a.distanceMiles }, { tier: b.tier, miles: b.distanceMiles }) || a.name.localeCompare(b.name);
   const ranked = capFirst(out.sort(order)).sort(order);
   if (!officePoint) notes.push("Add your office address in setup so distances are from your door.");
   return { label, center, zips, providers: ranked, requests: found.requests, notes };
@@ -270,6 +269,8 @@ export async function practiceContext(sql: postgres.Sql = db()): Promise<Practic
   const settings = await getReferralSettings(sql);
   const [profile] = await sql<{ state: string | null; who: string | null }[]>`
     select state, onboarding_answers ->> 'who_i_help' as who from practice_os.clinician_profile limit 1`.catch(() => []);
+  // Her niche and fee stance from her real settings (payer panels, fee schedule), as the board uses.
+  const { niche, selfPay } = await practiceFacts(sql);
   const [loc] = await sql<{ street: string | null; city: string | null; state: string | null; zip: string | null }[]>`
     select practice_location ->> 'street' as street, practice_location ->> 'city' as city,
            practice_location ->> 'state' as state, practice_location ->> 'zip' as zip
@@ -280,7 +281,15 @@ export async function practiceContext(sql: postgres.Sql = db()): Promise<Practic
     office = (await geocodeAddresses([key])).get(addressKey(key)) ?? null;
   }
   const suppressed = await suppressedNpis(sql).catch(() => new Set<string>());
-  return { office, officeZip: settings.searchZip, state: profile?.state ?? "IL", focus: focusFrom(profile?.who), suppressed };
+  return {
+    office,
+    officeZip: settings.searchZip,
+    state: profile?.state ?? "IL",
+    focus: focusFrom(profile?.who),
+    suppressed,
+    niche,
+    selfPay,
+  };
 }
 
 export function specialtyLabels(ids: SpecialtyId[]): string {

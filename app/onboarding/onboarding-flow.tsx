@@ -193,6 +193,16 @@ function OnboardingFlow({ initial, connections, startAt }: Props & { startAt?: s
     }
     const data = await post({ answers, current: nextId });
     if (!data) return;
+    // A helper answer that pre-fills later screens (her niche picks kinds): those open with the new saved values.
+    const refreshes = screen.helper?.question.refreshes;
+    if (refreshes?.length) {
+      const helper = screen.helper!.helper;
+      setValues((all) => {
+        const next = { ...all };
+        for (const id of refreshes) delete next[`${helper}:${id}`];
+        return next;
+      });
+    }
     setNote(data.notes?.join(" ") ?? "");
     // An answer can add or remove the screens after it (Instagram "Not for me"), so the
     // next screen comes from the new list.

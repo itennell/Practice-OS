@@ -10,9 +10,9 @@ const hasDb = Boolean(process.env.DATABASE_URL);
 const { approve } = await import("../lib/approvals");
 const { closeDb, db } = await import("../lib/db");
 const { draftOutreach } = await import("../lib/referrals/outreach");
-const { addToBoard, getSource, latestLetters, moveDueFollowUps, rescoreOldCards } = await import("../lib/referrals/store");
+const { addToBoard, getSource, latestLetters, moveDueFollowUps, practiceFacts, rescoreOldCards } = await import("../lib/referrals/store");
 const { practiceToday } = await import("../lib/compliance/store");
-const { SCORE_VERSION } = await import("../lib/referrals/tier");
+const { scoreVersionFor } = await import("../lib/referrals/tier");
 const { getReferralSettings, saveReferralSettings } = await import("../lib/referrals/settings");
 const { referralsQuestions } = await import("../lib/referrals/onboarding");
 
@@ -190,7 +190,8 @@ describe.skipIf(!hasDb)("score versions", () => {
     await db()`update practice_os.referral_sources set score_version = 1, fit_score = 3 where id = ${id}`;
     await rescoreOldCards(db(), async () => null, 500);
     const card = (await getSource(id))!;
-    expect(card.score_version).toBe(SCORE_VERSION);
+    // Marked current for her niche as it is now (tier.ts scoreVersionFor; SCORE_VERSION with none).
+    expect(card.score_version).toBe(scoreVersionFor((await practiceFacts()).niche));
     expect(card.fit_score).toBeGreaterThan(3);
   });
 });
