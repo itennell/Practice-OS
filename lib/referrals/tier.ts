@@ -177,7 +177,7 @@ export function isMismatch(reasons: string[]): boolean {
 export function focusRank(r: Pick<TierResult, "reasons">): number {
   if (isMismatch(r.reasons)) return 4;
   // A kind her niche weights up comes first, with a general OB/GYN for a perinatal practice.
-  if (r.reasons.some((x) => x.startsWith(NICHE_FIT))) return 0;
+  if (r.reasons.some((x) => x.startsWith(NICHE_FIT) || x.includes(`: ${NICHE_GROUP}`))) return 0;
   if (r.reasons.some((x) => x.startsWith(GENERAL_OB_REASON))) return 0;
   if (r.reasons.some((x) => x.startsWith("matches your"))) return 1;
   if (r.reasons.some((x) => x.startsWith("sees all ages"))) return 2;
@@ -251,6 +251,8 @@ export const NICHE_WORDS: Record<string, string> = {
 };
 /** Starts the reason on a card her niche weights up (focusRank reads it). */
 export const NICHE_FIT = "Fits your ";
+/** After "<group label>: " on a card whose group (not its own kind) her niche weights up. Ranks like NICHE_FIT. */
+export const NICHE_GROUP = "a group that often refers for your ";
 
 export function nicheWords(preset: string): string {
   return NICHE_WORDS[preset] ?? NICHE_PRESET_BY_ID.get(preset)?.label.toLowerCase() ?? preset;
@@ -361,7 +363,12 @@ export function tierFor(p: TierInput, ctx: TierContext): TierResult {
   if (weighted && type) {
     const label = CATEGORY_LABELS[type.category] ?? "";
     const words = nicheWords(niche!);
-    if (weighted.weight > 1) reasons.push(`${NICHE_FIT}${words} focus (${label})`);
+    // "Fits your … focus" only when her niche names this very kind (an oncologist, a hospice for
+    // oncology & end-of-life). A kind weighted up only for its group (any medical specialist, any
+    // hospital staff) never says it fits: the reason names the group instead.
+    const boosted = (NICHE_PRESET_BY_ID.get(niche!)?.type_boosts[type.id] ?? 1) > 1;
+    if (weighted.weight > 1 && boosted) reasons.push(`${NICHE_FIT}${words} focus (${label})`);
+    else if (weighted.weight > 1) reasons.push(`${label}: ${NICHE_GROUP}${words} focus`);
     else if (weighted.weight < 1) reasons.push(`${label}: less often a source for your ${words} focus`);
     else reasons.push(label);
   }

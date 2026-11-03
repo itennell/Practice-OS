@@ -15,6 +15,7 @@ import { CRISIS_REPLY, alertCrisis, checkCrisis } from "../safety";
 import { guard, REFUSAL, type GuardKind } from "./guard";
 import { relevantMemories, type Memory } from "./memory";
 import { soul } from "./soul";
+import { joinContext } from "../referrals/ask-context";
 import { getProfile, STAGE_LABEL, type Profile } from "../profile";
 import type { ApprovalMode } from "../approval-policy";
 import { cardsFrom, type DocumentCard } from "../documents/card";
@@ -49,7 +50,32 @@ export type RespondOptions = {
   today?: string;
   /** Swapped in by tests to replay recorded model replies. */
   chat?: ChatFn;
+  /** The Ask Aeon context line (lib/referrals/ask-context.ts contextSuffix), added under her words for the model only. */
+  context?: string;
+  /** Called with a plain line each time Aeon starts something ("Checking partner 2 of 3's public listings"). */
+  onProgress?: (label: string) => void;
 };
+
+/** What each slow tool is doing, for the progress line: n of total calls of it in this round. */
+const WORKING: Record<string, (n: number, total: number) => string> = {
+  recheck_referral_source: (n, t) => (t > 1 ? `Checking partner ${n} of ${t}: NPI Registry, Medicare, state license, their website (about 30 seconds each)` : "Checking this partner's public listings (about 30 seconds)"),
+  draft_outreach: (n, t) => (t > 1 ? `Writing letter ${n} of ${t}` : "Writing the letter (about 10 seconds a letter)"),
+  revise_referral_letter: () => "Rewriting the letter",
+  referral_outreach_plan: () => "Ranking your partners",
+  find_referral_sources: () => "Searching the NPI Registry near you",
+  find_referral_cards: () => "Looking through your board",
+  list_referral_sources: () => "Reading your board",
+  plan_referral_meeting: () => "Finding an open time on your calendar",
+  list_referral_meetings: () => "Reading your Referrals calendar",
+  referral_call_script: () => "Getting the call script",
+  log_referral_contact: () => "Logging it on the card",
+};
+
+/** The progress line for one tool call. */
+export function workingLabel(tool: string, n: number, total: number): string {
+  const f = WORKING[tool];
+  return f ? f(n, total) : total > 1 ? `Working on it (${n} of ${total})` : "Working on it";
+}
 
 const HELD_BACK =
   "I wrote an answer that included what looks like a client detail, so I held it back. Ask again without client details.";
@@ -103,20 +129,46 @@ export function systemPrompt(memories: Pick<Memory, "id" | "kind" | "text">[], t
 
 export type Outcome = { state: "ok" } | { state: "failed"; why: string } | { state: "waiting"; where: string };
 
+/** The result carries runTool's approval_outcomes block: an approval it queued already ran (done, failed or declined). */
+export function ranApprovals(result: ToolResult): boolean {
+  return result.content.some((b) => Array.isArray(asObject(b.text)?.approval_outcomes));
+}
+
+/** A JSON object, or null for plain text or anything else. */
+function asObject(text: string): Record<string, unknown> | null {
+  try {
+    const v = JSON.parse(text) as unknown;
+    return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * One convention for every tool: failed is an error, or JSON saying ok: false, saved: false
  * (unless already_remembered), an error, written: false, not_changed, not_checked,
  * moved: false, forgotten: false or prep: null. waiting_for_her is its own state.
  */
 export function outcomeOf(result: ToolResult): Outcome {
-  const text = result.content.map((b) => b.text).join("\n").trim();
-  let p: Record<string, unknown> | null = null;
-  try {
-    const v = JSON.parse(text) as unknown;
-    if (v && typeof v === "object" && !Array.isArray(v)) p = v as Record<string, unknown>;
-  } catch {
-    // Plain text: counts as working unless isError says otherwise.
+  // runTool's approval_outcomes block (lib/aeon/tools.ts withTrueOutcomes) is read on its own and kept
+  // out of the tool's own text, so the tool's JSON still parses.
+  const outcomes: Record<string, unknown>[] = [];
+  const own = result.content.filter((b) => {
+    const v = asObject(b.text);
+    if (v && Array.isArray(v.approval_outcomes)) {
+      outcomes.push(...(v.approval_outcomes as Record<string, unknown>[]));
+      return false;
+    }
+    return true;
+  });
+  // An approval her mode ran that failed or was declined: the change didn't happen, whatever the tool said.
+  const bad = outcomes.find((o) => o.status === "failed" || o.status === "rejected");
+  if (bad) {
+    const why = typeof bad.error === "string" && bad.error ? bad.error : `it ${String(bad.status)} when it ran`;
+    return { state: "failed", why: why.length > 220 ? `${why.slice(0, 217)}...` : why };
   }
+  const text = own.map((b) => b.text).join("\n").trim();
+  const p = asObject(text);
   if (p?.waiting_for_her === true) return { state: "waiting", where: typeof p.where === "string" ? p.where : "the bar above the chat box" };
   const failed =
     result.isError ||
@@ -136,6 +188,62 @@ export function outcomeOf(result: ToolResult): Outcome {
   return { state: "failed", why: reason.length > 220 ? `${reason.slice(0, 217)}...` : reason };
 }
 
+// ---- No repeated introductions ------------------------------------------------------------
+// The sweep (Nov 3) found "I'm Aeon, your referrals partner…" opening 3 of 6 task answers.
+
+/** A paragraph that opens with Aeon introducing itself. */
+const INTRO = /^(?:(?:hi|hello|hey)(?: there)?[,!.]?\s+)?(?:I['’]m|I am) Aeon\b/i;
+/** Her message greets Aeon or asks who it is or what it does: the one time an introduction fits. */
+const ASKS_WHO = /^\s*(?:hi|hello|hey|good (?:morning|afternoon|evening))\b[\s!.,]*(?:aeon)?[\s!.,]*$|\bwho are you\b|\bwhat (?:can|do) you do\b|\bwhat are you\b|\bintroduce yourself\b|\bhow can you help\b/i;
+
+/** The self-description right after the intro ("I help you find providers…"). */
+const SELF = /^I (?:help|can help|can) you\b/i;
+
+/**
+ * Aeon introduces itself only in a conversation's first reply, and only when she greets it
+ * or asks what it does. Anywhere else, the leading "I'm Aeon…" sentence (and an "I help you…"
+ * sentence right after it) is dropped in plain code; the rest of that paragraph and the reply
+ * stay, and a reply that would be left empty stays as it was.
+ */
+export function withoutIntro(reply: string, opts: { firstReply: boolean; message: string }): string {
+  if (opts.firstReply && ASKS_WHO.test(opts.message)) return reply;
+  const lead = reply.match(/^\s*/)![0];
+  const body = reply.slice(lead.length);
+  if (!INTRO.test(body)) return reply;
+  const end = body.search(/(?<=[.!?])\s|\n/);
+  if (end < 0) return reply;
+  let rest = body.slice(end).replace(/^[ \t]+/, "");
+  if (SELF.test(rest)) {
+    const next = rest.search(/(?<=[.!?])\s|\n/);
+    rest = next < 0 ? "" : rest.slice(next).replace(/^[ \t]+/, "");
+  }
+  const out = rest.replace(/^\s*\n/, "").trim();
+  return out || reply;
+}
+
+/**
+ * What an approval her mode already ran did, from the tool's result (lib/aeon/tools.ts
+ * withTrueOutcomes, or a tool's own booked: true), or null when nothing ran on its own.
+ */
+export function ranOf(result: ToolResult): string | null {
+  for (const block of result.content) {
+    let p: Record<string, unknown> | null = null;
+    try {
+      const v = JSON.parse(block.text) as unknown;
+      if (v && typeof v === "object" && !Array.isArray(v)) p = v as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+    if (!p) continue;
+    if (p.booked === true && typeof p.say === "string") return p.say;
+    if (Array.isArray(p.approval_outcomes)) {
+      const done = (p.approval_outcomes as Record<string, unknown>[]).find((o) => o.status === "done");
+      if (done) return typeof done.result_note === "string" && done.result_note ? done.result_note : "It already ran under your approval mode.";
+    }
+  }
+  return null;
+}
+
 /** Why a tool result didn't work, or null when it worked (or waits for her). */
 export function failureOf(result: ToolResult): string | null {
   const o = outcomeOf(result);
@@ -147,8 +255,12 @@ const OWNS_FAILURE = /\b(couldn'?t|could not|didn'?t|did not|wasn'?t|was not|wer
 const SAYS_WAITING = /\b(waiting for your (ok|okay|approval)|needs your (ok|okay|approval)|once you approve|after you approve)\b/i;
 const POINTS_TO_CARDS = /\bcards? (are |is )?(below|under)\b/i;
 
-/** One tool run in this turn. writes: the tool changes saved data. waiting: where it waits for her OK. cards: document cards it returned. */
-export type Attempt = { tool: string; failure: string | null; writes?: boolean; waiting?: string; cards?: number };
+/** A sentence that says something is still waiting for her, or that nothing happened yet. */
+const CLAIMS_WAITING =
+  /\b(waiting for your (ok|okay|approval)|needs your (ok|okay|approval)|ready for your (ok|okay|approval)|once you approve|after you approve|when you approve|approve (it|the time|this)|go to your approvals|in your approvals|nothing is on your calendar( yet)?|not on your calendar yet)\b/i;
+
+/** One tool run in this turn. writes: the tool changes saved data. waiting: where it waits for her OK. ran: what an approval her mode ran did. cards: document cards it returned. */
+export type Attempt = { tool: string; failure: string | null; writes?: boolean; waiting?: string; ran?: string; cards?: number };
 
 const owns = (text: string) => text.split(/(?<=[.!?])\s+/).some((sentence) => OWNS_FAILURE.test(sentence));
 
@@ -169,6 +281,17 @@ export function honestReply(text: string, attempts: Attempt[]): string {
   if (failedWrites.length && !owns(out)) {
     if (!okWrites.length && !waiting) return `That didn't work, so nothing changed. ${failedWrites[0].failure}`;
     out = `${out}\n\nOne change didn't work: ${failedWrites[0].failure}`;
+  }
+  // Her mode already ran it (Bypass booked the coffee): a reply that says it waits for her is wrong.
+  const ran = attempts.find((a) => a.ran && !a.failure);
+  if (ran && !waiting && CLAIMS_WAITING.test(out)) {
+    const kept = out
+      .split(/\n/)
+      .map((line) => line.split(/(?<=[.!?])\s+/).filter((s) => !CLAIMS_WAITING.test(s)).join(" "))
+      .join("\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+    out = `${kept ? `${kept}\n\n` : ""}Done already, under your approval mode: ${ran.ran}`;
   }
   if (waiting && !SAYS_WAITING.test(out)) {
     if (!okWrites.length && !failedWrites.length) return `That's waiting for your OK in ${waiting.waiting}; nothing has changed yet.`;
@@ -207,13 +330,17 @@ export async function verifiedApprovals(ids: string[], since: Date): Promise<str
   return ids.filter((id) => ok.has(id));
 }
 
-export async function respond(message: string, opts: RespondOptions): Promise<Reply> {
-  const crisis = checkCrisis(message);
+export async function respond(typed: string, opts: RespondOptions): Promise<Reply> {
+  // The crisis check reads her typed words only: a partner on her board named "Suicide Prevention
+  // Center" in the Ask Aeon context line never fires 988 and an urgent alert. Everything the
+  // model sees (her words and the context line) passes the privacy guard.
+  const crisis = checkCrisis(typed);
   if (crisis.crisis) {
     await audit({ actor: "safety", action: "crisis_reply", subjectType: "chat", details: { category: crisis.category, by: opts.by } });
     await alertCrisis({ source: "chat", category: crisis.category, by: opts.by });
     return { kind: "crisis", text: CRISIS_REPLY };
   }
+  const message = opts.context ? joinContext(typed, opts.context) : typed;
   const check = await guard(message, "message");
   if (!check.ok) {
     await audit({ actor: "safety", action: "phi_refused", subjectType: "chat", details: { kind: check.kind, by: opts.by } });
@@ -239,15 +366,27 @@ export async function respond(message: string, opts: RespondOptions): Promise<Re
   const started = new Date();
   const allIds = async () => [...new Set([...approvalIds, ...(await verifiedApprovals(textIds, started))])];
   // Her own words, for the plain-code checks inside tools (a fee's session length, a fuzzy date, who she helps).
-  const said = [...(opts.history ?? []).filter((t) => t.role === "clinician").slice(-SAID_TURNS).map((t) => t.content), message];
+  const said = [...(opts.history ?? []).filter((t) => t.role === "clinician").slice(-SAID_TURNS).map((t) => t.content), typed];
+
+  const progress = (label: string) => {
+    try {
+      opts.onProgress?.(label);
+    } catch {
+      // A progress line never stops the answer.
+    }
+  };
+  progress("Reading your question");
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
+    if (round > 0) progress("Thinking about what came back");
     const res = await callModel(FEATURE, { messages, tools });
     const reply = res.choices[0]?.message;
     if (!reply) break;
     const calls = readToolCalls(reply);
     if (calls.length === 0) {
-      const text = honestReply((reply.content ?? "").trim() || "I don't have an answer for that yet.", attempts);
+      progress("Writing the answer");
+      const spoken = withoutIntro((reply.content ?? "").trim() || "I don't have an answer for that yet.", { firstReply: !(opts.history ?? []).length, message: typed });
+      const text = honestReply(spoken, attempts);
       const out = await guard(text, "reply");
       if (!out.ok) {
         await audit({ actor: "safety", action: "reply_held_back", subjectType: "chat", details: { kind: out.kind, by: opts.by } });
@@ -256,7 +395,11 @@ export async function respond(message: string, opts: RespondOptions): Promise<Re
       return { kind: "answer", text: out.text, steps, approvalIds: await allIds() };
     }
     messages.push(reply);
+    const seen = new Map<string, number>();
     for (const call of calls) {
+      const nth = (seen.get(call.name) ?? 0) + 1;
+      seen.set(call.name, nth);
+      progress(workingLabel(call.name, nth, calls.filter((c) => c.name === call.name).length));
       const started = Date.now();
       const result: ToolResult = call.argsValid
         ? await runTool(call.name, call.args, { by: opts.by, viewOnly: opts.viewOnly, mode: opts.mode, said, ...(opts.chat ? { chat: opts.chat as never } : {}) }).catch(
@@ -266,11 +409,14 @@ export async function respond(message: string, opts: RespondOptions): Promise<Re
       const cards = result.isError ? [] : cardsFrom(result.structuredContent);
       const outcome = outcomeOf(result);
       const failure = outcome.state === "failed" ? outcome.why : null;
+      const ran = result.isError ? null : ranOf(result);
       attempts.push({
         tool: call.name,
         failure,
-        writes: TOOLS_BY_NAME.get(call.name)?.changesData !== false,
+        // A tool that only queues (changesData: false) still made a change when her mode ran its approval.
+        writes: TOOLS_BY_NAME.get(call.name)?.changesData !== false || ranApprovals(result),
         ...(outcome.state === "waiting" ? { waiting: outcome.where } : {}),
+        ...(ran ? { ran } : {}),
         cards: cards.length,
       });
       steps.push({

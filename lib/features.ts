@@ -88,6 +88,8 @@ export const REFERRAL_DEMO_TOOLS: readonly string[] = [
   // the Referrals calendar: Aeon proposes a time and queues a referral_meeting approval
   "plan_referral_meeting",
   "list_referral_meetings",
+  // the built-in call script (lib/referrals/call-script.ts), never a model-written one
+  "referral_call_script",
 ];
 
 /**

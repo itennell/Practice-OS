@@ -9,7 +9,7 @@ import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { APPROVAL_KINDS, type ApprovalKind } from "../approval-kinds";
 import { withOrigin, type ApprovalMode } from "../approval-policy";
-import { queueApproval, queueApprovalOnce } from "../approvals";
+import { approvalOutcome, approvalOutcomes, queueApproval, queueApprovalOnce, type ApprovalOutcome } from "../approvals";
 import { ANSWERS } from "../compliance/answers";
 import * as actions from "../compliance/actions";
 import { morningBrief } from "../compliance/brief";
@@ -169,6 +169,14 @@ export function letterSummary(
     includes_email: r.says.email,
     includes_plans: r.says.plans,
   };
+}
+
+/** A queued letter's real state, for the model: waiting, or already approved by her mode (ready to copy, never sent). */
+export function letterStatus(o: ApprovalOutcome | undefined): { status: string; waiting_for_her_approval: boolean; error?: string } {
+  if (!o || o.status === "pending") return { status: "waiting for her approval", waiting_for_her_approval: true };
+  if (o.status === "done") return { status: "approved under her mode: ready to copy, not sent", waiting_for_her_approval: false };
+  if (o.status === "running") return { status: "being approved now", waiting_for_her_approval: false };
+  return { status: `not ready: ${o.status}`, waiting_for_her_approval: false, ...(o.error ? { error: o.error } : {}) };
 }
 
 /** A card name for the model: newlines and control characters gone, at most 120 characters. */
@@ -719,7 +727,8 @@ export const TOOLS: AeonTool[] = [
     description:
       "Muse researches the clinician's state rules (license renewal, CE, entity filing, state taxes, records, compacts; payroll and " +
       "employer rules once she has employees) on official sites with web search. Every rule must quote an official page it cites; " +
-      "code drops anything it can't verify. The result waits in her approvals inbox as one item; nothing is saved until she approves. " +
+      "code drops anything it can't verify. The result waits in her approvals inbox as one item; nothing is saved until she approves " +
+      "(unless her mode runs it at once: then the result says so under approval_outcomes; say it was saved, never that it waits). " +
       "Slow (about 1-2 minutes per topic): pass 1-3 topics per call. Refuses states whose rules already ship verified (Illinois).",
     input: {
       topics: z
@@ -1312,7 +1321,8 @@ export const TOOLS: AeonTool[] = [
       "Approving makes it ready to copy; the card moves to Contacted, with a follow-up a week out, only when she marks it sent " +
       "(the card's I sent it button, or log_referral_contact with sent_letter). Uses her real phone, email, in-network plans and " +
       "her log notes for this card. If a letter to them is already waiting, it is rewritten in place; to change a waiting letter " +
-      "('make it shorter') use revise_referral_letter. Tell her what `included` and `left_out` say, never more. 'Letters for my top 3': pass top: 3 (never ids you picked), and the letters go to the " +
+      "('make it shorter') use revise_referral_letter. Tell her what `included` and `left_out` say, never more. Each letter's status says whether it waits for her approval or her mode already approved it (ready to copy, never sent): say which. " +
+      "'Letters for my top 3': pass top: 3 (never ids you picked), and the letters go to the " +
       "first 3 of referral_outreach_plan's ranked list; say who each is to and whether it gives her phone, email and plans (includes_*), nothing more. The letter names who she helps (groups of people, from her profile and what she says in this chat). " +
       "Takes about 10 seconds a letter.",
     input: {
@@ -1346,33 +1356,45 @@ export const TOOLS: AeonTool[] = [
             return { rank: i + 1, to: { card_name: cardName(item.name) }, drafted: false as const, why: err instanceof Error ? err.message : "couldn't write it" };
           }
         });
-        const made = letters.filter((l) => "approval_id" in l).length;
+        const ids = letters.flatMap((l) => ("approval_id" in l ? [l.approval_id] : []));
+        // Her mode may have approved some already (Bypass runs referral letters): each letter says which.
+        const outcomes = new Map((await approvalOutcomes(ids)).map((o) => [o.approval_id, o]));
+        const withStatus = letters.map((l) => ("approval_id" in l ? { ...l, ...letterStatus(outcomes.get(l.approval_id)) } : l));
+        const waitingN = withStatus.filter((l) => "status" in l && l.status === "waiting for her approval").length;
+        const readyN = withStatus.filter((l) => "status" in l && l.status === "approved under her mode: ready to copy, not sent").length;
+        const said = [
+          waitingN ? `${waitingN} waiting for her approval` : null,
+          readyN ? `${readyN} already approved under her mode (ready to copy from the Referrals board; nothing sent)` : null,
+        ].filter(Boolean).join(", ");
         return {
           content: [
-            { type: "text", text: `${made} of ${top} letters queued for her approval, for the top ${picked.length} of this week's outreach plan in its order${picked.length < top ? ` (only ${picked.length} are ready)` : ""}.` },
+            { type: "text", text: `${ids.length} of ${top} letters written${said ? ` (${said})` : ""}, for the top ${picked.length} of this week's outreach plan in its order${picked.length < top ? ` (only ${picked.length} are ready)` : ""}.` },
             // A slim summary only (who, what it includes, the approval): the letters themselves are on the approval cards.
-            { type: "text", text: JSON.stringify({ from: "referral_outreach_plan", letters, about_letters: ABOUT_LETTERS, about_names: ABOUT_NAMES }, null, 2) },
+            { type: "text", text: JSON.stringify({ from: "referral_outreach_plan", letters: withStatus, about_letters: ABOUT_LETTERS, about_names: ABOUT_NAMES }, null, 2) },
           ],
-          structuredContent: { status: "pending", approval_ids: letters.flatMap((l) => ("approval_id" in l ? [l.approval_id] : [])) },
+          structuredContent: { status: waitingN === ids.length ? "pending" : readyN === ids.length && ids.length ? "done" : "mixed", approval_ids: ids },
         };
       }
       const drafted = await draftOutreach(id!, opts);
       const { approvalId, revised, included, left_out } = drafted;
-      const [row] = await db()<{ status: string }[]>`select status from practice_os.approvals where id = ${approvalId}`;
+      const o = await approvalOutcome(approvalId);
+      const status = o?.status ?? "pending";
       return {
         content: [
           {
             type: "text",
             text:
-              (row?.status === "pending"
+              (status === "pending"
                 ? revised
                   ? "the letter already waiting was rewritten in place; still waiting for her approval"
                   : "queued for clinician approval"
-                : `ran on its own under her mode: ${row?.status} (ready to copy; not sent)`) + ` ${whatItSays(included, left_out)}`.trimEnd(),
+                : status === "done"
+                  ? "approved on its own under her mode: ready to copy from the Referrals board, not sent. It is NOT waiting for her approval."
+                  : `her mode tried to approve it and it ${status}: ${o?.error ?? "no reason given"}`) + ` ${whatItSays(included, left_out)}`.trimEnd(),
           },
-          { type: "text", text: JSON.stringify({ ...letterSummary(null, drafted), about_letters: ABOUT_LETTERS }, null, 2) },
+          { type: "text", text: JSON.stringify({ ...letterSummary(null, drafted), ...letterStatus(o ?? undefined), about_letters: ABOUT_LETTERS }, null, 2) },
         ],
-        structuredContent: { status: row?.status ?? "pending", approval_id: approvalId },
+        structuredContent: { status, approval_id: approvalId },
       };
     },
   }),
@@ -1386,6 +1408,10 @@ export const TOOLS: AeonTool[] = [
       "from the top of her Referrals board with why and the next step. People she reached out to in the last 30 days wait, and " +
       "anyone on her do-not-contact list is never suggested. New people who see who she helps come first. When she names kinds of " +
       "provider, or just searched for some, pass them as specialties (left out, her chat search from the last two hours counts). " +
+      "This is the same order as her Partners table (Best fit): each reach_out has its board_rank there, and skipped_above says why a card " +
+      "higher on that list isn't new this week (a letter waiting, already contacted); say so when her list's top differs. partners_top is " +
+      "the table's top 3 as she sees it: use it for 'my top 3' when she means her list (finding emails, checking cards), and reach_out for " +
+      "who to write to. Give each person's reason only from its kind, tier and why; say it fits her focus only when fits_focus is true. " +
       "Never suggest offering anything in return for a referral. Read-only.",
     input: {
       specialties: z
@@ -1610,7 +1636,16 @@ export const TOOLS: AeonTool[] = [
     run: async (_input, ctx) => {
       const r = await instagram.planWeek(ctx.by, { chat: ctx.chat });
       if (r.declined) return text({ written: false, why: instagram.DECLINED });
-      return text({ week_of: r.week, waiting_for_approval: r.saved.length - r.blocked, blocked: r.blocked, see: "/media/instagram" });
+      // Her mode may have approved some already (Bypass runs Instagram posts): count what really waits.
+      const outcomes = await approvalOutcomes(r.saved.flatMap((s) => (s.approvalId ? [s.approvalId] : [])));
+      const ready = outcomes.filter((o) => o.status === "done").length;
+      return text({
+        week_of: r.week,
+        waiting_for_approval: outcomes.filter((o) => o.status === "pending").length,
+        ...(ready ? { approved_under_her_mode: ready, about: "Approved by her mode: ready on the Instagram page, not posted and not waiting." } : {}),
+        blocked: r.blocked,
+        see: "/media/instagram",
+      });
     },
   }),
 
@@ -1770,6 +1805,7 @@ export const TOOLS: AeonTool[] = [
       if (r.outcome === "already_drafted") {
         return text({ written: false, already_drafted: true, idea: r.idea.number, headline: r.headline, approval_id: r.post.approvalId, why: "She already has a draft of this idea; it's in Approvals or on the Instagram page." });
       }
+      const o = r.post.approvalId ? await approvalOutcome(r.post.approvalId) : null;
       return text({
         written: r.outcome !== "blocked_after_rewrite",
         idea: r.idea.number,
@@ -1777,7 +1813,10 @@ export const TOOLS: AeonTool[] = [
         approval_id: r.post.approvalId,
         why: r.why,
         ...(r.outcome !== "blocked_after_rewrite"
-          ? { status: "waiting in Approvals", after_approval: "the Instagram page has the caption to copy, the picture to save and the steps to post it herself" }
+          ? {
+              status: o?.status === "done" ? "approved under her mode: ready on the Instagram page, not posted" : "waiting in Approvals",
+              after_approval: "the Instagram page has the caption to copy, the picture to save and the steps to post it herself",
+            }
           : {}),
       });
     },
@@ -2125,7 +2164,55 @@ export async function runTool(name: string, args: unknown, ctx: ToolContext): Pr
     return text({ waiting_for_her: true, approval_id: approvalId, mode: "manual", where: "the bar above the chat box", ...(created ? {} : { already_waiting: true }) });
   }
   const run = () => tool.run(parsed.data as never, ctx);
-  return guardResult(await (mode ? withOrigin({ mode }, run) : run()), name);
+  const started = new Date();
+  const result = await (mode ? withOrigin({ mode }, run) : run());
+  return guardResult(await withTrueOutcomes(result, started), name);
+}
+
+/** Every approval id a tool result names: structured approval_id / approval_ids, and "approval_id" keys in its JSON text. */
+export function approvalIdsIn(result: ToolResult): string[] {
+  const ids = new Set<string>();
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const one = result.structuredContent?.approval_id;
+  if (typeof one === "string" && uuid.test(one)) ids.add(one);
+  const many = result.structuredContent?.approval_ids;
+  if (Array.isArray(many)) for (const id of many) if (typeof id === "string" && uuid.test(id)) ids.add(id);
+  for (const block of result.content) for (const m of block.text.matchAll(/"approval_id":\s*"([0-9a-f-]{36})"/gi)) if (uuid.test(m[1])) ids.add(m[1]);
+  return [...ids];
+}
+
+/** Said with approvals her mode already ran: the model must not tell her they wait. */
+export const RAN_ON_ITS_OWN =
+  "These approvals were queued in this call and her approval mode (Auto or Bypass) ran them right away, without her tap. " +
+  "They are NOT waiting for her OK and are not in her Approvals inbox: say what happened (result_note, or the error), never that they wait.";
+
+/**
+ * One check for every queue-then-maybe-run tool (meetings, letters, posts, state rules): when an approval
+ * this call queued already ran under her mode, a block saying so (and how it went) is added to the result,
+ * so no tool's own "queued" wording can tell her it is waiting.
+ */
+export async function withTrueOutcomes(result: ToolResult, since: Date): Promise<ToolResult> {
+  const ids = approvalIdsIn(result);
+  if (!ids.length) return result;
+  const rows = await db()<{ id: string }[]>`
+    select id from practice_os.approvals where id in ${db()(ids)} and created_at >= ${new Date(since.getTime() - 2_000)}`.catch(() => []);
+  const fresh = new Set(rows.map((r) => r.id));
+  const ran = (await approvalOutcomes(ids.filter((id) => fresh.has(id)))).filter((o) => o.status !== "pending");
+  if (!ran.length) return result;
+  return {
+    ...result,
+    content: [
+      ...result.content,
+      {
+        type: "text",
+        text: JSON.stringify(
+          { approval_outcomes: ran.map(({ approval_id, status, ran_on_its_own, result_note, error }) => ({ approval_id, status, ran_on_its_own, result_note, error })), about: RAN_ON_ITS_OWN },
+          null,
+          2,
+        ),
+      },
+    ],
+  };
 }
 
 /** The tool list in Chat Completions shape (cookbook 03_tool_calling.ipynb). */
