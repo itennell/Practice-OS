@@ -4,6 +4,8 @@ Aeon is an open-source AI co-owner for independently licensed mental health clin
 
 It is practice operations software, not clinical care. It never gives medical or mental health advice, and nothing is sent, posted or booked until the clinician approves it.
 
+**The pitch:** what therapist marketing agencies and practice coaches sell as a monthly service (a new website, ads, search rankings, a plan to move from insurance to private pay), plus the paperwork, as a free AI co-owner that runs on her own computer. She owns all of it.
+
 Practice-OS is built by **Caseload** (a sole proprietorship).
 
 ## Text messages
@@ -14,11 +16,15 @@ Practice-OS is built by **Caseload** (a sole proprietorship).
 - [Terms & Conditions](docs/terms.md)
 - [How SMS opt-in works](docs/sms-opt-in.md)
 
+## The hackathon demo: Referrals
+
+The demo shows one helper end to end: **Referrals**, a relationship engine for the professionals who send a therapist clients (oncologists, hospice and palliative teams, funeral homes, clergy, cancer nonprofits and more). It finds them from public sources, ranks them for her niche with the reasons shown, drafts intro letters she copies and sends herself, and turns a spoken coffee-meeting debrief into a partner profile and a follow-up. Turn it on with `REFERRALS_ONLY_DEMO` in `lib/features.ts`; turn it off to get the full app. The walk-through is in [docs/demo-script.md](docs/demo-script.md).
+
 ## Three helpers
 
-- **Admin**: compliance calendar, "how do I" guides, credentialing prep, Good Faith Estimates.
-- **Referrals**: find local referral sources (NPPES NPI Registry), track them, draft outreach letters as Gmail drafts.
-- **Media**: getting her in front of people: Instagram coaching (post ideas, hooks and drafts about practice logistics, which she posts herself), her directory profile and her website.
+- **Admin**: everything in one place. A compliance calendar with sourced rules, practice settings she changes by talking to Aeon, client forms, Good Faith Estimates, superbills, an insurance hub by license, credentialing prep, and a Files page with every upload and every document Aeon made.
+- **Media**: getting her in front of people. The Grow tab works out how many private-pay clients replace each insurance panel, drafts Google and Facebook/Instagram ads that pass a health-ad policy check, and writes a one-page website she owns. Also her Psychology Today profile and Instagram posts about practice logistics. Nothing is spent or published: she approves, downloads and launches it herself.
+- **Referrals**: local referral sources from the NPPES NPI Registry and other public sources, on a map and a ranked list, with outreach letters she copies and sends from her own email.
 
 ## Why not just use a chatbot?
 
