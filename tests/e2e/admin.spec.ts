@@ -1,10 +1,16 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { execSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { parse } from "dotenv";
 import { shown, typeDate } from "../helpers/controls";
 import { REFERRALS_ONLY_DEMO } from "../../lib/features";
 
 test.skip(REFERRALS_ONLY_DEMO, "Hidden in the referrals-only demo (lib/features.ts); these run when REFERRALS_ONLY_DEMO is false.");
+
+// `next start` reads .env itself, so the server's database is a shared one when either the
+// shell or .env names a DATABASE_URL; with neither, it is the built-in database on this computer.
+const serverUsesBuiltInDb = !process.env.DATABASE_URL && !(existsSync(".env") && parse(readFileSync(".env")).DATABASE_URL);
 
 test.beforeAll(() => {
   execSync("npm run db:reset", { stdio: "ignore" });
@@ -165,6 +171,25 @@ test("Old links go to Admin", async ({ page }) => {
     await page.goto(from);
     await expect(page).toHaveURL(to);
   }
+});
+
+test("The crisis item tops Admin until she presses I checked", async ({ page }) => {
+  // Sends a crisis phrase, which writes permanent audit rows: built-in database only.
+  test.skip(!serverUsesBuiltInDb, "The server would use a shared DATABASE_URL: run with no DATABASE_URL in the shell or .env.");
+  await page.goto("/");
+  await page.waitForLoadState("networkidle");
+  const box = page.getByRole("textbox", { name: "Message Aeon" });
+  await box.fill("I don't want to be here anymore");
+  await box.press("Enter");
+  await expect(page.getByRole("alert").filter({ hasText: "988" })).toBeVisible();
+
+  await page.goto("/admin");
+  const item = page.getByRole("listitem", { name: /Aeon showed the 988 message in your chat/ });
+  await expect(item).toBeVisible();
+  await item.getByRole("button", { name: /I checked/ }).click();
+  await expect(item).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole("listitem", { name: /Aeon showed the 988 message/ })).toHaveCount(0);
 });
 
 test("Screenshots of Admin", async ({ page }, info) => {

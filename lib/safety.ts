@@ -19,6 +19,10 @@ export type CrisisResult = { crisis: false } | { crisis: true; category: CrisisC
 const SQUASHED: Record<CrisisCategory, string[]> = {
   self_harm: [
     "killmyself", "killherself", "killhimself", "killthemselves",
+    // "-ing" and "-ed" forms ("thinking about killing himself", "tried to hurt herself" is above).
+    "killingmyself", "killingherself", "killinghimself", "killingthemselves",
+    "hurtingmyself", "hurtingherself", "hurtinghimself", "hurtingthemselves", "hurtthemselves",
+    "cuttinghimself", "cuttingthemselves", "cutherself", "cuthimself", "cutthemselves",
     "selfharm", "selfinjur",
     "hurtmyself", "hurtherself", "hurthimself", "cutmyself", "cuttingmyself", "cuttingherself",
     "endmylife", "endmyownlife", "endherlife", "endhislife", "endtheirlife", "enditall",
