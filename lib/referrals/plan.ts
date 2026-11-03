@@ -12,8 +12,8 @@ import { jaroWinkler, normalizeName, normalizeOrg } from "./evidence/normalize";
 import { withoutDistance } from "./sensitive";
 import { contactsFor, isSuppressed, relationshipFrom, suppressedList, type Contact } from "./contacts";
 import { STAGE_LABEL } from "./stages";
-import { latestLetters, listSources, practiceFacts, type LetterState, type ReferralSource } from "./store";
-import { boardTier, focusRank, TIER_LABEL, withRelationship, type Focus, type TierResult } from "./tier";
+import { latestLetters, listSources, practiceFacts, tierContext, type LetterState, type ReferralSource } from "./store";
+import { boardTier, compareTiers, TIER_LABEL, withRelationship, type TierContext, type TierResult } from "./tier";
 import { SPECIALTY_BY_ID, specialtyForCode, type SpecialtyId } from "./nppes";
 
 /** At most this many new people a week: the research aims at 3 to 5 letters a month for the top tier. */
@@ -89,7 +89,7 @@ export function followUpsFrom(cards: ReferralSource[], contacts: Record<string, 
 export function tiersWithLog(
   cards: ReferralSource[],
   contacts: Record<string, Contact[]>,
-  ctx: { focus: Focus[]; clinicianState: string | null },
+  ctx: Omit<TierContext, "miles">,
 ): Record<string, TierResult> {
   return Object.fromEntries(
     cards.map((c) => {
@@ -97,6 +97,15 @@ export function tiersWithLog(
       // A sensitive card's reasons never say how far it is (lib/referrals/sensitive.ts).
       return [c.id, c.sensitive ? { ...t, reasons: [t.reasons[0], ...withoutDistance(t.reasons.slice(1))] } : t];
     }),
+  );
+}
+
+/** Cards in the one order (tier.ts compareTiers): tier, "not who you help" last, niche weight, fit, score, distance. */
+export function rankCards<T extends Pick<ReferralSource, "id" | "name" | "distance_miles">>(cards: T[], tiers: Record<string, TierResult>): T[] {
+  return [...cards].sort(
+    (a, b) =>
+      (tiers[a.id] && tiers[b.id] ? compareTiers({ tier: tiers[a.id], miles: a.distance_miles }, { tier: tiers[b.id], miles: b.distance_miles }) : 0) ||
+      a.name.localeCompare(b.name),
   );
 }
 
@@ -110,7 +119,7 @@ export async function outreachPlan(sql: postgres.Sql = db(), max = NEW_PER_WEEK,
   const [cards, today, facts, blocked] = await Promise.all([listSources(sql), practiceToday(sql), practiceFacts(sql), suppressedList(sql)]);
   const asked = opts.specialties?.length ? opts.specialties : await recentSearchKinds(sql).catch(() => [] as SpecialtyId[]);
   const contacts = await contactsFor(cards.map((c) => c.id), sql);
-  const tiers = tiersWithLog(cards, contacts, { focus: facts.focus, clinicianState: facts.state });
+  const tiers = tiersWithLog(cards, contacts, tierContext(facts));
   const follow_ups = followUpsFrom(cards, contacts, today);
   const due = new Set(follow_ups.map((f) => f.id));
 
@@ -159,8 +168,8 @@ export async function outreachPlan(sql: postgres.Sql = db(), max = NEW_PER_WEEK,
 
 /**
  * The new people to suggest, from cards ready for a first letter: only the
- * kinds she asked for (unless none of them is ready), those who see the
- * people she helps before those who see everyone, then by score and distance.
+ * kinds she asked for (unless none of them is ready), in the one order
+ * (rankCards: tier, niche weight, who-you-help fit, score, distance).
  */
 export function pickNew(
   fresh: ReferralSource[],
@@ -174,14 +183,7 @@ export function pickNew(
     return k !== null && wanted.has(k);
   });
   const useKinds = wanted.size > 0 && ofKind.length > 0;
-  const picked = [...(useKinds ? ofKind : fresh)]
-    .sort(
-      (a, b) =>
-        focusRank(tiers[a.id]) - focusRank(tiers[b.id]) ||
-        tiers[b.id].score - tiers[a.id].score ||
-        (a.distance_miles ?? 99) - (b.distance_miles ?? 99),
-    )
-    .slice(0, max);
+  const picked = rankCards(useKinds ? ofKind : fresh, tiers).slice(0, max);
   const labels = asked.map((k) => SPECIALTY_BY_ID.get(k)!.label);
   return { picked, kinds: useKinds ? labels : null, missing: wanted.size > 0 && !useKinds ? labels : null };
 }
@@ -276,6 +278,6 @@ export async function cardView(id: string, sql: postgres.Sql = db()) {
   const card = (await listSources(sql)).find((c) => c.id === id) ?? null;
   if (!card) return null;
   const [facts, contacts] = await Promise.all([practiceFacts(sql), contactsFor([id], sql)]);
-  const tier = tiersWithLog([card], contacts, { focus: facts.focus, clinicianState: facts.state })[id];
+  const tier = tiersWithLog([card], contacts, tierContext(facts))[id];
   return { card, tier, contacts: contacts[id] ?? [] };
 }

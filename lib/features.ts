@@ -81,6 +81,7 @@ export const REFERRAL_DEMO_TOOLS: readonly string[] = [
   "revise_referral_letter",
   // discovery: organisations she adds by hand (find_referral_sources also finds CMS and OpenStreetMap places)
   "add_referral_source",
+  "set_referral_niche",
   // coming: the debrief PR adds this tool; listed now so it works once merged
   "debrief_meeting",
 ];
@@ -109,7 +110,8 @@ export const REFERRAL_DEMO_SCREENS: readonly string[] = [
   "office",
   "who",
   "referrals:home_zip",
-  // who she'd like to hear from; the niche picker replaces it in a later PR
+  // her niche (pre-selects the kinds below), then who she'd like to hear from
+  "referrals:niche",
   "referrals:specialties",
   "employer_policy",
 ];

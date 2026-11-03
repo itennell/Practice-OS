@@ -12,7 +12,7 @@ import { afterAll, afterEach, describe, expect, it } from "vitest";
 import { loadEnv } from "../lib/env";
 import { needsNext } from "../lib/admin/needs-next";
 import { DANA_PROFILE } from "../lib/credentialing/demo";
-import { projectRefOf, resetDemoData, resetRefusal, DEMO_TABLES } from "../lib/demo-reset";
+import { projectRefOf, resetDemoData, resetRefusal, DEMO_NICHE, DEMO_REFERRAL_KINDS, DEMO_TABLES } from "../lib/demo-reset";
 import { removeDocumentFiles } from "../lib/uploads/cleanup";
 import { sha256 } from "../lib/uploads/store";
 
@@ -177,6 +177,17 @@ describe.skipIf(!local)("db:reset and the crisis item (built-in database only)",
     expect(await count("audit_log")).toBeGreaterThan(before.audit); // append-only: nothing removed
     const [last] = await db()`select actor, action from practice_os.audit_log order by id desc limit 1`;
     expect(last).toEqual({ actor: "db:reset", action: "demo_reset" });
+  });
+
+  it("gives Dana the oncology niche and its kinds every time, and seeds no score as current", async () => {
+    await db()`update practice_os.referral_settings set niche_preset = 'grief_loss', specialties = ${["pediatrics"]} where id`;
+    await reset(await tempDir());
+    const [row] = await db()<{ niche_preset: string; specialties: string[] }[]>`select niche_preset, specialties from practice_os.referral_settings where id`;
+    expect(row.niche_preset).toBe(DEMO_NICHE);
+    expect(row.specialties).toEqual(DEMO_REFERRAL_KINDS);
+    expect(row.specialties).toContain("oncology");
+    const scored = await db()<{ n: number }[]>`select count(*)::int as n from practice_os.referral_sources where is_sample and score_version <> 0`;
+    expect(scored[0].n).toBe(0);
   });
 
   it("I checked hides the item she saw and older ones, not one logged after her page loaded", async () => {

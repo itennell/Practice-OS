@@ -16,6 +16,7 @@ import type { Contact } from "@/lib/referrals/contacts";
 import { ContactLog, type CardView } from "./contact-log";
 import { DebriefButton, PartnerProfileBox } from "./debrief";
 import { EvidenceBox } from "./evidence-box";
+import { CategoryFilter, categoriesIn } from "./category-filter";
 import { TierBadge } from "./tier-badge";
 
 // The Referrals board (Isaiah's pipeline, AGENTS.md > Referrals). Cards move by
@@ -387,6 +388,11 @@ export function ReferralBoard({
   const [tierById, setTierById] = useState(tiers);
   const [drafting, setDrafting] = useState<string | null>(null);
   const [announce, setAnnounce] = useState("");
+  // Show one catalog category at a time (primary care, medical specialists, …), or all.
+  const [category, setCategory] = useState<number | null>(null);
+  const categories = categoriesIn(cards.map((c) => ({ category: tierById[c.id]?.category ?? null })));
+  const shownCategory = category !== null && categories.some((c) => c.id === category) ? category : null;
+  const inCategory = (c: ReferralSource) => shownCategory === null || tierById[c.id]?.category === shownCategory;
   // A new search refreshes the server data; take it when it arrives.
   const [seen, setSeen] = useState(initial);
   if (seen !== initial) {
@@ -456,6 +462,16 @@ export function ReferralBoard({
       <p role="status" aria-live="polite" className="sr-only">
         {announce}
       </p>
+      <CategoryFilter
+        label="Show cards by kind"
+        categories={categories}
+        value={shownCategory}
+        total={cards.length}
+        onChange={(c) => {
+          setCategory(c);
+          setAnnounce(c === null ? "Showing every card." : `Showing ${categories.find((x) => x.id === c)?.label ?? "one kind"} only.`);
+        }}
+      />
       <div
         tabIndex={0}
         role="region"
@@ -464,7 +480,7 @@ export function ReferralBoard({
       >
         <div className="grid grid-cols-1 gap-4 md:grid-cols-[repeat(5,minmax(16rem,1fr))]">
           {STAGES.map((stage) => (
-            <Column key={stage} stage={stage} cards={cards.filter((c) => c.stage === stage)} onDropCard={(id) => move(id, stage)}>
+            <Column key={stage} stage={stage} cards={cards.filter((c) => c.stage === stage && inCategory(c))} onDropCard={(id) => move(id, stage)}>
               {(shown) =>
                 shown.map((c) => (
                   <Card

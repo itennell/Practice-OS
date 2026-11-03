@@ -69,3 +69,14 @@ export function isSuppressed(card: KeyCard & { npi?: string | null }, list: Supp
   const key = orgKeyOf(card);
   return Boolean(key && list.orgs.some((o) => keyMatches(key, o)));
 }
+
+/** An NPPES provider as the do-not-contact check reads it. */
+export const providerKeyCard = (p: { npi: string; name: string; organization: string | null; practiceName: string | null; npiType: "individual" | "organization"; address: string; city: string; zip: string }) => ({
+  npi: p.npi,
+  name: p.npiType === "organization" ? (p.practiceName ?? p.organization ?? p.name) : p.name,
+  organization: p.practiceName ?? p.organization,
+  npi_type: p.npiType,
+  address: p.address,
+  city: p.city,
+  zip: p.zip,
+});

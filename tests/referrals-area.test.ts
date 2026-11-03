@@ -180,6 +180,7 @@ describe("tiers (plain code, with reasons)", () => {
       tier: "first",
       score: 94,
       specialty: "pediatrics",
+      category: 1,
       reasons: [
         // The catalog's why_they_refer for pediatrics, as a card reason.
         "child and teen behavior, ADHD follow-up and parent stress land on their desk",
@@ -268,8 +269,9 @@ describe("area search, golden run on the recorded 60614 replies", () => {
     // Tiers come first to last, best score first inside each.
     const order = ps.map((p) => ["first", "next", "later"].indexOf(p.tier.tier));
     expect(order).toEqual([...order].sort((a, b) => a - b));
-    // For an adults practice: psychiatry leads, pediatrics is Later.
-    expect(ps[0].tier.specialty).toBe("psychiatry");
+    // For an adults practice: who-you-help matches lead (OB/GYN sees adults), before all-ages kinds; pediatrics is Later.
+    expect(ps[0].tier.specialty).toBe("ob_gyn");
+    expect(ps.findIndex((p) => p.tier.specialty === "psychiatry")).toBeGreaterThan(0);
     expect(ps.filter((p) => p.tier.specialty === "pediatrics").every((p) => p.tier.tier === "later")).toBe(true);
     const counts = Object.fromEntries(["first", "next", "later"].map((t) => [t, ps.filter((p) => p.tier.tier === t).length]));
     expect(counts.first).toBeGreaterThan(0);

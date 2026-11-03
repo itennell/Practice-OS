@@ -5,8 +5,8 @@
 // special populations), each source type with how it can be found (NPPES, a CMS
 // dataset, OpenStreetMap tags, a public list, or by hand), its default points,
 // the niches it belongs to, and whether it is session-capped or sensitive.
-// Weights in the file are judgment calls and say so. Tier scoring does not use
-// the presets yet (next PR); tier.ts only reads default_points for the kinds it
+// Weights in the file are judgment calls and say so. Tier scoring (tier.ts)
+// weights default_points by her niche preset and reads default_points for the kinds it
 // has no points for.
 import { z } from "zod";
 import research from "../../docs/research/referral-sources.json" with { type: "json" };

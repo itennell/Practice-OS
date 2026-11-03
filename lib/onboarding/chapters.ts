@@ -552,7 +552,7 @@ export const QUESTIONS: Question[] = [
 ];
 
 /** Where each demo screen sits in the short path: the Referrals questions go under "Who you help". */
-const DEMO_CHAPTER: Record<string, ChapterId> = { "referrals:home_zip": "clients", "referrals:specialties": "clients" };
+const DEMO_CHAPTER: Record<string, ChapterId> = { "referrals:home_zip": "clients", "referrals:niche": "clients", "referrals:specialties": "clients" };
 
 /** The demo's own words where the full interview talks about estimates and superbills. */
 export const DEMO_WORDS: Record<string, { help?: string; aeonSays: string }> = {

@@ -11,7 +11,7 @@ values (
   'Dana Reyes, LCPC (fictional demo practice)',
   '{
     "note": "[Sample] Fictional demo practice",
-    "who_i_help": "[Sample] Adults in Chicago going through work stress and life transitions",
+    "who_i_help": "[Sample] Adults and families facing oncology care, serious illness and end of life",
     "how_i_work": "[Sample] Telehealth across Illinois and in person in Lincoln Park, weekday evenings",
     "fees": "[Sample] Self-pay $150 per session; superbills for out-of-network reimbursement",
     "insurance": "[Sample] Not in network yet; credentialing planned",
@@ -36,18 +36,30 @@ insert into practice_os.settings (id) values (true) on conflict (id) do nothing;
 insert into practice_os.referral_sources
   (id, name, organization, taxonomy, specialty, npi_type, city, state, email, stage, last_contacted_at, next_follow_up_on, distance_miles, fit_score, score_version, notes, is_sample) values
   ('00000000-0000-4000-8000-000000000201', '[Sample] Lakeview Family Medicine', '[Sample] Lakeview Family Medicine',
-   '207Q00000X', 'Family medicine', 'organization', 'Chicago', 'IL', 'frontdesk@example.com', 'found', null, null, 0.6, 81, 3, '[Sample] Near the office.', true),
+   '207Q00000X', 'Family medicine', 'organization', 'Chicago', 'IL', 'frontdesk@example.com', 'found', null, null, 0.6, null, 0, '[Sample] Near the office.', true),
   ('00000000-0000-4000-8000-000000000202', '[Sample] Dr. Alex Example', '[Sample] North Side Internal Medicine',
-   '207R00000X', 'Internal medicine', 'individual', 'Chicago', 'IL', 'alex@example.com', 'contacted', now() - interval '8 days', current_date + 6, 1.4, 77, 3,
+   '207R00000X', 'Internal medicine', 'individual', 'Chicago', 'IL', 'alex@example.com', 'contacted', now() - interval '8 days', current_date + 6, 1.4, null, 0,
    '[Sample] Sent intro letter.', true),
   ('00000000-0000-4000-8000-000000000203', '[Sample] Old Town OB-GYN', '[Sample] Old Town OB-GYN',
-   '207V00000X', 'OB/GYN', 'organization', 'Chicago', 'IL', 'office@example.com', 'follow_up', now() - interval '20 days', current_date, 1.1, 69, 3,
+   '207V00000X', 'OB/GYN', 'organization', 'Chicago', 'IL', 'office@example.com', 'follow_up', now() - interval '20 days', current_date, 1.1, null, 0,
    '[Sample] Follow-up due today.', true),
   ('00000000-0000-4000-8000-000000000204', '[Sample] Lincoln Park Pediatrics', '[Sample] Lincoln Park Pediatrics',
-   '208000000X', 'Pediatrics', 'organization', 'Chicago', 'IL', 'hello@example.com', 'connected', now() - interval '35 days', null, 0.3, 79, 3,
-   '[Sample] Happy to share referrals for parents.', true);
+   '208000000X', 'Pediatrics', 'organization', 'Chicago', 'IL', 'hello@example.com', 'connected', now() - interval '35 days', null, 0.3, null, 0,
+   '[Sample] Happy to share referrals for parents.', true),
+  -- Dana's niche is oncology / serious illness / end of life: two kinds it ranks first.
+  ('00000000-0000-4000-8000-000000000205', '[Sample] Lakeshore Oncology Group', '[Sample] Lakeshore Oncology Group',
+   '207RX0202X', 'Oncology', 'organization', 'Chicago', 'IL', 'intake@example.com', 'found', null, null, 0.9, null, 0,
+   '[Sample] Cancer center near the office.', true),
+  ('00000000-0000-4000-8000-000000000206', '[Sample] North Side Hospice', '[Sample] North Side Hospice',
+   '251G00000X', 'Hospice', 'organization', 'Chicago', 'IL', 'care@example.com', 'found', null, null, 1.8, null, 0,
+   '[Sample] Bereavement coordinator on staff.', true);
 
--- Dana's Referrals setup. Seeded only when missing: db:reset never overwrites her choice.
+-- Her office phones ([Sample] 555 numbers), so the cards score the way the demo shows. Every card
+-- starts at score_version 0: the board scores them for her niche on first load (no typed-in scores).
+update practice_os.referral_sources set phone = '(312) 555-0141' where id = '00000000-0000-4000-8000-000000000201';
+update practice_os.referral_sources set phone = '(312) 555-0143' where id = '00000000-0000-4000-8000-000000000203';
+
+-- Dana's Referrals setup. Seeded only when missing; lib/demo-reset.ts then sets her demo niche and its kinds.
 insert into practice_os.referral_settings (id, home_zip, specialties)
 values (true, '60614', array['family_medicine', 'internal_medicine'])
 on conflict (id) do nothing;

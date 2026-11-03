@@ -13,10 +13,10 @@ import { STAGE_LABEL } from "@/lib/referrals/stages";
 import { getProfile } from "@/lib/profile";
 import { evidenceFor } from "@/lib/referrals/evidence/store";
 import { recheckIfDue, recheckDeps } from "@/lib/referrals/sources/recheck";
-import { latestLetters, listSources, moveDueFollowUps, practiceFacts, rescoreOldCards } from "@/lib/referrals/store";
+import { latestLetters, listSources, moveDueFollowUps, practiceFacts, rescoreOldCards, tierContext } from "@/lib/referrals/store";
 import { contactsFor } from "@/lib/referrals/contacts";
-import { tiersWithLog } from "@/lib/referrals/plan";
-import { SCORE_VERSION, type TierResult } from "@/lib/referrals/tier";
+import { rankCards, tiersWithLog } from "@/lib/referrals/plan";
+import { scoreVersionFor, type TierResult } from "@/lib/referrals/tier";
 
 export const metadata = { title: "Referrals · Practice-OS" };
 
@@ -46,8 +46,8 @@ async function Referrals({ searchParams }: { searchParams: PageProps<"/referrals
     practiceFacts(),
     getProfile(),
   ]);
-  // Cards scored by an older formula are scored again after the page is sent.
-  if (sources.some((s) => s.score_version !== SCORE_VERSION)) {
+  // Cards scored by an older formula, or for a niche she has since changed, are scored again after the page is sent.
+  if (sources.some((s) => s.score_version !== scoreVersionFor(facts.niche))) {
     after(() => rescoreOldCards().catch((err) => console.error(`[referrals] rescore: ${err instanceof Error ? err.message : String(err)}`)));
   }
   // Cards last checked over 30 days ago are checked again once a day, after the page is sent (her computer only).
@@ -66,7 +66,9 @@ async function Referrals({ searchParams }: { searchParams: PageProps<"/referrals
   const board = Object.fromEntries(sources.filter((s) => s.npi).map((s) => [s.npi!, { stage: STAGE_LABEL[s.stage] }]));
   // Tiers with her contact log on top (a prior referral, a warm intro, a meeting, a reply).
   const contacts = await contactsFor(sources.map((s) => s.id));
-  const tiers: Record<string, TierResult> = tiersWithLog(sources, contacts, { focus: facts.focus, clinicianState: facts.state });
+  const tiers: Record<string, TierResult> = tiersWithLog(sources, contacts, tierContext(facts));
+  // Each column in the one order (tier, niche weight, fit, score, distance).
+  const ranked = rankCards(sources, tiers);
   return (
     <div className="flex flex-col gap-8">
       <AreaExplorer
@@ -80,7 +82,7 @@ async function Referrals({ searchParams }: { searchParams: PageProps<"/referrals
         <h2 id="board-heading" className="text-body font-semibold">
           Your board
         </h2>
-        <ReferralBoard initial={sources} letters={letters} tiers={tiers} evidence={evidence} contacts={contacts} demo={profile?.is_sample ?? true} openDebrief={openDebrief} />
+        <ReferralBoard initial={ranked} letters={letters} tiers={tiers} evidence={evidence} contacts={contacts} demo={profile?.is_sample ?? true} openDebrief={openDebrief} />
       </section>
     </div>
   );
