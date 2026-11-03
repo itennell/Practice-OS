@@ -4,6 +4,7 @@ import { adsCampaign } from "./ads_campaign";
 import { website } from "./website";
 import { gfeIssue } from "./gfe_issue";
 import { referralLetter } from "./referral_letter";
+import { referralMeeting } from "./referral_meeting";
 import { instagramPost } from "./instagram_post";
 import { stateRules } from "./state_rules";
 import { testNote } from "./test_note";
@@ -26,6 +27,7 @@ export const executors: Partial<Record<string, Executor>> = {
   website,
   aeon_action: aeonAction,
   referral_letter: referralLetter,
+  referral_meeting: referralMeeting,
   instagram_post: instagramPost,
   // Front Desk
   text_consult_options: textConsultOptions,

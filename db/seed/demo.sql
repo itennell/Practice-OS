@@ -358,3 +358,28 @@ insert into practice_os.referral_contacts (source_id, kind, happened_on, note, c
   ('00000000-0000-4000-8000-000000000215', 'met', current_date - 100, null, 'clinician', true, null),
   ('00000000-0000-4000-8000-000000000215', 'referred_out', current_date - 100, null, 'clinician', true, 1),
   ('00000000-0000-4000-8000-000000000204', 'referred_out', current_date - 12, null, 'clinician', true, 2);
+
+-- The Referrals calendar (047): four [Sample] meetings this week and next, on her open weekdays at
+-- set wall-clock times in her zone. d(n) is the next weekday n (ISO: 1 = Mon ... 5 = Fri) after today.
+insert into practice_os.referral_meetings (source_id, kind, starts_at, ends_at, location, notes, status, created_by, is_sample)
+select m.source_id::uuid, m.kind, (m.day + m.starts)::timestamp at time zone z.tz, (m.day + m.ends)::timestamp at time zone z.tz,
+       m.location, m.notes, 'planned', 'clinician', true
+  from (select coalesce((select timezone from practice_os.settings limit 1), 'America/Chicago') as tz) z,
+       (values
+         -- Coffee with the debrief target (205), this coming Thursday.
+         ('00000000-0000-4000-8000-000000000205', 'coffee',
+          current_date + 1 + ((4 - extract(isodow from current_date + 1)::int + 7) % 7), time '10:00', time '10:45',
+          '[Sample] Bean There Cafe on Halsted', '[Sample] Bring the one-page practice sheet.'),
+         -- Call with the hospice bereavement coordinator (209), this coming Friday.
+         ('00000000-0000-4000-8000-000000000209', 'call',
+          current_date + 1 + ((5 - extract(isodow from current_date + 1)::int + 7) % 7), time '14:00', time '14:20',
+          '[Sample] Phone', null),
+         -- Lunch talk for the grief center's staff (208), Tuesday of the week after.
+         ('00000000-0000-4000-8000-000000000208', 'lunch_talk',
+          current_date + 8 + ((2 - extract(isodow from current_date + 8)::int + 7) % 7), time '12:00', time '13:00',
+          '[Sample] Their office, second floor', '[Sample] 20-minute talk on how a first session works, then questions.'),
+         -- Meeting with the oncology nurse navigator (210), Wednesday of the week after.
+         ('00000000-0000-4000-8000-000000000210', 'meeting',
+          current_date + 8 + ((3 - extract(isodow from current_date + 8)::int + 7) % 7), time '15:00', time '15:45',
+          '[Sample] Zoom', null)
+       ) as m(source_id, kind, day, starts, ends, location, notes);

@@ -85,13 +85,16 @@ export const REFERRAL_DEMO_TOOLS: readonly string[] = [
   "set_referral_niche",
   // coming: the debrief PR adds this tool; listed now so it works once merged
   "debrief_meeting",
+  // the Referrals calendar: Aeon proposes a time and queues a referral_meeting approval
+  "plan_referral_meeting",
+  "list_referral_meetings",
 ];
 
 /**
  * Approval kinds the demo shows: what the referral tools queue, and file_document (file_upload's
  * "keep this file" approval: her uploads are hers). aeon_action counts too when it wraps one of REFERRAL_DEMO_TOOLS.
  */
-export const REFERRAL_DEMO_APPROVAL_KINDS: readonly string[] = ["referral_letter", "file_document"];
+export const REFERRAL_DEMO_APPROVAL_KINDS: readonly string[] = ["referral_letter", "referral_meeting", "file_document"];
 
 /** Files page and document index kinds shown in the demo: her own uploads and referral letters. */
 export const REFERRAL_DEMO_FILE_KINDS: readonly string[] = ["uploaded", "referral_letter"];

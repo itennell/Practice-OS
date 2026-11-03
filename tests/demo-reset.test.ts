@@ -211,6 +211,30 @@ describe.skipIf(!local)("db:reset and the crisis item (built-in database only)",
     expect(scored[0].n).toBe(0);
   });
 
+  it("empties the Referrals calendar and reseeds its four [Sample] meetings on weekdays this week and next", async () => {
+    expect(DEMO_TABLES).toContain("referral_meetings");
+    const [card] = await db()<{ id: string }[]>`select id from practice_os.referral_sources where is_sample limit 1`;
+    await db()`insert into practice_os.referral_meetings (source_id, kind, starts_at, ends_at, created_by) values (${card.id}, 'call', '2030-01-07T15:00:00Z', '2030-01-07T15:20:00Z', 'vitest')`;
+    await reset(await tempDir());
+    const rows = await db()<{ kind: string; status: string; is_sample: boolean; name: string; local_day: string; local_start: string; dow: number; days_out: number }[]>`
+      select m.kind, m.status, m.is_sample, s.name,
+             to_char(m.starts_at at time zone z.tz, 'YYYY-MM-DD') as local_day, to_char(m.starts_at at time zone z.tz, 'HH24:MI') as local_start,
+             extract(isodow from m.starts_at at time zone z.tz)::int as dow, ((m.starts_at at time zone z.tz)::date - current_date) as days_out
+        from practice_os.referral_meetings m join practice_os.referral_sources s on s.id = m.source_id,
+             (select coalesce((select timezone from practice_os.settings limit 1), 'America/Chicago') as tz) z
+       order by m.starts_at`;
+    expect(rows).toHaveLength(4); // the test's own meeting is gone
+    expect(rows.every((r) => r.is_sample && r.status === "planned" && r.name.startsWith("[Sample]"))).toBe(true);
+    // Thu 10:00 coffee, Fri 2 pm call, Tue lunch talk and Wed meeting the week after, in her zone.
+    const byKind = Object.fromEntries(rows.map((r) => [r.kind, [r.dow, r.local_start]]));
+    expect(byKind).toEqual({ coffee: [4, "10:00"], call: [5, "14:00"], lunch_talk: [2, "12:00"], meeting: [3, "15:00"] });
+    expect(rows.find((r) => r.kind === "coffee")!.name).toBe("[Sample] Quillmere Oncology Group");
+    for (const r of rows) {
+      expect(r.days_out).toBeGreaterThanOrEqual(1);
+      expect(r.days_out).toBeLessThanOrEqual(14);
+    }
+  });
+
   it("I checked hides the item she saw and older ones, not one logged after her page loaded", async () => {
     const a = await fail();
     const b = await fail(); // logged after her page showed a
