@@ -18,6 +18,7 @@ import { haversineMiles, zipCenters } from "./geo";
 import { orgToCard, saveOrgCard, type SaveResult } from "./org-store";
 import { CMS_LIMIT, cmsByCcn, searchCmsAgencies, type CmsAgencyType, type FoundOrg } from "./sources/cms-agencies";
 import { OSM_ATTRIBUTION, osmByRef, osmTypes, searchOsmOrgs } from "./sources/osm-orgs";
+import type { StoreErrorSink } from "./sources/stored-cache";
 import { listSources, type ReferralSource } from "./store";
 import { isSensitiveSource } from "./sensitive";
 
@@ -77,7 +78,11 @@ type Deps = {
   centers?: Record<string, Point>;
   cards?: Pick<ReferralSource, "id" | "name" | "npi" | "ccn" | "osm_ref" | "organization" | "npi_type" | "address" | "city" | "zip" | "phone" | "stage">[];
   sql?: postgres.Sql | null;
+  /** Told, in plain words, when a CMS or OpenStreetMap answer couldn't be kept in referral_fetch_cache (demo:warm's notKept). */
+  onStoreError?: StoreErrorSink;
 };
+
+const errText = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
 /** Where to look: a ZIP (or a few), a typed place, or her own ZIP. Chicagoland is too wide here. */
 async function resolve(area: Area, radiusMiles: number, ctx: Ctx, deps: Deps) {
@@ -124,7 +129,8 @@ export async function discoverOrgs(req: { area: Area; radiusMiles: number; types
   const attribution: string[] = [];
   const found: FoundOrg[] = [];
   if (cmsTypes.length) {
-    const r = await (deps.cms ?? searchCmsAgencies)(cmsTypes, zips, { sql: deps.sql });
+    const onStoreError = deps.onStoreError && ((err: unknown) => deps.onStoreError!(`Couldn't keep a CMS Provider Data Catalog answer: ${errText(err)}`));
+    const r = await (deps.cms ?? searchCmsAgencies)(cmsTypes, zips, { sql: deps.sql, onStoreError });
     found.push(...r.orgs);
     for (const u of r.unavailable) notes.push(`${u} didn't answer. Try again in a minute.`);
     for (const t of r.more ?? []) notes.push(`The CMS list has more ${SOURCE_TYPE_BY_ID.get(t)?.label.toLowerCase() ?? t} there than one search reads. A smaller radius shows them all.`);
@@ -136,7 +142,8 @@ export async function discoverOrgs(req: { area: Area; radiusMiles: number; types
     const miles = Math.min(req.radiusMiles, OSM_MAX_MILES);
     if (req.radiusMiles > OSM_MAX_MILES) notes.push(`OpenStreetMap places are shown within ${OSM_MAX_MILES} miles.`);
     try {
-      const r = await (deps.osm ?? searchOsmOrgs)(osmPicked, center, miles, { sql: deps.sql });
+      const onStoreError = deps.onStoreError && ((err: unknown) => deps.onStoreError!(`Couldn't keep an OpenStreetMap answer: ${errText(err)}`));
+      const r = await (deps.osm ?? searchOsmOrgs)(osmPicked, center, miles, { sql: deps.sql, onStoreError });
       found.push(...r.orgs);
       for (const t of r.capped) notes.push(`There are many ${SOURCE_TYPE_BY_ID.get(t)?.label.toLowerCase() ?? t} nearby, so this shows the nearest.`);
     } catch {

@@ -89,7 +89,7 @@ test("Screenshots of Home and the failed state", async ({ page }, info) => {
 test("Referrals-only demo: only the referral letter waits, and Admin pages open Home", async ({ page }) => {
   test.skip(!REFERRALS_ONLY_DEMO, "Runs while the referrals-only demo is on (lib/features.ts).");
   await page.goto("/approvals");
-  await expect(page.getByRole("listitem", { name: "[Sample] Intro letter to Lakeview Family Medicine" })).toBeVisible();
+  await expect(page.getByRole("listitem", { name: "[Sample] Intro letter to Juniper Row Family Medicine" })).toBeVisible();
   await expect(page.getByRole("listitem", { name: /Test note/ })).toHaveCount(0);
   await expect(page.getByRole("listitem", { name: /GFE-2026/ })).toHaveCount(0);
   for (const hidden of ["/admin", "/admin/deadlines", "/media", "/media/instagram"]) {

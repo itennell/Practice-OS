@@ -8,6 +8,8 @@ export class SourceUnavailable extends Error {
   constructor(
     readonly source: string,
     readonly status: number | null,
+    /** From a Retry-After header in seconds (a 429 or 503), when the source sent one. */
+    readonly retryAfterMs: number | null = null,
   ) {
     super(`${source} didn't answer${status ? ` (${status})` : ""}. Aeon will try again later.`);
   }
@@ -28,9 +30,15 @@ export function jsonFetcher(source: string, timeoutMs = 15_000): JsonFetcher {
     } catch {
       throw new SourceUnavailable(source, null);
     }
-    if (!res.ok) throw new SourceUnavailable(source, res.status);
+    if (!res.ok) throw new SourceUnavailable(source, res.status, retryAfterMs(res.headers.get("retry-after")));
     return res.json();
   };
+}
+
+/** A Retry-After header given in seconds, as milliseconds (an HTTP date or nonsense: null). */
+export function retryAfterMs(header: string | null): number | null {
+  if (!header || !/^\d{1,6}$/.test(header.trim())) return null;
+  return Number(header.trim()) * 1000;
 }
 
 /** Text from an outside source, trimmed, or null when empty. */

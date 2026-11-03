@@ -23,6 +23,29 @@ export function postKey(url: string, body: string): string {
   return `${url}#sha256=${createHash("sha256").update(body).digest("hex")}`;
 }
 
+/** Statuses worth another polite try: rate limited, or the server busy or timed out (null: no answer at all). */
+const RETRY_STATUSES = new Set<number | null>([null, 429, 502, 503, 504]);
+/** The longest Retry-After waited out here; a longer one means the source counts as unavailable now. */
+export const RETRY_AFTER_MAX_MS = 30_000;
+
+/**
+ * `ask()`, tried again after each of `delaysMs` when the source is rate limited or busy
+ * (SourceUnavailable with 429, 502, 503, 504 or no answer). A Retry-After the source
+ * sent is waited out instead of a shorter delay, up to RETRY_AFTER_MAX_MS; a longer one
+ * isn't waited for. Any other error is thrown at once.
+ */
+export async function withRetry<T>(ask: () => Promise<T>, delaysMs: readonly number[], sleep: (ms: number) => Promise<unknown> = (ms) => new Promise((r) => setTimeout(r, ms))): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await ask();
+    } catch (err) {
+      if (!(err instanceof SourceUnavailable) || !RETRY_STATUSES.has(err.status) || attempt >= delaysMs.length) throw err;
+      if ((err.retryAfterMs ?? 0) > RETRY_AFTER_MAX_MS) throw err;
+      await sleep(Math.max(delaysMs[attempt], err.retryAfterMs ?? 0));
+    }
+  }
+}
+
 /** Waits for this host's next turn: at least `spacingMs` after its last request. */
 export async function waitTurn(host: string, spacingMs: number, now = Date.now, sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))): Promise<void> {
   const t = now();

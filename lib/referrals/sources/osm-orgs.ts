@@ -16,7 +16,7 @@ import { formatPhone, phoneDigits, zip5 } from "../evidence/normalize";
 import type { Fact } from "../evidence/merge";
 import { OSM_ATTRIBUTION } from "../evidence/merge";
 import { haversineMiles } from "../geo";
-import { cachedJson, postKey, waitTurn } from "./cache";
+import { cachedJson, postKey, waitTurn, withRetry } from "./cache";
 import type { FoundOrg } from "./cms-agencies";
 import { jsonFetcher, type JsonFetcher } from "./http";
 import { OVERPASS_URL } from "./osm";
@@ -161,19 +161,36 @@ export function osmOrgFacts(org: FoundOrg): Fact[] {
   return facts;
 }
 
-type Deps = { fetcher?: JsonFetcher; sql?: postgres.Sql | null; now?: () => Date };
+/** After a 429, a busy server or no answer, Overpass is asked again after these waits (each still after its 2-second turn). */
+export const OVERPASS_RETRY_MS = [5_000, 15_000] as const;
+
+type Deps = {
+  fetcher?: JsonFetcher;
+  sql?: postgres.Sql | null;
+  now?: () => Date;
+  /** Told when an answer couldn't be kept in referral_fetch_cache (it is still used). */
+  onStoreError?: (err: unknown) => void;
+  /** Waits before asking again (default OVERPASS_RETRY_MS); tests pass [] or a fake sleep. */
+  retryDelaysMs?: readonly number[];
+  sleep?: (ms: number) => Promise<unknown>;
+};
 
 async function overpass(query: string, deps: Deps): Promise<unknown> {
   const fetcher = deps.fetcher ?? jsonFetcher("OpenStreetMap (Overpass)", 30_000);
   const body = new URLSearchParams({ data: query }).toString();
   return cachedJson(
     postKey(OVERPASS_URL, query),
-    async () => {
-      await waitTurn("overpass-api.de", SPACING_MS);
-      // Sensitive places are dropped here, so their raw JSON is never cached or stored.
-      return dropSensitive(await fetcher(OVERPASS_URL, { method: "POST", body, headers: { "Content-Type": "application/x-www-form-urlencoded" } }));
-    },
-    { sql: deps.sql, host: "overpass-api.de", source: "OpenStreetMap (Overpass)" },
+    () =>
+      withRetry(
+        async () => {
+          await waitTurn("overpass-api.de", SPACING_MS);
+          // Sensitive places are dropped here, so their raw JSON is never cached or stored.
+          return dropSensitive(await fetcher(OVERPASS_URL, { method: "POST", body, headers: { "Content-Type": "application/x-www-form-urlencoded" } }));
+        },
+        deps.retryDelaysMs ?? OVERPASS_RETRY_MS,
+        deps.sleep,
+      ),
+    { sql: deps.sql, host: "overpass-api.de", source: "OpenStreetMap (Overpass)", onStoreError: deps.onStoreError },
   );
 }
 

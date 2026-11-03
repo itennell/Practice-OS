@@ -14,7 +14,7 @@ test.setTimeout(180_000);
 
 test("a card shows Confirmed by and its email with where it came from", async ({ page }) => {
   await page.goto("/referrals");
-  const card = page.getByRole("region", { name: "Found" }).getByRole("listitem", { name: "[Sample] Lakeview Family Medicine" });
+  const card = page.getByRole("region", { name: "Found" }).getByRole("listitem", { name: "[Sample] Juniper Row Family Medicine" });
   const ev = card.getByTestId("evidence");
   await expect(ev).toContainText("Confirmed");
   await expect(ev).toContainText("Confirmed by: OpenStreetMap · Their website");
@@ -28,7 +28,7 @@ test("logging a call moves the card; their reply moves it to Connected and up a 
   const errors: string[] = [];
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
   await page.goto("/referrals");
-  const name = "[Sample] Old Town OB-GYN";
+  const name = "[Sample] Thistlewood OB-GYN";
   let card = page.getByRole("region", { name: "Follow up" }).getByRole("listitem", { name });
   await expect(card).toContainText("Warm up next");
 
@@ -61,7 +61,7 @@ test("logging a call moves the card; their reply moves it to Connected and up a 
 
 test("they referred someone: only a count, and the confidentiality rule is shown", async ({ page }) => {
   await page.goto("/referrals");
-  const card = page.getByRole("listitem", { name: "[Sample] Lincoln Park Pediatrics" });
+  const card = page.getByRole("listitem", { name: "[Sample] Fernhollow Pediatrics" });
   await card.getByText(/^Log a call, email or meeting/).click();
   await expect(card).toContainText("Referred someone to you 1 time.");
   await expect(card).toContainText("never tells the referrer that someone became your client");
@@ -70,7 +70,7 @@ test("they referred someone: only a count, and the confidentiality rule is shown
 
 test("Referrals v2 board passes axe with the log and sources open", async ({ page }) => {
   await page.goto("/referrals");
-  const card = page.getByRole("listitem", { name: "[Sample] Lakeview Family Medicine" });
+  const card = page.getByRole("listitem", { name: "[Sample] Juniper Row Family Medicine" });
   await card.getByText("What each source says").click();
   await card.getByText(/^Log a call, email or meeting/).click();
   const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();

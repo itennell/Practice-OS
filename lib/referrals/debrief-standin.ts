@@ -6,9 +6,9 @@
 import type OpenAI from "openai";
 import type { ChatParams } from "../meta";
 
-/** A debrief of coffee with the fictional [Sample] Lincoln Park Pediatrics, with one patient story in it. */
+/** A debrief of coffee with the fictional [Sample] Fernhollow Pediatrics, with one patient story in it. */
 export const STANDIN_TRANSCRIPT =
-  "I just had coffee with the office manager at Lincoln Park Pediatrics. " +
+  "I just had coffee with the office manager at Fernhollow Pediatrics. " +
   "They send referrals by fax, and the front desk coordinator handles them. " +
   "They mostly see new and expecting parents, and most families have Blue Cross or pay privately. " +
   "They need a therapist who can see new parents within two weeks, because the therapists they use now have a waitlist. " +
@@ -28,7 +28,7 @@ export const STANDIN_FIELDS = {
   payer_mix: "Mostly Blue Cross or private pay",
   best_time: "Tuesday mornings",
   last_meeting_summary:
-    "Coffee with the office manager at Lincoln Park Pediatrics. They refer by fax through the front desk coordinator and need a therapist who can see new parents within two weeks.",
+    "Coffee with the office manager at Fernhollow Pediatrics. They refer by fax through the front desk coordinator and need a therapist who can see new parents within two weeks.",
   connection_points: "We both trained at Loyola",
   who_else: [
     { name: "Jenna Cho", role: "lactation consultant", organization: "Lincoln Park Birth Center" },

@@ -22,12 +22,21 @@ export function db(): postgres.Sql {
     // A script or helper started without DATABASE_URL joins the built-in database the app is running.
     const url = process.env.DATABASE_URL || builtInDatabaseUrl();
     if (!url) throw new Error("DATABASE_URL is not set and the built-in database hasn't been started (run npm run dev or npm run db:migrate).");
-    const options = { max: 5, prepare: false, max_pipeline: 0, onnotice: () => {} } as postgres.Options<Record<string, postgres.PostgresType>>;
-    const sql = postgres(url, options);
-    sql.begin = begin.bind(null, sql) as postgres.Sql["begin"];
-    client = sql;
+    client = poolerSafeClient(url, { max: 5 });
   }
   return client;
+}
+
+/**
+ * A client of its own (scripts like demo:check and demo:warm) with the same
+ * pooler-safe settings as db(): prepare: false, max_pipeline: 0 and the
+ * reserved-connection begin() below. Close it with sql.end().
+ */
+export function poolerSafeClient(url: string, opts: { max?: number } = {}): postgres.Sql {
+  const options = { max: opts.max ?? 1, prepare: false, max_pipeline: 0, onnotice: () => {} } as postgres.Options<Record<string, postgres.PostgresType>>;
+  const sql = postgres(url, options);
+  sql.begin = begin.bind(null, sql) as postgres.Sql["begin"];
+  return sql;
 }
 
 type TxFn = (tx: postgres.TransactionSql) => unknown;
