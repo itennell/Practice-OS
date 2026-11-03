@@ -26,12 +26,12 @@ test("a partner's panel shows Confirmed by and its email with where it came from
   await expect(ev).toContainText("Their robots.txt: robots.txt allows /contact");
 });
 
-test("logging a call moves the partner; their reply moves it to Connected and up a tier", async ({ page }) => {
+test("logging a call moves the partner; their reply moves it to Met", async ({ page }) => {
   const errors: string[] = [];
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
   await page.goto("/referrals");
   const name = "[Sample] Thistlewood OB-GYN";
-  await expect(partnerRow(page, name)).toContainText("Follow up");
+  await expect(partnerRow(page, name)).toContainText("Reached out");
   const card = await openPartner(page, name);
   await expect(card).toContainText("Warm up next");
 
@@ -43,20 +43,21 @@ test("logging a call moves the partner; their reply moves it to Connected and up
   expect((await saved).ok()).toBe(true);
   await expect(page.getByRole("status").filter({ hasText: `Logged "Called" for ${name}.` })).toBeAttached();
   await expect(card).toContainText("Spoke with the office manager.");
-  await expect(card).toContainText("Contacted");
+  await expect(card).toContainText("Reached out");
 
-  // They replied: +8 from the research weights, from Warm up next to Reach out first.
+  // They replied: the card moves to Met, and "Reach out first" (advice for someone she hasn't met) no longer shows.
   await card.getByRole("combobox", { name: "What happened" }).click();
   await page.getByRole("option", { name: "They replied" }).click();
   await card.getByRole("button", { name: "Log it" }).click();
-  await expect(card).toContainText("Reach out first");
+  await expect(card).toContainText("Met");
+  await expect(card).not.toContainText("Reach out first");
   await expect(card).toContainText("They answered your letter");
   await closePanel(page);
-  await expect(partnerRow(page, name)).toContainText("Connected");
+  await expect(partnerRow(page, name)).toContainText("Met");
 
   await page.reload();
-  await expect(partnerRow(page, name)).toContainText("Connected");
-  await expect(await openPartner(page, name)).toContainText("Reach out first");
+  await expect(partnerRow(page, name)).toContainText("Met");
+  await expect(await openPartner(page, name)).toContainText("They answered your letter");
   expect(errors).toEqual([]);
 });
 

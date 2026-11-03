@@ -24,11 +24,13 @@ export type ScriptFacts = {
   email: string | null;
   /** Her niche as who she helps ("people grieving a loss"), or null. */
   niche: string | null;
+  /** Her niche's id ("oncology_serious_illness"), for the niche's own lines. */
+  nicheId?: string | null;
   /** The groups she sees ("adults", "couples"). */
   whoSheHelps: string[];
   /** Insurers that approved her: the only ones named as in network. */
   inNetwork: string[];
-  /** Applied and waiting: named only as pending. */
+  /** Applied and waiting. Never said aloud on a call (a pending application isn't a network). */
   appliedPending: string[];
   /** She listed fees for clients who pay her themselves. */
   privatePay: boolean;
@@ -60,14 +62,37 @@ function intro(f: ScriptFacts): string {
   return who ? `${who}${at}${where}` : `a therapist${at}${where}`;
 }
 
+/** Insurer names the way people say them: "Blue Cross Blue Shield of Illinois", never "BCBSIL". */
+const SPOKEN_PAYER: Record<string, string> = {
+  bcbsil: "Blue Cross Blue Shield of Illinois",
+  bcbs: "Blue Cross Blue Shield",
+  "blue cross and blue shield of illinois": "Blue Cross Blue Shield of Illinois",
+  uhc: "UnitedHealthcare",
+  "united healthcare": "UnitedHealthcare",
+  "imcd": "Illinois Medicaid",
+};
+
+export function spokenPayer(name: string): string {
+  const bare = name.replace(/\s*\([^)]*\)\s*$/, "").trim();
+  return SPOKEN_PAYER[bare.toLowerCase()] ?? SPOKEN_PAYER[name.trim().toLowerCase()] ?? bare;
+}
+
+/** "Dr. Tellez's office", "Lakeshore Associates' office". */
+export function possessive(name: string): string {
+  return /s$/i.test(name.trim()) ? `${name.trim()}'` : `${name.trim()}'s`;
+}
+
+/** Niches whose partners (oncology, hospice, palliative teams) ask first about families. */
+const FAMILY_NICHES = new Set(["oncology_serious_illness", "older_adults_caregivers", "grief_loss"]);
+
 function whoLines(f: ScriptFacts): string[] {
   const lines: string[] = [];
   if (f.niche) lines.push(`I work with ${f.niche}.`);
   else if (f.whoSheHelps.length) lines.push(`I see ${listWords(f.whoSheHelps)}.`);
   else lines.push("I see adults for counseling.");
   if (f.niche && f.whoSheHelps.length) lines.push(`I see ${listWords(f.whoSheHelps)}.`);
-  if (f.inNetwork.length) lines.push(`I'm in network with ${listWords(f.inNetwork)}.`);
-  if (f.appliedPending.length) lines.push(`My application with ${listWords(f.appliedPending)} is pending.`);
+  if (f.nicheId && FAMILY_NICHES.has(f.nicheId)) lines.push("I also see family members and caregivers, including people grieving after a death.");
+  if (f.inNetwork.length) lines.push(`I'm in network with ${listWords([...new Set(f.inNetwork.map(spokenPayer))])}.`);
   if (f.privatePay || !f.inNetwork.length) {
     lines.push(
       f.slidingScale
@@ -76,6 +101,7 @@ function whoLines(f: ScriptFacts): string[] {
     );
   }
   if (f.telehealth) lines.push("I see clients in person and by telehealth.");
+  lines.push("If you have someone in mind, I can tell you today how soon I can see them.");
   return lines;
 }
 
@@ -110,7 +136,7 @@ function sectionsFor(f: ScriptFacts, p: ScriptPartner, v: ScriptVariant): Script
     ];
   }
   return [
-    { id: "open", title: TITLES.open, lines: [`Hi, this is ${me}.`, `I'm calling for ${p.organization ? `the ${p.greeting}` : `${p.greeting}'s office`} to introduce my practice.`] },
+    { id: "open", title: TITLES.open, lines: [`Hi, this is ${me}.`, `I'm calling for ${p.organization ? `the ${p.greeting}` : `${possessive(p.greeting)} office`} to introduce my practice.`] },
     { id: "who", title: TITLES.who, lines: whoLines(f).slice(0, 2) },
     {
       id: "ask",

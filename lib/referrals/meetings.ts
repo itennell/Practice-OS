@@ -18,6 +18,7 @@ import { db } from "../db";
 import type { guard } from "../aeon/guard";
 import { localDate, zonedTime } from "../frontdesk/calendar/zone";
 import { checkNote, isSuppressed, suppressedList } from "./contacts";
+import { canMarkDone, NOT_YET } from "./meeting-rules";
 import type { ReferralSource } from "./store";
 
 export const MEETING_KINDS = ["coffee", "call", "meeting", "lunch_talk", "other"] as const;
@@ -241,6 +242,8 @@ export async function updateMeeting(id: string, input: UpdateInput, sql: postgre
   const moved = input.startsAt !== undefined || input.endsAt !== undefined;
   // Moving a meeting needs a time still ahead (marking a past one done or canceled is fine).
   if (moved && status === "planned" && starts.getTime() <= (now ?? new Date()).getTime()) throw new MeetingError(PAST_TIME);
+  // Done means it happened: a meeting still ahead can't be marked done.
+  if (input.status === "done" && had.status !== "done" && !canMarkDone(starts, now)) throw new MeetingError(NOT_YET);
   const location = input.location !== undefined ? cleanText(input.location, 200, "The place") : had.location;
   const notes = input.notes !== undefined ? cleanText(input.notes, 500, "The note") : had.notes;
   if (input.location !== undefined) await screenNotes(location, check, input.by);

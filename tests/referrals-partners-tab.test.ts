@@ -1,7 +1,7 @@
 // Referrals › Partners (the calm CRM): the table's rows, search, filters and sort,
 // the next-step line, and the call script (plain code, value-checked, no model call).
 import { describe, expect, it } from "vitest";
-import { buildCallScript, listWords, SCRIPT_VARIANTS, type ScriptFacts } from "../lib/referrals/call-script";
+import { buildCallScript, listWords, possessive, SCRIPT_VARIANTS, spokenPayer, type ScriptFacts } from "../lib/referrals/call-script";
 import { DEFAULT_FILTERS, filterPartners, kindOptions, letterIsWaiting, nextStep, partnerRows, stageOptions } from "../lib/referrals/partners";
 import type { ReferralSource } from "../lib/referrals/store";
 import type { TierResult } from "../lib/referrals/tier";
@@ -39,7 +39,7 @@ describe("partners table", () => {
   it("searches name, ZIP and email; filters by kind, email and distance", () => {
     expect(filterPartners(rows, { ...DEFAULT_FILTERS, query: "thistle" }).map((r) => r.card.id)).toEqual(["b"]);
     expect(filterPartners(rows, { ...DEFAULT_FILTERS, query: "60657" }).map((r) => r.card.id)).toEqual(["b"]);
-    expect(filterPartners(rows, { ...DEFAULT_FILTERS, kinds: ["1"] }).map((r) => r.card.id)).toEqual(["a", "c"]);
+    expect(filterPartners(rows, { ...DEFAULT_FILTERS, kinds: ["Primary care"] }).map((r) => r.card.id)).toEqual(["a", "c"]);
     expect(filterPartners(rows, { ...DEFAULT_FILTERS, email: "missing" }).map((r) => r.card.id)).toEqual(["c"]);
     expect(filterPartners(rows, { ...DEFAULT_FILTERS, email: "has" }).map((r) => r.card.id)).toEqual(["a", "b"]);
     expect(filterPartners(rows, { ...DEFAULT_FILTERS, distance: "3" }).map((r) => r.card.id)).toEqual(["a", "b"]);
@@ -87,7 +87,9 @@ describe("call script", () => {
     expect(front.text).toContain("Dana Reyes, LCPC with Reyes Counseling PLLC in Lincoln Park, Chicago");
     expect(front.text).toContain("I work with people grieving a loss.");
     expect(front.text).toContain("I'm in network with Blue Cross Blue Shield of Illinois.");
-    expect(front.text).toContain("My application with Aetna is pending.");
+    // A pending application is never said aloud on a call.
+    expect(front.text).not.toMatch(/pending|Aetna/);
+    expect(front.text).toContain("If you have someone in mind, I can tell you today how soon I can see them.");
     expect(front.text).toContain("How do you usually refer for counseling?");
     expect(front.sections[3].lines).toEqual(["Who handles referrals:", "How they refer (fax, portal, email or phone):", "Best time to call:"]);
     expect(buildCallScript(facts, partner, "provider").text).toContain("Hi Dr. Tellez,");
@@ -136,6 +138,40 @@ describe("Ask Aeon context", async () => {
     expect(out.length).toBe(CHAT_MAX);
     expect(out.endsWith(contextSuffix("Partners", picked))).toBe(true);
     expect(withContext("Hi", "Board", [])).toBe("Hi\n\n(Asked from Referrals › Board.)");
+  });
+});
+
+describe("real-use sweep fixes", () => {
+  it("one stage vocabulary: rows, the Stage menu and its filter use the Board's columns", () => {
+    expect(rows.map((r) => r.column)).toEqual(["found", "reached_out", "met", "not_a_fit"]);
+    expect(stageOptions(rows, true).map((o) => o.label)).toEqual(["Found", "Reached out", "Met", "Referring", "Not a fit"]);
+    expect(filterPartners(rows, { ...DEFAULT_FILTERS, stages: ["met"] }).map((r) => r.card.id)).toEqual(["c"]);
+    const referred = partnerRows([card({ id: "r", stage: "connected" })], {}, { r: [{ id: "k", kind: "referred", happened_on: "2026-10-30" } as never] }, {});
+    expect(referred[0].column).toBe("referring");
+  });
+
+  it("Kind: the specialty Aeon knows wins, and every kind on the board is in the menu", () => {
+    const pall = card({ id: "p", specialty: "Hospice and Palliative Medicine", taxonomy: "207RH0002X" });
+    const home = card({ id: "h", specialty: "Home Health", taxonomy: "251E00000X", npi_type: "organization" });
+    const r = partnerRows([pall, home], { p: { ...tier(5), specialty: "palliative_care" }, h: { ...tier(null), specialty: null } }, {}, {});
+    expect(r.map((x) => x.kind)).toEqual(["Palliative care", "Home Health"]);
+    expect(kindOptions(r).map((o) => o.label).sort()).toEqual(["Home Health", "Palliative care"]);
+    expect(kindOptions(r).reduce((n, o) => n + o.count, 0)).toBe(2);
+  });
+
+  it("call script: spoken insurer names, no pending applications, a how-soon line, family line for her niche, possessives", () => {
+    expect(spokenPayer("BCBSIL")).toBe("Blue Cross Blue Shield of Illinois");
+    expect(spokenPayer("Blue Cross and Blue Shield of Illinois (BCBSIL)")).toBe("Blue Cross Blue Shield of Illinois");
+    expect(spokenPayer("Aetna")).toBe("Aetna");
+    expect(possessive("Lakeshore Associates")).toBe("Lakeshore Associates'");
+    expect(possessive("Dr. Tellez")).toBe("Dr. Tellez's");
+    const onc = buildCallScript({ ...facts, inNetwork: ["BCBSIL"], appliedPending: ["UHC"], nicheId: "oncology_serious_illness" }, { name: "x", greeting: "Lakeshore Associates" }, "voicemail");
+    expect(onc.text).toContain("I'm calling for Lakeshore Associates' office");
+    expect(onc.text).not.toMatch(/BCBSIL|UHC|UnitedHealthcare|pending/);
+    const front = buildCallScript({ ...facts, inNetwork: ["BCBSIL"], nicheId: "oncology_serious_illness" }, partner, "front_desk");
+    expect(front.text).toContain("I'm in network with Blue Cross Blue Shield of Illinois.");
+    expect(front.text).toContain("I also see family members and caregivers, including people grieving after a death.");
+    expect(front.left_out).toBe(0);
   });
 });
 

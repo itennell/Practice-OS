@@ -44,6 +44,7 @@ export function PlanSheet({
   const [partner, setPartner] = useState("");
   const [kind, setKind] = useState<Kind>("coffee");
   const [day, setDay] = useState("");
+  const [dayError, setDayError] = useState("");
   const [time, setTime] = useState("10:00");
   const [minutes, setMinutes] = useState(String(KIND_MINUTES.coffee));
   const [lengthTouched, setLengthTouched] = useState(false);
@@ -66,6 +67,7 @@ export function PlanSheet({
       setLengthTouched(false);
       const d = start.day && start.day >= today ? start.day : free.day;
       setDay(d);
+      setDayError("");
       setTime(start.time ?? (d === free.day ? free.time : "10:00"));
       setLocation("");
       setNotes("");
@@ -75,6 +77,8 @@ export function PlanSheet({
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (!partner) return setError("Pick who the meeting is with.");
+    // A typed date with a problem never books (the field empties its value; this says why).
+    if (dayError) return setError(dayError);
     if (!day) return setError("Pick a date.");
     const starts = wallInstant(day, time, timeZone);
     const ends = new Date(starts.getTime() + Number(minutes) * 60_000);
@@ -125,7 +129,7 @@ export function PlanSheet({
           compact
         />
         <div className="grid gap-4 sm:grid-cols-2">
-          <DateField label="Date" value={day} onChange={setDay} min={today} required />
+          <DateField label="Date" value={day} onChange={setDay} onValidity={setDayError} min={today} required />
           <SettingSelect label="Time" value={time} onValueChange={setTime} options={TIMES} compact />
         </div>
         <SettingSelect
@@ -155,7 +159,7 @@ export function PlanSheet({
           </p>
         )}
         <div>
-          <Button type="submit" variant="accent" disabled={busy || !allowed.length}>
+          <Button type="submit" variant="accent" disabled={busy || !allowed.length || Boolean(dayError)}>
             {busy ? "Planning…" : "Plan meeting"}
           </Button>
         </div>

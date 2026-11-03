@@ -12,7 +12,9 @@ const local = Boolean(dbUrl && ["localhost", "127.0.0.1", "::1"].includes(dbUrl.
 
 const { closeDb, db } = await import("../lib/db");
 const { outreachPlan } = await import("../lib/referrals/plan");
-const { recentReferralApprovals } = await import("../lib/referrals/crm");
+const { recentReferralApprovals, recentStageMoves } = await import("../lib/referrals/crm");
+const { updateMeeting } = await import("../lib/referrals/meetings");
+const { moveSource } = await import("../lib/referrals/store");
 
 const made: string[] = [];
 const approvals: string[] = [];
@@ -42,6 +44,27 @@ describe.skipIf(!local)("referrals CRM final fixes (built-in database only)", ()
     expect(reach).not.toContain(safe);
     expect(reach).toContain(twin);
     expect(plan.going_cold.map((g) => g.id)).not.toContain(coldSafe);
+  });
+
+  it("a meeting still ahead can't be marked done; a past one can", async () => {
+    const id = await makeCard("[Sample] Final Fix Meeting Clinic", { stage: "found", sensitive: false });
+    const [ahead] = await db()<{ id: string }[]>`
+      insert into practice_os.referral_meetings (source_id, kind, starts_at, ends_at, created_by, is_sample)
+      values (${id}, 'coffee', now() + interval '2 days', now() + interval '2 days 45 minutes', 'clinician', true) returning id`;
+    const [past] = await db()<{ id: string }[]>`
+      insert into practice_os.referral_meetings (source_id, kind, starts_at, ends_at, created_by, is_sample)
+      values (${id}, 'coffee', now() - interval '2 days', now() - interval '2 days' + interval '45 minutes', 'clinician', true) returning id`;
+    await expect(updateMeeting(ahead.id, { status: "done", by: "clinician" } as never)).rejects.toThrow(/hasn't started yet/);
+    expect((await updateMeeting(past.id, { status: "done", by: "clinician" } as never)).status).toBe("done");
+  });
+
+  it("stage moves come back from the audit log for the timeline", async () => {
+    const id = await makeCard("[Sample] Final Fix Mover", { stage: "found", sensitive: false });
+    await moveSource(id, "contacted", "clinician");
+    const moves = await recentStageMoves(db());
+    const mine = moves.find((m) => m.source_id === id)!;
+    expect(mine).toMatchObject({ from: "found", to: "contacted" });
+    expect(mine.at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
   });
 
   it("Latest activity approvals carry ISO instants (the Overview route reads them)", async () => {

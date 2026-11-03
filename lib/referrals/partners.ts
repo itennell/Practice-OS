@@ -2,7 +2,8 @@
 // filters and sort over it. Pure, so the page and the tests share it.
 import { CATEGORY_LABELS } from "./categories";
 import type { Contact } from "./contacts";
-import { STAGES, STAGE_LABEL, type Stage } from "./stages";
+import { SPECIALTY_BY_ID } from "./nppes";
+import { BOARD_COLUMNS, COLUMN_LABEL, columnFor, type BoardColumn } from "./stages";
 import type { LetterState, ReferralSource } from "./store";
 import type { TierResult } from "./tier";
 
@@ -15,7 +16,8 @@ export type PartnerFilters = {
   /** Catalog categories (as strings); none means every kind. */
   kinds: string[];
   /** None means every stage. */
-  stages: Stage[];
+  /** The Board's columns (Found, Reached out, Met, Referring, Not a fit); none means every one. */
+  stages: BoardColumn[];
   email: EmailFilter;
   distance: DistanceFilter;
   sort: PartnerSort;
@@ -28,7 +30,7 @@ export const SORT_OPTIONS: { value: PartnerSort; label: string }[] = [
   { value: "best", label: "Best fit first" },
   { value: "nearest", label: "Nearest first" },
   { value: "last_contact", label: "Longest since contact" },
-  { value: "stage", label: "Stage" },
+  { value: "stage", label: "Stage (Found to Referring)" },
   { value: "name", label: "Name (A to Z)" },
 ];
 export const EMAIL_OPTIONS: { value: EmailFilter; label: string }[] = [
@@ -49,7 +51,10 @@ export type PartnerRow = {
   /** The email on the card: hers wins, else the one Aeon found on their website. */
   email: string | null;
   /** The catalog category's name ("Primary care"), else the card's specialty. */
+  /** The partner's kind in plain words: the specialty when Aeon knows it ("Palliative care"), else the catalog category ("Primary care"), else the card's own. */
   kind: string;
+  /** The column she sees on the Board, in the table and the panel (one vocabulary). */
+  column: BoardColumn;
   category: number | null;
   /** Their last logged contact (a day), else the card's last contacted date. */
   lastContact: string | null;
@@ -70,7 +75,8 @@ export function partnerRows(
     return {
       card,
       email: emails[card.id] ?? card.email ?? null,
-      kind: (category && CATEGORY_LABELS[category]) || card.specialty || card.taxonomy || "Other",
+      kind: kindWords(card, tiers[card.id]),
+      column: columnFor(card, log),
       category,
       lastContact: log[0]?.happened_on ?? card.last_contacted_at?.slice(0, 10) ?? null,
       rank,
@@ -83,10 +89,10 @@ const fold = (s: string) => s.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").
 export function filterPartners(rows: PartnerRow[], f: PartnerFilters): PartnerRow[] {
   const q = fold(f.query.trim());
   const max = f.distance === "any" ? null : Number(f.distance);
-  const kept = rows.filter(({ card, email, kind, category }) => {
+  const kept = rows.filter(({ card, email, kind, column }) => {
     if (card.stage === "not_a_fit" && !f.showNotAFit && !f.stages.includes("not_a_fit")) return false;
-    if (f.stages.length && !f.stages.includes(card.stage)) return false;
-    if (f.kinds.length && !(category !== null && f.kinds.includes(String(category)))) return false;
+    if (f.stages.length && !f.stages.includes(column)) return false;
+    if (f.kinds.length && !f.kinds.includes(kind)) return false;
     if (f.email === "has" && !email) return false;
     if (f.email === "missing" && email) return false;
     if (max !== null && (card.distance_miles === null || card.distance_miles > max)) return false;
@@ -102,20 +108,34 @@ export function filterPartners(rows: PartnerRow[], f: PartnerFilters): PartnerRo
     name: (a, b) => a.card.name.replace(/^\[Sample\]\s*/, "").localeCompare(b.card.name.replace(/^\[Sample\]\s*/, "")),
     // Never contacted first, then the longest since.
     last_contact: (a, b) => (a.lastContact ?? "").localeCompare(b.lastContact ?? "") || a.rank - b.rank,
-    stage: (a, b) => STAGES.indexOf(a.card.stage) - STAGES.indexOf(b.card.stage) || a.rank - b.rank,
+    stage: (a, b) => BOARD_COLUMNS.indexOf(a.column) - BOARD_COLUMNS.indexOf(b.column) || a.rank - b.rank,
   };
   return [...kept].sort(by[f.sort]);
 }
 
-/** The Kind menu: the categories on her board, in category order, with counts. */
-export function kindOptions(rows: PartnerRow[]): { value: string; label: string; count: number }[] {
-  const counts = new Map<number, number>();
-  for (const r of rows) if (r.category && CATEGORY_LABELS[r.category]) counts.set(r.category, (counts.get(r.category) ?? 0) + 1);
-  return [...counts.entries()].sort((a, b) => a[0] - b[0]).map(([id, count]) => ({ value: String(id), label: CATEGORY_LABELS[id], count }));
+/** The kind words for a card: the specialty Aeon knows ("Palliative care", "Home health"), else the category, else the card's own. */
+export function kindWords(card: Pick<ReferralSource, "specialty" | "taxonomy">, tier: Pick<TierResult, "specialty" | "category"> | undefined): string {
+  const known = tier?.specialty ? SPECIALTY_BY_ID.get(tier.specialty)?.label : null;
+  const category = tier?.category ?? null;
+  return known || (category && CATEGORY_LABELS[category]) || card.specialty || card.taxonomy || "Other";
 }
 
-export function stageOptions(rows: PartnerRow[], showNotAFit: boolean): { value: Stage; label: string; count: number }[] {
-  return STAGES.filter((s) => showNotAFit || s !== "not_a_fit").map((s) => ({ value: s, label: STAGE_LABEL[s], count: rows.filter((r) => r.card.stage === s).length }));
+/** The Kind menu: every kind on her board (none left out), grouped in category order, with counts. */
+export function kindOptions(rows: PartnerRow[]): { value: string; label: string; count: number }[] {
+  const seen = new Map<string, { count: number; order: number }>();
+  for (const r of rows) {
+    const k = seen.get(r.kind) ?? { count: 0, order: r.category ?? 99 };
+    k.count++;
+    seen.set(r.kind, k);
+  }
+  return [...seen.entries()]
+    .sort((a, b) => a[1].order - b[1].order || a[0].localeCompare(b[0]))
+    .map(([kind, { count }]) => ({ value: kind, label: kind, count }));
+}
+
+/** The Stage menu: the Board's columns, with counts. */
+export function stageOptions(rows: PartnerRow[], showNotAFit: boolean): { value: BoardColumn; label: string; count: number }[] {
+  return BOARD_COLUMNS.filter((c) => showNotAFit || c !== "not_a_fit").map((c) => ({ value: c, label: COLUMN_LABEL[c], count: rows.filter((r) => r.column === c).length }));
 }
 
 /** "0.6 mi", "in your ZIP", or null. */

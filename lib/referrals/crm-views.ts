@@ -4,11 +4,11 @@
 // the tabs (client) and the tests share it. "They referred someone" rows carry a
 // date only: nothing here ever reads or shows who a client was.
 import { zonedTime } from "../frontdesk/calendar/zone";
+import { COLUMN_LABEL, columnFor, STAGES, type Stage } from "./stages";
 import { CATEGORY_LABELS } from "./categories";
 import { CONTACT_LABEL, type ContactKind } from "./contact-kinds";
 import type { Contact } from "./contacts";
 import { filterPartners, DEFAULT_FILTERS, type DistanceFilter, type EmailFilter, type PartnerRow } from "./partners";
-import type { Stage } from "./stages";
 import type { LetterState, ReferralSource } from "./store";
 import type { Tier, TierResult } from "./tier";
 
@@ -123,7 +123,21 @@ export function letterCounts(letters: Record<string, LetterState | undefined>, c
 
 // ---- Overview: latest activity ---------------------------------------------
 
-export type ApprovalBits = { id: string; kind: string; title: string; status: string; created_at: string; decided_at: string | null };
+export type ApprovalBits = {
+  id: string;
+  kind: string;
+  title: string;
+  status: string;
+  created_at: string;
+  decided_at: string | null;
+  /** The card a referral letter is for (payload.referral_source_id), when known. */
+  source_id?: string | null;
+  /** A letter she approved and then marked sent. */
+  sent?: boolean;
+};
+
+/** A stage move from the audit log (referral_stage_moved): which card, from and to, and when (ISO). */
+export type MoveBits = { id: string; source_id: string; from: string | null; to: string; at: string };
 export type ActivityItem = { id: string; day: string; sourceId: string | null; title: string; detail: string; kind: "contact" | "approval" };
 
 const APPROVAL_STATUS: Record<string, string> = {
@@ -158,62 +172,9 @@ export function latestActivity(
   return [...fromLog, ...fromApprovals.filter((a) => a.day)].sort((a, b) => b.day.localeCompare(a.day)).slice(0, max);
 }
 
-// ---- Board: five columns -----------------------------------------------------
+// ---- Board: five columns (lib/referrals/stages.ts, shared with the Partners table) ----
 
-export const BOARD_COLUMNS = ["found", "reached_out", "met", "referring", "not_a_fit"] as const;
-export type BoardColumn = (typeof BOARD_COLUMNS)[number];
-export const COLUMN_LABEL: Record<BoardColumn, string> = {
-  found: "Found",
-  reached_out: "Reached out",
-  met: "Met",
-  referring: "Referring",
-  not_a_fit: "Not a fit",
-};
-
-/**
- * Which column a card sits in. The stages are found, contacted, follow_up, connected
- * and not_a_fit (lib/referrals/stages.ts): Reached out is contacted and follow up;
- * connected (met or replied) is Met, or Referring once they have referred someone.
- */
-export function columnFor(card: Pick<ReferralSource, "stage">, contacts: Pick<Contact, "kind">[]): BoardColumn {
-  switch (card.stage) {
-    case "found":
-      return "found";
-    case "contacted":
-    case "follow_up":
-      return "reached_out";
-    case "connected":
-      return contacts.some((c) => c.kind === "referred") ? "referring" : "met";
-    default:
-      return "not_a_fit";
-  }
-}
-
-/** The stage a card dropped in a column gets. Referring is connected plus a logged referral. */
-export const COLUMN_STAGE: Record<BoardColumn, Stage> = {
-  found: "found",
-  reached_out: "contacted",
-  met: "connected",
-  referring: "connected",
-  not_a_fit: "not_a_fit",
-};
-
-export type BoardMove =
-  | { do: "none" }
-  | { do: "stage"; stage: Stage }
-  /** Into Referring: she confirms, and a dated "they referred someone" entry is logged (which also makes it connected). */
-  | { do: "log_referral" }
-  /** Out of Referring (to any column): the referral is in her log, so the card can't leave it by a drag. */
-  | { do: "explain" }
-  /** Not a fit into Referring: she moves them back first; no referral is logged for a card set aside. */
-  | { do: "refuse" };
-
-export function boardMove(from: BoardColumn, to: BoardColumn): BoardMove {
-  if (from === to) return { do: "none" };
-  if (from === "referring") return { do: "explain" };
-  if (to === "referring") return from === "not_a_fit" ? { do: "refuse" } : { do: "log_referral" };
-  return { do: "stage", stage: COLUMN_STAGE[to] };
-}
+export { BOARD_COLUMNS, boardMove, COLUMN_LABEL, COLUMN_STAGE, columnFor, type BoardColumn, type BoardMove } from "./stages";
 
 // ---- Board: filters ------------------------------------------------------------
 
@@ -316,7 +277,7 @@ export function cardPins(
 
 // ---- Meetings and notes: the timeline ------------------------------------------------
 
-export type TimelineKind = "meeting" | "call" | "letter" | "referral" | "note";
+export type TimelineKind = "meeting" | "call" | "letter" | "referral" | "note" | "move";
 export type TimelineFilter = "all" | TimelineKind;
 export const TIMELINE_FILTER_OPTIONS: { value: TimelineFilter; label: string }[] = [
   { value: "all", label: "All" },
@@ -325,6 +286,7 @@ export const TIMELINE_FILTER_OPTIONS: { value: TimelineFilter; label: string }[]
   { value: "letter", label: "Letters" },
   { value: "referral", label: "Referrals" },
   { value: "note", label: "Notes" },
+  { value: "move", label: "Stage moves" },
 ];
 
 export const KIND_GROUP: Record<ContactKind, TimelineKind> = {
@@ -363,7 +325,7 @@ export function timelineItems(
   cards: Pick<ReferralSource, "id" | "name" | "last_meeting_summary">[],
   contacts: Record<string, Pick<Contact, "id" | "kind" | "happened_on" | "source_id" | "note" | "people_count">[] | undefined>,
   meetings: MeetingBits[],
-  opts: { timeZone: string; now?: Date },
+  opts: { timeZone: string; now?: Date; approvals?: ApprovalBits[]; moves?: MoveBits[] },
 ): TimelineItem[] {
   const byId = new Map(cards.map((c) => [c.id, c]));
   const now = opts.now ?? new Date();
@@ -395,7 +357,8 @@ export function timelineItems(
     .filter((m) => m.status !== "canceled" && byId.has(m.source_id))
     .map((m): TimelineItem => {
       const planned = new Date(m.starts_at) > now && m.status === "planned";
-      const time = new Date(m.starts_at).toLocaleTimeString("en-US", { timeZone: opts.timeZone, hour: "numeric", minute: "2-digit" });
+      // "4:00 pm", the way the calendar writes it.
+      const time = new Date(m.starts_at).toLocaleTimeString("en-US", { timeZone: opts.timeZone, hour: "numeric", minute: "2-digit" }).replace(/\s*([AP])M$/, (_, p: string) => ` ${p.toLowerCase()}m`);
       return {
         id: `m-${m.id}`,
         day: dayIn(opts.timeZone, m.starts_at),
@@ -409,7 +372,33 @@ export function timelineItems(
         planned,
       };
     });
-  return [...fromLog, ...fromCalendar];
+  // Letters waiting for her approval, approved and ready to send, or declined (the Letters filter).
+  const fromLetters = (opts.approvals ?? [])
+    .filter((a) => a.kind === "referral_letter" && a.source_id && byId.has(a.source_id))
+    .flatMap((a): TimelineItem[] => {
+      const at = a.decided_at ?? a.created_at;
+      const day = dayIn(opts.timeZone, at);
+      if (!day) return [];
+      return [{ id: `a-${a.id}`, day, at: "", sourceId: a.source_id!, name: byId.get(a.source_id!)!.name, kind: "letter", label: LETTER_WORDS(a), note: null, debrief: false, planned: false }];
+    });
+  // Her stage moves (the Board, the table, the panel), in the Board's words.
+  const fromMoves = (opts.moves ?? [])
+    .filter((m) => byId.has(m.source_id) && STAGE_SET.has(m.to))
+    .flatMap((m): TimelineItem[] => {
+      const day = dayIn(opts.timeZone, m.at);
+      if (!day) return [];
+      return [{ id: `s-${m.id}`, day, at: "", sourceId: m.source_id, name: byId.get(m.source_id)!.name, kind: "move", label: `Moved to ${COLUMN_LABEL[columnFor({ stage: m.to as Stage }, [])]}`, note: null, debrief: false, planned: false }];
+    });
+  return [...fromLog, ...fromCalendar, ...fromLetters, ...fromMoves];
+}
+
+const STAGE_SET = new Set<string>(STAGES);
+
+function LETTER_WORDS(a: ApprovalBits): string {
+  if (a.status === "pending" || a.status === "running") return "Letter drafted: waiting for your approval";
+  if (a.status === "done") return a.sent ? "Letter approved and sent" : "Letter approved: ready to send";
+  if (a.status === "rejected") return "Letter declined";
+  return "Letter didn't go through";
 }
 
 export function filterTimeline(items: TimelineItem[], kind: TimelineFilter, partner: string): TimelineItem[] {

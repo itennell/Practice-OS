@@ -47,12 +47,12 @@ test("Referrals CRM: header, numbers, tabs in the URL, the partners table, and M
   await row.getByRole("button", { name: "More for [Sample] Juniper Row Family Medicine" }).click();
   await page.getByRole("menuitem", { name: "Move stage" }).click();
   const saved = page.waitForResponse((r) => r.url().endsWith("/stage") && r.request().method() === "POST");
-  await page.getByRole("menuitemradio", { name: /^Connected/ }).click();
+  await page.getByRole("menuitemradio", { name: /^Met/ }).click();
   expect((await saved).ok()).toBe(true);
-  await expect(page.getByRole("status").filter({ hasText: "Moved [Sample] Juniper Row Family Medicine to Connected." })).toBeAttached();
-  await expect(row).toContainText("Connected");
+  await expect(page.getByRole("status").filter({ hasText: "Moved [Sample] Juniper Row Family Medicine to Met." })).toBeAttached();
+  await expect(row).toContainText("Met");
   await page.reload();
-  await expect(partnerRow(page, "[Sample] Juniper Row Family Medicine")).toContainText("Connected");
+  await expect(partnerRow(page, "[Sample] Juniper Row Family Medicine")).toContainText("Met");
   expect(errors).toEqual([]);
 });
 

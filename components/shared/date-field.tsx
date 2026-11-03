@@ -9,7 +9,7 @@ import { Popover } from "@base-ui/react/popover";
 import { CalendarDays, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Calendar } from "./calendar";
-import { formatTyped, fromIso, parseTyped, toIso } from "./date-field-parse";
+import { dateFieldError, formatTyped, fromIso, parseTyped, toIso } from "./date-field-parse";
 import { LABEL_CLASS, WRAP_CLASS, type FieldLayout } from "./settings-controls";
 
 const FOCUS = "outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] focus-visible:outline-solid";
@@ -28,7 +28,10 @@ export type DateFieldProps = {
   clearable?: boolean;
   disabled?: boolean;
   className?: string;
+  /** Told what is wrong with the typed date ("" when fine), so a form can block its submit button. */
+  onValidity?: (error: string) => void;
 } & FieldLayout;
+
 
 export function DateField({
   label,
@@ -40,6 +43,7 @@ export function DateField({
   required,
   clearable,
   disabled,
+  onValidity,
   compact = true,
   hideLabel,
   className,
@@ -56,22 +60,26 @@ export function DateField({
     if ((parseTyped(text) ?? "") !== value) setText(formatTyped(value));
   }
 
-  const inRange = (iso: string) => (!min || iso >= min) && (!max || iso <= max);
+  const check = (next: string) => dateFieldError(next, { min, max, required });
 
+  // What is typed is the value: a date that can't be read, or is out of range, empties the
+  // value (never keeps the last good one) and tells the form, so it can't be submitted.
   const type = (next: string) => {
     setText(next);
-    setError("");
-    if (!next.trim()) return onChange("");
+    const problem = check(next);
     const iso = parseTyped(next);
-    if (iso && inRange(iso)) onChange(iso);
+    onValidity?.(problem);
+    // A whole date out of range shows at once; a half-typed one waits for the blur.
+    setError(iso && problem ? problem : "");
+    onChange(problem ? "" : (iso ?? ""));
   };
 
   const blur = () => {
-    if (!text.trim()) return setError(required ? "Pick a date." : "");
+    const problem = check(text);
+    setError(problem);
+    onValidity?.(problem);
     const iso = parseTyped(text);
-    if (!iso) return setError("Type a date like 11/25/2026, or pick one.");
-    if (!inRange(iso)) return setError(min && iso < min ? `Pick ${formatTyped(min)} or later.` : `Pick ${formatTyped(max!)} or earlier.`);
-    setText(formatTyped(iso));
+    if (!problem && iso) setText(formatTyped(iso));
   };
 
   const pick = (d: Date | undefined) => {
@@ -80,6 +88,7 @@ export function DateField({
     onChange(iso);
     setText(formatTyped(iso));
     setError("");
+    onValidity?.("");
     setOpen(false);
   };
 

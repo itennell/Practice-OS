@@ -7,7 +7,7 @@
 // A referral row is a date only: nothing about the client is ever kept or shown.
 
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, HandHeart, Mail, Mic, NotebookPen, Phone, Search, Users } from "lucide-react";
+import { ArrowRightLeft, CalendarDays, HandHeart, Mail, Mic, NotebookPen, Phone, Search, Users } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
 import { FilterMenu } from "@/components/shared/filter-menu";
 import { TextField } from "@/components/shared/settings-controls";
@@ -20,20 +20,24 @@ import {
   meetingRange,
   TIMELINE_FILTER_OPTIONS,
   timelineItems,
+  type ApprovalBits,
   type MeetingBits,
+  type MoveBits,
   type TimelineFilter,
   type TimelineKind,
 } from "@/lib/referrals/crm-views";
 import { cn } from "@/lib/utils";
-import { CARD, getMeetings, type CrmTabProps } from "./tab-props";
+import { CARD, getJson, getMeetings, type CrmTabProps } from "./tab-props";
 
-const ICON: Record<TimelineKind, typeof Phone> = { meeting: CalendarDays, call: Phone, letter: Mail, referral: HandHeart, note: NotebookPen };
+const ICON: Record<TimelineKind, typeof Phone> = { meeting: CalendarDays, call: Phone, letter: Mail, referral: HandHeart, note: NotebookPen, move: ArrowRightLeft };
 const SHOW_DAYS = 30;
 
 export function MeetingsTab({ data, onOpenPartner }: CrmTabProps = {}) {
   const [kind, setKind] = useState<TimelineFilter>("all");
   const [partner, setPartner] = useState("all");
   const [meetings, setMeetings] = useState<MeetingBits[]>([]);
+  // Her letters (waiting, ready, sent) and stage moves from the audit log.
+  const [activity, setActivity] = useState<{ approvals: ApprovalBits[]; moves: MoveBits[] }>({ approvals: [], moves: [] });
   const [picking, setPicking] = useState(false);
   const [query, setQuery] = useState("");
   const [days, setDays] = useState(SHOW_DAYS);
@@ -45,11 +49,12 @@ export function MeetingsTab({ data, onOpenPartner }: CrmTabProps = {}) {
     // The calendar's API allows 62 days at most: the last 55 and the week ahead. No calendar yet (404): the log alone.
     const { from, to } = meetingRange(today, 54, 7, data?.timeZone ?? "America/Chicago");
     getMeetings<MeetingBits>(from, to, ctl.signal).then((m) => !ctl.signal.aborted && setMeetings(m ?? []));
+    getJson<{ approvals: ApprovalBits[]; moves: MoveBits[] }>("/api/referrals/activity", ctl.signal).then((a) => !ctl.signal.aborted && a && setActivity(a));
     return () => ctl.abort();
   }, [today, data?.timeZone]);
 
   const cards = useMemo(() => data?.cards ?? [], [data]);
-  const items = useMemo(() => (data ? timelineItems(cards, data.contacts, meetings, { timeZone: data.timeZone }) : []), [cards, data, meetings]);
+  const items = useMemo(() => (data ? timelineItems(cards, data.contacts, meetings, { timeZone: data.timeZone, approvals: activity.approvals, moves: activity.moves }) : []), [cards, data, meetings, activity]);
   const groups = useMemo(() => groupByDay(filterTimeline(items, kind, partner)), [items, kind, partner]);
   const partnerOptions = useMemo(() => {
     const count = new Map<string, number>();

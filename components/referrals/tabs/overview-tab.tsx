@@ -166,7 +166,7 @@ export function OverviewTab({ data, onOpenPartner, onTab }: CrmTabProps = {}) {
               <ListRow
                 icon={<Mail size={16} />}
                 title={letters.ready ? `${letters.ready} ${letters.ready === 1 ? "letter is" : "letters are"} ready to send` : "No letters ready to send"}
-                detail={letters.waiting ? `${letters.waiting} more waiting for your approval. Aeon never sends: you copy and send it yourself.` : "Approved letters wait here until you send them from your own email."}
+                detail={letters.waiting ? `${letters.waiting} waiting for your approval. Aeon never sends: you copy and send it yourself.` : "Approved letters wait here until you send them from your own email."}
                 end={letters.waiting ? <a href="/approvals" className={LINK}>Approvals</a> : undefined}
                 wrapEnd
               />

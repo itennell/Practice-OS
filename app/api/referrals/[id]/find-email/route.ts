@@ -42,5 +42,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/referrals/[
   const evidence = (await evidenceFor([{ id, npi_type: card.npi_type }]))[id];
   const after = await getSource(id);
   const email = evidence?.fields.email?.value ?? after?.email ?? null;
-  return Response.json({ email, evidence, card: after, notes: result.notes, unavailable: result.unavailable });
+  // The page it read, if any: with none, the row says "No website on file to check" and offers Add website.
+  const website = evidence?.fields.website?.value ?? after?.website ?? null;
+  return Response.json({ email, website, evidence, card: after, notes: result.notes, unavailable: result.unavailable });
 }

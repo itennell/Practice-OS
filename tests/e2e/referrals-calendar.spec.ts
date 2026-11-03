@@ -62,15 +62,20 @@ test("week view: seeded meetings, details, plan a meeting", async ({ page }) => 
   await expect(sheet).toBeVisible();
   await expect(sheet).toContainText("[Sample] Bean There Cafe on Halsted");
   await expect(sheet).toContainText("[Sample] Bring the one-page practice sheet.");
-  for (const name of ["Reschedule", "Mark done", "Cancel meeting"]) await expect(sheet.getByRole("button", { name })).toBeVisible();
+  for (const name of ["Reschedule", "Cancel meeting"]) await expect(sheet.getByRole("button", { name })).toBeVisible();
+  // Still ahead: it can't be marked done yet.
+  await expect(sheet.getByRole("button", { name: "Mark done" })).toHaveCount(0);
   await expect(sheet.getByRole("link", { name: "Open partner" })).toHaveAttribute("href", /\/referrals\?partner=00000000-0000-4000-8000-000000000205$/);
   await expect(sheet.getByRole("link", { name: "Record a debrief after" })).toHaveAttribute("href", /\/referrals\?debrief=00000000-0000-4000-8000-000000000205$/);
   const axe = await new AxeBuilder({ page }).include('[role="dialog"]').analyze();
   expect(axe.violations.filter((v) => v.impact === "serious" || v.impact === "critical")).toEqual([]);
   // Cancel asks first; keep it.
   await sheet.getByRole("button", { name: "Cancel meeting" }).click();
-  await expect(page.getByRole("alertdialog", { name: "Cancel this meeting?" })).toBeVisible();
-  await page.keyboard.press("Escape");
+  const ask = page.getByRole("alertdialog", { name: "Cancel this meeting?" });
+  await expect(ask).toBeVisible();
+  // The way out says what it does: "Keep meeting", never a second "Cancel".
+  await expect(ask.getByRole("button", { name: "Keep meeting" })).toBeVisible();
+  await ask.getByRole("button", { name: "Keep meeting" }).click();
   await page.getByRole("button", { name: "Close panel" }).last().click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
@@ -112,6 +117,11 @@ test("Partners' Plan a meeting opens the form with that partner", async ({ page 
   const form = page.getByRole("form", { name: "Plan a meeting" });
   await expect(form).toBeVisible();
   await expect(form.getByRole("combobox", { name: "With" })).toHaveText(new RegExp(JUNIPER.replace(/[[\]]/g, "\\$&")));
+  // A typed past date shows its error and never books (the field doesn't keep the last good date).
+  const y = new Date(Date.now() - 3 * 86_400_000);
+  await typeDate(form, "Date", `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, "0")}-${String(y.getDate()).padStart(2, "0")}`);
+  await expect(form.getByText(/^Pick \d{2}\/\d{2}\/\d{4} or later\.$/)).toBeVisible();
+  await expect(form.getByRole("button", { name: "Plan meeting" })).toBeDisabled();
 });
 
 test("the calendar's partner list: board cards, why some are blocked, no addresses", async ({ request }) => {

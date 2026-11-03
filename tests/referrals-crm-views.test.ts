@@ -23,6 +23,7 @@ import {
   shortStep,
   timelineItems,
 } from "../lib/referrals/crm-views";
+import { canMarkDone } from "../lib/referrals/meeting-rules";
 import { meetingBlocked } from "../lib/referrals/meetings";
 import { coldNudges } from "../lib/referrals/nurture";
 import { partnerRows } from "../lib/referrals/partners";
@@ -175,7 +176,7 @@ describe("timeline", () => {
     expect(items.some((i) => i.id === "m-m2")).toBe(false);
     const planned = items.find((i) => i.id === "m-m1")!;
     expect(planned).toMatchObject({ kind: "meeting", day: addDays(TODAY, 2), planned: true, note: "At [Sample] Cafe" });
-    expect(planned.label).toMatch(/^Coffee at 9:00\sAM \(planned\)$/);
+    expect(planned.label).toBe("Coffee at 9:00 am (planned)");
     expect(items.filter((i) => i.kind === "referral").every((i) => i.note === null)).toBe(true);
   });
 
@@ -221,6 +222,27 @@ describe("final review fixes", () => {
     const old = (id: string, sensitive: boolean) => ({ id, name: `[Sample] ${id}`, email: null, stage: "connected" as const, last_contacted_at: "2025-01-01T12:00:00Z", sensitive });
     const nudges = coldNudges([old("shelter", true), old("clinic", false)], {}, { shelter: { tier: "first" }, clinic: { tier: "first" } }, TODAY, "America/Chicago");
     expect(nudges.map((n) => n.id)).toEqual(["clinic"]);
+  });
+
+  it("the timeline shows letters (waiting, ready) and stage moves, in the Board's words", () => {
+    const items = timelineItems(cards, {}, [], {
+      timeZone: "America/Chicago",
+      approvals: [
+        { id: "l1", kind: "referral_letter", title: "t", status: "pending", created_at: "2026-11-02T15:00:00Z", decided_at: null, source_id: "a" },
+        { id: "l2", kind: "referral_letter", title: "t", status: "done", created_at: "2026-11-01T15:00:00Z", decided_at: "2026-11-02T16:00:00Z", source_id: "b", sent: false },
+        { id: "l3", kind: "referral_letter", title: "t", status: "pending", created_at: "2026-11-02T15:00:00Z", decided_at: null, source_id: "gone" },
+      ],
+      moves: [{ id: "9", source_id: "b", from: "found", to: "contacted", at: "2026-11-02T18:00:00Z" }],
+    });
+    expect(filterTimeline(items, "letter", "all").map((i) => i.label)).toEqual(["Letter drafted: waiting for your approval", "Letter approved: ready to send"]);
+    expect(filterTimeline(items, "move", "all").map((i) => [i.name, i.label, i.day])).toEqual([["[Sample] Dr. Ada Example", "Moved to Reached out", "2026-11-02"]]);
+  });
+
+  it("Mark done only once a meeting has started", () => {
+    const now = new Date("2026-11-03T15:00:00Z");
+    expect(canMarkDone("2026-11-03T14:00:00Z", now)).toBe(true);
+    expect(canMarkDone("2026-11-05T15:00:00Z", now)).toBe(false);
+    expect(canMarkDone("nonsense", now)).toBe(false);
   });
 
   it("no meeting is planned with a sensitive card (checked before any database read)", async () => {

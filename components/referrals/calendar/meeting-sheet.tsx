@@ -14,6 +14,7 @@ import { SettingSelect } from "@/components/shared/settings-controls";
 import { SideSheet } from "@/components/shared/side-sheet";
 import { notify } from "@/components/shared/toaster";
 import { Button, buttonClass } from "@/components/ui";
+import { canMarkDone } from "@/lib/referrals/meeting-rules";
 import { cancelMeeting, changeMeeting, type Meeting } from "./api";
 import { dayKey, KIND_LABEL, timeOptions, wallInstant, wallTime, whenLabel, type Kind } from "./layout";
 import type { CalendarPartner } from "./api";
@@ -46,6 +47,7 @@ export function MeetingSheet({
 }) {
   const [moving, setMoving] = useState(false);
   const [day, setDay] = useState("");
+  const [dayError, setDayError] = useState("");
   const [time, setTime] = useState("09:00");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -56,6 +58,7 @@ export function MeetingSheet({
     setSeen(meeting?.id ?? null);
     setMoving(false);
     setError("");
+    setDayError("");
     setConfirm(false);
     if (meeting) {
       setDay(dayKey(meeting.starts_at, timeZone));
@@ -80,6 +83,7 @@ export function MeetingSheet({
 
   function reschedule() {
     if (!meeting) return;
+    if (dayError) return setError(dayError);
     if (!day) return setError("Pick a date.");
     const starts = wallInstant(day, time, timeZone);
     const length = Date.parse(meeting.ends_at) - Date.parse(meeting.starts_at);
@@ -89,6 +93,8 @@ export function MeetingSheet({
   const m = meeting;
   const title = m ? `${KIND_LABEL[m.kind as Kind]} with ${m.source_name}` : "Meeting";
   const planned = m?.status === "planned";
+  // A meeting can be marked done only once it has started (never one still ahead).
+  const started = m ? canMarkDone(m.starts_at) : false;
   // Plain links: they load the Referrals page fresh with that partner's panel open.
   const partnerHref = m ? `/referrals?partner=${m.source_id}` : "#";
   const debriefHref = m ? `/referrals?debrief=${m.source_id}` : "#";
@@ -110,7 +116,7 @@ export function MeetingSheet({
                   Reschedule
                 </Button>
               )}
-              {planned && (
+              {planned && started && (
                 <Button variant="quiet" onClick={() => run(() => changeMeeting(m.id, { status: "done" }), "Marked done.")} disabled={busy}>
                   <Check aria-hidden size={16} />
                   Mark done
@@ -155,12 +161,12 @@ export function MeetingSheet({
             {moving && planned && (
               <section aria-label="Reschedule" className="flex flex-col gap-3 rounded-[var(--radius-card-sm)] border border-[var(--line)] bg-[var(--glass)] p-4">
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <DateField label="New date" value={day} onChange={setDay} min={today} required />
+                  <DateField label="New date" value={day} onChange={setDay} onValidity={setDayError} min={today} required />
                   <SettingSelect label="New time" value={time} onValueChange={setTime} options={TIMES} compact />
                 </div>
                 <p className="text-small text-[var(--fg-muted)]">It keeps its length. Times are in your practice&apos;s time zone.</p>
                 <div>
-                  <Button variant="accent" onClick={reschedule} disabled={busy}>
+                  <Button variant="accent" onClick={reschedule} disabled={busy || Boolean(dayError) || !day}>
                     Save new time
                   </Button>
                 </div>
@@ -192,6 +198,7 @@ export function MeetingSheet({
         title="Cancel this meeting?"
         description={m ? `${title}, ${whenLabel(m, timeZone)}. It comes off your calendar. Nothing is sent: let them know yourself if they expect you.` : ""}
         confirmLabel="Cancel meeting"
+        cancelLabel="Keep meeting"
         onConfirm={async () => {
           if (!m) return;
           const c = await cancelMeeting(m.id);
