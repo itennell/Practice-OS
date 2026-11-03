@@ -86,7 +86,10 @@ export async function checkNote(
     // alerts off, the urgent item at the top of Admin). A saved note screened again for a letter
     // (screenedNote, audit: false) isn't a new event.
     if (opts.audit !== false) {
-      await audit({ actor: "safety", action: "crisis_note_refused", subjectType: "referral_note", details: { category: crisis.category } }).catch(() => undefined);
+      // A failed audit write never hides the alert, and never fails silently either.
+      await audit({ actor: "safety", action: "crisis_note_refused", subjectType: "referral_note", details: { category: crisis.category } }).catch((e) =>
+        console.error("crisis_note_refused audit failed", e instanceof Error ? e.message : String(e)),
+      );
       await alertCrisis({ source: "referral_note", category: crisis.category, by: opts.by ?? "clinician" }).catch((e) =>
         console.error("crisis alert failed", e instanceof Error ? e.message : String(e)),
       );

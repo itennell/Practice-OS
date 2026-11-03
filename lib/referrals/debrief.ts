@@ -249,6 +249,8 @@ const NAMED_ROLE = new RegExp(
 const POINTED_BACK = new RegExp(
   // "... and said she'd make an introduction", "... would be good to meet"
   `${INTRODUCTION}|\\b(?:would\\s+be\\s+|is\\s+)?(?:good|great|worth|nice|helpful)\\s+to\\s+(?:${INTRO_VERB})\\b|` +
+  // "... takes a lot of referrals and is the person to ask for there"
+  `\\b(?:is|'s|’s)\\s+the\\s+(?:person|one)\\s+to\\s+(?:ask\\s+for|talk\\s+to|call|contact|reach)\\b|` +
   `\\b(?:I|me|you|we|us)\\b(?:\\s+[\\w’']+){0,3}?\\s+(?:${INTRO_VERB})\\s+(?:with\\s+|to\\s+)?(?:her|him|them)\\b|\\bis\\s+(?:someone|somebody|a\\s+person|the\\s+person|the\\s+one)\\s+(?:I|we|you)\\s+(?:[\\w’']+\\s+){0,2}?(?:${INTRO_VERB})\\b`,
   "i",
 );
@@ -376,6 +378,9 @@ const HANDLER_PHRASE =
   /\b(?:the|a)\s+(?:person|one)\s+(?:who|that)\s+(?:handles?|takes?|does|manages?|coordinates?|processes?|reviews?)\s+(?:the\s+|all\s+|their\s+|our\s+)?(?:referrals?|intake)\b|\b(?:the|a)\s+(?:person|one)\s+to\s+(?:ask\s+for|talk\s+to|call|contact|reach)\b/gi;
 // A masked vetted name in apposition (", the colleague," or "intake coordinator the colleague") is taken out
 // before the guard: the name-finder reads "Intake Coordinator The Colleague" as a stranger.
+// The guard's title-cased second read takes "Handles Intake" / "Handles Referrals" for a person's name;
+// "handles the intake" reads as the work it is. Only the guard's copy is rewritten.
+const BARE_WORK = /\b(handles?|coordinates?|takes?|manages?|reviews?|processes?|runs?|does|covers)\s+(intake|referrals?|admissions|scheduling)\b/gi;
 const MASKED_APPOSITIVE = new RegExp(`,\\s*the colleague\\s*(?=[,.;!?]|$)|(?<=\\b(?:${ROLE})\\b)\\s+the colleague\\b`, "gi");
 
 /**
@@ -449,7 +454,7 @@ const SHE_IS_ROLE_AFTER = new RegExp(`^,\\s*(?:she|he)(?:'s|’s|\\s+is)\\s+(?:t
 // A staff member's full name doing the referral work: "Rosa Diaz handles referrals", "Rosa Diaz at the front desk is the one who sends them".
 // "Marisol Quint, she runs social work at Orrindale Hospice", "Rosa Diaz handles intake there", "Talk to Rosa Diaz, she coordinates intake".
 const NAME_RUNS_AFTER =
-  /^\s*,?\s*(?:(?:she|he)(?:'s|’s|\s+is)?\s+)?(?:runs|leads|heads|directs|manages|handles|coordinates|oversees|does|covers)\s+(?:the\s+|their\s+|all\s+|our\s+)?(?:social\s+work|intake|referrals?|admissions|chaplaincy|spiritual\s+care|bereavement(?:\s+services)?|care\s+coordination|outreach|scheduling)\b/i;
+  /^\s*,?\s*(?:(?:she|he|who)(?:'s|’s|\s+is)?\s+)?(?:runs|leads|heads|directs|manages|handles|coordinates|oversees|does|covers)\s+(?:the\s+|their\s+|all\s+|our\s+)?(?:social\s+work|intake|referrals?|admissions|chaplaincy|spiritual\s+care|bereavement(?:\s+services)?|care\s+coordination|outreach|scheduling)\b/i;
 // "Ask for Rosa Diaz in intake", "Rosa Diaz at intake is the person to ask for".
 const NAME_IN_DEPT_AFTER = /^\s+(?:in|at|from)\s+(?:intake|admissions|scheduling|the\s+front\s+desk)\b|^\s+(?:is|'s|’s)\s+(?:the\s+)?(?:person|one)\s+to\s+(?:ask\s+for|talk\s+to|call|contact)\b/i;
 // A job with no "the" at the start of a clause: "Intake coordinator Rosa Diaz", "Also, hospice social worker Marisol Quint".
@@ -581,7 +586,8 @@ export async function cleanTranscript(
     // (", the colleague,") is taken out: the name-finder reads "intake coordinator, the colleague," as a stranger.
     const forGuard = maskKnown(withoutCareRoles(s), known)
       .replace(CARE_SERVICE, " a service")
-      .replace(MASKED_APPOSITIVE, "");
+      .replace(MASKED_APPOSITIVE, "")
+      .replace(BARE_WORK, "$1 the $2");
     const r = await check(forGuard, allow);
     if (r.ok) kept.push(s);
   }
@@ -1089,7 +1095,7 @@ export async function writeFollowUp(
     };
     let held = false;
     for (const line of sentences(finished.replace(/^\s*(?:dear|hello|hi)\b[^\n]*$/gim, " "))) {
-      const t = maskKnown(line, known).replace(MASKED_APPOSITIVE, "").trim();
+      const t = maskKnown(line, known).replace(MASKED_APPOSITIVE, "").replace(BARE_WORK, "$1 the $2").trim();
       if (t && !(await check(t, letterAllow)).ok) {
         held = true;
         break;

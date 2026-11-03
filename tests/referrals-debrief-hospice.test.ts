@@ -132,6 +132,31 @@ const PATIENTS: [string, string[]][] = [
   ["Her top suggestion was Kevin Ortiz, who just finished chemo.", ["Kevin Ortiz", "chemo"]],
   ["Next step: call Joe Banks at Orrindale Hospice, he is actively dying.", ["Joe Banks", "actively dying"]],
   ["Rosa said the best time to catch her is Tuesday, before her chemo.", ["chemo"]],
+  // #144 debrief review: 24 smuggles in the new referral forms.
+  ["Next step: meet Joe Banks, the hospice patient who is dying.", ["Joe Banks", "dying"]],
+  ["Rosa Diaz in intake has breast cancer, she said.", ["breast cancer"]],
+  ["Hospice social worker Joe Banks, whose wife has ALS, wants to meet.", ["Joe Banks", "ALS"]],
+  ["Her top suggestion was Joe Banks, who is on hospice now.", ["Joe Banks", "on hospice"]],
+  ["Her top suggestion was Marisol Quint, who runs social work at Orrindale Hospice and just started chemo.", ["chemo"]],
+  ["Intake coordinator Rosa Diaz handles intake, but she is out on medical leave.", ["medical leave"]],
+  ["Intake coordinator Rosa Diaz handles intake for her son, who is in rehab.", ["rehab"]],
+  ["She mentioned that Marisol Quint, the hospice social worker at Orrindale Hospice, is dying and is the person to ask for there.", ["dying"]],
+  ["She mentioned that Joe Banks takes a lot of referrals and is the person to ask for, since his cancer came back.", ["cancer came back"]],
+  ["Ask for Rosa Diaz in intake about the man in room 12.", ["room 12"]],
+  ["Talk to Rosa Diaz, she coordinates intake for her husband now.", ["husband"]],
+  ["Also, hospice social worker Joe Banks at Orrindale Hospice is a patient there, she said.", ["Joe Banks", "a patient there"]],
+  ["Next step: call Joe Banks, the 70-year-old at Orrindale Hospice.", ["70-year-old"]],
+  ["Her top suggestion was the hospice patient Joe Banks.", ["Joe Banks"]],
+  ["Dr. Okafor also wants me to meet Joe Banks, she runs social work at Orrindale Hospice and her mom just died.", ["her mom just died"]],
+  ["Rosa Diaz at intake is the person to ask for, and she was just diagnosed with lupus.", ["diagnosed"]],
+  ["She said she'd make an introduction to Joe Banks, who has stage four cancer.", ["stage four"]],
+  ["Next step: meet Kevin Ortiz at Orrindale Hospice, he is in their palliative care program.", ["Kevin Ortiz", "palliative care program"]],
+  ["Her top suggestion was a client named Ana at the hospice.", ["Ana"]],
+  ["Intake coordinator Rosa Diaz is who sends them out, she is in recovery.", ["recovery"]],
+  ["Hospice social worker Joe Banks wants to meet, he relapsed last week.", ["relapsed"]],
+  ["Next step: meet the hospice social worker for the young adult who just moved here.", ["young adult"]],
+  ["She mentioned that Rosa Diaz takes a lot of referrals, she is the one they mentioned with the overdose.", ["overdose"]],
+  ["Ask for Rosa Diaz in intake; she has long covid and works part time.", ["long covid"]],
 ];
 
 // Professionals she was pointed to, or a role that handles referrals. Each must pass.
@@ -178,6 +203,10 @@ const PROFESSIONALS: [string, string[]][] = [
   ["Ask for Rosa Diaz in intake.", ["Rosa Diaz"]],
   ["Rosa Diaz at intake is the person to ask for.", ["Rosa Diaz"]],
   ["Talk to Rosa Diaz, she coordinates intake.", ["Rosa Diaz"]],
+  // #144 debrief review.
+  ["Her top suggestion was Marisol Quint, who runs social work at Orrindale Hospice.", ["Marisol Quint"]],
+  ["Intake coordinator Rosa Diaz handles intake.", ["Rosa Diaz"]],
+  ["She mentioned that Marisol Quint, the hospice social worker at Orrindale Hospice, takes a lot of referrals and is the person to ask for there.", ["Marisol Quint"]],
 ];
 
 // Names each demo phrasing must find as a professional (so the card can suggest them).
@@ -209,6 +238,9 @@ const DEMO_PROFESSIONALS: [string, string][] = [
   ["Ask for Rosa Diaz in intake.", "Rosa Diaz"],
   ["Rosa Diaz at intake is the person to ask for.", "Rosa Diaz"],
   ["Talk to Rosa Diaz, she coordinates intake.", "Rosa Diaz"],
+  ["Her top suggestion was Marisol Quint, who runs social work at Orrindale Hospice.", "Marisol Quint"],
+  ["Intake coordinator Rosa Diaz handles intake.", "Rosa Diaz"],
+  ["She mentioned that Marisol Quint, the hospice social worker at Orrindale Hospice, takes a lot of referrals and is the person to ask for there.", "Marisol Quint"],
 ];
 
 describe("hospice and oncology words in the privacy pass (real guard and name-finder)", () => {

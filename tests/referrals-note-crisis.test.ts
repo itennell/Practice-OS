@@ -18,6 +18,9 @@ const OFFICE_FACTS = [
   "They have an eating disorder and self-harm group.",
   "Their suicide attempt survivors group meets Mondays.",
   "Their self-injury program takes referrals by fax.",
+  // #144 review: an "and" before the qualifier, and an office phrase about who they serve.
+  "Self-harm and suicide prevention training for nurses quarterly.",
+  "Hospice bereavement team; refers families after a suicide loss to our group.",
 ];
 // About a person, or ambiguous: always route.
 const ROUTES = [
@@ -30,13 +33,38 @@ const ROUTES = [
   "She is in their suicide prevention program after an attempt last night.",
   "Their suicide prevention program called because someone wants to end it all.",
   "They have a self-harm group, and he said he wants to die.",
+  // #144 review: the service word is the only crisis cue, but a person is in the note. Default refuse.
+  "Joe needs their suicide attempt program tonight",
+  "Maria: suicidal group asap",
+  "my sister needs the self harm clinic tonight",
+  "my husband needs their suicide prevention services, now",
+  "Dana's brother: suicide attempt survivors group, he has pills saved",
+  "the veteran from church needs their suicide prevention team today",
+  "suicide attempt group. mom tried again yesterday",
+  "Ana self harm IOP intake, cutting again",
+  "my wife suicide prevention program",
+  "suicide group for Sam",
+  "Mike suicide attempt program",
+  "joe suicide program now",
+  "suicide attempt survivors group joined by Leo after his attempt",
+  // And with an office-fact word next to a person cue.
+  "They run a suicide prevention program and Joe is in it",
+  "Their self-harm group meets weekly, my nephew goes",
+  "They offer a suicide loss group, I need it tonight",
+  "Staff runs the self-harm IOP for Sam",
+  "They have a suicide attempt program; she tried again",
 ];
+// Read in any note, whatever else it says.
+const ALWAYS = ["Their IOP takes referrals; a teen is cutting again", "They have a group. Tried again last week.", "Weekly group; he has pills saved"];
 
 describe("the note crisis check", () => {
   it.each(OFFICE_FACTS)("a fact about the office doesn't route: %s", (note) => {
     expect(checkNoteCrisis(note).crisis).toBe(false);
   });
   it.each(ROUTES)("routes: %s", (note) => {
+    expect(checkNoteCrisis(note).crisis).toBe(true);
+  });
+  it.each(ALWAYS)("always routes: %s", (note) => {
     expect(checkNoteCrisis(note).crisis).toBe(true);
   });
   it("every line of the crisis corpus that must route still routes as a note", async () => {
