@@ -32,6 +32,8 @@ export type DebriefDraft = {
   partner: string;
   fields: DebriefFields;
   rejected: Rejected[];
+  /** Fields left empty because the debrief didn't say them (Muse guessed): a count, not listed as refusals. */
+  not_said?: number;
   /** Sentences left out because they were about someone's patient (a count, never the words). */
   withheld: number;
   follow_up: FollowUpDraft | null;
