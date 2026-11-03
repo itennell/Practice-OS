@@ -9,11 +9,16 @@ import { audit } from "../audit";
 import { db } from "../db";
 import { CUE_VERSION, isSensitiveSource, sensitiveByKind, siteHashes } from "./sensitive";
 
+/**
+ * Site hashes of cards sensitive by kind (a DV/SA agency or shelter type, or a NUCC code).
+ * Hashes a name-cue card got earlier (migration 045's backfill, older saves) are left out:
+ * a name cue can be a false flag and must not hide everyone at that street.
+ */
 export async function knownSensitiveSites(sql: postgres.Sql = db()): Promise<Set<string>> {
   await reflagSensitiveOnce(sql);
-  const rows = await sql<{ h: string }[]>`
-    select unnest(site_hashes) as h from practice_os.referral_sources where sensitive and site_hashes is not null`;
-  return new Set(rows.map((r) => r.h));
+  const rows = await sql<{ source_type: string | null; taxonomy: string | null; site_hashes: string[] }[]>`
+    select source_type, taxonomy, site_hashes from practice_os.referral_sources where sensitive and site_hashes is not null`;
+  return new Set(rows.filter((r) => sensitiveByKind(r)).flatMap((r) => r.site_hashes));
 }
 
 // One re-flag per database connection, cue version and 10 minutes: a chat search
@@ -72,11 +77,11 @@ export async function reflagSensitive(sql: postgres.Sql = db()): Promise<number>
         returning id`;
       if (rows.length === 0) return false;
       await tx`delete from practice_os.referral_facts where source_id = ${r.id} and field = 'address'`;
+      // In the same transaction: a card never changes without its audit row.
+      await audit({ actor: "system", action: "referral_reflagged_sensitive", subjectType: "referral_source", subjectId: r.id, details: { reason, cue_version: CUE_VERSION } }, tx as unknown as postgres.Sql);
       return true;
     });
-    if (!done) continue;
-    changed++;
-    await audit({ actor: "system", action: "referral_reflagged_sensitive", subjectType: "referral_source", subjectId: r.id, details: { reason, cue_version: CUE_VERSION } }, sql);
+    if (done) changed++;
   }
   return changed;
 }

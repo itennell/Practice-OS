@@ -36,7 +36,7 @@ export function cueText(s: string): string {
 }
 
 /** Bump when the cues change: lib/referrals/sensitive-sites.ts re-flags old cards once per version. */
-export const CUE_VERSION = 2;
+export const CUE_VERSION = 3;
 
 /** Plain cues, on cueText. Plurals included. Always sensitive, whatever else the name says. */
 export const SENSITIVE_CUES = new RegExp(
@@ -49,29 +49,35 @@ export const SENSITIVE_CUES = new RegExp(
       "victims? of (?:crime|violence|abuse|assault|trafficking|domestic|sexual|rape)", "victim (?:services|advocates?|advocacy|assistance)",
       "survivors? of (?:abuse|violence|assault|trafficking|domestic|sexual|rape|incest)",
       "womens (?:center|centre|centers|shelter|shelters|refuge|safe ?house|resource center|services|crisis|aid|advocacy)",
-      "shelters?", "safe ?houses?", "safe ?places?", "safe ?homes?", "safe ?space",
-      "hope ?houses?", "house of hope", "houses of hope", "ruths house", "apna ghar",
-      "family justice", "justice center", "(?:rape|sexual assault|sexual violence|domestic violence|dv) crisis",
+      "shelters?", "safe ?houses?", "house of hope", "houses of hope", "ruths house", "apna ghar",
+      "family justice", "(?:rape|sexual assault|sexual violence|domestic violence|dv) crisis",
       "transitional (?:housing|living)", "ywca",
-      // Chicago DV and SA agencies by name.
-      "sarahs inn", "family rescue", "mujeres latinas en accion", "kan win", "wings program", "casa de esperanza",
+      // Chicago DV and SA agencies by name, distinctive enough to match anywhere.
+      "sarahs inn", "mujeres latinas en accion", "kan win",
     ].join("|") +
     ")\\b",
 );
-/** Agency names too plain to match inside other names: only the whole name counts ("Between Friends", "Resilience"). */
-const AGENCY_NAMES = new Set(["between friends", "life span", "resilience", "wings", "kan win"]);
-const NAME_FILLER = /^(?:(?:test|sample|the)\s+)*|(?:\s+(?:chicago|inc|il|illinois|nfp|org))*$/g;
+/**
+ * Sensitive unless the name is plainly a care, health or emergency service ("Hope House
+ * Hospice", "Safe Place Pediatrics", "Justice Center Pediatrics", "Family Rescue Squad EMS").
+ */
+const MID_CUES =
+  /\b(?:hope ?(?:houses?|haus)|safe ?places?|safe ?homes?|safe ?space|justice center|family rescue|wings program|casa de esperanza)\b/;
+/** Agency names too plain to match inside other names: they must start the name ("Life Span Center for Legal Services"). */
+const AGENCY_PREFIXES = /^(?:between friends|life span|resilience (?:chicago|formerly))\b/;
+const NAME_FILLER = /^(?:(?:test|sample|the)\s+)*/;
 
 /** "Survivors" alone is sensitive, except next to cancer, loss or grief ("Cancer Survivors Network"). */
 const SURVIVORS = /\bsurvivors?\b/;
-const SURVIVORS_OK = /\b(?:cancer|oncology|loss|suicide|grief|bereave\w*|widow\w*|leukemia|lymphoma|tumou?rs?|breast|survivorship|heart|stroke|burn|transplant|cardiac|brain|ovarian|prostate|lung|colon|hospice|covid)\b/;
+const SURVIVORS_OK = /\b(?:cancer|oncology|loss|suicide|grief|bereave\w*|widow\w*|leukemia|lymphoma|tumou?rs?|breast|survivorship|heart|stroke|burn|transplant|cardiac|brain|ovarian|prostate|lung|colon|hospice|covid|holocaust|camp|camps)\b/;
 
 /** Soft cues: sensitive unless the name is plainly hospice, home health, funeral or church ("Safe Harbor Hospice"). */
 const SOFT_CUES = /\b(?:safe harbou?rs?|safe ?havens?|safe passage|sanctuar(?:y|ies))\b/;
 /** Borderline names: one of these with a services word counts as sensitive (soft too). */
 export const BORDERLINE = /\b(?:house of [a-z]+|havens?|refuges?|harbou?rs? house|hope center|new beginnings?|new hope)\b/;
 export const SERVICES_WORD = /\b(?:services?|centers?|centres?|projects?|network|programs?|ministr(?:y|ies)|alliance|outreach|homes?|house|inc|foundation|coalition|place|support)\b/;
-const CARE_CONTEXT = /\b(?:hospice|home health|home care|funeral|cemetery|memorial|church|chapel|parish|cathedral|temple|synagogue|mosque|palliative|senior living|assisted living|nursing)\b/;
+const CARE_CONTEXT =
+  /\b(?:hospice|home health|home care|funeral|cemetery|memorial|church|chapel|parish|cathedral|temple|synagogue|mosque|palliative|senior living|assisted living|nursing|counseling|counselling|therapy|therapists?|wellness|pediatrics?|clinics?|medical|medicine|health|healthcare|dental|cancer|oncology|ems|squad|ambulance|fire)\b/;
 
 /** Edit distance counting a swap of two neighbours as one, for "sheltr" and "shleter". */
 function editDistance(a: string, b: string): number {
@@ -88,10 +94,15 @@ function editDistance(a: string, b: string): number {
 
 function textLooksSensitive(t: string): boolean {
   if (SENSITIVE_CUES.test(t)) return true;
-  if (AGENCY_NAMES.has(t.replace(NAME_FILLER, "").trim())) return true;
   if (SURVIVORS.test(t) && !SURVIVORS_OK.test(t)) return true;
-  if (t.split(" ").some((w) => w.length >= 6 && (editDistance(w, "shelter") <= 1 || editDistance(w, "shelters") <= 1))) return true;
+  const words = t.split(" ");
+  // Typos: "shleter" (7+ letters, starting "sh", so never "smelter"), "domestc violence".
+  if (words.some((w) => w.length >= 7 && w.startsWith("sh") && (editDistance(w, "shelter") <= 1 || editDistance(w, "shelters") <= 1))) return true;
+  for (let i = 0; i + 1 < words.length; i++) {
+    if (editDistance(words[i], "domestic") <= 1 && (editDistance(words[i + 1], "violence") <= 1 || editDistance(words[i + 1], "abuse") <= 1)) return true;
+  }
   if (CARE_CONTEXT.test(t)) return false;
+  if (MID_CUES.test(t) || AGENCY_PREFIXES.test(t.replace(NAME_FILLER, ""))) return true;
   if (SOFT_CUES.test(t)) return true;
   // "Haven House", "House of Ruth Services": the borderline word plus a services word (itself excluded).
   const border = t.match(BORDERLINE)?.[0];

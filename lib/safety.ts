@@ -13,7 +13,6 @@ export type CrisisResult = { crisis: false } | { crisis: true; category: CrisisC
 
 // Reflexive forms for every person ("hung himself", "offing herself", "cutting
 // themself"), so a clinician passing on what a partner or caller said routes too.
-const SELVES = ["myself", "himself", "herself", "themselves", "themself", "yourself", "ourselves"];
 const SELF_VERBS = [
   "kill", "kills", "killed", "killing", "hurt", "hurts", "hurting", "harm", "harms", "harmed", "harming",
   "cut", "cuts", "cutting", "hang", "hangs", "hanged", "hanging", "hung", "shoot", "shoots", "shot", "shooting",
@@ -21,7 +20,8 @@ const SELF_VERBS = [
   "suffocate", "suffocates", "suffocated", "suffocating", "unalive", "unalives", "unalived", "unaliving",
   "starve", "starves", "starved", "starving", "overdose", "overdoses", "overdosed", "overdosing", "electrocute", "electrocuted",
 ];
-const reflexive = SELF_VERBS.flatMap((v) => SELVES.map((p) => `${v}${p}`));
+// Matched as words on the spaced text, so "he made the skill himself" passes; "kill my self" still matches.
+const REFLEXIVE = new RegExp(`\\b(${SELF_VERBS.join("|")}) ?(my|him|her|them|your|our) ?sel(f|ves)\\b`);
 // "end her own life", "took his life", "ending their own lives".
 const LIFE_VERBS = ["end", "ends", "ended", "ending", "take", "takes", "took", "taken", "taking"];
 const POSSESSIVES = ["my", "her", "his", "their", "your", "our"];
@@ -34,7 +34,6 @@ const ownLife = LIFE_VERBS.flatMap((v) => POSSESSIVES.flatMap((p) => ["life", "l
 // risk can pass, while "I'm suicidal" still routes.
 const SQUASHED: Record<CrisisCategory, string[]> = {
   self_harm: [
-    ...reflexive,
     ...ownLife,
     "selfharm", "selfinjur", "selfdelet", "sewerslide", "sewersliding", "seppuku",
     "enditall", "endingitall",
@@ -46,9 +45,7 @@ const SQUASHED: Record<CrisisCategory, string[]> = {
     "doesntwanttobehereanymore", "doesntwanttoliveanymore", "doesntwanttolive", "doesntwanttowakeup",
     "dontwannabehereanymore", "dontwannalive", "dontwannabealive", "dontwanttoexist", "dontwannaexist",
     "cantgoonliving", "wantittobeover", "wantsittobeover", "wantitalltobeover", "wantsitalltobeover",
-    "wantittostop", "wantsittostop", "wantitalltostop", "wantsitalltostop", "wanteditalltostop", "wanteditalltobeover",
-    "ratherbedead", "stopexisting", "doesntwanttoexist", "doesnotwanttoexist", "donotwanttoexist",
-    "betteroffwithouther", "betteroffwithouthim", "betteroffwithoutthem",
+    "doesntwanttoexist", "doesnotwanttoexist", "donotwanttoexist",
     "noreasonforhertolive", "noreasonforhimtolive", "noreasonforthemtolive", "noreasonformetolive",
     // Spanish
     "quieromorir", "deseomorir", "ganasdemorir", "noquierovivir", "noquieroseguirviviendo",
@@ -56,6 +53,7 @@ const SQUASHED: Record<CrisisCategory, string[]> = {
     "lastimarme", "hacermedano", "autolesion",
     // Spanish, third person ("quiere matarse", "se va a matar", "ella quiere morir")
     "quierematarse", "sequierematar", "quierequitarselavida", "sevaamatar", "vaamatarse", "noquierevivir", "quieremorir",
+    "acabarconsuvida", "acabarconmivida", "terminarconsuvida", "terminarconmivida", "acabarconsupropiavida", "terminarconsupropiavida",
     // Portuguese
     "queromorrer", "naoqueroviver", "voumematar", "queromematar", "tirarminhavida", "automutila", "quersematar", "vaisematar",
     // French
@@ -94,14 +92,25 @@ const WORDS: Record<CrisisCategory, RegExp[]> = {
     /\bset (my|him|her|them)sel(f|ves) on fire\b/,
     /\bunaliv(e|es|ed|ing)\b/,
     /\bself ?delet(e|ed|es|ing)\b/,
+    REFLEXIVE,
+    // Not "stop existing clients from booking", "want it to stop syncing", "better off without him on the panel", "rather be dead tired".
+    /\bstop existing\b(?= *$| (anymore|forever|now|already|tonight|today|altogether|and|but|so|because|or|please|honestly|completely)\b)/,
+    /\b(want|wants|wanted|wanting|wish|wishes) (it|everything|this)( all)? to (stop|be over|end)\b(?! \w+ing\b)(?! (at|by|on|in|for|with|after|before|up|soon|early|on time)\b)/,
+    /\bbetter off without (her|him|them)\b(?! (as|on|in|at|for|from|handling|doing|running|\w+ing)\b)/,
+    /\brather be dead\b(?! (tired|last|wrong|serious|set|broke|even|on|center|weight|end)\b)/,
     // Overdose with a drug name or a bottle: "a bottle of xanax", "took all her tylenol", "OD'd on her meds".
     // A bottle counts only with a taking verb: "swallowed a bottle of advil"; "a bottle of advil for the office" passes.
-    new RegExp(`\\b(took|taken|take|taking|swallowed|swallow|swallowing|downed|down|ate|eat|chugged|chug|emptied|empty|finished|popped)( (her|his|my|their|the|a|an|that|this|those|these))?( (whole|entire|full))? bottles? of (\\w+ )?${DRUGS}\\b`),
+    new RegExp(`\\b(took|taken|swallowed|downed|ate|chugged|emptied|finished|popped)( (her|his|my|their|the|a|an|that|this|those|these))?( (whole|entire|full))? bottles? of (\\w+ )?${DRUGS}\\b`),
+    // Present tense, but not carrying it somewhere ("take a bottle of tylenol to the office").
+    new RegExp(`\\b(take|taking|swallow|swallowing|down|eat|chug|empty)( (her|his|my|their|the|a|an|that|this|those|these))?( (whole|entire|full))? bottles? of (\\w+ )?${DRUGS}\\b(?! (to|into|in|for|from|at|over|back|home|with)\\b)`),
     new RegExp(`\\b(took|taken|swallowed|downed|ate|chugged|popped)( (her|his|my|their|the|a|an|those|these))?( \\w+)? (whole|entire|full|handful|fistful|bunch|lot|ton|all|every one|too many|too much)( (of|of her|of his|of my|of their|of the))?( \\w+)? ${DRUGS}\\b`),
     // Stockpiling and researching doses.
-    new RegExp(`\\b(stockpil|hoard|sav)\\w* (up )?(all )?(her|his|my|their) ${DRUGS}\\b`),
-    new RegExp(`\\b(research\\w*|look\\w* up|googl\\w*|search\\w*|find\\w* out|wonder\\w*|ask\\w*)( \\w+)? (how many|how much) (of (her|his|my|their|the) )?${DRUGS}\\b`),
-    /\b(lethal|fatal|deadly) (doses?|dosages?|amounts?)\b/,
+    new RegExp(`\\b(stockpil|hoard)\\w* (up )?(all )?(her|his|my|their) ${DRUGS}\\b(?! (list|lists|log|logs|chart|charts|record|records|in the fridge|fridge|schedule)\\b)`),
+    // "how many pills it takes", not "how many meds she takes" or "how much insulin to stock".
+    new RegExp(`\\bhow (many|much) (of (her|his|my|their|the) )?(\\w+ )?${DRUGS} (it takes|it would take|would it take|would take|to die|to overdose|is lethal|would be lethal|to kill)\\b`),
+    /\bhow (many|much) (it takes|it would take|would it take|would take) to die\b/,
+    // Looking up a lethal dose; a bare "lethal dose" (a lecture, a CE course) passes.
+    /\b(look|looks|looked|looking|research|researched|researching|googled|googling|search|searched|searching)( up| for| into)?( the| a| her| his| my)? (lethal|fatal|deadly) (doses?|dosages?|amounts?)\b/,
     // Present tense needs an amount ("take all my meds off the list" passes; "take all her pills at once" is above).
     new RegExp(`\\b(take|taking|swallow|swallowing|eat|eating|pop|popping)( (her|his|my|their|the|a|an|those|these))?( \\w+)? (whole|entire|handful|fistful|bunch|ton|too many|too much)( (of|of her|of his|of my|of their|of the))?( \\w+)? ${DRUGS}\\b`),
     new RegExp(`\\b(od|odd|oded|oding|odeing)( ed)? on (my |her |his |their |the |those |some )?(\\w+ )?${DRUGS}\\b`),
@@ -110,7 +119,12 @@ const WORDS: Record<CrisisCategory, RegExp[]> = {
     /\b(sleep|bed) and (not|never) wak(e|ing)( up)?\b/,
     /\b(wish|wishes|wished|hope|hopes|hoping|pray|prays|praying)( that)? (i|she|he|they) (dont|doesnt|wont|wouldnt|didnt|never|do not|does not|will not|would not) wake up\b/,
     /\bwish(es|ed)? (i|she|he|they) (was|were) dead\b/,
-    /\b(nobody|no one|noone) (would|will|wouldnt|is going to|gonna)( even)? (notice|care|miss) (me|her|him|them|if)\b/,
+    /\b(nobody|no one|noone) (would|will|wouldnt|is going to|gonna)( even)? (notice|care|miss) (me|her|him|them)\b/,
+    // Said as her own words: "she says she won't be around much longer"; "a note saying goodbye to everyone".
+    /\b(says|said|told \w+|keeps saying|tells \w+)( that)? (she|he|they|i) (wont|will not|is not going to|isnt going to) be (around|here)( for)?( much)? longer\b/,
+    /\b(note|notes|letter|letters|message|messages|video|text|post)( \w+)? (saying|that says|that said) (goodbye|good bye|bye) to (everyone|everybody|all of us|her family|his family|their family|the family|us all)\b/,
+    // "k y s" spelled out, only standing alone at the end of a message.
+    /(^| )k [ym] s( (rn|now|lol|honestly|tbh|seriously|fr))?$/,
     /\b(dont|do not|doesnt|does not) want to exist\b/,
     /\b(want|wants|wanna|wanted) to dye\b(?! (my|her|his|their|the|it|them|this|that|a|an|some|our|your)\b)/,
     /\bwanna die\b/,
@@ -126,7 +140,7 @@ const WORDS: Record<CrisisCategory, RegExp[]> = {
     // Implicit ending: "I want to end it", "going to end it, hotline?". No end
     // anchor; only a few plainly benign completions pass ("end it at 5",
     // "end it with the vendor", "end things with him").
-    /\b(want to|wanna|going to|gonna|ready to|about to|planning to|plan to|thinking about|thinking of|need to|have to|just) end(ing)? (it|everything|things)( all)?\b(?! (at|by|early|earlier|with|after|before|on time|there|here|for the day|for today|off|up)\b)/,
+    /\b(want to|wants to|wanted to|wanna|going to|gonna|ready to|about to|planning to|plan to|thinking about|thinking of|need to|have to|just) end(ing)? (it|everything|things)( all)?\b(?! (at|by|early|earlier|with|after|before|on time|there|here|for the day|for today|off|up)\b)/,
     /\bend(ing)? (it|everything) (tonight|today|right now|for good)\b/,
     // Overdose without the word: "took a bunch of pills", "took too many of my pills".
     /\b(took|taken|swallowed|downed)( (a (bunch|lot|handful|ton|bottle) of|too many( of)?|all( of)?|every one of|(the|a) whole bottle of))( (my|the|those|these|her|his))?( \w+)? (pills|tablets|meds|medication|medications)\b/,
@@ -259,10 +273,21 @@ function editDistance(a: string, b: string): number {
 
 // "kill myslef", "kil myself": one typo in "kill" (it must still start with k) or in the reflexive word.
 const REFLEXIVES = ["myself", "himself", "herself", "themselves", "themself", "yourself"];
+// Typos of "kill" made by deleting, adding or swapping an l, i or k ("kil", "kll", "kilk", "klil"),
+// never a real word or name ("kiln", "kilt", "kilo", "kiel", "kits").
+const KILL_TYPOS = (() => {
+  const out = new Set<string>();
+  const w = "kill";
+  for (let i = 0; i < w.length; i++) out.add(w.slice(0, i) + w.slice(i + 1));
+  for (let i = 0; i <= w.length; i++) for (const c of "lik") out.add(w.slice(0, i) + c + w.slice(i));
+  for (let i = 0; i + 1 < w.length; i++) out.add(w.slice(0, i) + w[i + 1] + w[i] + w.slice(i + 2));
+  for (const real of ["kill", "kiln", "kilt", "kilo", "kiel", "kits", "kit", "kin", "kid", "kids", "ill"]) out.delete(real);
+  return new Set([...out].filter((t) => t.startsWith("k")));
+})();
 function nearMissKillSelf(spaced: string): boolean {
   const w = spaced.split(" ");
   for (let i = 0; i + 1 < w.length; i++) {
-    if (!w[i].startsWith("k") || w[i].length < 3 || w[i].length > 6 || editDistance(w[i], "kill") > 1) continue;
+    if (!KILL_TYPOS.has(w[i]) && w[i] !== "kill") continue;
     if (REFLEXIVES.some((r) => editDistance(w[i + 1], r) <= 1)) return true;
   }
   return false;
@@ -278,12 +303,16 @@ function nearMissSuicide(spaced: string): boolean {
 // gave away her things", "hospice helps patients say goodbye to the family"). One
 // alone never routes; it routes with another sign, a will, a finality cue or a
 // suicide word, and not in plain end-of-life context.
-const WARNING_SIGNS: RegExp[] = [
-  /\b(gave|giving|give|gives|given) away (all |most |everything )?(of )?(my|her|his|their) (things|stuff|belongings|possessions|pets?|dog|cat|savings|money)\b/,
-  /\b(goodbye|good bye|farewell) (letters?|notes?|messages?|videos?|texts?|posts?)\b/,
-  /\b(said|saying|says|say) (goodbye|good bye|bye) to (everyone|everybody|all of us|her family|his family|their family|the family)\b/,
-  /\b(wont|will not|isnt going to|is not going to|not going to) be (around|here)( for)?( much)? longer\b/,
-  /\b(wrote|writing|written|made|making|updated|updating|finished) (a |her |his |my |their )?(will|wills)\b/,
+// Soft signs (saying goodbye, giving things away) are what dying patients do; hard
+// signs (a will, goodbye letters, a funeral plan, not being around) are not softened.
+const WARNING_SIGNS: Array<{ re: RegExp; hard: boolean }> = [
+  { re: /\b(gave|giving|give|gives|given) away (all |most |everything )?(of )?(my|her|his|their) (things|stuff|belongings|possessions|pets?|dog|cat|savings|money)\b/, hard: false },
+  { re: /\b(gave|giving|give|gives|given) (my|her|his|their) (things|stuff|belongings|possessions|pets?|dog|cat|savings|money) away\b/, hard: false },
+  { re: /\b(said|saying|says|say) (goodbye|good bye)\b/, hard: false },
+  { re: /\b(goodbye|good bye|farewell) (letters?|notes?|messages?|videos?|texts?|posts?)\b/, hard: true },
+  { re: /\b(wont|will not|isnt going to|is not going to|not going to) be (around|here)( for)?( much)? longer\b/, hard: true },
+  { re: /\b(wrote|writing|written|made|making|updated|updating|finished) (a |her |his |my |their )?(will|wills)\b/, hard: true },
+  { re: /\b(plan|plans|planned|planning|arranging|arranged) (my|her|his|their) (own )?funeral\b/, hard: true },
 ];
 const END_OF_LIFE = /\b(hospice|dying|terminal|terminally|palliative|end of life|comfort care|prognosis|passed away|bereavement|grandkids|grandchildren)\b/;
 
@@ -295,8 +324,20 @@ const IDIOMS = [
   /\bcut(ting|s)? (my|him|her|them|your|our)sel(f|ves) (some slack|a break|short|off from)\b/g,
 ];
 
+// Hospice wishes: "she wants to die at home with hospice", "quiere morir en paz". Dropped only
+// when nothing else in the message is a crisis cue; bare "she wants to die" still routes.
+const PEACEFUL_DEATH = [
+  /\b(want|wants|wanted|wanting|wish|wishes) to die (at home|in peace|peacefully|with hospice|in hospice|on hospice|surrounded by|naturally|comfortably|with dignity|in her (own )?bed|in his (own )?bed)\b/g,
+  /\b(quiere|quiero|quieren|desea) morir (en casa|en paz|con hospicio|en (el )?hospicio|tranquil\w*|rodead\w*|naturalmente|dignamente|con dignidad)\b/g,
+  /\bno (quiere|quiero|quieren) vivir en (un|una) (asilo|residencia|hogar|hospital|centro)\b/g,
+  // A brochure line: "what to do if your loved one says they want to die".
+  /\b(si|if) (su|tu|your|a|their) (ser querido|loved one|familiar|family member|patient|paciente) (dice|says|said|dijo)( que| that)?( (he|she|they))? (quiere morir|wants to die|want to die)\b/g,
+];
+const OTHER_CUE = /\b(tonight|soon|plan|plans|planning|pills?|overdose|gun|rope|kill|end it|end my|bridge|jump|today|right now|knife|matar\w*|esta noche|pronto)\b/;
+
 function checkOne(text: string): CrisisResult {
-  const spaced = FINALITY.test(text) ? text : IDIOMS.reduce((t, re) => t.replace(re, " "), text);
+  let spaced = FINALITY.test(text) ? text : IDIOMS.reduce((t, re) => t.replace(re, " "), text);
+  if (!FINALITY.test(spaced) && !OTHER_CUE.test(spaced)) spaced = PEACEFUL_DEATH.reduce((t, re) => t.replace(re, " "), spaced);
   const personal = PERSONAL.some((re) => re.test(spaced));
   const squashed = spaced.replace(/ /g, "");
   // 1. Ideation, self-harm and direct danger: always crisis, whatever else is said.
@@ -304,9 +345,10 @@ function checkOne(text: string): CrisisResult {
     if (SQUASHED[category].some((s) => squashed.includes(s))) return { crisis: true, category };
     if (WORDS[category].some((re) => re.test(spaced))) return { crisis: true, category };
   }
-  // Two warning signs, or one with a finality cue or a suicide word; plain end-of-life talk passes.
-  const signs = WARNING_SIGNS.filter((re) => re.test(spaced)).length;
-  if (signs > 0 && (FINALITY.test(spaced) || /suicid/.test(squashed) || (signs > 1 && !END_OF_LIFE.test(spaced)))) {
+  // Two warning signs, or one with a finality cue or a suicide word; two soft signs in end-of-life talk pass.
+  const found = WARNING_SIGNS.filter((w) => w.re.test(spaced));
+  const signs = found.length;
+  if (signs > 0 && (FINALITY.test(spaced) || /suicid/.test(squashed) || (signs > 1 && (found.some((w) => w.hard) || !END_OF_LIFE.test(spaced))))) {
     return { crisis: true, category: "self_harm" };
   }
   if (nearMissKillSelf(spaced)) return { crisis: true, category: "self_harm" };

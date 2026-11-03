@@ -280,12 +280,24 @@ describe.skipIf(!local)("migration 045 and discovery cards (built-in database on
       organization: null, practiceName: null, credential: "LCSW", taxonomy: "1041C0700X", taxonomyLabel: "Social Worker, Clinical", specialty: "therapists" as const,
       specialtyLabel: "Therapists", city: "Chicago", state: "IL", zip: "60614", phone: null, homeAddress: false, fax: null, distanceMiles: 0.2, fitScore: 50,
     };
-    await saveSources([{ ...base, npi: "1999999970", name: "[Test045] Bayview Safe House", npiType: "organization", address: "88 Harbor Rd" } as never]);
+    // A shelter by kind marks people NPPES lists at its street.
+    const { siteHashes } = await import("../lib/referrals/sensitive");
+    const [shelter] = await db()<{ id: string }[]>`
+      insert into practice_os.referral_sources (name, npi_type, city, state, source_type, sensitive, site_hashes)
+      values ('[Test045] Quiet Harbor Shelter', 'organization', 'Chicago', 'IL', 'shelters', true, ${siteHashes("88 Harbor Rd", "60614")}) returning id`;
+    track(shelter.id);
     await saveSources([{ ...base, npi: "1999999971", name: "[Test045] Robin Example", npiType: "individual", address: "88 HARBOR ROAD" } as never]);
-    const rows = await db()<{ npi: string; id: string; sensitive: boolean; address: string | null; distance_miles: number | null }[]>`
-      select npi, id, sensitive, address, distance_miles from practice_os.referral_sources where npi in ('1999999970', '1999999971') order by npi`;
+    // A name cue (round 2 review) is sensitive itself, but neither keeps hashes nor marks its neighbours.
+    await saveSources([{ ...base, npi: "1999999970", name: "[Test045] Bayview Safe House", npiType: "organization", address: "12 Bay Rd" } as never]);
+    await saveSources([{ ...base, npi: "1999999972", name: "[Test045] Sam Neighbour", npiType: "individual", address: "12 BAY ROAD" } as never]);
+    const rows = await db()<{ npi: string; id: string; sensitive: boolean; address: string | null; distance_miles: number | null; site_hashes: string[] | null }[]>`
+      select npi, id, sensitive, address, distance_miles, site_hashes from practice_os.referral_sources where npi in ('1999999970', '1999999971', '1999999972') order by npi`;
     rows.forEach((r) => track(r.id));
-    expect(rows.map((r) => [r.sensitive, r.address, r.distance_miles])).toEqual([[true, null, null], [true, null, null]]);
+    expect(rows.map((r) => [r.npi, r.sensitive, r.address, r.distance_miles, r.site_hashes])).toEqual([
+      ["1999999970", true, null, null, null],
+      ["1999999971", true, null, null, null],
+      ["1999999972", false, "12 BAY ROAD", "0.2", null],
+    ]);
   });
 
   it("summarize leaves a sensitive card's address evidence out, so recheck and email answers never carry it", async () => {

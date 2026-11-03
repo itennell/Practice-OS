@@ -25,13 +25,16 @@ export type OrgKey = {
   person?: boolean;
 };
 
-/** The suite or floor of a street address: "Ste210", "Suite 210", "#210" give "u:210"; "2nd Fl", "Floor 2" give "fl:2". */
+/**
+ * The suite or floor of a street address: "Ste210", "Suite 0210", "#210" give "u:210";
+ * "2nd Fl", "Floor 2" give "fl:2". A suite wins over a floor ("2nd Floor Suite 210" is u:210).
+ */
 export function unitOf(address: string | null | undefined): string | null {
   const a = (address ?? "").toLowerCase();
-  const floor = a.match(/\b(\d+)(?:st|nd|rd|th)?\s*(?:fl|flr|floor)\b/) ?? a.match(/\b(?:fl|flr|floor)\.?\s*(\d+)\b/);
-  if (floor) return `fl:${floor[1]}`;
   const unit = a.match(/\b(?:ste|suite|unit|apt|rm|room|bldg|building)\.?\s*#?\s*([a-z0-9-]+)\b/) ?? a.match(/#\s*([a-z0-9-]+)/);
-  return unit ? `u:${unit[1].replace(/-/g, "")}` : null;
+  if (unit) return `u:${unit[1].replace(/-/g, "").replace(/^0+(?=[0-9a-z])/, "")}`;
+  const floor = a.match(/\b(\d+)(?:st|nd|rd|th)?\s*(?:fl|flr|floor)\b/) ?? a.match(/\b(?:fl|flr|floor)\.?\s*(\d+)\b/);
+  return floor ? `fl:${floor[1].replace(/^0+(?=\d)/, "")}` : null;
 }
 
 const cityKey = (city: string | null | undefined) => {
@@ -90,8 +93,8 @@ const GENERIC_HEAD = new Set([
 ]);
 const DIRECTION_WORD: Record<string, string> = { n: "north", s: "south", e: "east", w: "west" };
 
-/** A name key with spacing, punctuation, "and" and generic trailing words gone, for comparing. */
-export function compactName(nameKey: string): string {
+/** The words of each side of a name key ("first last at group"), generic tails gone. */
+function compactWords(nameKey: string): string[][] {
   const compactPart = (part: string) => {
     const words = part
       .toLowerCase()
@@ -102,11 +105,15 @@ export function compactName(nameKey: string): string {
     const full = words.join("");
     const named = (ws: string[]) => ws.some((w) => !GENERIC_HEAD.has(w) && !GENERIC_TAIL.has(w));
     while (words.length > 1 && GENERIC_TAIL.has(words[words.length - 1]) && named(words.slice(0, -1))) words.pop();
-    const short = words.join("");
-    return short.length >= 4 ? short : full;
+    return words.join("").length >= 4 ? words : [full];
   };
   // A person's key is "first last at group": each side compacted on its own.
-  return nameKey.split(/ at /).map(compactPart).join("@");
+  return nameKey.split(/ at /).map(compactPart);
+}
+
+/** A name key with spacing, punctuation, "and" and generic trailing words gone, for comparing. */
+export function compactName(nameKey: string): string {
+  return compactWords(nameKey).map((w) => w.join("")).join("@");
 }
 
 /** Edit distance counting a swap of two neighbours as one. */
@@ -122,8 +129,18 @@ function editDistance(a: string, b: string): number {
   return d[a.length][b.length];
 }
 
-/** The same name, or one typo apart when both are long enough (only ever used once the place matches). */
-const nearName = (a: string, b: string) => a === b || (Math.min(a.length, b.length) >= 6 && editDistance(a, b) <= 1);
+/**
+ * The same name compacted, or one typo apart: only names of 8 or more letters, and
+ * never in the first word ("Smith"/"Smyth", "Hope"/"Home Hospice", "Ann Kim"/"Ann Kym"
+ * stay apart). Only ever used once the place matches.
+ */
+function nearName(a: string[], b: string[]): boolean {
+  const ja = a.join("");
+  const jb = b.join("");
+  if (ja === jb) return true;
+  if (Math.min(ja.length, jb.length) < 8 || a.length < 2 || b.length < 2 || a[0] !== b[0]) return false;
+  return editDistance(a.slice(1).join(""), b.slice(1).join("")) <= 1;
+}
 
 const DIRECTIONALS = new Set(["n", "s", "e", "w", "ne", "nw", "se", "sw"]);
 
@@ -171,15 +188,18 @@ function samePlace(card: OrgKey, listed: OrgKey): boolean {
  */
 export function keyMatches(card: OrgKey, listed: OrgKey): boolean {
   if (!samePlace(card, listed)) return false;
-  const listedName = compactName(listed.name_key);
-  const cardName = compactName(card.name_key);
-  if (nearName(cardName, listedName)) return true;
-  const listedIsPerson = Boolean(listed.person) || listedName.includes("@");
-  if (listedIsPerson) return false;
-  const at = cardName.lastIndexOf("@");
-  if (at >= 0 && nearName(cardName.slice(at + 1), listedName)) return true;
+  const listedSides = compactWords(listed.name_key);
+  const cardSides = compactWords(card.name_key);
+  const whole = (sides: string[][]) => (sides.length === 1 ? sides[0] : [sides.map((w) => w.join("")).join("@")]);
+  if (nearName(whole(cardSides), whole(listedSides))) return true;
+  if (listed.person || listedSides.length > 1) return false;
+  if (cardSides.length > 1 && nearName(cardSides[cardSides.length - 1], listedSides[0])) return true;
+  // The street rule needs to know the listed key is an organisation and its suite. A key read back
+  // from her stored list has neither (person is undefined), so it never applies there: that needs
+  // a migration adding unit_key and person to referral_suppressions_org.
+  if (listed.person === undefined) return false;
   const unitsAgree = !card.unit_key || !listed.unit_key || card.unit_key === listed.unit_key;
-  return Boolean(card.person && at < 0 && card.street_key && listed.street_key && unitsAgree);
+  return Boolean(card.person && cardSides.length === 1 && card.street_key && listed.street_key && unitsAgree);
 }
 
 /**

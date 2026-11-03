@@ -14,7 +14,7 @@ import { compareTiers, focusFrom, providerTier, SCORE_VERSION, scoreVersionFor, 
 import { isNichePreset } from "./catalog";
 import { STAGES, STAGE_LABEL, type Stage } from "./stages";
 import { knownSensitiveSites, sensitiveAt } from "./sensitive-sites";
-import { siteHashes } from "./sensitive";
+import { sensitiveByKind, siteHashes } from "./sensitive";
 
 export { STAGES, STAGE_LABEL, type Stage };
 
@@ -213,7 +213,8 @@ export async function saveSources(found: FoundSource[], sql: postgres.Sql = db()
   // and so does anyone NPPES lists at a sensitive site's street: one already on the board, or in this batch.
   const sites = await knownSensitiveSites(sql);
   for (const p of found) {
-    if (sensitiveAt({ taxonomy: p.taxonomy, name: p.name, organization: p.organization }, sites).sensitive) for (const h of siteHashes(p.address, p.zip)) sites.add(h);
+    // Only a sensitive kind (NUCC code) spreads to others at its street, never a name cue.
+    if (sensitiveByKind({ taxonomy: p.taxonomy })) for (const h of siteHashes(p.address, p.zip)) sites.add(h);
   }
   const rows = found.map((p) => {
     const at = sensitiveAt({ taxonomy: p.taxonomy, name: p.name, organization: p.organization, street: p.address, zip: p.zip }, sites);
@@ -232,7 +233,7 @@ export async function saveSources(found: FoundSource[], sql: postgres.Sql = db()
     zip: sensitive ? null : p.zip,
     phone: p.phone,
     sensitive,
-    site_hashes: sensitive && at.hashes.length ? at.hashes : null,
+    site_hashes: sensitive && sensitiveByKind({ taxonomy: p.taxonomy }) && at.hashes.length ? at.hashes : null,
     distance_miles: sensitive ? null : p.distanceMiles,
     fit_score: p.fitScore,
     score_version: (p.scoreVersion ?? SCORE_VERSION) === current ? current : 0,

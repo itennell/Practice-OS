@@ -293,8 +293,8 @@ describe("do not contact without an NPI", () => {
   it("sensitive names: DV/SA cues, named Chicago agencies, initials and typos; oncology, hospice and church partners pass (PR #141 review)", () => {
     const yes = [
       "[Test] Survivors Healing Center", "[Test] Hope House Chicago", "Lakeview Safe Place", "Safe Haven Inc", "Sanctuary Services", "Family Justice Center",
-      "Rape Crisis Line", "H.O.P.E. House", "Northside Sheltr", "Lakeview Shleter", "Sarah's Inn", "Between Friends", "Family Rescue",
-      "Mujeres Latinas en Acción", "Life Span", "KAN-WIN", "WINGS Program", "Casa de Esperanza", "Resilience", "[Test] Resilience Chicago",
+      "Rape Crisis Line", "H.O.P.E. House", "Lakeview Shleter", "Hope Haus", "Domestc Violence Center", "Life Span Center for Legal Services", "Sarah's Inn", "Between Friends", "Family Rescue",
+      "Mujeres Latinas en Acción", "Life Span", "KAN-WIN", "WINGS Program", "Casa de Esperanza", "[Test] Resilience Chicago",
       "Survivors of Abuse Network", "Domestic Violence Legal Clinic", "Victim Services of Cook County", "Sexual Assault Crisis Center", "Haven House Services",
       "Refuge Ministries", "Safe Harbor Center", "Ruth's House", "Battered Women's Network",
     ];
@@ -303,6 +303,10 @@ describe("do not contact without an NPI", () => {
       "Sanctuary Home Health", "Haven Funeral Home", "New Hope Church", "Refuge Hospice", "Lakeview Crisis Center", "Violence Prevention Research Program",
       "Substance Abuse Treatment Center", "Northside Oncology", "Gilda's Club Chicago", "Lifespan Health", "Resilience Counseling", "Fullerton Funeral Home",
       "Lakeview Family Medicine", "Northwestern Medicine Lurie Cancer Center", "Safe Passage Hospice",
+      // round 2 over-flags
+      "Safe Harbor Counseling", "Sanctuary Wellness", "Hope House Hospice", "Safe Place Pediatrics", "Justice Center Pediatrics", "Wings",
+      "Resilience Inc", "Resilience", "Wings Program for Kids with Cancer", "Family Rescue Squad EMS", "Holocaust Survivors Center", "Kids Survivors Camp",
+      "Smelter Clinic", "Northside Sheltr",
     ];
     for (const n of yes) expect(looksSensitive(n), n).toBe(true);
     for (const n of no) expect(looksSensitive(n), n).toBe(false);
@@ -325,7 +329,11 @@ describe("do not contact without an NPI", () => {
     // People at the listed office.
     expect(m({ name: "[Test] Pat Doe", organization: "[Test] Westside Oncology Partners", npi_type: "individual", address: "100 W Madison St", city: "Chicago", zip: "60602" })).toBe(true);
     expect(m({ name: "[Test] Pat Doe", organization: "[Test] West Side Oncology", npi_type: "individual", city: "Chicago" })).toBe(true);
-    expect(m({ name: "[Test] Pat Doe", npi_type: "individual", address: "100 W Madison St, Suite 4", city: "Chicago", zip: "60602" })).toBe(true);
+    // A person with no group at the street: only against a key that knows it's an organisation (not one read back from her list).
+    const inMemory = orgKeyOf({ name: "[Test] Westside Oncology Partners", npi_type: "organization", address: "100 W Madison St", city: "Chicago", zip: "60602" })!;
+    const patNoGroup = orgKeyOf({ name: "[Test] Pat Doe", npi_type: "individual", address: "100 W Madison St, Suite 4", city: "Chicago", zip: "60602" })!;
+    expect(keyMatches(patNoGroup, inMemory)).toBe(true);
+    expect(m({ name: "[Test] Pat Doe", npi_type: "individual", address: "100 W Madison St, Suite 4", city: "Chicago", zip: "60602" })).toBe(false);
     // Another named tenant of the building, or a person at another organisation there: allowed.
     expect(m({ name: "[Test] Other Clinic", npi_type: "organization", address: "100 W. Madison St., Suite 4", city: "Chicago", zip: "60602" })).toBe(false);
     expect(m({ name: "[Test] Pat Doe", organization: "[Test] Lakeside Cardiology", npi_type: "individual", address: "100 W Madison St", city: "Chicago", zip: "60602" })).toBe(false);
@@ -350,6 +358,16 @@ describe("do not contact without an NPI", () => {
     expect(nameSuppressed({ name: "[Test] West Side Oncology", npi_type: "organization" }, { npis: new Set(), orgs: [listed] })).toBe(true);
     expect(unitOf("100 W Madison St Ste210")).toBe("u:210");
     expect(unitOf("100 W Madison St, 2nd Fl")).toBe("fl:2");
+    expect(unitOf("100 W Madison St, 2nd Floor Suite 210")).toBe("u:210");
+    expect(unitOf("100 W Madison St, Suite 0210")).toBe("u:210");
+  });
+  it("typo-close names only for long names, never in the first word, and only at the same place (round 2)", () => {
+    const at = (name: string, npi_type: "individual" | "organization" = "organization") => orgKeyOf({ name, npi_type, address: "5 Elm St", city: "Chicago", zip: "60614" })!;
+    expect(keyMatches(at("Smyth Counseling"), fromDb(at("Smith Counseling")))).toBe(false);
+    expect(keyMatches(at("Home Hospice"), fromDb(at("Hope Hospice")))).toBe(false);
+    expect(keyMatches(at("Ann Kym", "individual"), fromDb(at("Ann Kim", "individual")))).toBe(false);
+    expect(keyMatches(at("Lakeview Oncolgy Partners"), fromDb(at("Lakeview Oncology Partners")))).toBe(true);
+    expect(keyMatches(orgKeyOf({ name: "Lakeview Oncolgy Partners", npi_type: "organization", city: "Evanston" })!, fromDb(at("Lakeview Oncology Partners")))).toBe(false);
   });
   it("isSuppressed checks the NPI list and the org keys; a debrief's who-else with only an organisation matches too", () => {
     const list: Suppressed = { npis: new Set(["1900000001"]), orgs: [orgKeyOf({ name: "Northside Hospice", npi_type: "organization", city: "Chicago" })!] };
