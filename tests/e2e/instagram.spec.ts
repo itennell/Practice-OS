@@ -4,6 +4,9 @@ import { execFileSync, execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import postgres from "postgres";
 import sharp from "sharp";
+import { REFERRALS_ONLY_DEMO } from "../../lib/features";
+
+test.skip(REFERRALS_ONLY_DEMO, "Hidden in the referrals-only demo (lib/features.ts); these run when REFERRALS_ONLY_DEMO is false.");
 
 // The Instagram page with three [Sample] posts seeded straight into the
 // database (no model calls): one waiting for her, one blocked, one ready to post.

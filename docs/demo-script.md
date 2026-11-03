@@ -5,11 +5,12 @@ A walk-through of Aeon's Referrals helper for the hackathon video, about 3 minut
 ## Before recording
 
 1. In `lib/features.ts`, `REFERRALS_ONLY_DEMO` is `true` (the app shows only Referrals, the chat, Approvals, Files, Memory and Settings).
-2. Run `npm run db:reset` so the practice starts clean with the oncology niche.
-3. Use a production build (`npm run build && npm start`) so the developer badge doesn't show.
-4. Under the message box, set the mode to **Ask**, so every change waits for an approval on screen.
-5. Run one search for 60614 before recording so the public directories are cached and the map fills at once.
-6. Close other tabs, turn on Do Not Disturb, and set the browser to phone width for the debrief scene.
+2. Run `npm run db:reset` so the practice starts clean with the oncology niche and its [Sample] partners.
+3. Run `npm run demo:warm` so the public directories for 60614 are cached and the map fills at once.
+4. Run `npm run demo:check`. Every line should pass; fix anything it flags before recording.
+5. Use a production build (`npm run build && npm start`) so the developer badge doesn't show.
+6. Under the message box, set the mode to **Ask**, so every change waits for an approval on screen.
+7. Close other tabs, turn on Do Not Disturb, and set the browser to phone width for the debrief scene.
 
 ## The story
 

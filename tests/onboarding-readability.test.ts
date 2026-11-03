@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { firstFor, HELPERS, QUESTIONS } from "@/lib/onboarding/chapters";
+import { DEMO_WORDS, firstFor, HELPERS, QUESTIONS } from "@/lib/onboarding/chapters";
 import { grade } from "./helpers/readability";
 
 // Plain language for everyone from a brand-new clinician to a 95-year-old: the
@@ -7,6 +7,7 @@ import { grade } from "./helpers/readability";
 
 const sentences = [
   ...QUESTIONS.flatMap((q) => [q.ask, q.help ?? "", q.aeonSays]),
+  ...Object.values(DEMO_WORDS).flatMap((w) => [w.help ?? "", w.aeonSays]),
   ...HELPERS.map((h) => h.does),
   ...(["beginning", "middle", "late"] as const).map((s) => firstFor(s).focus),
 ].filter(Boolean);

@@ -1,5 +1,8 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { REFERRALS_ONLY_DEMO } from "../../lib/features";
+
+test.skip(REFERRALS_ONLY_DEMO, "Hidden in the referrals-only demo (lib/features.ts); these run when REFERRALS_ONLY_DEMO is false.");
 
 test("A deadline's 'How do I do this?' opens its guide, with her steps marked", async ({ page }) => {
   const errors: string[] = [];

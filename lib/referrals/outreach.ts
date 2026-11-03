@@ -16,7 +16,7 @@ import { chat } from "../meta";
 import { getProfile } from "../profile";
 import { allPayers } from "../payers/catalog";
 import { listPayerApplications, WAITING } from "../payers/store";
-import { CONTACT_LABEL, contactsFor, screenedNote, suppressedNpis } from "./contacts";
+import { CONTACT_LABEL, contactsFor, isSuppressed, screenedNote, suppressedList } from "./contacts";
 import { getSource, latestLetters, practiceFacts, type ReferralSource } from "./store";
 import { focusFrom, FOCUS_WORDS, type Focus } from "./tier";
 
@@ -33,6 +33,23 @@ const OFF_LIMITS: [RegExp, string][] = [
   [/\b(?:gift|gifts|gift card|lunch|dinner|coffee on me|treat you|swag|tickets?|free (?:session|sessions|consult\w*|month))\b/i, "a gift or something free"],
   [/\b(?:per referral|for each referral|for every referral|in exchange for|reward\w*|incentive\w*|bonus\w*|thank-you gift)\b/i, "something in return for referrals"],
   [/\b(?:suicid\w*|self-harm|diagnos\w*|treatment plan|medication)\b/i, "clinical content"],
+];
+
+/**
+ * The money-and-gifts half of OFF_LIMITS on any text (a debrief's fields, what a
+ * partner said): what it mentions of value tied to referrals, or null.
+ */
+export function valueOffered(text: string): string | null {
+  for (const [pattern, what] of [...OFF_LIMITS.slice(0, -1), ...VALUE_EXTRA]) if (pattern.test(text)) return what;
+  return null;
+}
+
+// Also refused in what partners say: a share of her fees, free services for
+// referrals, and the same offers in Spanish.
+const VALUE_EXTRA: [RegExp, string][] = [
+  [/(?:\b\d+(?:\.\d+)?\s*(?:%|percent\b|per\s+cent\b)|\b(?:cut|share|portion|percentage)\s+of\b)[^.!?\n]{0,40}\b(?:fees?|revenue|income|billing|referr\w*|each\s+client)\b/i, "a share of fees"],
+  [/\bfree\b[^.!?\n]{0,40}\b(?:sessions?|therapy|consult\w*|services?|visits?|months?)\b[^.!?\n]*\b(?:if|when|for|so|as long as)\b|\b(?:if|when)\s+(?:they|you|she|he)\s+send\b[^.!?\n]*\bfree\b/i, "something free in return for referrals"],
+  [/\bd[oó]lares\b|\bpor\s+cada\s+(?:referid|paciente|cliente)\w*|\bcomisi[oó]n\b|\bregalo\b|\bgratis\b/i, "money or payment"],
 ];
 
 export type LetterCheck = { ok: true } | { ok: false; reason: string };
@@ -112,7 +129,7 @@ export async function letterFacts(
     loadMediaFacts().catch(() => null),
     contactsFor([source.id]).catch(() => ({}) as Awaited<ReturnType<typeof contactsFor>>),
     listPayerApplications().catch(() => []),
-    practiceFacts().catch(() => ({ focus: [] as Focus[], state: null })),
+    practiceFacts().catch(() => ({ focus: [] as Focus[], state: null, niche: null, selfPay: false })),
   ]);
   const inNetwork = media?.inNetwork ?? [];
   const focus = focusGroups(opts.focus, practice.focus);
@@ -470,8 +487,11 @@ export async function pendingLetter(sourceId: string): Promise<PendingLetter | n
 }
 
 /** On her do-not-contact list or set aside as Not a fit: no letter is written or approved. */
-export async function blockedReason(source: Pick<ReferralSource, "name" | "npi" | "stage">): Promise<string | null> {
-  if (source.npi && (await suppressedNpis()).has(source.npi)) return `${source.name} is on your do-not-contact list, so I won't write to them.`;
+export async function blockedReason(
+  source: Pick<ReferralSource, "name" | "npi" | "stage"> & Partial<Pick<ReferralSource, "organization" | "npi_type" | "address" | "city" | "zip">>,
+): Promise<string | null> {
+  // By NPI, or for a card with no NPI (a hospice, a church, someone she added) by its org key.
+  if (isSuppressed(source, await suppressedList())) return `${source.name} is on your do-not-contact list, so I won't write to them.`;
   if (source.stage === "not_a_fit") return `${source.name} is in Not a fit, so I won't write to them. Move the card back first if that changed.`;
   return null;
 }

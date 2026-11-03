@@ -4,15 +4,18 @@
 // and an NPI on the do-not-contact list is never suggested.
 import type postgres from "postgres";
 import research from "../../docs/research/referral-tiers.json" with { type: "json" };
-import { practiceToday } from "../compliance/store";
+import { todayIn } from "../compliance/dates";
+import { practiceTimeZone, practiceToday } from "../compliance/store";
 import { db } from "../db";
 import { orgNameScore } from "./evidence/match";
 import { jaroWinkler, normalizeName, normalizeOrg } from "./evidence/normalize";
-import { contactsFor, relationshipFrom, suppressedNpis, type Contact } from "./contacts";
+import { withoutDistance } from "./sensitive";
+import { contactsFor, isSuppressed, relationshipFrom, suppressedList, type Contact } from "./contacts";
 import { STAGE_LABEL } from "./stages";
-import { latestLetters, listSources, practiceFacts, type LetterState, type ReferralSource } from "./store";
-import { boardTier, focusRank, TIER_LABEL, withRelationship, type Focus, type TierResult } from "./tier";
+import { latestLetters, listSources, practiceFacts, tierContext, type LetterState, type ReferralSource } from "./store";
+import { boardTier, compareTiers, TIER_LABEL, withRelationship, type TierContext, type TierResult } from "./tier";
 import { SPECIALTY_BY_ID, specialtyForCode, type SpecialtyId } from "./nppes";
+import { coldNudges, type ColdNudge } from "./nurture";
 
 /** At most this many new people a week: the research aims at 3 to 5 letters a month for the top tier. */
 export const NEW_PER_WEEK = 3;
@@ -30,6 +33,8 @@ export type OutreachPlan = {
   letters_waiting: number;
   /** The kinds of provider the new people were picked from, when she asked for (or just searched) some. */
   kinds: string[] | null;
+  /** Up to 2 people she knows who are going cold (no contact past their tier's cadence), with a suggested action. */
+  going_cold: ColdNudge[];
   summary: string;
 };
 
@@ -62,6 +67,7 @@ const LAST_WORDS: Record<Contact["kind"], string> = {
   replied: "they replied",
   note: "a note",
   referred: "they referred someone",
+  referred_out: "you referred someone to them",
 };
 
 /** Cards whose follow-up date is within `days` (overdue included), soonest first. */
@@ -86,10 +92,23 @@ export function followUpsFrom(cards: ReferralSource[], contacts: Record<string, 
 export function tiersWithLog(
   cards: ReferralSource[],
   contacts: Record<string, Contact[]>,
-  ctx: { focus: Focus[]; clinicianState: string | null },
+  ctx: Omit<TierContext, "miles">,
 ): Record<string, TierResult> {
   return Object.fromEntries(
-    cards.map((c) => [c.id, withRelationship(boardTier(c, ctx), relationshipFrom(contacts[c.id] ?? [], c.introduced_by ?? null))]),
+    cards.map((c) => {
+      const t = withRelationship(boardTier(c, ctx), relationshipFrom(contacts[c.id] ?? [], c.introduced_by ?? null));
+      // A sensitive card's reasons never say how far it is (lib/referrals/sensitive.ts).
+      return [c.id, c.sensitive ? { ...t, reasons: [t.reasons[0], ...withoutDistance(t.reasons.slice(1))] } : t];
+    }),
+  );
+}
+
+/** Cards in the one order (tier.ts compareTiers): tier, "not who you help" last, niche weight, fit, score, distance. */
+export function rankCards<T extends Pick<ReferralSource, "id" | "name" | "distance_miles">>(cards: T[], tiers: Record<string, TierResult>): T[] {
+  return [...cards].sort(
+    (a, b) =>
+      (tiers[a.id] && tiers[b.id] ? compareTiers({ tier: tiers[a.id], miles: a.distance_miles }, { tier: tiers[b.id], miles: b.distance_miles }) : 0) ||
+      a.name.localeCompare(b.name),
   );
 }
 
@@ -100,10 +119,10 @@ export function tiersWithLog(
  * come before those who see everyone, then by score.
  */
 export async function outreachPlan(sql: postgres.Sql = db(), max = NEW_PER_WEEK, opts: { specialties?: SpecialtyId[] } = {}): Promise<OutreachPlan> {
-  const [cards, today, facts, blocked] = await Promise.all([listSources(sql), practiceToday(sql), practiceFacts(sql), suppressedNpis(sql)]);
+  const [cards, today, facts, blocked] = await Promise.all([listSources(sql), practiceToday(sql), practiceFacts(sql), suppressedList(sql)]);
   const asked = opts.specialties?.length ? opts.specialties : await recentSearchKinds(sql).catch(() => [] as SpecialtyId[]);
   const contacts = await contactsFor(cards.map((c) => c.id), sql);
-  const tiers = tiersWithLog(cards, contacts, { focus: facts.focus, clinicianState: facts.state });
+  const tiers = tiersWithLog(cards, contacts, tierContext(facts));
   const follow_ups = followUpsFrom(cards, contacts, today);
   const due = new Set(follow_ups.map((f) => f.id));
 
@@ -111,7 +130,7 @@ export async function outreachPlan(sql: postgres.Sql = db(), max = NEW_PER_WEEK,
   let waiting = 0;
   let letters_waiting = 0;
   const fresh = cards.filter((c) => {
-    if (c.stage !== "found" || due.has(c.id) || (c.npi && blocked.has(c.npi))) return false;
+    if (c.stage !== "found" || due.has(c.id) || isSuppressed(c, blocked)) return false;
     if (letterWaiting(letters[c.id])) {
       letters_waiting++;
       return false;
@@ -124,6 +143,10 @@ export async function outreachPlan(sql: postgres.Sql = db(), max = NEW_PER_WEEK,
     return tiers[c.id].tier !== "later";
   });
   const { picked, kinds, missing } = pickNew(fresh, tiers, asked, max);
+  // People she already knows whose last contact is past their tier's cadence (referral-tiers.json touch_cadence).
+  // Skipped: a due follow-up (already in the plan), her do-not-contact list (NPI or org key), and a letter waiting or ready.
+  const skip = new Set([...due, ...cards.filter((c) => isSuppressed(c, blocked) || letterWaiting(letters[c.id])).map((c) => c.id)]);
+  const going_cold = coldNudges(cards, contacts, tiers, today, await practiceTimeZone(sql), { skip, tierLabel: TIER_LABEL });
   const reach_out = picked.map((c) => {
       const t = tiers[c.id];
       return {
@@ -146,14 +169,15 @@ export async function outreachPlan(sql: postgres.Sql = db(), max = NEW_PER_WEEK,
     waiting,
     letters_waiting,
     kinds,
-    summary: summarizePlan({ follow_ups, reach_out, waiting, kinds, missing, letters_waiting }),
+    going_cold,
+    summary: summarizePlan({ follow_ups, reach_out, waiting, kinds, missing, letters_waiting, going_cold }),
   };
 }
 
 /**
  * The new people to suggest, from cards ready for a first letter: only the
- * kinds she asked for (unless none of them is ready), those who see the
- * people she helps before those who see everyone, then by score and distance.
+ * kinds she asked for (unless none of them is ready), in the one order
+ * (rankCards: tier, niche weight, who-you-help fit, score, distance).
  */
 export function pickNew(
   fresh: ReferralSource[],
@@ -167,20 +191,18 @@ export function pickNew(
     return k !== null && wanted.has(k);
   });
   const useKinds = wanted.size > 0 && ofKind.length > 0;
-  const picked = [...(useKinds ? ofKind : fresh)]
-    .sort(
-      (a, b) =>
-        focusRank(tiers[a.id]) - focusRank(tiers[b.id]) ||
-        tiers[b.id].score - tiers[a.id].score ||
-        (a.distance_miles ?? 99) - (b.distance_miles ?? 99),
-    )
-    .slice(0, max);
+  const picked = rankCards(useKinds ? ofKind : fresh, tiers).slice(0, max);
   const labels = asked.map((k) => SPECIALTY_BY_ID.get(k)!.label);
   return { picked, kinds: useKinds ? labels : null, missing: wanted.size > 0 && !useKinds ? labels : null };
 }
 
 export function summarizePlan(
-  p: Pick<OutreachPlan, "follow_ups" | "reach_out" | "waiting"> & { kinds?: string[] | null; missing?: string[] | null; letters_waiting?: number },
+  p: Pick<OutreachPlan, "follow_ups" | "reach_out" | "waiting"> & {
+    kinds?: string[] | null;
+    missing?: string[] | null;
+    letters_waiting?: number;
+    going_cold?: ColdNudge[];
+  },
 ): string {
   const lines: string[] = [];
   if (p.kinds?.length) lines.push(`Picked from the ${p.kinds.join(" and ")} on your board, as you asked.`);
@@ -196,7 +218,11 @@ export function summarizePlan(
     lines.push(`New this week (${p.reach_out.length}):`);
     for (const r of p.reach_out) lines.push(`- ${r.name} (${r.tier}): ${r.why}. ${r.next_step}`);
   }
-  if (!p.follow_ups.length && !p.reach_out.length) lines.push("Nobody new to reach out to this week. Search the map for more, or check in with someone you know.");
+  if (p.going_cold?.length) {
+    lines.push(`Going cold (${p.going_cold.length}):`);
+    for (const g of p.going_cold) lines.push(`- ${g.name} (${g.tier}): ${g.label.replace(/^Going cold: /, "")}; aim for ${g.cadence}. ${g.action}`);
+  }
+  if (!p.follow_ups.length && !p.reach_out.length && !p.going_cold?.length) lines.push("Nobody new to reach out to this week. Search the map for more, or check in with someone you know.");
   if (p.letters_waiting) {
     lines.push(`${p.letters_waiting} more already have a letter waiting for your approval or ready to send: finish those first.`);
   }
@@ -215,12 +241,14 @@ export type LetterReady = { id: string; name: string; approved_on: string; days:
 
 /** For the morning brief: approved letters she hasn't marked sent, 2 or more days after approving. */
 export async function lettersReady(sql: postgres.Sql = db(), days = LETTER_READY_DAYS): Promise<LetterReady[]> {
-  const [letters, cards, today] = await Promise.all([latestLetters(sql), listSources(sql), practiceToday(sql)]);
+  const [letters, cards, tz] = await Promise.all([latestLetters(sql), listSources(sql), practiceTimeZone(sql)]);
+  const today = todayIn(tz);
   const out: LetterReady[] = [];
   for (const c of cards) {
     const l = letters[c.id];
     if (!l || l.status !== "done" || l.sent || !l.decidedAt || c.stage === "not_a_fit") continue;
-    const on = l.decidedAt.slice(0, 10);
+    // The approval day where the practice is, not the UTC date (evenings in Chicago are already tomorrow in UTC).
+    const on = todayIn(tz, new Date(l.decidedAt));
     const age = daysBetween(on, today);
     if (age >= days) out.push({ id: c.id, name: c.name, approved_on: on, days: age });
   }
@@ -267,6 +295,6 @@ export async function cardView(id: string, sql: postgres.Sql = db()) {
   const card = (await listSources(sql)).find((c) => c.id === id) ?? null;
   if (!card) return null;
   const [facts, contacts] = await Promise.all([practiceFacts(sql), contactsFor([id], sql)]);
-  const tier = tiersWithLog([card], contacts, { focus: facts.focus, clinicianState: facts.state })[id];
+  const tier = tiersWithLog([card], contacts, tierContext(facts))[id];
   return { card, tier, contacts: contacts[id] ?? [] };
 }

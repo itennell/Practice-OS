@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { APPROVAL_KINDS } from "../lib/approval-kinds";
 import { TOOLS } from "../lib/aeon/tools";
 import { editableField, executors } from "../lib/executors";
+import { REFERRALS_ONLY_DEMO } from "../lib/features";
 
 const FORBIDDEN = /attest|submit|(^|_)e?_?sign(_|$)|signature|certif/i;
 
@@ -17,7 +18,11 @@ const mcpTools = TOOLS.map((t) => t.name);
 describe("nothing can attest, sign or submit", () => {
   it("finds the MCP tools (guards against the list silently being empty)", () => {
     expect(mcpTools).toEqual(
-      expect.arrayContaining(["status", "queue_approval", "morning_brief", "research_state_rules", "recheck_rules", "update_facts", "answer_setup", "log_event", "remember", "forget"]),
+      expect.arrayContaining(
+        REFERRALS_ONLY_DEMO // the referrals-only demo lists only its own tools (lib/features.ts)
+          ? ["status", "queue_approval", "find_referral_sources", "draft_outreach", "remember", "forget"]
+          : ["status", "queue_approval", "morning_brief", "research_state_rules", "recheck_rules", "update_facts", "answer_setup", "log_event", "remember", "forget"],
+      ),
     );
   });
 

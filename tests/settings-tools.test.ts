@@ -3,6 +3,7 @@
 // store the app itself reads (a GFE prices from fee_schedule, the PDF route reads the
 // '_practice' policies), not just what the tool said. Everything is put back after.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { REFERRALS_ONLY_DEMO } from "../lib/features";
 import { z } from "zod";
 import { loadEnv } from "../lib/env";
 
@@ -64,7 +65,7 @@ const FEES = [
 ];
 const HOURS = { weekdays: [1, 2, 3, 4], closed_on: [], close_federal_holidays: true };
 
-describe("settings tools are registered", () => {
+describe.skipIf(REFERRALS_ONLY_DEMO)("settings tools are registered", () => {
   it("are in the shared tool list, change data and are refused on the view-only copy", async () => {
     for (const name of ["set_fees", "set_office_days", "set_license_type", "set_practice_policies", "undo_last_setting"]) {
       const t = TOOLS.find((x) => x.name === name);
@@ -101,7 +102,7 @@ describe("fees (plain code)", () => {
     expect(applyFees([], [{ code: "90832", dollars: 90 }]).fees).toEqual([{ code: "90832", label: "Therapy, 30 minutes", cents: 9000 }]);
   });
 
-  it("refuses $0 unless she says it's free", async () => {
+  it.skipIf(REFERRALS_ONLY_DEMO)("refuses $0 unless she says it's free", async () => {
     const t = TOOLS_BY_NAME.get("set_fees")!;
     const schema = z.object(t.input);
     expect(schema.safeParse({ changes: [{ code: "90834", dollars: 0 }] }).success).toBe(false);
@@ -118,7 +119,7 @@ describe("office days and policies (plain code)", () => {
     expect(() => applyDays(HOURS, { remove_weekdays: ["monday", "tuesday", "wednesday", "thursday"] })).toThrow(/no open days/);
   });
 
-  it("turns policy dollars into cents, and 'none' into 0; $0 alone is refused", () => {
+  it.skipIf(REFERRALS_ONLY_DEMO)("turns policy dollars into cents, and 'none' into 0; $0 alone is refused", () => {
     expect(toPolicies({ cancel_hours: 24, late_cancel_fee_dollars: 100, no_show_fee_dollars: "none" })).toEqual({ cancel_hours: 24, late_cancel_fee_cents: 10000, no_show_fee_cents: 0 });
     const schema = z.object(TOOLS_BY_NAME.get("set_practice_policies")!.input);
     expect(schema.safeParse({ late_cancel_fee_dollars: 0 }).success).toBe(false);
@@ -165,7 +166,7 @@ describe("settings are never memories (plain code)", () => {
   });
 });
 
-describe.skipIf(!hasDb)("settings tools write the real stores", () => {
+describe.skipIf(REFERRALS_ONLY_DEMO || !hasDb)("settings tools write the real stores", () => {
   it("set_fees changes the fee list GFEs price from, returns before/after and audits from/to", async () => {
     // Without her words (as over MCP) a session fee names its code.
     const { body } = await run("set_fees", { changes: [{ service: "intake", dollars: 150 }, { code: "90834", dollars: 130 }, { code: "90837", dollars: 130 }] });

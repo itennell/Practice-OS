@@ -1,0 +1,3332 @@
+{
+  "version": "1.0",
+  "updated": "2026-11-02",
+  "status": "first pass. Source types follow the referrals engine brief (13 categories). default_points (points_basis judgment, at most 20), sees, why_they_refer (why_basis judgment unless a URL is given), niche weights, type boosts and the session-capped boost are judgment calls (no source measures referral share by source type), labelled as such; the seven types that match referral-tiers.json keep its specialty points (points_basis research). Every NUCC code is in NUCC v26.1 and was returned by one of its own type's NPPES searches in Illinois (nppes_verification.codes_returned). Codes are unique per type; shared_with marks a type found by another type's codes. Niche presets are not yet used by tier scoring (next PR).",
+  "sources": [
+    {
+      "what": "NUCC Health Care Provider Taxonomy code set v26.1 (CSV)",
+      "url": "https://www.nucc.org/images/stories/CSV/nucc_taxonomy_261.csv"
+    },
+    {
+      "what": "NPPES NPI Registry API v2.1 (taxonomy_description + state=IL)",
+      "url": "https://npiregistry.cms.hhs.gov/api-page"
+    },
+    {
+      "what": "CMS Provider Data Catalog: Hospice - General Information",
+      "url": "https://data.cms.gov/provider-data/dataset/yc9t-dgbk"
+    },
+    {
+      "what": "CMS Provider Data Catalog: Home Health Care Agencies",
+      "url": "https://data.cms.gov/provider-data/dataset/6jpm-sxkc"
+    },
+    {
+      "what": "OpenStreetMap tags (wiki), ODbL attribution required",
+      "url": "https://wiki.openstreetmap.org/wiki/Map_features"
+    },
+    {
+      "what": "Medicare hospice bereavement counseling (42 CFR 418.64(d)(1), up to 1 year after death)",
+      "url": "https://www.ecfr.gov/current/title-42/chapter-IV/subchapter-B/part-418/subpart-C/section-418.64"
+    },
+    {
+      "what": "Transplant program psychosocial evaluation (42 CFR 482.90(a)(1))",
+      "url": "https://www.ecfr.gov/current/title-42/chapter-IV/subchapter-G/part-482/subpart-E/section-482.90"
+    },
+    {
+      "what": "Verification log",
+      "url": "docs/research/referral-sources-verification.md"
+    }
+  ],
+  "findable_via": {
+    "nppes": "NPI Registry search by nppes_searches; keep only primary codes in nucc_codes (lib/referrals/nppes.ts SPECIALTIES)",
+    "cms_dataset": "CMS Provider Data Catalog dataset by ZIP (cms_dataset.id)",
+    "osm_tags": "OpenStreetMap features with these tags (Overpass, rate-limited, ODbL attribution)",
+    "public_list": "A public directory or list (state bar, state licensing, school or hospital websites); added by hand or CSV",
+    "manual": "Not in any dataset; she adds them by hand"
+  },
+  "categories": [
+    {
+      "id": 1,
+      "label": "Primary care"
+    },
+    {
+      "id": 2,
+      "label": "Medical specialists"
+    },
+    {
+      "id": 3,
+      "label": "Psychiatry and prescribers"
+    },
+    {
+      "id": 4,
+      "label": "Mental health peers (two-way)"
+    },
+    {
+      "id": 5,
+      "label": "Hospital and health system staff"
+    },
+    {
+      "id": 6,
+      "label": "Aging and long-term care"
+    },
+    {
+      "id": 7,
+      "label": "Schools and universities"
+    },
+    {
+      "id": 8,
+      "label": "Workplace"
+    },
+    {
+      "id": 9,
+      "label": "Legal and financial"
+    },
+    {
+      "id": 10,
+      "label": "Faith and community"
+    },
+    {
+      "id": 11,
+      "label": "Nonprofits and support organizations"
+    },
+    {
+      "id": 12,
+      "label": "Life-transition and wellness businesses"
+    },
+    {
+      "id": 13,
+      "label": "Special populations"
+    }
+  ],
+  "points_note": "default_points is the score before niche weighting, on the same 0-35 scale as the specialty factor in referral-tiers.json. The seven original kinds keep their researched points; every other type is judgment and capped at 20 (the therapists' level) so none outranks a researched kind before the niche step exists. Niche-weighted points are clamped to 0-35.",
+  "types": [
+    {
+      "id": "family_medicine",
+      "label": "Family medicine",
+      "category": 1,
+      "why_they_refer": "Often the first stop for anxiety, depression and stress, with no one in-house to send them to.",
+      "findable_via": "nppes",
+      "nppes_specialties": [
+        "family_medicine"
+      ],
+      "nppes_searches": [
+        "Family Medicine"
+      ],
+      "nucc_codes": [
+        "207Q00000X",
+        "207QA0401X",
+        "207QH0002X",
+        "363LF0000X"
+      ],
+      "default_points": 35,
+      "points_basis": "research",
+      "why_basis": "judgment",
+      "niches": [
+        "general_adult",
+        "children_teens_families",
+        "older_adults_caregivers",
+        "chronic_illness_pain",
+        "eating_disorders"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist who answers fast, says when she has openings and sends a short note back when the patient allows it.",
+        "you_offer": "Your openings, fee and superbill policy on one page, and a direct line for the front desk."
+      },
+      "sees": "all"
+    },
+    {
+      "id": "internal_medicine",
+      "label": "Internal medicine",
+      "category": 1,
+      "why_they_refer": "Sees adults with stress, anxiety and depression alongside chronic illness.",
+      "findable_via": "nppes",
+      "nppes_specialties": [
+        "internal_medicine"
+      ],
+      "nppes_searches": [
+        "Internal Medicine"
+      ],
+      "nucc_codes": [
+        "207R00000X"
+      ],
+      "default_points": 30,
+      "points_basis": "research",
+      "why_basis": "judgment",
+      "niches": [
+        "general_adult",
+        "older_adults_caregivers",
+        "chronic_illness_pain",
+        "oncology_serious_illness"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Somewhere reliable to send adults who need more than a quick check-in.",
+        "you_offer": "A clear list of who you see and how a patient books a first consult."
+      },
+      "sees": [
+        "adults",
+        "older_adults"
+      ]
+    },
+    {
+      "id": "pediatrics",
+      "label": "Pediatrics",
+      "category": 1,
+      "why_they_refer": "Child and teen behavior, ADHD follow-up and parent stress land on their desk.",
+      "findable_via": "nppes",
+      "nppes_specialties": [
+        "pediatrics"
+      ],
+      "nppes_searches": [
+        "Pediatrics"
+      ],
+      "nucc_codes": [
+        "208000000X",
+        "2080A0000X",
+        "2080P0204X",
+        "363LP0200X"
+      ],
+      "default_points": 33,
+      "points_basis": "research",
+      "why_basis": "judgment",
+      "niches": [
+        "children_teens_families",
+        "eating_disorders",
+        "perinatal_reproductive"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist who sees their age group and talks to parents in plain words.",
+        "you_offer": "The ages you see, whether you work with parents, and your wait time."
+      },
+      "sees": [
+        "children",
+        "teens",
+        "families",
+        "perinatal"
+      ]
+    },
+    {
+      "id": "ob_gyn",
+      "label": "OB/GYN",
+      "category": 1,
+      "why_they_refer": "Often see perinatal mood changes, pregnancy loss and infertility stress at routine visits.",
+      "findable_via": "nppes",
+      "nppes_specialties": [
+        "ob_gyn"
+      ],
+      "nppes_searches": [
+        "Obstetrics & Gynecology"
+      ],
+      "nucc_codes": [
+        "207V00000X",
+        "207VM0101X",
+        "207VG0400X",
+        "363LX0001X"
+      ],
+      "default_points": 32,
+      "points_basis": "research",
+      "why_basis": "judgment",
+      "niches": [
+        "perinatal_reproductive"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A perinatal-ready therapist who can see someone within a couple of weeks.",
+        "you_offer": "Your perinatal focus, video options and how quickly you can see a new parent."
+      },
+      "sees": [
+        "adults",
+        "perinatal",
+        "couples"
+      ]
+    },
+    {
+      "id": "midwives",
+      "label": "Midwives",
+      "category": 1,
+      "why_they_refer": "Follow pregnancy and the months after birth closely, so they see mood changes early.",
+      "findable_via": "nppes",
+      "nppes_specialties": [
+        "midwives"
+      ],
+      "nppes_searches": [
+        "Midwife",
+        "Advanced Practice Midwife"
+      ],
+      "nucc_codes": [
+        "176B00000X",
+        "367A00000X"
+      ],
+      "default_points": 20,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "perinatal_reproductive"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Someone gentle and quick for parents who are struggling after birth.",
+        "you_offer": "Perinatal openings, home-friendly video sessions and a short intro sheet."
+      },
+      "sees": [
+        "adults",
+        "perinatal",
+        "couples",
+        "families"
+      ]
+    },
+    {
+      "id": "geriatrics",
+      "label": "Geriatrics",
+      "category": 1,
+      "why_they_refer": "Grief, adjustment to aging and caregiver strain come up in every visit.",
+      "findable_via": "nppes",
+      "nppes_specialties": [
+        "family_medicine",
+        "internal_medicine"
+      ],
+      "nppes_searches": [
+        "Geriatric Medicine"
+      ],
+      "nucc_codes": [
+        "207QG0300X",
+        "207RG0300X"
+      ],
+      "default_points": 20,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "older_adults_caregivers",
+        "grief_loss",
+        "oncology_serious_illness"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist comfortable with older adults and their families, with no stairs to climb or video help.",
+        "you_offer": "Your work with older adults and caregivers, and accessibility details for your office."
+      },
+      "note": "Geriatric codes stay inside the family medicine and internal medicine searches so existing cards keep their kind; the tier PR can split them."
+    },
+    {
+      "id": "nurse_practitioners_pas",
+      "label": "Nurse practitioners and PAs",
+      "category": 1,
+      "why_they_refer": "Often the person a patient actually sees for primary care.",
+      "findable_via": "nppes",
+      "nppes_specialties": [
+        "nurse_practitioners_pas"
+      ],
+      "nppes_searches": [
+        "Nurse Practitioner",
+        "Physician Assistant"
+      ],
+      "nucc_codes": [
+        "363L00000X",
+        "363LP2300X",
+        "363LG0600X",
+        "363A00000X",
+        "363AM0700X"
+      ],
+      "default_points": 20,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "general_adult",
+        "chronic_illness_pain"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A quick way to hand off a patient who needs ongoing therapy.",
+        "you_offer": "A one-page how-to-refer sheet and your current openings."
+      },
+      "sees": "all",
+      "note": "Family, women's health, pediatric and psychiatric NPs stay with their own fields."
+    },
+    {
+      "id": "concierge_primary_care",
+      "label": "Concierge and direct primary care",
+      "category": 1,
+      "why_they_refer": "Cash-pay patients who expect fast, personal care; a strong fit for private pay.",
+      "findable_via": "manual",
+      "default_points": 20,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "general_adult"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist who matches their service level and can see people soon.",
+        "you_offer": "Private-pay fee, superbill policy and how fast you schedule a consult."
+      },
+      "note": "No NUCC code marks concierge practice; found from their own websites."
+    },
+    {
+      "id": "urgent_care",
+      "label": "Urgent care and retail clinics",
+      "category": 1,
+      "why_they_refer": "Often see panic attacks and crisis follow-ups with nowhere to send people next.",
+      "findable_via": "nppes",
+      "nppes_specialties": [
+        "urgent_care"
+      ],
+      "nppes_searches": [
+        "Urgent Care"
+      ],
+      "nucc_codes": [
+        "261QU0200X"
+      ],
+      "default_points": 16,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "general_adult",
+        "trauma"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A short list of therapists taking new clients this month.",
+        "you_offer": "A small card or flyer with how to book; 988 for a mental health crisis, 911 for emergencies."
+      },
+      "sees": "all"
+    },
+    {
+      "id": "oncology",
+      "label": "Oncology and hematology",
+      "category": 2,
+      "why_they_refer": "Distress, fear of recurrence and family strain follow a cancer diagnosis.",
+      "findable_via": "nppes",
+      "nppes_specialties": [
+        "oncology"
+      ],
+      "nppes_searches": [
+        "Hematology & Oncology",
+        "Medical Oncology",
+        "Radiation Oncology",
+        "Gynecologic Oncology"
+      ],
+      "nucc_codes": [
+        "207RH0003X",
+        "207RX0202X",
+        "2085R0001X",
+        "207VX0201X"
+      ],
+      "default_points": 22,
+      "points_basis": "research",
+      "why_basis": "judgment",
+      "niches": [
+        "oncology_serious_illness",
+        "grief_loss"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist who understands treatment schedules and can flex around them.",
+        "you_offer": "Your serious-illness focus, video sessions on treatment days and a direct contact for the nurse navigator."
+      },
+      "sees": [
+        "adults",
+        "older_adults"
+      ]
+    },
+    {
+      "id": "cardiology",
+      "label": "Cardiology",
+      "category": 2,
+      "why_they_refer": "Depression after a heart attack and health anxiety often come up in follow-up visits.",
+      "findable_via": "nppes",
+      "nppes_specialties": [
+        "cardiology"
+      ],
+      "nppes_searches": [
+        "Cardiovascular Disease"
+      ],
+      "nucc_codes": [
+        "207RC0000X"
+      ],
+      "default_points": 18,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "chronic_illness_pain",
+        "older_adults_caregivers"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Someone to send patients whose worry is slowing their recovery.",
+        "you_offer": "Your chronic-illness focus and how to book."
+      },
+      "sees": [
+        "adults",
+        "older_adults"
+      ]
+    },
+    {
+      "id": "neurology",
+      "label": "Neurology",
+      "category": 2,
+      "why_they_refer": "MS, brain injury, epilepsy and dementia bring adjustment and family stress.",
+      "findable_via": "nppes",
+      "nppes_specialties": [
+        "neurology"
+      ],
+      "nppes_searches": [
+        "Neurology"
+      ],
+      "nucc_codes": [
+        "2084N0400X",
+        "2084N0402X"
+      ],
+      "default_points": 20,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "chronic_illness_pain",
+        "older_adults_caregivers",
+        "oncology_serious_illness"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist used to working around fatigue and memory changes.",
+        "you_offer": "Your experience with chronic and neurological illness and caregiver sessions."
+      },
+      "sees": "all"
+    },
+    {
+      "id": "gastroenterology",
+      "label": "Gastroenterology",
+      "category": 2,
+      "why_they_refer": "Many patients with IBS and other gut-brain conditions are offered therapy alongside medical care.",
+      "findable_via": "nppes",
+      "nppes_specialties": [
+        "gastroenterology"
+      ],
+      "nppes_searches": [
+        "Gastroenterology"
+      ],
+      "nucc_codes": [
+        "207RG0100X"
+      ],
+      "default_points": 18,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "chronic_illness_pain",
+        "eating_disorders"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist who takes gut-brain referrals seriously.",
+        "you_offer": "Whether you offer gut-directed or health-focused work and your openings."
+      },
+      "sees": [
+        "adults",
+        "older_adults"
+      ]
+    },
+    {
+      "id": "endocrinology",
+      "label": "Endocrinology",
+      "category": 2,
+      "why_they_refer": "Diabetes distress, thyroid changes and gender-affirming care raise mental health needs.",
+      "findable_via": "nppes",
+      "nppes_specialties": [
+        "endocrinology"
+      ],
+      "nppes_searches": [
+        "Endocrinology, Diabetes & Metabolism"
+      ],
+      "nucc_codes": [
+        "207RE0101X"
+      ],
+      "default_points": 18,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "chronic_illness_pain",
+        "eating_disorders"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Someone who understands living with a chronic condition day to day.",
+        "you_offer": "Your chronic-illness focus and affirming-care stance."
+      },
+      "sees": [
+        "adults",
+        "older_adults"
+      ]
+    },
+    {
+      "id": "rheumatology",
+      "label": "Rheumatology",
+      "category": 2,
+      "why_they_refer": "Chronic pain and flares wear on mood and coping.",
+      "findable_via": "nppes",
+      "nppes_specialties": [
+        "rheumatology"
+      ],
+      "nppes_searches": [
+        "Rheumatology"
+      ],
+      "nucc_codes": [
+        "207RR0500X"
+      ],
+      "default_points": 18,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "chronic_illness_pain"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist who works with chronic pain and coping.",
+        "you_offer": "Your chronic pain focus and flexible video sessions."
+      },
+      "sees": [
+        "adults",
+        "older_adults"
+      ]
+    },
+    {
+      "id": "pain_medicine",
+      "label": "Pain management",
+      "category": 2,
+      "why_they_refer": "Pain programs need therapy alongside procedures and medication.",
+      "findable_via": "nppes",
+      "nppes_specialties": [
+        "pain_medicine"
+      ],
+      "nppes_searches": [
+        "Pain Medicine",
+        "Interventional Pain Medicine"
+      ],
+      "nucc_codes": [
+        "208VP0000X",
+        "208VP0014X",
+        "207LP2900X",
+        "2081P2900X"
+      ],
+      "default_points": 20,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "chronic_illness_pain",
+        "trauma"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist who does pain-focused work and reports back on engagement when allowed.",
+        "you_offer": "Your pain-focused approach and how quickly you can start."
+      },
+      "sees": [
+        "adults",
+        "older_adults"
+      ]
+    },
+    {
+      "id": "sleep_medicine",
+      "label": "Sleep medicine",
+      "category": 2,
+      "why_they_refer": "CBT for insomnia is often recommended, and many therapists don't offer it.",
+      "findable_via": "nppes",
+      "nppes_specialties": [
+        "sleep_medicine"
+      ],
+      "nppes_searches": [
+        "Sleep Medicine"
+      ],
+      "nucc_codes": [
+        "207RS0012X",
+        "2084S0012X"
+      ],
+      "default_points": 16,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "chronic_illness_pain",
+        "general_adult"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Someone who offers CBT for insomnia or knows who does.",
+        "you_offer": "Whether you offer CBT-I and your openings."
+      },
+      "sees": [
+        "adults",
+        "older_adults"
+      ]
+    },
+    {
+      "id": "fertility",
+      "label": "Fertility clinics",
+      "category": 2,
+      "why_they_refer": "IVF stress, loss and donor decisions need a therapist who knows the process.",
+      "findable_via": "nppes",
+      "also_findable_via": [
+        "public_list"
+      ],
+      "nppes_specialties": [
+        "ob_gyn"
+      ],
+      "nppes_searches": [
+        "Reproductive Endocrinology"
+      ],
+      "nucc_codes": [
+        "207VE0102X"
+      ],
+      "default_points": 20,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "perinatal_reproductive",
+        "couples"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist fluent in fertility treatment and loss.",
+        "you_offer": "Your reproductive focus and couples sessions."
+      },
+      "note": "Reproductive endocrinology stays inside the OB/GYN search so existing cards keep their kind; clinic names come from their websites."
+    },
+    {
+      "id": "bariatric_surgery",
+      "label": "Bariatric surgery programs",
+      "category": 2,
+      "why_they_refer": "Programs often require a psychological evaluation before surgery and support after.",
+      "findable_via": "public_list",
+      "default_points": 20,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "eating_disorders",
+        "chronic_illness_pain"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Clinicians who do pre-surgical evaluations or post-surgery support on time.",
+        "you_offer": "What you can and can't do (evaluations or ongoing therapy) and your turnaround."
+      },
+      "note": "No NUCC code for bariatric surgery (NPPES matches 'Bariatric' only to obesity medicine); programs are listed on hospital websites."
+    },
+    {
+      "id": "plastic_surgery",
+      "label": "Plastic and reconstructive surgery",
+      "category": 2,
+      "why_they_refer": "Body image concerns and reconstruction after cancer come up before and after surgery.",
+      "findable_via": "nppes",
+      "nppes_specialties": [
+        "plastic_surgery"
+      ],
+      "nppes_searches": [
+        "Plastic Surgery"
+      ],
+      "nucc_codes": [
+        "208200000X",
+        "2086S0122X"
+      ],
+      "default_points": 12,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "oncology_serious_illness",
+        "eating_disorders"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Someone for patients whose expectations or distress worry them.",
+        "you_offer": "Your body-image or serious-illness focus."
+      },
+      "sees": [
+        "adults",
+        "older_adults"
+      ]
+    },
+    {
+      "id": "transplant_programs",
+      "label": "Transplant programs",
+      "category": 2,
+      "why_they_refer": "Candidates must get a psychosocial evaluation before the waiting list, if possible (42 CFR 482.90), and often need long-term support.",
+      "findable_via": "public_list",
+      "default_points": 18,
+      "points_basis": "judgment",
+      "why_basis": "https://www.ecfr.gov/current/title-42/chapter-IV/subchapter-G/part-482/subpart-E/section-482.90",
+      "niches": [
+        "oncology_serious_illness",
+        "chronic_illness_pain"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Clinicians who understand transplant timelines and caregiver strain.",
+        "you_offer": "Your serious-illness focus and caregiver sessions."
+      },
+      "note": "Found on hospital websites, not NPPES."
+    },
+    {
+      "id": "dermatology",
+      "label": "Dermatology",
+      "category": 2,
+      "why_they_refer": "Psychodermatology: skin conditions and body image weigh on mood.",
+      "findable_via": "nppes",
+      "nppes_specialties": [
+        "dermatology"
+      ],
+      "nppes_searches": [
+        "Dermatology"
+      ],
+      "nucc_codes": [
+        "207N00000X",
+        "207ND0101X",
+        "207NP0225X",
+        "207NS0135X"
+      ],
+      "default_points": 12,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "chronic_illness_pain"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist for patients whose skin condition affects how they live.",
+        "you_offer": "Your body-image and chronic-illness focus."
+      },
+      "sees": "all"
+    },
+    {
+      "id": "genetic_counselors",
+      "label": "Genetic counselors",
+      "category": 2,
+      "why_they_refer": "BRCA and other results bring family risk decisions and worry.",
+      "findable_via": "nppes",
+      "nppes_specialties": [
+        "genetic_counselors"
+      ],
+      "nppes_searches": [
+        "Genetic Counselor"
+      ],
+      "nucc_codes": [
+        "170300000X"
+      ],
+      "default_points": 20,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "oncology_serious_illness",
+        "perinatal_reproductive"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist who can help someone live with a result and talk to family.",
+        "you_offer": "Your serious-illness and family focus."
+      },
+      "sees": "all"
+    },
+    {
+      "id": "physiatry",
+      "label": "Physiatry and rehab medicine",
+      "category": 2,
+      "why_they_refer": "Injury and disability bring adjustment and loss of role.",
+      "findable_via": "nppes",
+      "nppes_specialties": [
+        "physiatry"
+      ],
+      "nppes_searches": [
+        "Physical Medicine & Rehabilitation"
+      ],
+      "nucc_codes": [
+        "208100000X"
+      ],
+      "default_points": 16,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "chronic_illness_pain",
+        "trauma"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Someone who works with adjustment after injury.",
+        "you_offer": "Your chronic-illness and trauma focus and accessible office details."
+      },
+      "sees": [
+        "adults",
+        "older_adults"
+      ]
+    },
+    {
+      "id": "psychiatry",
+      "label": "Psychiatry",
+      "category": 3,
+      "why_they_refer": "Their patients often need therapy alongside medication, and many psychiatrists mostly manage medication.",
+      "findable_via": "nppes",
+      "nppes_specialties": [
+        "psychiatry"
+      ],
+      "nppes_searches": [
+        "Psychiatry"
+      ],
+      "nucc_codes": [
+        "2084P0800X"
+      ],
+      "default_points": 30,
+      "points_basis": "research",
+      "why_basis": "judgment",
+      "niches": [
+        "general_adult",
+        "college_young_adults",
+        "trauma",
+        "eating_disorders"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist who coordinates with releases on file and sees patients weekly.",
+        "you_offer": "Your openings, approach and how you coordinate care with consent."
+      },
+      "sees": "all"
+    },
+    {
+      "id": "child_psychiatry",
+      "label": "Child and adolescent psychiatry",
+      "category": 3,
+      "why_they_refer": "Child and teen patients need weekly therapy and parent work.",
+      "findable_via": "nppes",
+      "nppes_specialties": [
+        "psychiatry"
+      ],
+      "nppes_searches": [
+        "Psychiatry"
+      ],
+      "nucc_codes": [
+        "2084P0804X"
+      ],
+      "default_points": 20,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "children_teens_families",
+        "college_young_adults"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist who sees their ages and works with parents.",
+        "you_offer": "The ages you see and your parent sessions."
+      },
+      "note": "Inside the psychiatry search (2084P08*)."
+    },
+    {
+      "id": "pmhnp",
+      "label": "Psychiatric-mental health NPs",
+      "category": 3,
+      "why_they_refer": "Many prescribe without therapy in-house.",
+      "findable_via": "nppes",
+      "nppes_specialties": [
+        "psychiatry"
+      ],
+      "nppes_searches": [
+        "Psychiatry"
+      ],
+      "nucc_codes": [
+        "363LP0808X"
+      ],
+      "default_points": 20,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "general_adult",
+        "college_young_adults",
+        "perinatal_reproductive"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A dependable therapist to pair with medication management.",
+        "you_offer": "Your openings and how you coordinate with prescribers."
+      },
+      "note": "Inside the psychiatry specialty (363LP0808X)."
+    },
+    {
+      "id": "addiction_medicine",
+      "label": "Addiction medicine",
+      "category": 3,
+      "why_they_refer": "Medication treatment works best with therapy alongside it.",
+      "findable_via": "nppes",
+      "nppes_specialties": [
+        "addiction_medicine"
+      ],
+      "nppes_searches": [
+        "Addiction Medicine"
+      ],
+      "nucc_codes": [
+        "2084A0401X",
+        "207RA0401X",
+        "2083A0300X",
+        "207LA0401X"
+      ],
+      "default_points": 20,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "general_adult",
+        "trauma"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist comfortable working with someone in recovery.",
+        "you_offer": "Whether you see people in recovery and how you coordinate."
+      },
+      "sees": [
+        "adults",
+        "older_adults"
+      ]
+    },
+    {
+      "id": "therapists",
+      "label": "Solo therapists (LCSW, LCPC, LMFT)",
+      "category": 4,
+      "why_they_refer": "Full caseloads or clients outside their niche; referrals go both ways.",
+      "findable_via": "nppes",
+      "nppes_specialties": [
+        "therapists"
+      ],
+      "nppes_searches": [
+        "Social Worker",
+        "Marriage & Family Therapist",
+        "Counselor"
+      ],
+      "nucc_codes": [
+        "1041C0700X",
+        "106H00000X",
+        "101YP2500X",
+        "101YM0800X"
+      ],
+      "default_points": 20,
+      "points_basis": "research",
+      "why_basis": "judgment",
+      "niches": [
+        "general_adult",
+        "couples",
+        "trauma",
+        "college_young_adults",
+        "children_teens_families"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A colleague to send overflow and out-of-niche clients to.",
+        "you_offer": "Your niche, your openings, and the kinds of clients you send out in return."
+      },
+      "sees": "all"
+    },
+    {
+      "id": "psychologists",
+      "label": "Psychologists",
+      "category": 4,
+      "why_they_refer": "Testing and evaluation referrals often run both directions.",
+      "findable_via": "nppes",
+      "nppes_specialties": [
+        "therapists"
+      ],
+      "nppes_searches": [
+        "Psychologist"
+      ],
+      "nucc_codes": [
+        "103T00000X",
+        "103TC0700X"
+      ],
+      "default_points": 20,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "general_adult",
+        "children_teens_families",
+        "college_young_adults",
+        "trauma"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist for ongoing care after an evaluation.",
+        "you_offer": "Your openings, and clients you'd send for testing."
+      },
+      "note": "Inside the therapists specialty (103T*)."
+    },
+    {
+      "id": "group_practices",
+      "label": "Group practices",
+      "category": 4,
+      "why_they_refer": "Overflow and waitlists, especially for niches they don't cover.",
+      "findable_via": "nppes",
+      "nppes_specialties": [
+        "therapists"
+      ],
+      "nppes_searches": [
+        "Social Worker",
+        "Psychologist",
+        "Marriage & Family Therapist",
+        "Counselor"
+      ],
+      "shared_with": "therapists",
+      "default_points": 18,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "general_adult",
+        "couples",
+        "college_young_adults"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Somewhere to send waitlisted or out-of-niche clients.",
+        "you_offer": "Your niche and current openings, updated monthly."
+      },
+      "note": "Organization (NPI-2) records in the therapists searches; codes are the therapists' and psychologists' (shared_with)."
+    },
+    {
+      "id": "niche_specialists",
+      "label": "Niche specialists (couples, sex therapy, eating disorders, trauma, OCD)",
+      "category": 4,
+      "why_they_refer": "Cases outside their scope go to a trusted colleague.",
+      "findable_via": "manual",
+      "default_points": 18,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "couples",
+        "trauma",
+        "eating_disorders"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A colleague who covers what they don't.",
+        "you_offer": "Your niche, plus the cases you'd send to them."
+      },
+      "note": "Found in NPPES as therapists; the niche itself only shows on their own website."
+    },
+    {
+      "id": "mental_health_programs",
+      "label": "IOP, PHP and residential programs",
+      "category": 4,
+      "why_they_refer": "Step-down after discharge needs an outpatient therapist ready to go.",
+      "findable_via": "nppes",
+      "also_findable_via": [
+        "public_list"
+      ],
+      "nppes_specialties": [
+        "mental_health_programs"
+      ],
+      "nppes_searches": [
+        "Mental Health",
+        "Psychiatric Residential Treatment Facility",
+        "Psychiatric Hospital",
+        "Psychiatric Unit"
+      ],
+      "nucc_codes": [
+        "261QM0801X",
+        "283Q00000X",
+        "323P00000X",
+        "273R00000X"
+      ],
+      "default_points": 20,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "eating_disorders",
+        "trauma",
+        "college_young_adults",
+        "general_adult"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Outpatient therapists who can take a step-down client within a week of discharge.",
+        "you_offer": "Fast intake for step-downs and how you coordinate with their team."
+      },
+      "sees": "all"
+    },
+    {
+      "id": "discharge_planners",
+      "label": "Inpatient psychiatric discharge planners",
+      "category": 4,
+      "why_they_refer": "Need aftercare appointments before a patient leaves.",
+      "findable_via": "manual",
+      "default_points": 20,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "general_adult",
+        "trauma"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist who can book an aftercare appointment quickly.",
+        "you_offer": "A direct number and your soonest openings."
+      }
+    },
+    {
+      "id": "crisis_teams",
+      "label": "Crisis teams and 988 centers",
+      "category": 4,
+      "why_they_refer": "Stabilized callers need ongoing outpatient care.",
+      "findable_via": "public_list",
+      "default_points": 18,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "trauma",
+        "general_adult"
+      ],
+      "session_capped": true,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Outpatient therapists taking new clients.",
+        "you_offer": "Your openings and how to book; you do not provide crisis services."
+      },
+      "note": "Crisis services are short by design and hand people off."
+    },
+    {
+      "id": "training_clinics",
+      "label": "University training clinics",
+      "category": 4,
+      "why_they_refer": "Clients beyond what trainees can take on.",
+      "findable_via": "manual",
+      "default_points": 14,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "college_young_adults",
+        "general_adult"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Licensed clinicians for complex cases.",
+        "you_offer": "Your niche and openings."
+      }
+    },
+    {
+      "id": "supervisors_consultation",
+      "label": "Clinical supervisors and consultation groups",
+      "category": 4,
+      "why_they_refer": "Trusted handoffs between colleagues they know.",
+      "findable_via": "manual",
+      "default_points": 16,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "general_adult"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Colleagues they can vouch for.",
+        "you_offer": "Your niche and a short profile they can pass on."
+      }
+    },
+    {
+      "id": "hospital_social_workers",
+      "label": "Hospital social workers and case managers",
+      "category": 5,
+      "why_they_refer": "Discharge plans need outpatient therapy lined up.",
+      "findable_via": "manual",
+      "default_points": 20,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "oncology_serious_illness",
+        "older_adults_caregivers",
+        "chronic_illness_pain"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Therapists who answer quickly and take the patient's situation in stride.",
+        "you_offer": "A direct contact and your openings."
+      }
+    },
+    {
+      "id": "nurse_navigators",
+      "label": "Nurse navigators (cancer, cardiac, transplant)",
+      "category": 5,
+      "why_they_refer": "Guide patients through treatment and know who is struggling.",
+      "findable_via": "manual",
+      "default_points": 20,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "oncology_serious_illness"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist they can name to a patient with confidence.",
+        "you_offer": "Your serious-illness focus and a one-page intro for their resource binder."
+      },
+      "note": "Usually not in NPPES; found through the cancer center or hospital."
+    },
+    {
+      "id": "palliative_care",
+      "label": "Palliative care teams",
+      "category": 5,
+      "why_they_refer": "Serious illness and family meetings bring distress for patients and families.",
+      "findable_via": "nppes",
+      "nppes_specialties": [
+        "palliative_care"
+      ],
+      "nppes_searches": [
+        "Hospice and Palliative Medicine"
+      ],
+      "nucc_codes": [
+        "207RH0002X",
+        "207PH0002X",
+        "207LH0002X"
+      ],
+      "default_points": 20,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "oncology_serious_illness",
+        "grief_loss",
+        "older_adults_caregivers"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Someone who can see patients and family members, often by video.",
+        "you_offer": "Your serious-illness and family focus and video sessions."
+      },
+      "sees": [
+        "adults",
+        "older_adults",
+        "families"
+      ],
+      "note": "Family medicine, pediatric and OB/GYN palliative codes stay with those fields."
+    },
+    {
+      "id": "hospice",
+      "label": "Hospice agencies and bereavement coordinators",
+      "category": 5,
+      "why_they_refer": "Families often need grief support after the hospice bereavement period (up to a year) ends.",
+      "findable_via": "nppes",
+      "also_findable_via": [
+        "cms_dataset"
+      ],
+      "nppes_specialties": [
+        "hospice"
+      ],
+      "nppes_searches": [
+        "Hospice Care, Community Based",
+        "Hospice, Inpatient"
+      ],
+      "nucc_codes": [
+        "251G00000X",
+        "315D00000X"
+      ],
+      "cms_dataset": {
+        "id": "yc9t-dgbk",
+        "title": "Hospice - General Information",
+        "url": "https://data.cms.gov/provider-data/dataset/yc9t-dgbk"
+      },
+      "default_points": 20,
+      "points_basis": "judgment",
+      "why_basis": "https://www.ecfr.gov/current/title-42/chapter-IV/subchapter-B/part-418/subpart-C/section-418.64",
+      "niches": [
+        "oncology_serious_illness",
+        "grief_loss",
+        "older_adults_caregivers"
+      ],
+      "session_capped": true,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A grief therapist to hand families to when their bereavement program ends.",
+        "you_offer": "Your grief focus and how families book."
+      },
+      "sees": [
+        "adults",
+        "older_adults",
+        "families"
+      ],
+      "note": "Medicare hospice bereavement counseling runs up to 1 year after the patient's death (42 CFR 418.64(d)(1)), then ends."
+    },
+    {
+      "id": "chaplains",
+      "label": "Chaplains and spiritual care",
+      "category": 5,
+      "why_they_refer": "Spiritual distress and end-of-life questions come to them first.",
+      "findable_via": "manual",
+      "default_points": 16,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "oncology_serious_illness",
+        "grief_loss"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist who respects faith and meaning.",
+        "you_offer": "Your stance on faith and your serious-illness focus."
+      },
+      "note": "NPPES has no chaplain taxonomy (checked 2026-11-02); found through hospital spiritual care departments."
+    },
+    {
+      "id": "child_life_nicu_ed",
+      "label": "Child life, NICU and ED social work",
+      "category": 5,
+      "why_they_refer": "Families in medical crisis need follow-up care.",
+      "findable_via": "manual",
+      "default_points": 14,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "children_teens_families",
+        "oncology_serious_illness",
+        "grief_loss",
+        "perinatal_reproductive"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Therapists for families after a hospital stay.",
+        "you_offer": "Your family and perinatal focus."
+      }
+    },
+    {
+      "id": "home_health",
+      "label": "Home health agencies",
+      "category": 6,
+      "why_they_refer": "Homebound clients and worn-out caregivers.",
+      "findable_via": "cms_dataset",
+      "also_findable_via": [
+        "nppes"
+      ],
+      "nppes_specialties": [
+        "home_health"
+      ],
+      "nppes_searches": [
+        "Home Health"
+      ],
+      "nucc_codes": [
+        "251E00000X"
+      ],
+      "cms_dataset": {
+        "id": "6jpm-sxkc",
+        "title": "Home Health Care Agencies",
+        "url": "https://data.cms.gov/provider-data/dataset/6jpm-sxkc"
+      },
+      "default_points": 18,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "older_adults_caregivers",
+        "oncology_serious_illness"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Therapists who do video sessions for homebound people.",
+        "you_offer": "Video sessions and caregiver work."
+      },
+      "sees": [
+        "adults",
+        "older_adults"
+      ]
+    },
+    {
+      "id": "senior_living",
+      "label": "Senior living and memory care",
+      "category": 6,
+      "why_they_refer": "Residents and families face moves, loss and decline.",
+      "findable_via": "public_list",
+      "also_findable_via": ["osm_tags"],
+      "osm_tags": { "social_facility": ["assisted_living", "nursing_home"] },
+      "default_points": 16,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "older_adults_caregivers",
+        "grief_loss"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist who can see residents or family members.",
+        "you_offer": "Video or on-site options and caregiver sessions."
+      },
+      "note": "State licensing lists."
+    },
+    {
+      "id": "geriatric_care_managers",
+      "label": "Geriatric care managers",
+      "category": 6,
+      "why_they_refer": "Caregiver burnout and family conflict.",
+      "findable_via": "public_list",
+      "default_points": 20,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "older_adults_caregivers"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist for the family caregiver.",
+        "you_offer": "Your caregiver focus."
+      },
+      "note": "Aging Life Care Association directory."
+    },
+    {
+      "id": "area_agencies_on_aging",
+      "label": "Area Agencies on Aging",
+      "category": 6,
+      "why_they_refer": "Run caregiver programs and field requests for counseling.",
+      "findable_via": "public_list",
+      "default_points": 16,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "older_adults_caregivers"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Local therapists for their resource lists.",
+        "you_offer": "Your older-adult and caregiver focus."
+      }
+    },
+    {
+      "id": "elder_law_attorneys",
+      "label": "Elder law and estate attorneys",
+      "category": 6,
+      "why_they_refer": "Family conflict and end-of-life planning bring stress.",
+      "findable_via": "public_list",
+      "default_points": 14,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "older_adults_caregivers",
+        "oncology_serious_illness",
+        "grief_loss"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist they can mention to a stressed family.",
+        "you_offer": "Your family and end-of-life focus."
+      },
+      "note": "State bar directory."
+    },
+    {
+      "id": "school_staff",
+      "label": "School counselors, psychologists and social workers",
+      "category": 7,
+      "why_they_refer": "Can't provide long-term therapy, so they refer out.",
+      "findable_via": "public_list",
+      "default_points": 20,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "children_teens_families"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Therapists who see students and talk to parents.",
+        "you_offer": "The ages you see and after-school hours."
+      },
+      "note": "District directories."
+    },
+    {
+      "id": "college_counseling",
+      "label": "College counseling centers",
+      "category": 7,
+      "why_they_refer": "Many have session limits and often refer students off campus.",
+      "findable_via": "public_list",
+      "default_points": 20,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "college_young_adults",
+        "eating_disorders"
+      ],
+      "session_capped": true,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Off-campus therapists who see students soon and take their insurance or a sliding fee.",
+        "you_offer": "Your openings, fees and video for students."
+      }
+    },
+    {
+      "id": "disability_offices",
+      "label": "College disability and accessibility offices",
+      "category": 7,
+      "why_they_refer": "ADHD, autism and chronic illness students need ongoing support.",
+      "findable_via": "public_list",
+      "default_points": 14,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "college_young_adults",
+        "chronic_illness_pain"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Therapists who understand accommodations.",
+        "you_offer": "Your college and chronic-illness focus."
+      }
+    },
+    {
+      "id": "private_schools",
+      "label": "Private school administrators",
+      "category": 7,
+      "why_they_refer": "Families who pay out of pocket.",
+      "findable_via": "public_list",
+      "default_points": 16,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "children_teens_families"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist families trust.",
+        "you_offer": "The ages you see and your private-pay fee."
+      },
+      "note": "School websites."
+    },
+    {
+      "id": "educational_consultants",
+      "label": "Educational consultants, ADHD coaches and tutors",
+      "category": 7,
+      "why_they_refer": "Spot underlying mental health needs in the students they work with.",
+      "findable_via": "manual",
+      "default_points": 14,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "children_teens_families",
+        "college_young_adults"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist to suggest when it's beyond coaching.",
+        "you_offer": "Your focus and how families book."
+      }
+    },
+    {
+      "id": "eap",
+      "label": "Employee assistance programs",
+      "category": 8,
+      "why_they_refer": "Often short-term, then refer for long-term care.",
+      "findable_via": "manual",
+      "default_points": 20,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "general_adult",
+        "trauma"
+      ],
+      "session_capped": true,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Clinicians who take clients after the EAP sessions run out.",
+        "you_offer": "Your private-pay fee, superbills and openings."
+      }
+    },
+    {
+      "id": "hr_benefits",
+      "label": "HR and benefits teams",
+      "category": 8,
+      "why_they_refer": "Employees in distress ask them where to go.",
+      "findable_via": "manual",
+      "default_points": 12,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "general_adult"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A local name to give employees besides the EAP.",
+        "you_offer": "A one-page intro."
+      }
+    },
+    {
+      "id": "union_map",
+      "label": "Union member-assistance programs",
+      "category": 8,
+      "why_they_refer": "Members and families need longer-term care.",
+      "findable_via": "manual",
+      "default_points": 16,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "general_adult",
+        "trauma"
+      ],
+      "session_capped": true,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Clinicians who understand their members' work.",
+        "you_offer": "Your openings and fees."
+      }
+    },
+    {
+      "id": "clinician_wellness",
+      "label": "Physician and nurse wellness programs",
+      "category": 8,
+      "why_they_refer": "Clinician burnout needs discreet outside care.",
+      "findable_via": "manual",
+      "default_points": 16,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "general_adult"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Discreet, flexible therapists for clinicians.",
+        "you_offer": "Evening or video hours and your privacy practices."
+      },
+      "note": "Hospital programs."
+    },
+    {
+      "id": "first_responder_peer_support",
+      "label": "First responder peer-support teams",
+      "category": 8,
+      "why_they_refer": "Trauma exposure on the job.",
+      "findable_via": "manual",
+      "default_points": 16,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "trauma"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Clinicians who know first responder culture.",
+        "you_offer": "Your trauma focus."
+      }
+    },
+    {
+      "id": "family_law_attorneys",
+      "label": "Family law attorneys and mediators",
+      "category": 9,
+      "why_they_refer": "Divorce, custody and co-parenting stress.",
+      "findable_via": "public_list",
+      "default_points": 18,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "couples",
+        "children_teens_families"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist for clients going through divorce or custody.",
+        "you_offer": "Your couples and family focus; you do not do custody evaluations unless you do."
+      },
+      "note": "State bar directory."
+    },
+    {
+      "id": "personal_injury_attorneys",
+      "label": "Personal injury attorneys",
+      "category": 9,
+      "why_they_refer": "Trauma after accidents.",
+      "findable_via": "public_list",
+      "default_points": 14,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "trauma",
+        "chronic_illness_pain"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Trauma therapists for their clients.",
+        "you_offer": "Your trauma focus and what records you can and can't provide."
+      },
+      "note": "State bar directory."
+    },
+    {
+      "id": "immigration_attorneys",
+      "label": "Immigration attorneys",
+      "category": 9,
+      "why_they_refer": "Need psychological evaluations for hardship and asylum cases.",
+      "findable_via": "public_list",
+      "default_points": 12,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "trauma"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Clinicians who do evaluations or ongoing trauma care.",
+        "you_offer": "What you do and don't do (evaluations or therapy)."
+      },
+      "note": "State bar directory."
+    },
+    {
+      "id": "guardians_ad_litem",
+      "label": "Guardians ad litem and parenting coordinators",
+      "category": 9,
+      "why_they_refer": "Family court cases need therapists.",
+      "findable_via": "public_list",
+      "default_points": 14,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "children_teens_families"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Therapists for children and families in court cases.",
+        "you_offer": "The ages you see and your family focus."
+      },
+      "note": "Court lists."
+    },
+    {
+      "id": "financial_planners",
+      "label": "Financial planners and divorce financial analysts",
+      "category": 9,
+      "why_they_refer": "Life transitions and wealth stress.",
+      "findable_via": "manual",
+      "default_points": 10,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "couples",
+        "grief_loss",
+        "older_adults_caregivers"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist to suggest when money stress is really life stress.",
+        "you_offer": "Your life-transition focus."
+      }
+    },
+    {
+      "id": "clergy",
+      "label": "Clergy (all faiths)",
+      "category": 10,
+      "why_they_refer": "Grief, marriage and crisis come to them first.",
+      "findable_via": "osm_tags",
+      "also_findable_via": [
+        "public_list"
+      ],
+      "osm_tags": {
+        "amenity": "place_of_worship"
+      },
+      "default_points": 18,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "grief_loss",
+        "couples",
+        "oncology_serious_illness"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist who respects faith.",
+        "you_offer": "Your stance on faith and your grief and couples focus."
+      },
+      "note": "Contact through the congregation's website."
+    },
+    {
+      "id": "cultural_centers",
+      "label": "Cultural and immigrant community centers",
+      "category": 10,
+      "why_they_refer": "Members look for culturally matched care.",
+      "findable_via": "manual",
+      "default_points": 14,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "general_adult",
+        "trauma"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Therapists who share or understand their culture and language.",
+        "you_offer": "Languages you speak and your cultural focus."
+      }
+    },
+    {
+      "id": "lgbtq_centers",
+      "label": "LGBTQ+ centers",
+      "category": 10,
+      "why_they_refer": "Members look for affirming therapists.",
+      "findable_via": "public_list",
+      "default_points": 18,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "general_adult",
+        "college_young_adults",
+        "couples"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Affirming therapists for their referral list.",
+        "you_offer": "Your affirming-care stance."
+      }
+    },
+    {
+      "id": "veterans_orgs",
+      "label": "Veterans service organizations and Vet Centers",
+      "category": 10,
+      "why_they_refer": "Military trauma and transition.",
+      "findable_via": "public_list",
+      "default_points": 16,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "trauma"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Clinicians who understand military life.",
+        "you_offer": "Your trauma focus and veteran experience."
+      }
+    },
+    {
+      "id": "libraries_community_centers",
+      "label": "Libraries and community centers",
+      "category": 10,
+      "why_they_refer": "Workshops and visibility, more than direct referrals.",
+      "findable_via": "osm_tags",
+      "osm_tags": {
+        "amenity": [
+          "community_centre",
+          "library"
+        ]
+      },
+      "default_points": 8,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "general_adult",
+        "older_adults_caregivers"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Free talks on practical topics.",
+        "you_offer": "A free talk on how therapy works and how to find a therapist, never tied to referrals."
+      }
+    },
+    {
+      "id": "disease_orgs",
+      "label": "Disease organizations (cancer, MS, Alzheimer's, diabetes)",
+      "category": 11,
+      "why_they_refer": "Members need depth work beyond support groups.",
+      "findable_via": "public_list",
+      "default_points": 20,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "oncology_serious_illness",
+        "chronic_illness_pain",
+        "older_adults_caregivers"
+      ],
+      "session_capped": true,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Therapists to list for members who need more than a group.",
+        "you_offer": "Your serious-illness focus."
+      },
+      "note": "Charity lists. Many offer free short-term counseling, then refer out (judgment)."
+    },
+    {
+      "id": "grief_centers",
+      "label": "Grief centers and child bereavement programs",
+      "category": 11,
+      "why_they_refer": "Families need ongoing grief therapy after a program ends.",
+      "findable_via": "manual",
+      "default_points": 20,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "grief_loss",
+        "children_teens_families",
+        "oncology_serious_illness"
+      ],
+      "session_capped": true,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Grief therapists for after their program.",
+        "you_offer": "Your grief focus and the ages you see."
+      },
+      "note": "Programs often run in fixed cycles (judgment)."
+    },
+    {
+      "id": "nami_dbsa",
+      "label": "NAMI and DBSA chapters",
+      "category": 11,
+      "why_they_refer": "Families and peers ask them for therapists.",
+      "findable_via": "public_list",
+      "default_points": 16,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "general_adult",
+        "children_teens_families"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Local therapists for their resource lists.",
+        "you_offer": "Your openings, and a free talk for families, never tied to referrals."
+      }
+    },
+    {
+      "id": "dv_sa_agencies",
+      "label": "Domestic violence and sexual assault agencies",
+      "category": 11,
+      "why_they_refer": "Survivors need long-term trauma therapy.",
+      "findable_via": "public_list",
+      "default_points": 18,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "trauma"
+      ],
+      "session_capped": true,
+      "sensitive": true,
+      "talk_track": {
+        "they_need": "Trauma therapists who understand safety planning and confidentiality.",
+        "you_offer": "Your trauma focus and sliding-scale options."
+      },
+      "note": "Sensitive: never map or display a street address; contact only through their public channels. State lists."
+    },
+    {
+      "id": "shelters",
+      "label": "Domestic violence and homeless shelters",
+      "category": 11,
+      "why_they_refer": "Residents often need trauma-informed care once they are safe and housed.",
+      "findable_via": "public_list",
+      "default_points": 14,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "trauma"
+      ],
+      "session_capped": false,
+      "sensitive": true,
+      "talk_track": {
+        "they_need": "Therapists who understand safety, confidentiality and sliding fees.",
+        "you_offer": "Your trauma focus and sliding-scale options, contacted only through their public channels."
+      },
+      "note": "Sensitive: never map or display a street address; contact only through their public channels."
+    },
+    {
+      "id": "postpartum_support",
+      "label": "Postpartum support organizations",
+      "category": 11,
+      "why_they_refer": "Perinatal mood support beyond their groups.",
+      "findable_via": "public_list",
+      "default_points": 20,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "perinatal_reproductive"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Perinatal therapists for their provider list.",
+        "you_offer": "Your perinatal training and openings."
+      }
+    },
+    {
+      "id": "adoption_foster",
+      "label": "Adoption and foster agencies",
+      "category": 11,
+      "why_they_refer": "Attachment and family therapy.",
+      "findable_via": "public_list",
+      "default_points": 16,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "children_teens_families",
+        "perinatal_reproductive"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Adoption-competent therapists.",
+        "you_offer": "Your family and attachment focus."
+      },
+      "note": "State licensing lists."
+    },
+    {
+      "id": "refugee_resettlement",
+      "label": "Refugee resettlement agencies",
+      "category": 11,
+      "why_they_refer": "Trauma and adjustment after resettlement.",
+      "findable_via": "public_list",
+      "default_points": 14,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "trauma"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Therapists who understand resettlement and work with interpreters.",
+        "you_offer": "Languages and interpreter-friendly sessions."
+      }
+    },
+    {
+      "id": "support_group_leaders",
+      "label": "Support group leaders",
+      "category": 11,
+      "why_they_refer": "Members who need more than a group.",
+      "findable_via": "manual",
+      "default_points": 14,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "chronic_illness_pain",
+        "grief_loss",
+        "oncology_serious_illness"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist to mention when a member needs more.",
+        "you_offer": "Your focus and how to book."
+      }
+    },
+    {
+      "id": "funeral_homes",
+      "label": "Funeral homes",
+      "category": 12,
+      "why_they_refer": "Grief, especially after sudden loss.",
+      "findable_via": "osm_tags",
+      "also_findable_via": [
+        "public_list"
+      ],
+      "osm_tags": {
+        "shop": "funeral_directors"
+      },
+      "default_points": 16,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "grief_loss",
+        "oncology_serious_illness"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A grief therapist they can name to families.",
+        "you_offer": "Your grief focus and a card for their aftercare packet."
+      }
+    },
+    {
+      "id": "doulas",
+      "label": "Doulas",
+      "category": 12,
+      "why_they_refer": "Close to families through pregnancy and the first weeks.",
+      "findable_via": "nppes",
+      "also_findable_via": [
+        "manual"
+      ],
+      "nppes_specialties": [
+        "doulas"
+      ],
+      "nppes_searches": [
+        "Doula"
+      ],
+      "nucc_codes": [
+        "374J00000X"
+      ],
+      "default_points": 20,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "perinatal_reproductive"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A perinatal therapist they can hand a struggling parent to.",
+        "you_offer": "Your perinatal focus and quick openings."
+      },
+      "sees": [
+        "perinatal",
+        "families",
+        "couples"
+      ],
+      "note": "NUCC added Doula (374J00000X); many doulas still have no NPI."
+    },
+    {
+      "id": "lactation_consultants",
+      "label": "Lactation consultants",
+      "category": 12,
+      "why_they_refer": "See feeding struggles and the mood changes around them.",
+      "findable_via": "nppes",
+      "nppes_specialties": [
+        "lactation_consultants"
+      ],
+      "nppes_searches": [
+        "Lactation Consultant"
+      ],
+      "nucc_codes": [
+        "163WL0100X",
+        "174N00000X"
+      ],
+      "default_points": 18,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "perinatal_reproductive"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A perinatal therapist for parents who are struggling.",
+        "you_offer": "Your perinatal focus and video sessions."
+      },
+      "sees": [
+        "perinatal",
+        "families"
+      ]
+    },
+    {
+      "id": "pelvic_floor_pt",
+      "label": "Pelvic floor physical therapists",
+      "category": 12,
+      "why_they_refer": "Perinatal recovery, pelvic pain and sexual health.",
+      "findable_via": "nppes",
+      "also_findable_via": [
+        "manual"
+      ],
+      "nppes_specialties": [
+        "rehab_therapists"
+      ],
+      "nppes_searches": [
+        "Physical Therapist"
+      ],
+      "shared_with": "rehab_therapists",
+      "default_points": 18,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "perinatal_reproductive",
+        "chronic_illness_pain"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist comfortable with pelvic pain and sexual health.",
+        "you_offer": "Your perinatal and chronic pain focus."
+      },
+      "note": "No pelvic floor taxonomy; found as physical therapists and confirmed from their website."
+    },
+    {
+      "id": "dietitians",
+      "label": "Dietitians",
+      "category": 12,
+      "why_they_refer": "Eating disorders and chronic illness need a therapist on the team.",
+      "findable_via": "nppes",
+      "nppes_specialties": [
+        "dietitians"
+      ],
+      "nppes_searches": [
+        "Dietitian, Registered"
+      ],
+      "nucc_codes": [
+        "133V00000X"
+      ],
+      "default_points": 18,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "eating_disorders",
+        "chronic_illness_pain"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist who works with eating concerns and coordinates with them.",
+        "you_offer": "Your eating disorder focus and how you coordinate."
+      },
+      "sees": "all"
+    },
+    {
+      "id": "rehab_therapists",
+      "label": "Physical, occupational and speech therapists",
+      "category": 12,
+      "why_they_refer": "Injury and disability adjustment.",
+      "findable_via": "nppes",
+      "nppes_specialties": [
+        "rehab_therapists"
+      ],
+      "nppes_searches": [
+        "Physical Therapist",
+        "Occupational Therapist",
+        "Speech-Language Pathologist"
+      ],
+      "nucc_codes": [
+        "225100000X",
+        "225X00000X",
+        "235Z00000X"
+      ],
+      "default_points": 12,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "chronic_illness_pain",
+        "trauma"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Someone for patients struggling to adjust.",
+        "you_offer": "Your chronic-illness and adjustment focus."
+      },
+      "sees": "all"
+    },
+    {
+      "id": "bodywork",
+      "label": "Chiropractors, acupuncturists and massage therapists",
+      "category": 12,
+      "why_they_refer": "Stress and pain clients.",
+      "findable_via": "nppes",
+      "nppes_specialties": [
+        "bodywork"
+      ],
+      "nppes_searches": [
+        "Chiropractor",
+        "Acupuncturist",
+        "Massage Therapist"
+      ],
+      "nucc_codes": [
+        "111N00000X",
+        "171100000X",
+        "225700000X"
+      ],
+      "default_points": 10,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "chronic_illness_pain"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist to suggest when stress is driving the pain.",
+        "you_offer": "Your stress and chronic pain focus."
+      },
+      "sees": [
+        "teens",
+        "adults",
+        "older_adults"
+      ]
+    },
+    {
+      "id": "fitness_yoga",
+      "label": "Yoga studios and gyms",
+      "category": 12,
+      "why_they_refer": "Wellness-minded, often cash-pay clients.",
+      "findable_via": "osm_tags",
+      "osm_tags": {
+        "leisure": "fitness_centre",
+        "sport": "yoga"
+      },
+      "default_points": 6,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "general_adult",
+        "eating_disorders"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Visibility more than referrals.",
+        "you_offer": "A free workshop on stress or sleep, never tied to referrals."
+      }
+    },
+    {
+      "id": "coaches",
+      "label": "Career and life coaches",
+      "category": 12,
+      "why_they_refer": "Clients beyond coaching scope.",
+      "findable_via": "manual",
+      "default_points": 10,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "general_adult",
+        "college_young_adults"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist to suggest when it's beyond coaching.",
+        "you_offer": "Your focus and how to book."
+      }
+    },
+    {
+      "id": "sports_medicine",
+      "label": "Athletic departments and sports medicine",
+      "category": 13,
+      "why_they_refer": "Performance pressure, injury and eating disorders.",
+      "findable_via": "nppes",
+      "also_findable_via": [
+        "public_list"
+      ],
+      "nppes_specialties": [
+        "sports_medicine"
+      ],
+      "nppes_searches": [
+        "Sports Medicine"
+      ],
+      "nucc_codes": [
+        "207XX0005X",
+        "207RS0010X",
+        "2081S0010X"
+      ],
+      "default_points": 14,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "eating_disorders",
+        "college_young_adults"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist who knows athletes.",
+        "you_offer": "Your sport-performance or eating disorder focus."
+      },
+      "sees": [
+        "teens",
+        "adults"
+      ],
+      "note": "Family medicine and pediatric sports codes stay with those fields; athletic departments come from school websites."
+    },
+    {
+      "id": "performing_arts",
+      "label": "Performing arts schools and companies",
+      "category": 13,
+      "why_they_refer": "Performance anxiety.",
+      "findable_via": "public_list",
+      "default_points": 10,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "college_young_adults",
+        "eating_disorders"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "A therapist who knows performers.",
+        "you_offer": "Your performance anxiety focus."
+      },
+      "note": "Their websites."
+    },
+    {
+      "id": "professional_associations",
+      "label": "Professional associations (medical, legal, tech)",
+      "category": 13,
+      "why_they_refer": "Member wellness programs.",
+      "findable_via": "manual",
+      "default_points": 10,
+      "points_basis": "judgment",
+      "why_basis": "judgment",
+      "niches": [
+        "general_adult"
+      ],
+      "session_capped": false,
+      "sensitive": false,
+      "talk_track": {
+        "they_need": "Therapists for member wellness lists.",
+        "you_offer": "A short member-wellness talk, never tied to referrals."
+      }
+    }
+  ],
+  "niche_presets": {
+    "judgment": true,
+    "note": "Judgment calls, not measured. A type's points become default_points x category weight x type boost (1 when not listed). 1 is neutral; 1.5 is the brief's highest-weighted categories.",
+    "presets": [
+      {
+        "id": "oncology_serious_illness",
+        "label": "Oncology / serious illness / end of life",
+        "category_weights": {
+          "1": 1.0,
+          "2": 1.5,
+          "3": 0.75,
+          "4": 1.0,
+          "5": 1.5,
+          "6": 1.5,
+          "7": 0.75,
+          "8": 0.75,
+          "9": 0.75,
+          "10": 1.25,
+          "11": 1.5,
+          "12": 1.0,
+          "13": 0.75
+        },
+        "type_boosts": {
+          "funeral_homes": 1.5,
+          "clergy": 1.5,
+          "genetic_counselors": 1.5,
+          "oncology": 1.5,
+          "palliative_care": 1.5,
+          "hospice": 1.5
+        }
+      },
+      {
+        "id": "grief_loss",
+        "label": "Grief and loss",
+        "category_weights": {
+          "1": 1.0,
+          "2": 0.75,
+          "3": 0.75,
+          "4": 1.0,
+          "5": 1.5,
+          "6": 1.25,
+          "7": 0.75,
+          "8": 0.75,
+          "9": 0.75,
+          "10": 1.5,
+          "11": 1.5,
+          "12": 1.25,
+          "13": 0.75
+        },
+        "type_boosts": {
+          "hospice": 1.5,
+          "funeral_homes": 1.5,
+          "grief_centers": 1.5,
+          "clergy": 1.25
+        }
+      },
+      {
+        "id": "perinatal_reproductive",
+        "label": "Perinatal / reproductive",
+        "category_weights": {
+          "1": 1.5,
+          "2": 1.25,
+          "3": 0.75,
+          "4": 1.0,
+          "5": 0.75,
+          "6": 0.75,
+          "7": 0.75,
+          "8": 0.75,
+          "9": 0.75,
+          "10": 0.75,
+          "11": 1.25,
+          "12": 1.5,
+          "13": 0.75
+        },
+        "type_boosts": {
+          "ob_gyn": 1.5,
+          "midwives": 1.5,
+          "fertility": 1.5,
+          "doulas": 1.5,
+          "lactation_consultants": 1.5,
+          "pelvic_floor_pt": 1.5,
+          "postpartum_support": 1.25
+        }
+      },
+      {
+        "id": "children_teens_families",
+        "label": "Children, teens and families",
+        "category_weights": {
+          "1": 1.5,
+          "2": 0.75,
+          "3": 1.25,
+          "4": 1.0,
+          "5": 0.75,
+          "6": 0.75,
+          "7": 1.5,
+          "8": 0.75,
+          "9": 1.25,
+          "10": 0.75,
+          "11": 1.0,
+          "12": 0.75,
+          "13": 0.75
+        },
+        "type_boosts": {
+          "pediatrics": 1.5,
+          "child_psychiatry": 1.5,
+          "family_law_attorneys": 1.25,
+          "school_staff": 1.5
+        }
+      },
+      {
+        "id": "college_young_adults",
+        "label": "College and young adults",
+        "category_weights": {
+          "1": 1.0,
+          "2": 0.75,
+          "3": 1.25,
+          "4": 1.25,
+          "5": 0.75,
+          "6": 0.75,
+          "7": 1.5,
+          "8": 0.75,
+          "9": 0.75,
+          "10": 0.75,
+          "11": 0.75,
+          "12": 0.75,
+          "13": 1.0
+        },
+        "type_boosts": {
+          "college_counseling": 1.5,
+          "disability_offices": 1.25
+        }
+      },
+      {
+        "id": "couples",
+        "label": "Couples",
+        "category_weights": {
+          "1": 1.0,
+          "2": 0.75,
+          "3": 0.75,
+          "4": 1.5,
+          "5": 0.75,
+          "6": 0.75,
+          "7": 0.75,
+          "8": 0.75,
+          "9": 1.25,
+          "10": 1.25,
+          "11": 0.75,
+          "12": 0.75,
+          "13": 0.75
+        },
+        "type_boosts": {
+          "family_law_attorneys": 1.5,
+          "clergy": 1.5,
+          "fertility": 1.25
+        }
+      },
+      {
+        "id": "trauma",
+        "label": "Trauma",
+        "category_weights": {
+          "1": 1.0,
+          "2": 0.75,
+          "3": 1.0,
+          "4": 1.5,
+          "5": 0.75,
+          "6": 0.75,
+          "7": 0.75,
+          "8": 1.25,
+          "9": 1.25,
+          "10": 0.75,
+          "11": 1.5,
+          "12": 0.75,
+          "13": 0.75
+        },
+        "type_boosts": {
+          "personal_injury_attorneys": 1.5,
+          "dv_sa_agencies": 1.5,
+          "refugee_resettlement": 1.5,
+          "first_responder_peer_support": 1.5,
+          "veterans_orgs": 1.25
+        }
+      },
+      {
+        "id": "chronic_illness_pain",
+        "label": "Chronic illness / pain",
+        "category_weights": {
+          "1": 1.0,
+          "2": 1.5,
+          "3": 0.75,
+          "4": 1.0,
+          "5": 0.75,
+          "6": 0.75,
+          "7": 0.75,
+          "8": 0.75,
+          "9": 0.75,
+          "10": 0.75,
+          "11": 1.0,
+          "12": 1.5,
+          "13": 0.75
+        },
+        "type_boosts": {
+          "pain_medicine": 1.5,
+          "rheumatology": 1.5,
+          "physiatry": 1.25
+        }
+      },
+      {
+        "id": "eating_disorders",
+        "label": "Eating disorders",
+        "category_weights": {
+          "1": 1.25,
+          "2": 0.75,
+          "3": 1.0,
+          "4": 1.25,
+          "5": 0.75,
+          "6": 0.75,
+          "7": 1.0,
+          "8": 0.75,
+          "9": 0.75,
+          "10": 0.75,
+          "11": 0.75,
+          "12": 1.5,
+          "13": 1.5
+        },
+        "type_boosts": {
+          "dietitians": 1.5,
+          "sports_medicine": 1.5,
+          "mental_health_programs": 1.25
+        }
+      },
+      {
+        "id": "older_adults_caregivers",
+        "label": "Older adults and caregivers",
+        "category_weights": {
+          "1": 1.25,
+          "2": 1.0,
+          "3": 0.75,
+          "4": 0.75,
+          "5": 1.25,
+          "6": 1.5,
+          "7": 0.75,
+          "8": 0.75,
+          "9": 0.75,
+          "10": 0.75,
+          "11": 1.0,
+          "12": 0.75,
+          "13": 0.75
+        },
+        "type_boosts": {
+          "geriatrics": 1.5,
+          "geriatric_care_managers": 1.5,
+          "home_health": 1.25
+        }
+      },
+      {
+        "id": "general_adult",
+        "label": "General adult",
+        "category_weights": {
+          "1": 1.5,
+          "2": 1.0,
+          "3": 1.25,
+          "4": 1.25,
+          "5": 0.75,
+          "6": 0.75,
+          "7": 0.75,
+          "8": 1.25,
+          "9": 0.75,
+          "10": 0.75,
+          "11": 0.75,
+          "12": 0.75,
+          "13": 0.75
+        },
+        "type_boosts": {
+          "family_medicine": 1.25,
+          "eap": 1.25
+        }
+      }
+    ]
+  },
+  "session_capped_boost": {
+    "judgment": true,
+    "points": 8,
+    "applies_when": "her practice is private pay (self-pay)",
+    "note": "Programs with a session cap (EAPs, college counseling, hospice bereavement, free short-term nonprofit counseling) hand clients off when the cap runs out. Added after niche weighting, before the 100 cap. Judgment."
+  },
+  "nppes_verification": {
+    "Family Medicine": {
+      "il_results": 191,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "207Q00000X",
+        "207QA0401X",
+        "207QH0002X",
+        "363LF0000X"
+      ]
+    },
+    "Internal Medicine": {
+      "il_results": 186,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "207R00000X"
+      ]
+    },
+    "Pediatrics": {
+      "il_results": 194,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "208000000X",
+        "2080A0000X",
+        "2080P0204X",
+        "363LP0200X"
+      ]
+    },
+    "Obstetrics & Gynecology": {
+      "il_results": 188,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "207V00000X",
+        "207VG0400X",
+        "207VM0101X",
+        "363LX0001X"
+      ]
+    },
+    "Midwife": {
+      "il_results": 155,
+      "of": 159,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "176B00000X",
+        "367A00000X"
+      ]
+    },
+    "Advanced Practice Midwife": {
+      "il_results": 188,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "176B00000X",
+        "367A00000X"
+      ]
+    },
+    "Geriatric Medicine": {
+      "il_results": 188,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "207QG0300X",
+        "207RG0300X"
+      ]
+    },
+    "Nurse Practitioner": {
+      "il_results": 198,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "363A00000X",
+        "363L00000X",
+        "363LG0600X",
+        "363LP2300X"
+      ]
+    },
+    "Physician Assistant": {
+      "il_results": 187,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "363A00000X",
+        "363AM0700X",
+        "363L00000X"
+      ]
+    },
+    "Urgent Care": {
+      "il_results": 200,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "261QU0200X"
+      ]
+    },
+    "Hematology & Oncology": {
+      "il_results": 177,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "207RH0003X",
+        "207RX0202X",
+        "207VX0201X",
+        "2085R0001X"
+      ]
+    },
+    "Medical Oncology": {
+      "il_results": 178,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "207RH0003X",
+        "207RX0202X",
+        "207VX0201X",
+        "2085R0001X"
+      ]
+    },
+    "Radiation Oncology": {
+      "il_results": 173,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "207RH0003X",
+        "207RX0202X",
+        "207VX0201X",
+        "2085R0001X"
+      ]
+    },
+    "Gynecologic Oncology": {
+      "il_results": 131,
+      "of": 138,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "207RH0003X",
+        "207RX0202X",
+        "207VX0201X",
+        "2085R0001X"
+      ]
+    },
+    "Cardiovascular Disease": {
+      "il_results": 177,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "207RC0000X"
+      ]
+    },
+    "Neurology": {
+      "il_results": 170,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "2084N0400X",
+        "2084N0402X"
+      ]
+    },
+    "Gastroenterology": {
+      "il_results": 176,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "207RG0100X"
+      ]
+    },
+    "Endocrinology, Diabetes & Metabolism": {
+      "il_results": 185,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "207RE0101X"
+      ]
+    },
+    "Rheumatology": {
+      "il_results": 181,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "207RR0500X"
+      ]
+    },
+    "Pain Medicine": {
+      "il_results": 185,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "207LP2900X",
+        "2081P2900X",
+        "208VP0000X",
+        "208VP0014X"
+      ]
+    },
+    "Interventional Pain Medicine": {
+      "il_results": 189,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "207LP2900X",
+        "2081P2900X",
+        "208VP0000X",
+        "208VP0014X"
+      ]
+    },
+    "Sleep Medicine": {
+      "il_results": 182,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "207RS0012X",
+        "2084S0012X"
+      ]
+    },
+    "Reproductive Endocrinology": {
+      "il_results": 170,
+      "of": 177,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "207VE0102X"
+      ]
+    },
+    "Plastic Surgery": {
+      "il_results": 182,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "208200000X",
+        "2086S0122X"
+      ]
+    },
+    "Dermatology": {
+      "il_results": 188,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "207N00000X",
+        "207ND0101X",
+        "207NP0225X",
+        "207NS0135X"
+      ]
+    },
+    "Genetic Counselor": {
+      "il_results": 200,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "170300000X"
+      ]
+    },
+    "Physical Medicine & Rehabilitation": {
+      "il_results": 190,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "208100000X"
+      ]
+    },
+    "Psychiatry": {
+      "il_results": 188,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "2084P0800X",
+        "2084P0804X",
+        "363LP0808X"
+      ]
+    },
+    "Addiction Medicine": {
+      "il_results": 193,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "207LA0401X",
+        "207RA0401X",
+        "2083A0300X",
+        "2084A0401X"
+      ]
+    },
+    "Social Worker": {
+      "il_results": 198,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "101YM0800X",
+        "101YP2500X",
+        "1041C0700X",
+        "106H00000X"
+      ]
+    },
+    "Marriage & Family Therapist": {
+      "il_results": 195,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "101YM0800X",
+        "101YP2500X",
+        "1041C0700X",
+        "106H00000X"
+      ]
+    },
+    "Counselor": {
+      "il_results": 198,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "101YM0800X",
+        "101YP2500X",
+        "1041C0700X",
+        "106H00000X"
+      ]
+    },
+    "Psychologist": {
+      "il_results": 193,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "103T00000X",
+        "103TC0700X"
+      ]
+    },
+    "Mental Health": {
+      "il_results": 198,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "261QM0801X"
+      ]
+    },
+    "Psychiatric Residential Treatment Facility": {
+      "il_results": 52,
+      "of": 52,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "261QM0801X",
+        "283Q00000X",
+        "323P00000X"
+      ]
+    },
+    "Psychiatric Hospital": {
+      "il_results": 72,
+      "of": 73,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "261QM0801X",
+        "273R00000X",
+        "283Q00000X",
+        "323P00000X"
+      ]
+    },
+    "Psychiatric Unit": {
+      "il_results": 200,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "261QM0801X",
+        "273R00000X",
+        "283Q00000X"
+      ]
+    },
+    "Hospice and Palliative Medicine": {
+      "il_results": 173,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "207LH0002X",
+        "207PH0002X",
+        "207RH0002X"
+      ]
+    },
+    "Hospice Care, Community Based": {
+      "il_results": 199,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "251G00000X",
+        "315D00000X"
+      ]
+    },
+    "Hospice, Inpatient": {
+      "il_results": 17,
+      "of": 18,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "251G00000X",
+        "315D00000X"
+      ]
+    },
+    "Home Health": {
+      "il_results": 200,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "251E00000X"
+      ]
+    },
+    "Doula": {
+      "il_results": 198,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "374J00000X"
+      ]
+    },
+    "Lactation Consultant": {
+      "il_results": 194,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "163WL0100X",
+        "174N00000X"
+      ]
+    },
+    "Physical Therapist": {
+      "il_results": 199,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "225100000X",
+        "225X00000X",
+        "235Z00000X"
+      ]
+    },
+    "Dietitian, Registered": {
+      "il_results": 195,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "133V00000X"
+      ]
+    },
+    "Occupational Therapist": {
+      "il_results": 197,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "225100000X",
+        "225X00000X",
+        "235Z00000X"
+      ]
+    },
+    "Speech-Language Pathologist": {
+      "il_results": 197,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "225100000X",
+        "225X00000X",
+        "235Z00000X"
+      ]
+    },
+    "Chiropractor": {
+      "il_results": 200,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "111N00000X",
+        "171100000X",
+        "225700000X"
+      ]
+    },
+    "Acupuncturist": {
+      "il_results": 197,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "111N00000X",
+        "171100000X",
+        "225700000X"
+      ]
+    },
+    "Massage Therapist": {
+      "il_results": 200,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "111N00000X",
+        "171100000X",
+        "225700000X"
+      ]
+    },
+    "Sports Medicine": {
+      "il_results": 181,
+      "of": 200,
+      "limit": 200,
+      "checked": "2026-11-02",
+      "codes_returned": [
+        "207RS0010X",
+        "207XX0005X",
+        "2081S0010X"
+      ]
+    }
+  },
+  "hard_rules": [
+    "Sensitive types (domestic violence and sexual assault agencies): never map or display a street address; contact only through their public channels.",
+    "No source type, weight or talk track may offer or reward anything of value for a referral.",
+    "Talk tracks are about practice logistics (openings, fees, how to book), never clinical advice or a client's details."
+  ]
+}

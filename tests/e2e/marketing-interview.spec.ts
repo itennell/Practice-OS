@@ -1,6 +1,9 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { execSync } from "node:child_process";
+import { REFERRALS_ONLY_DEMO } from "../../lib/features";
+
+test.skip(REFERRALS_ONLY_DEMO, "Hidden in the referrals-only demo (lib/features.ts); these run when REFERRALS_ONLY_DEMO is false.");
 
 // Onboarding's marketing interview (chapter 6) for three fictional therapists, each on
 // her own path: one posts weekly, one has no Instagram but wants one, and one says

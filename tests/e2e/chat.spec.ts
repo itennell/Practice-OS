@@ -1,6 +1,8 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { execSync } from "node:child_process";
+import { REFERRALS_ONLY_DEMO } from "../../lib/features";
+import { REFERRAL_DEMO_SUGGESTIONS } from "../../lib/aeon/suggestions";
 
 // Chat with Aeon at /. No live model call: the guards answer before any model,
 // and a model-backed conversation is replayed from a recorded fixture into the
@@ -27,8 +29,9 @@ test("Opens on Aeon with a greeting, data-built chips and one quiet Today list",
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1, name: /^(Good (morning|afternoon|evening)|Hello)\b/ })).toBeVisible();
   const suggestions = page.getByRole("list", { name: "Suggestions" }).getByRole("button");
-  // The seeded practice has approvals waiting, so the middle chip asks about them.
-  await expect(suggestions).toHaveText(["What needs me this week?", "What's waiting for my OK?", "Draft a Good Faith Estimate"]);
+  // The seeded practice has approvals waiting, so the middle chip asks about them. The
+  // referrals-only demo (lib/features.ts) shows its fixed referral tiles instead.
+  await expect(suggestions).toHaveText(REFERRALS_ONLY_DEMO ? REFERRAL_DEMO_SUGGESTIONS : ["What needs me this week?", "What's waiting for my OK?", "Draft a Good Faith Estimate"]);
   const today = page.getByRole("region", { name: /^Today/ });
   await expect(today).toContainText(/\d+ waiting for your OK/);
   await expect(today.getByRole("link", { name: "Review" })).toHaveAttribute("href", "/approvals");
@@ -61,6 +64,7 @@ test("A client name and birth date are refused, never shown, and stay in the box
 });
 
 test("A saved chat shows what Aeon checked and the approval card, the same row as Approvals", async ({ page }) => {
+  test.skip(REFERRALS_ONLY_DEMO, "Good Faith Estimates are hidden in the referrals-only demo (lib/features.ts).");
   const id = execSync("npx tsx scripts/seed-chat.ts draft-gfe", { encoding: "utf8" }).trim().split("\n").at(-1)!;
   await page.goto(`/?c=${id}`);
   const log = page.getByRole("log", { name: "Conversation" });

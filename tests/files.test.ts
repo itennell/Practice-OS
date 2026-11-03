@@ -7,6 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadEnv } from "../lib/env";
+import { REFERRAL_DEMO_FILE_KINDS, REFERRALS_ONLY_DEMO } from "../lib/features";
 import { documentCardSchema, type DocumentCard } from "../lib/documents/card";
 import { GROUP_OF, matchesSearch, sortFiles, toFileEntry } from "../lib/documents/file-entry";
 import { capText, passages, READ_CAP } from "../lib/aeon/tools-files";
@@ -130,7 +131,9 @@ describe.skipIf(!hasDb)("Files and read_document on the demo practice", async ()
     const { entries: files, capped } = await listFiles();
     expect(capped).toEqual({});
     const groups = new Set(files.map((f) => f.group));
-    for (const g of ["uploaded", "forms", "money"]) expect(groups).toContain(g);
+    // The referrals-only demo (lib/features.ts) shows only her uploads and referral letters.
+    if (REFERRALS_ONLY_DEMO) expect(files.every((f) => REFERRAL_DEMO_FILE_KINDS.includes(f.card.kind))).toBe(true);
+    else for (const g of ["uploaded", "forms", "money"]) expect(groups).toContain(g);
     expect(files.some((f) => f.card.kind === "deadline" || f.card.kind === "guide" || f.card.kind === "credentialing_profile")).toBe(false);
     expect(files.find((f) => f.card.id === `uploaded:${lease.id}`)).toMatchObject({ source: "uploaded", group: "uploaded" });
 

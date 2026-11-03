@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { execSync } from "node:child_process";
+import { REFERRALS_ONLY_DEMO } from "../../lib/features";
 
 // The Files page (/files): everything she added and everything Aeon made, in one list
 // from the document index (lib/documents/files.ts). Filter chips, search, the Open
@@ -16,6 +17,7 @@ async function axeViolations(page: Page) {
 }
 
 test("Files lists everything in one place, filters, searches and opens a file", async ({ page }) => {
+  test.skip(REFERRALS_ONLY_DEMO, "The referrals-only demo shows only uploads and referral letters (lib/features.ts).");
   await page.goto("/files");
   await expect(page.getByRole("heading", { level: 1, name: "Files" })).toBeVisible();
   if ((page.viewportSize()?.width ?? 0) >= 768) {
@@ -73,4 +75,15 @@ test("Files lists everything in one place, filters, searches and opens a file", 
   await page.keyboard.press("Escape");
   await expect(page).toHaveURL(/\/files$/);
   await expect(panel).toHaveCount(0);
+});
+
+test("Referrals-only demo: Files shows the referral letter and her uploads, nothing else", async ({ page }) => {
+  test.skip(!REFERRALS_ONLY_DEMO, "Runs while the referrals-only demo is on (lib/features.ts).");
+  await page.goto("/files");
+  await expect(page.getByRole("heading", { level: 1, name: "Files" })).toBeVisible();
+  await expect(page.getByRole("region", { name: /^Referrals/ })).toBeVisible();
+  await expect(page.getByRole("region", { name: /^Forms/ })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: /^Estimates & superbills/ })).toHaveCount(0);
+  await expect(page.getByText(/^GFE-\d{4}-\d{4}: /)).toHaveCount(0);
+  expect(await axeViolations(page)).toEqual([]);
 });

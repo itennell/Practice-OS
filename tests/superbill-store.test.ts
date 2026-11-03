@@ -1,6 +1,7 @@
 // Saved superbills against the live database. Runs only when DATABASE_URL is
 // set and migration 011 has run; every superbill made here is deleted after.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { REFERRALS_ONLY_DEMO } from "../lib/features";
 import { loadEnv } from "../lib/env";
 
 loadEnv();
@@ -60,7 +61,7 @@ describe.skipIf(!hasDb)("saved superbills", () => {
     ).rejects.toThrow();
   });
 
-  it("canary: a client name offered to the tool and the store is stored nowhere", async ({ skip }) => {
+  it.skipIf(REFERRALS_ONLY_DEMO)("canary: a client name offered to the tool and the store is stored nowhere", async ({ skip }) => {
     if (!ready) skip();
     const viaTool = await runTool("draft_superbill", { lines: [{ ...line, client_name: CANARY }] }, { by: "test" });
     expect(viaTool.isError).toBe(true);

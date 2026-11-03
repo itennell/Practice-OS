@@ -5,6 +5,11 @@
 import type { CrisisCategory } from "../../lib/safety";
 
 export const MUST_ROUTE: string[] = [
+  // -ing forms and third person (Nov 2 debrief review)
+  "A patient told the nurse he was thinking about killing himself.",
+  "she keeps talking about killing herself",
+  "they mentioned hurting themselves",
+  "he has been cutting himself",
   // direct
   "I want to kill myself",
   "i'm going to kill myself tonight",

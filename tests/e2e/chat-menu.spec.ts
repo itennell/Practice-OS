@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { FRONT_DESK_ENABLED } from "../../lib/features";
+import { FRONT_DESK_ENABLED, hiddenInDemo, REFERRALS_ONLY_DEMO } from "../../lib/features";
 import { execSync } from "node:child_process";
 
 // The dark chat menu (UI-005): the same menu on desktop (left column) and phones (slides in).
@@ -40,8 +40,10 @@ test("Menu: Aeon, New chat, search, practice links with counts, recent chats and
   await expect(menu.getByRole("button", { name: "New chat" })).toBeVisible();
   await expect(menu.getByRole("searchbox", { name: "Search chats" })).toBeVisible();
   const main = menu.getByRole("navigation", { name: "Main" });
-  for (const name of [/^Admin/, /^Approvals/, "Referrals", "Media"]) {
-    await expect(main.getByRole("link", { name })).toBeVisible();
+  for (const name of [/^Admin/, /^Approvals/, "Referrals", "Media", "Files"]) {
+    // The referrals-only demo (lib/features.ts) hides Admin and Media.
+    const hidden = REFERRALS_ONLY_DEMO && (name === "Media" || String(name) === String(/^Admin/));
+    await expect(main.getByRole("link", { name })).toHaveCount(hidden ? 0 : 1);
   }
   // Front Desk is in the menu only while it is on (lib/features.ts); paused it is three helpers.
   await expect(main.getByRole("link", { name: "Front Desk" })).toHaveCount(FRONT_DESK_ENABLED ? 1 : 0);
@@ -90,7 +92,7 @@ test("Phones: the menu slides in, traps focus, and closes on Escape", async ({ p
   await expect(page.getByRole("button", { name: "Open menu" })).toBeFocused();
 });
 
-for (const path of ["/", "/approvals", "/admin/deadlines"]) {
+for (const path of ["/", "/approvals", "/admin/deadlines"].filter((p) => !hiddenInDemo(p))) {
   test(`Screenshot with the menu: ${path}`, async ({ page }, info) => {
     await page.goto(path);
     await page.waitForLoadState("networkidle");

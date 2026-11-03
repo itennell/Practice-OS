@@ -1,6 +1,9 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { execSync } from "node:child_process";
+import { REFERRALS_ONLY_DEMO } from "../../lib/features";
+
+test.skip(REFERRALS_ONLY_DEMO, "Hidden in the referrals-only demo (lib/features.ts); these run when REFERRALS_ONLY_DEMO is false.");
 
 // The Instagram content coach in chat: "give me 3 post ideas for this week", then
 // "draft the second one". The conversation is replayed from a recorded golden run

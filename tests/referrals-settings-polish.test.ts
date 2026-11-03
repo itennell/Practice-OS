@@ -5,6 +5,7 @@
 // client-form blanks asked for in the chat). Built-in database, stand-in model,
 // fake data only. The privacy guard is a pass-through here (its model isn't downloaded).
 import { afterAll, describe, expect, it, vi } from "vitest";
+import { REFERRALS_ONLY_DEMO } from "../lib/features";
 
 vi.mock("../lib/aeon/guard", async (orig) => ({ ...(await orig<typeof import("../lib/aeon/guard")>()), guard: vi.fn(async (t: string) => ({ ok: true, text: t })) }));
 // Flip to make reading her saved fees fail (set_fees' preflight has to answer, not throw).
@@ -237,7 +238,7 @@ describe("a session fee goes to the length her words name, never the model's pic
   });
 });
 
-describe("reply time in business days stays business days", () => {
+describe.skipIf(REFERRALS_ONLY_DEMO)("reply time in business days stays business days", () => {
   it("is stored as she said it, clears hours, and prints as business days", () => {
     expect(businessDaysSaid("I reply within 2 business days")).toBe(2);
     expect(toPolicies({ reply_within_business_days: 2 })).toEqual({ reply_within_business_days: 2, reply_within_hours: null });
@@ -368,6 +369,8 @@ describe.skipIf(!hasDb)("referrals against the database", () => {
     const [audit] = await db()<{ n: number }[]>`select count(*)::int as n from practice_os.audit_log where action = 'approval_declined' and approval_id = ${a.id}`;
     expect(audit.n).toBe(1);
     await db()`delete from practice_os.referral_suppressions where npi = (select npi from practice_os.referral_sources where id = ${id})`;
+    const { unsuppress } = await import("../lib/referrals/contacts");
+    await unsuppress(id); // its org key too (migration 045)
   });
 
   it("a revision keeps BCBS (as pending), sliding scale and 6 years; plain code checks, retrying until it does", async () => {
@@ -409,7 +412,7 @@ describe.skipIf(!hasDb)("referrals against the database", () => {
   });
 });
 
-describe.skipIf(!hasDb)("settings against the database", () => {
+describe.skipIf(REFERRALS_ONLY_DEMO || !hasDb)("settings against the database", () => {
   it("'sessions are $130' with two session codes asks which and queues nothing (Manual)", async () => {
     const [p] = await db()<{ fee_schedule: unknown }[]>`select fee_schedule from practice_os.clinician_profile limit 1`;
     savedFees = p.fee_schedule;

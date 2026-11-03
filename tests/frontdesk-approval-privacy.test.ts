@@ -4,6 +4,7 @@
 // calendar; it writes inquiries, approvals and bookings and flips the Front
 // Desk switches, so it runs only on a local throwaway database (localhost).
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { REFERRALS_ONLY_DEMO } from "../lib/features";
 // These test Front Desk itself, so they run with it switched on (lib/features.ts).
 vi.mock("../lib/features", async (orig) => ({ ...(await orig<typeof import("../lib/features")>()), FRONT_DESK_ENABLED: true }));
 import { loadEnv } from "../lib/env";
@@ -117,7 +118,7 @@ function expectMasked(rows: Row[], p: string) {
   }
 }
 
-describe.skipIf(!localDb)("Front Desk approvals show only the masked number (local database only)", () => {
+describe.skipIf(REFERRALS_ONLY_DEMO || !localDb)("Front Desk approvals show only the masked number (local database only)", () => {
   it("consult times (offers), a pick-again reply and the booking (ingest), and the reminder", async () => {
     expect(await processVoicemail(vm(BOOKER, "Hi, I'd like to book a first consult."), phone)).toBe("done"); // offers.ts: consult times
     await processText(text(BOOKER, "R"), phone); // ingest.ts: quick sms_reply, "no consult to change"

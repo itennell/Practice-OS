@@ -2,6 +2,7 @@
 // phone, and a [Sample] voicemail runs the real pipeline without texting anyone.
 // Writes settings, approvals and inquiries, so it runs only on a local throwaway database.
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { REFERRALS_ONLY_DEMO } from "../lib/features";
 // These test Front Desk itself, so they run with it switched on (lib/features.ts).
 vi.mock("../lib/features", async (orig) => ({ ...(await orig<typeof import("../lib/features")>()), FRONT_DESK_ENABLED: true }));
 import { loadEnv } from "../lib/env";
@@ -74,7 +75,7 @@ describe("sample calendar (plain code)", () => {
   });
 });
 
-describe.skipIf(!localDb)("test console (local database only)", () => {
+describe.skipIf(REFERRALS_ONLY_DEMO || !localDb)("test console (local database only)", () => {
   it("refuses the test text when she has no alert phone", async () => {
     await db()`update practice_os.settings set alert_phone = null`;
     await expect(queueTestText()).rejects.toBeInstanceOf(TestConsoleError);

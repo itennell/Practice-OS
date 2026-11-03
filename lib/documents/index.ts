@@ -19,6 +19,7 @@ import { getSuperbill, listSuperbills, summarize, type SuperbillRow } from "../s
 import { DOC_KIND_LABEL } from "../uploads/classify";
 import { listStoredDocuments, getStoredDocument, type StoredDocument } from "../uploads/store";
 import { db } from "../db";
+import { fileKindEnabled } from "../features";
 import { DOCUMENT_KINDS, KIND_LABEL, type DocumentCard, type DocumentKind } from "./card";
 
 // The document index: every kind of paperwork Admin holds or can make, read from its
@@ -386,7 +387,7 @@ export async function allDocuments(): Promise<DocumentCard[]> {
     listReferralLetters(10),
     listInstagramPosts(10),
   ]);
-  return [
+  const cards = [
     ...deadlines.due.map((o) => deadlineCard(o, today)),
     ...apps.map((a) => payerCard(a, today)),
     ...(caqh ? [caqh] : []),
@@ -401,6 +402,8 @@ export async function allDocuments(): Promise<DocumentCard[]> {
     ...letters.map(referralLetterCard),
     ...posts.map(instagramPostCard),
   ];
+  // The referrals-only demo (lib/features.ts) shows only her uploads and referral letters.
+  return cards.filter((c) => fileKindEnabled(c.kind));
 }
 
 // Words she might use for a kind, so "the Medicare form" or "insurance" finds it.
@@ -418,6 +421,7 @@ const KIND_WORDS: Record<DocumentKind, string[]> = {
   guide: ["how", "guide", "steps"],
   uploaded: ["uploaded", "added", "contract", "letter", "certificate", "w9", "malpractice", "fee", "schedule"],
   referral_letter: ["referral", "referrals", "letter", "letters", "intro", "introduction", "outreach"],
+  referral_debrief: ["debrief", "coffee", "meeting", "met", "referral", "partner"],
   instagram_post: ["instagram", "post", "posts", "caption", "picture", "social"],
 };
 
@@ -481,7 +485,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export async function openDocument(id: string): Promise<DocumentCard | null> {
   const [kind, ...rest] = id.split(":");
   const key = rest.join(":");
-  if (!(DOCUMENT_KINDS as readonly string[]).includes(kind)) return null;
+  if (!(DOCUMENT_KINDS as readonly string[]).includes(kind) || !fileKindEnabled(kind)) return null;
   const today = await practiceToday();
   switch (kind as DocumentKind) {
     case "gfe": {

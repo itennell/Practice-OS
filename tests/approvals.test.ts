@@ -2,6 +2,7 @@
 // Each test creates its own approval (created_by 'test') and deletes it after.
 // The audit rows it writes stay, because audit_log is append-only.
 import { afterAll, describe, expect, it, vi } from "vitest";
+import { REFERRALS_ONLY_DEMO } from "../lib/features";
 // These test Front Desk itself, so they run with it switched on (lib/features.ts).
 vi.mock("../lib/features", async (orig) => ({ ...(await orig<typeof import("../lib/features")>()), FRONT_DESK_ENABLED: true }));
 import { loadEnv } from "../lib/env";
@@ -34,7 +35,7 @@ afterAll(async () => {
   await closeDb();
 });
 
-describe.skipIf(!hasDb)("approve flow", () => {
+describe.skipIf(REFERRALS_ONLY_DEMO || !hasDb)("approve flow", () => {
   it("approves a test note: done, with a result and audit rows", async () => {
     const id = await makeApproval("test_note", { note: "hello" });
     const res = await approve(id, { by: "test" });

@@ -32,6 +32,9 @@ export default defineConfig({
       PLAYWRIGHT_CRITIC_STANDIN: process.env.PLAYWRIGHT_LIVE === "1" ? "0" : "1",
       // The chat-first studio's models (research merge, words, slides, chat edits); off on a live run.
       PLAYWRIGHT_STUDIO_STANDIN: process.env.PLAYWRIGHT_LIVE === "1" ? "0" : "1",
+      // The coffee debrief's transcriber and Muse (lib/referrals/debrief-standin.ts); off on a live run.
+      PLAYWRIGHT_DEBRIEF_STANDIN: process.env.PLAYWRIGHT_LIVE === "1" ? "0" : "1",
+      PRACTICE_OS_E2E: "1",
       DRY_RUN: "true",
       FRONT_DESK_POLL: "off",
       ...Object.fromEntries(

@@ -4,6 +4,7 @@
 // Database tests: run only when DATABASE_URL is set (a throwaway local Postgres).
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { REFERRALS_ONLY_DEMO } from "../lib/features";
 
 vi.mock("../lib/meta", async (orig) => {
   const real = await orig<typeof import("../lib/meta")>();
@@ -51,7 +52,7 @@ afterAll(async () => {
   await closeDb();
 });
 
-describe.skipIf(!hasDb)("Grow drafts, approvals and exports", () => {
+describe.skipIf(REFERRALS_ONLY_DEMO || !hasDb)("Grow drafts, approvals and exports", () => {
   it("private_pay_plan answers with the [Sample] plan for the demo practice", async () => {
     const r = json(await runTool("private_pay_plan", {}, ctx));
     expect(r.headline).toBe("[Sample] You need 9 private-pay clients to replace BCBSIL: 7 more than you have now. 12-week plan.");

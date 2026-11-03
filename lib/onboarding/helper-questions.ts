@@ -25,6 +25,8 @@ type Base = {
   says?: string;
   /** Picking this answer puts the screen on "Still to set up", under these words. */
   later?: { when: string; ask: string };
+  /** This block's question ids whose screens open with load()'s new values after this answer saves (a niche pre-selects kinds). */
+  refreshes?: string[];
   /**
    * Leave out when it doesn't apply. Defaults to always. `mine` holds this block's
    * answers so far (ids without the helper prefix), so a block can branch.

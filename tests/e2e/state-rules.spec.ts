@@ -3,6 +3,9 @@ import { expect, test } from "@playwright/test";
 import { execSync } from "node:child_process";
 import { loadEnv } from "../../lib/env";
 import { TEST_RULE_ID, sampleResearch } from "../helpers/researched-rule";
+import { REFERRALS_ONLY_DEMO } from "../../lib/features";
+
+test.skip(REFERRALS_ONLY_DEMO, "Hidden in the referrals-only demo (lib/features.ts); these run when REFERRALS_ONLY_DEMO is false.");
 
 loadEnv();
 

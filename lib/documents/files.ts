@@ -7,7 +7,8 @@ import { listStoredDocuments } from "../uploads/store";
 import { getEstimate } from "../gfe/store";
 import { getSuperbill } from "../superbill/store";
 import { getStoredDocument } from "../uploads/store";
-import { sortFiles, toFileEntry, type FileEntry, type FileGroup } from "./file-entry";
+import { fileKindEnabled } from "../features";
+import { SHOWN_GROUPS, sortFiles, toFileEntry, type FileEntry, type FileGroup } from "./file-entry";
 import {
   clientFormCards,
   cms855iCard,
@@ -74,7 +75,11 @@ export async function listFiles(): Promise<FilesView> {
   if (money.length) capped.money = `Showing the newest ${money.join(" and ")}.`;
   if (full(letters, FILE_CAPS.letters)) capped.referrals = `Showing the newest ${FILE_CAPS.letters}.`;
   if (full(posts, FILE_CAPS.posts)) capped.media = `Showing the newest ${FILE_CAPS.posts}.`;
-  return { entries: sortFiles(entries.filter((e): e is FileEntry => e !== null)), capped };
+  // A note only for a group the page shows (the referrals-only demo hides most: lib/features.ts).
+  for (const g of Object.keys(capped) as (keyof typeof capped)[]) if (!SHOWN_GROUPS.includes(g)) delete capped[g];
+  // The referrals-only demo (lib/features.ts) shows only her uploads and referral letters.
+  const shown = entries.filter((e): e is FileEntry => e !== null && fileKindEnabled(e.card.kind));
+  return { entries: sortFiles(shown), capped };
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -85,6 +90,7 @@ export async function getFile(id: string): Promise<FileEntry | null> {
   const kind = id.slice(0, at);
   const key = id.slice(at + 1);
   const uuid = UUID.test(key);
+  if (!fileKindEnabled(kind)) return null; // hidden in the referrals-only demo (lib/features.ts)
   switch (kind) {
     case "uploaded": {
       const d = uuid ? await getStoredDocument(key) : null;

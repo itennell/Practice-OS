@@ -2,7 +2,7 @@ import type { ComponentType } from "react";
 import { GoogleCard } from "./google-card";
 import { InstagramCard } from "./instagram-card";
 import { MuseCard } from "./muse-card";
-import { FRONT_DESK_ENABLED, PHONE_ENABLED } from "@/lib/features";
+import { FRONT_DESK_ENABLED, PHONE_ENABLED, REFERRALS_ONLY_DEMO } from "@/lib/features";
 import { CalcomConnectionCard } from "./calcom-card";
 import { PhoneConnectionCard } from "./phone-card";
 
@@ -26,7 +26,7 @@ export type ConnectionCard = {
   Card: ComponentType<{ status: ConnectionStatus }>;
 };
 
-export const CONNECTION_CARDS: ConnectionCard[] = [
+const ALL_CARDS: ConnectionCard[] = [
   { id: "muse", order: 0, Card: MuseCard },
   { id: "google", order: 20, Card: GoogleCard },
   // Instagram: publishing is cut for now (Isaiah, 2026-10-29). The card only says there is
@@ -37,3 +37,9 @@ export const CONNECTION_CARDS: ConnectionCard[] = [
   ...(PHONE_ENABLED ? [{ id: "phone", order: 40, Card: PhoneConnectionCard }] : []),
   ...(FRONT_DESK_ENABLED ? [{ id: "calcom", order: 50, Card: CalcomConnectionCard }] : []),
 ];
+
+/**
+ * The referrals-only demo (lib/features.ts) shows only Muse: Gmail is cut, so no Google card. The
+ * urgent-alert phone card stays whenever PHONE_ENABLED brings it back (the crisis text needs it).
+ */
+export const CONNECTION_CARDS: ConnectionCard[] = REFERRALS_ONLY_DEMO ? ALL_CARDS.filter((c) => c.id === "muse" || c.id === "phone") : ALL_CARDS;

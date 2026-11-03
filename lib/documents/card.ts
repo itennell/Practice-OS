@@ -20,6 +20,7 @@ export const DOCUMENT_KINDS = [
   "guide",
   "uploaded",
   "referral_letter",
+  "referral_debrief",
   "instagram_post",
 ] as const;
 export type DocumentKind = (typeof DOCUMENT_KINDS)[number];
@@ -38,6 +39,7 @@ export const KIND_LABEL: Record<DocumentKind, string> = {
   guide: "How-do-I guide",
   uploaded: "Your document",
   referral_letter: "Referral letter",
+  referral_debrief: "Coffee debrief",
   instagram_post: "Instagram post",
 };
 

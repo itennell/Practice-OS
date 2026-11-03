@@ -6,6 +6,7 @@ import { CheckCheck, ChevronRight } from "lucide-react";
 import { Insurance } from "@/components/admin/insurance-panel";
 import { Credentialing, GoodFaithEstimates, ReleaseForms, Superbills } from "@/components/admin/panels";
 import { ClientForms } from "@/components/admin/client-forms";
+import { NeedPostButton } from "@/components/admin/need-post-button";
 import { SidePanel } from "@/components/admin/side-panel";
 import { EmptyState } from "@/components/shared/empty-state";
 import { OfficeSettings } from "@/components/office-settings";
@@ -57,10 +58,24 @@ export default function AdminPage({ searchParams }: PageProps<"/admin">) {
   );
 }
 
-function actionHref(a: NeedAction): string {
+function actionHref(a: Exclude<NeedAction, { post: string }>): string {
   if ("panel" in a) return `/admin?panel=${a.panel}`;
   if ("ask" in a) return `/?ask=${encodeURIComponent(a.ask)}`;
   return a.href;
+}
+
+function NeedButton({ action, title }: { action: NeedAction; title: string }) {
+  if ("post" in action) {
+    // Saving goes through a local-only route, so the view-only Vercel copy shows no button.
+    if (process.env.VERCEL) return null;
+    return <NeedPostButton label={action.label} post={action.post} body={action.body} title={title} />;
+  }
+  return (
+    <ButtonLink variant="quiet" href={actionHref(action)}>
+      {action.label}
+      <span className="sr-only">: {title}</span>
+    </ButtonLink>
+  );
 }
 
 function NeedRow({ item }: { item: NeedItem }) {
@@ -70,10 +85,10 @@ function NeedRow({ item }: { item: NeedItem }) {
         <p className="font-semibold">{item.title}</p>
         <p className="text-small text-[var(--fg-muted)]">{item.why}</p>
       </div>
-      <ButtonLink variant="quiet" href={actionHref(item.action)} className="shrink-0 self-start sm:self-auto">
-        {item.action.label}
-        <span className="sr-only">: {item.title}</span>
-      </ButtonLink>
+      <div className="flex shrink-0 flex-wrap items-start gap-2 self-start sm:self-auto">
+        <NeedButton action={item.action} title={item.title} />
+        {item.also && <NeedButton action={item.also} title={item.title} />}
+      </div>
     </li>
   );
 }

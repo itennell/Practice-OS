@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FRONT_DESK_ENABLED } from "../lib/features";
+import { FRONT_DESK_ENABLED, REFERRALS_ONLY_DEMO } from "../lib/features";
 import {
   CHAPTERS,
   firstFor,
@@ -47,7 +47,7 @@ describe("onboarding chapters", () => {
     for (const q of QUESTIONS) expect(`${q.ask} ${q.help ?? ""}`).not.toMatch(/license number\?|social security number\?|date of birth|birthday/i);
   });
 
-  it("leaves out questions that don't apply", () => {
+  it.skipIf(REFERRALS_ONLY_DEMO)("leaves out questions that don't apply", () => {
     const il = ids(base);
     expect(il).toContain("adults_26");
     expect(il).not.toContain("psypact");
@@ -65,7 +65,7 @@ describe("onboarding chapters", () => {
 
   // Chapter 6 opens on how clients find her and her website (the marketing interview);
   // Instagram's own screens are a helper block and aren't counted here.
-  it("stays at 25 to 37 questions for typical practices", () => {
+  it.skipIf(REFERRALS_ONLY_DEMO)("stays at 25 to 37 questions for typical practices", () => {
     for (const c of [base, { ...base, insurance: "some" as const, medicare: "enrolled" as const, medicaid: true }, { ...base, state: "TX", credential: "LMFT" as const }])  {
       const n = flatten(c).length;
       expect(n).toBeGreaterThanOrEqual(25);
@@ -75,18 +75,18 @@ describe("onboarding chapters", () => {
     expect(flatten({ ...base, credential: "Psychologist", insurance: "some", medicare: "enrolled", medicaid: true }).length).toBeLessThanOrEqual(38);
   });
 
-  it("fills in her license type", () => {
+  it.skipIf(REFERRALS_ONLY_DEMO)("fills in her license type", () => {
     expect(flatten(base).find((s) => s.id === "license_expires")?.ask).toBe("When does your LCPC license expire?");
   });
 
-  it("counts progress inside the current chapter only", () => {
+  it.skipIf(REFERRALS_ONLY_DEMO)("counts progress inside the current chapter only", () => {
     const screens = flatten(base);
     const i = screens.findIndex((s) => s.id === "license_expires");
     expect(progressFor(screens, i)).toMatchObject({ chapter: "license", chapterNumber: 2, at: 1 });
     expect(progressFor(screens, i).of).toBe(screens.filter((s) => s.chapter === "license").length);
   });
 
-  it("slots each helper's questions after the texting question, skipping ones that don't apply", () => {
+  it.skipIf(REFERRALS_ONLY_DEMO)("slots each helper's questions after the texting question, skipping ones that don't apply", () => {
     const screens = flatten(base, {
       helpers: [
         {
@@ -104,7 +104,7 @@ describe("onboarding chapters", () => {
     expect(screens.some((s) => s.id === "referrals:zip")).toBe(false);
   });
 
-  it("hands the browser plain data only, even when a helper uses appliesWhen", () => {
+  it.skipIf(REFERRALS_ONLY_DEMO)("hands the browser plain data only, even when a helper uses appliesWhen", () => {
     const screens = flatten(base, {
       helpers: [
         {

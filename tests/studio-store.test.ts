@@ -3,6 +3,7 @@
 // Redo, and the safety rules (self-harm, advice topics) on every step.
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { REFERRALS_ONLY_DEMO } from "../lib/features";
 import { approve } from "../lib/approvals";
 import { closeDb, db } from "../lib/db";
 import { RULE_TEXT, type ChatFn } from "../lib/instagram/critic";
@@ -200,7 +201,7 @@ async function approveIt(projectId: string) {
 }
 
 describe.skipIf(!hasDb)("studio review fixes", () => {
-  it("an approved post is never changed silently: Aeon asks, and Continue queues a fresh approval", async () => {
+  it.skipIf(REFERRALS_ONLY_DEMO)("an approved post is never changed silently: Aeon asks, and Continue queues a fresh approval", async () => {
     const { project } = await makeReel();
     const id = project!.id;
     const ready = await approveIt(id);
