@@ -40,6 +40,8 @@ export const DEMO_TABLES = [
   "referral_facts",
   // Referrals v2 (024): the contact log.
   "referral_contacts",
+  // Referrals calendar (047): planned coffees, calls and talks.
+  "referral_meetings",
   "posts",
   // Instagram studio (021)
   "post_research",

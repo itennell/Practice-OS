@@ -19,6 +19,8 @@ export const APPROVAL_KINDS = [
   // Grow: ad and website drafts (migration 042)
   "ads_campaign",
   "website",
+  // Referrals calendar: a meeting Aeon planned (migration 047)
+  "referral_meeting",
 ] as const;
 
 export type ApprovalKind = (typeof APPROVAL_KINDS)[number];

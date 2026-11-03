@@ -60,7 +60,7 @@ const page = (pathname: string) => proxy(new NextRequest(`http://${HOST}${pathna
 
 describe("referrals-only demo: the allow-lists", () => {
   it("names only real tools, pages and kinds", () => {
-    const src = readFileSync(new URL("../lib/aeon/tools.ts", import.meta.url), "utf8") + readFileSync(new URL("../lib/aeon/tools-referrals.ts", import.meta.url), "utf8") + readFileSync(new URL("../lib/aeon/tools-files.ts", import.meta.url), "utf8");
+    const src = readFileSync(new URL("../lib/aeon/tools.ts", import.meta.url), "utf8") + readFileSync(new URL("../lib/aeon/tools-referrals.ts", import.meta.url), "utf8") + readFileSync(new URL("../lib/aeon/tools-files.ts", import.meta.url), "utf8") + readFileSync(new URL("../lib/aeon/tools-meetings.ts", import.meta.url), "utf8");
     for (const name of REFERRAL_DEMO_TOOLS) if (!COMING.includes(name) || src.includes(`name: "${name}"`)) expect(src, name).toContain(`name: "${name}"`);
     for (const p of REFERRAL_DEMO_HIDDEN_API) expect(readdirSync(new URL(`../app${p}`, import.meta.url)).length, p).toBeGreaterThan(0);
     for (const p of REFERRAL_DEMO_HIDDEN_PAGES) expect(p).toMatch(/^\/[a-z-]+$/);

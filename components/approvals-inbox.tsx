@@ -30,6 +30,7 @@ const KIND_LABEL: Record<string, string> = {
   file_document: "File a document",
   ads_campaign: "Ad campaign draft",
   website: "Website draft",
+  referral_meeting: "Referral meeting",
 };
 
 type Filter = "waiting" | "done" | "declined" | "all";
