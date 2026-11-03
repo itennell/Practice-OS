@@ -389,12 +389,31 @@ function checkOne(text: string): CrisisResult {
   return { crisis: false };
 }
 
-export function checkCrisis(text: string): CrisisResult {
+// A note on a referral card describes the partner's office. There, a crisis word naming one of
+// their services ("a suicide prevention program", "a self-harm IOP", "a suicide loss support group")
+// is a fact about the office, not a crisis. Only for notes, and never when the note names a person who
+// could be in it ("their client", "she is in"): then every word is read and it routes as usual.
+const NOTE_SERVICE =
+  /\b(?:suicide|suicidal|self ?harm|self ?injury|self ?injurious|nssi)(?: (?:prevention|loss|attempt|awareness|risk|and grief|bereavement))?(?: survivors?)? (?:program|programs|iop|iops|php|php s|clinic|clinics|training|trainings|group|groups|support group|support groups|services|service|team|track|curriculum|workshop|workshops|class|classes|specialists?|coordinator|counselors?)\b/g;
+const NOTE_PERSON =
+  /\b(?:client|clients|patient|patients|kid|kids|son|daughter|someone|somebody|man|woman|boy|girl|teen|caller|referral)\b|\b(?:she|he|they|her|him|them)( s)? (?:is|was|are|were|went|got|has been|have been|is being|been)\b/;
+
+function crisisIn(text: string, note: boolean): CrisisResult {
   for (const spaced of normalize(text)) {
-    const result = checkOne(spaced);
+    const read = note && !NOTE_PERSON.test(spaced) ? spaced.replace(NOTE_SERVICE, " a program ") : spaced;
+    const result = checkOne(read);
     if (result.crisis) return result;
   }
   return { crisis: false };
+}
+
+export function checkCrisis(text: string): CrisisResult {
+  return crisisIn(text, false);
+}
+
+/** The crisis check for a note on a referral card (lib/referrals/contacts.ts checkNote): the office's own services are facts. */
+export function checkNoteCrisis(text: string): CrisisResult {
+  return crisisIn(text, true);
 }
 
 /**
@@ -404,7 +423,9 @@ export function checkCrisis(text: string): CrisisResult {
  * approvals). Never includes the words that triggered it. Front Desk has its own
  * caller-facing version (lib/frontdesk/crisis.ts) and shares the alert phone.
  */
-export async function alertCrisis(input: { source: "chat" | "upload" | "media"; category: CrisisCategory; by: string }): Promise<{ alerted: boolean }> {
+export type CrisisSource = "chat" | "upload" | "media" | "referral_note";
+
+export async function alertCrisis(input: { source: CrisisSource; category: CrisisCategory; by: string }): Promise<{ alerted: boolean }> {
   const { audit } = await import("./audit");
   const { alertPhone } = await import("./frontdesk/crisis");
   const { sendText } = await import("./frontdesk/store");
@@ -421,7 +442,13 @@ export async function alertCrisis(input: { source: "chat" | "upload" | "media"; 
     return { alerted: false };
   }
   const what =
-    input.source === "chat" ? "A message in your chat with Aeon" : input.source === "upload" ? "A file added in your chat with Aeon" : "Something typed on the Media page";
+    input.source === "chat"
+      ? "A message in your chat with Aeon"
+      : input.source === "upload"
+        ? "A file added in your chat with Aeon"
+        : input.source === "referral_note"
+          ? "A note typed on your Referrals board"
+          : "Something typed on the Media page";
   try {
     await sendText({
       to,

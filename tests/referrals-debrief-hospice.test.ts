@@ -118,6 +118,20 @@ const PATIENTS: [string, string[]][] = [
   ["You should meet the grief counselor, who just got sober.", ["sober"]],
   ["You should meet the hospice chaplain, who uses a wheelchair.", ["wheelchair"]],
   ["You should meet the oncology nurse navigator, who is recovering from an accident.", ["accident"]],
+  // Follow-up (#143): smuggles against the new referral forms.
+  ["Dr. Okafor also wants me to meet Marisol Quint, she runs social work at Orrindale Hospice and has cancer herself.", ["cancer herself"]],
+  ["Next step: meet the man in room 4 at Orrindale Hospice.", ["room 4"]],
+  ["Her top suggestion was a patient named Joe at Orrindale Hospice.", ["Joe"]],
+  ["Ask for Rosa Diaz in intake, she is dying.", ["dying"]],
+  ["Rosa Diaz handles intake there, her husband just passed.", ["husband"]],
+  ["Intake coordinator Rosa Diaz is who sends them out, and she just got diagnosed.", ["diagnosed"]],
+  ["Also, hospice social worker Marisol Quint at Orrindale Hospice is in hospice herself, she said.", ["in hospice herself"]],
+  ["She mentioned Marisol Quint is the hospice social worker at Orrindale Hospice and said her client is dying.", ["her client"]],
+  ["Rosa Diaz at intake is the person to ask for, she has long covid.", ["long covid"]],
+  ["Next step: meet Kevin Ortiz, whose wife has leukemia.", ["Kevin Ortiz", "leukemia"]],
+  ["Her top suggestion was Kevin Ortiz, who just finished chemo.", ["Kevin Ortiz", "chemo"]],
+  ["Next step: call Joe Banks at Orrindale Hospice, he is actively dying.", ["Joe Banks", "actively dying"]],
+  ["Rosa said the best time to catch her is Tuesday, before her chemo.", ["chemo"]],
 ];
 
 // Professionals she was pointed to, or a role that handles referrals. Each must pass.
@@ -153,6 +167,17 @@ const PROFESSIONALS: [string, string[]][] = [
   ["She gave me a name: Marisol Quint, the hospice social worker at Orrindale Hospice.", ["Marisol Quint"]],
   ["She told me Marisol Quint is the hospice social worker at Orrindale Hospice and I should talk with her.", ["Marisol Quint"]],
   ["They see a lot of people with disabilities and their caregivers.", ["people with disabilities"]],
+  // Follow-up (#143): round-4 phrasings.
+  ["Dr. Okafor also wants me to meet Marisol Quint, she runs social work at Orrindale Hospice.", ["Marisol Quint"]],
+  ["She mentioned Marisol Quint is the hospice social worker at Orrindale Hospice and said she'd make an introduction.", ["Marisol Quint"]],
+  ["Her top suggestion was Marisol Quint, the social worker at Orrindale Hospice.", ["Marisol Quint"]],
+  ["Also, hospice social worker Marisol Quint at Orrindale Hospice would be good to meet, she said.", ["Marisol Quint"]],
+  ["Next step: meet Marisol Quint, the hospice social worker at Orrindale Hospice.", ["Marisol Quint"]],
+  ["Intake coordinator Rosa Diaz is who sends them out.", ["Rosa Diaz"]],
+  ["Rosa Diaz handles intake there.", ["Rosa Diaz"]],
+  ["Ask for Rosa Diaz in intake.", ["Rosa Diaz"]],
+  ["Rosa Diaz at intake is the person to ask for.", ["Rosa Diaz"]],
+  ["Talk to Rosa Diaz, she coordinates intake.", ["Rosa Diaz"]],
 ];
 
 // Names each demo phrasing must find as a professional (so the card can suggest them).
@@ -174,6 +199,16 @@ const DEMO_PROFESSIONALS: [string, string][] = [
   ["Their hospice social worker, Marisol Quint, is someone I should definitely meet, since lots of their patients' families need grief counseling.", "Marisol Quint"],
   ["She gave me a name: Marisol Quint, the hospice social worker at Orrindale Hospice.", "Marisol Quint"],
   ["She told me Marisol Quint is the hospice social worker at Orrindale Hospice and I should talk with her.", "Marisol Quint"],
+  ["Dr. Okafor also wants me to meet Marisol Quint, she runs social work at Orrindale Hospice.", "Marisol Quint"],
+  ["She mentioned Marisol Quint is the hospice social worker at Orrindale Hospice and said she'd make an introduction.", "Marisol Quint"],
+  ["Her top suggestion was Marisol Quint, the social worker at Orrindale Hospice.", "Marisol Quint"],
+  ["Also, hospice social worker Marisol Quint at Orrindale Hospice would be good to meet, she said.", "Marisol Quint"],
+  ["Next step: meet Marisol Quint, the hospice social worker at Orrindale Hospice.", "Marisol Quint"],
+  ["Intake coordinator Rosa Diaz is who sends them out.", "Rosa Diaz"],
+  ["Rosa Diaz handles intake there.", "Rosa Diaz"],
+  ["Ask for Rosa Diaz in intake.", "Rosa Diaz"],
+  ["Rosa Diaz at intake is the person to ask for.", "Rosa Diaz"],
+  ["Talk to Rosa Diaz, she coordinates intake.", "Rosa Diaz"],
 ];
 
 describe("hospice and oncology words in the privacy pass (real guard and name-finder)", () => {
@@ -212,8 +247,16 @@ describe("hospice and oncology words in the privacy pass (real guard and name-fi
     expect(c.text).toContain("Best time to reach Rosa is mornings, before ten.");
   }, 120_000);
 
-  // A bare "lunch" is refused by valueOffered (outreach.ts) until PR #140 changes value-check.ts; this file doesn't touch either.
-  it.skip("keeps a best time after lunch (expected to pass after PR #140)", async () => {
+  it("a vetted professional's first name with her/him is kept: the best time to catch her", async () => {
+    const { cleanTranscript } = await import("../lib/referrals/debrief");
+    const line = "Rosa said the best time to catch her is Tuesday or Thursday mornings.";
+    const c = await cleanTranscript(`${BASE} Rosa Diaz handles intake there. ${line}`, SRC);
+    expect(c.professionals).toContain("Rosa Diaz");
+    expect(c.text).toContain(line);
+  }, 120_000);
+
+  // A bare "lunch" was refused by valueOffered until PR #140 (value-check.ts).
+  it("keeps a best time after lunch", async () => {
     const { cleanTranscript } = await import("../lib/referrals/debrief");
     const c = await cleanTranscript(`${BASE} Best time to call is right after lunch.`, SRC);
     expect(c.text).toContain("Best time to call is right after lunch.");
@@ -301,6 +344,9 @@ describe("hospice professionals in the field checks", () => {
     ["population new health words", { populations: ["adults with metastatic cancer"] }],
     ["population recombined", { populations: ["families in active treatment"] }],
     ["follow-up hospice person", { follow_up_points: ["Ask the hospice social worker about the one on comfort care"] }],
+    // Her own plan gets her strict value rules (speaker "her"): no meal or gift for the office.
+    ["follow-up lunch for staff", { follow_up_points: ["Bring lunch for their front desk"] }],
+    ["follow-up coffee gift", { follow_up_points: ["Drop off coffee for the hospice team"] }],
   ];
   it.each(REFUSED)("refuses %s", async (_id, stub) => {
     const r = await run(stub);
@@ -309,6 +355,19 @@ describe("hospice professionals in the field checks", () => {
       expect(Array.isArray(v) ? v.length : v).toBeFalsy();
     }
     expect(r.rejected.length + r.unsupported.length).toBeGreaterThan(0);
+  }, 120_000);
+
+  it("her follow-up plan is read with her own value rules, even when she said it", async () => {
+    const { cleanTranscript, checkFields, debriefAllowlist } = await import("../lib/referrals/debrief");
+    const t = `${BASE} I said I would bring lunch for their front desk next week and send my flyer.`;
+    const c = await cleanTranscript(t, SRC);
+    const allow = await debriefAllowlist(SRC, c.professionals);
+    const r = await checkFields({ ...empty, follow_up_points: ["Bring lunch for their front desk next week", "Send my flyer"] } as never, c.text, allow, {
+      professionals: c.professionals,
+      sourceId: "x",
+    });
+    expect(r.fields.follow_up_points).not.toContain("Bring lunch for their front desk next week");
+    expect(r.rejected.map((x) => x.why).join(" ")).toMatch(/nothing of value/);
   }, 120_000);
 
   it("guesses Muse made are left empty and counted apart from the refusals", async () => {

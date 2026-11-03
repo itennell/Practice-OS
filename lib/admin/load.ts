@@ -29,7 +29,7 @@ export async function loadAlertFailures(sql: postgres.Sql = db(), limit = 5): Pr
   const rows = await sql<{ id: string; at: Date }[]>`
     select f.id::text as id, f.at
       from practice_os.audit_log f
-     where f.action = 'crisis_alert_failed' and f.subject_type in ('chat', 'upload', 'media')
+     where f.action = 'crisis_alert_failed' and f.subject_type in ('chat', 'upload', 'media', 'referral_note')
        and f.at > now() - interval '3 days'
        and not exists (select 1 from practice_os.audit_log s where s.action = 'crisis_alert_sent' and s.actor = 'safety' and s.at > f.at)
        and not exists (

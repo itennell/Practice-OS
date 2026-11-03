@@ -10,7 +10,7 @@ import { guard, REFUSAL } from "../aeon/guard";
 import { audit } from "../audit";
 import { practiceToday } from "../compliance/store";
 import { db } from "../db";
-import { checkCrisis, CRISIS_REPLY } from "../safety";
+import { alertCrisis, checkNoteCrisis, CRISIS_REPLY } from "../safety";
 import { valueOffered } from "./value-check";
 import { CONTACT_KINDS, type ContactKind } from "./contact-kinds";
 import { keyMatches, orgKeyOf, type OrgKey, type Suppressed } from "./dnc-key";
@@ -73,12 +73,23 @@ export const CRISIS_NOTE = `I didn't save that note because it mentions danger o
  * check (lib/safety.ts) and the referral-value check (nothing of value for referrals), then the
  * privacy check.
  */
-export async function checkNote(note: string, check = (t: string) => guard(t, "message"), opts: { audit?: boolean } = {}): Promise<string | null> {
-  const crisis = checkCrisis(note);
+export async function checkNote(
+  note: string,
+  check = (t: string) => guard(t, "message"),
+  opts: { audit?: boolean; by?: string } = {},
+): Promise<string | null> {
+  // Read as a note: a crisis word naming the office's own service ("a suicide prevention program",
+  // "a self-harm IOP") is a fact about them; anything about a person still routes (lib/safety.ts).
+  const crisis = checkNoteCrisis(note);
   if (crisis.crisis) {
-    // Audited when she types it; a saved note screened again for a letter (screenedNote) isn't a new event.
+    // When she types it, it routes like the chat: crisis_detected, the urgent alert (or, with phone
+    // alerts off, the urgent item at the top of Admin). A saved note screened again for a letter
+    // (screenedNote, audit: false) isn't a new event.
     if (opts.audit !== false) {
       await audit({ actor: "safety", action: "crisis_note_refused", subjectType: "referral_note", details: { category: crisis.category } }).catch(() => undefined);
+      await alertCrisis({ source: "referral_note", category: crisis.category, by: opts.by ?? "clinician" }).catch((e) =>
+        console.error("crisis alert failed", e instanceof Error ? e.message : String(e)),
+      );
     }
     return CRISIS_NOTE;
   }
