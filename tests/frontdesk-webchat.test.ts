@@ -2,6 +2,7 @@
 // model, consult times only after her approval, fixed wording throughout.
 // Writes inquiries, messages and approvals, so it runs only on a local throwaway database.
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { REFERRALS_ONLY_DEMO } from "../lib/features";
 // These test Front Desk itself, so they run with it switched on (lib/features.ts).
 vi.mock("../lib/features", async (orig) => ({ ...(await orig<typeof import("../lib/features")>()), FRONT_DESK_ENABLED: true }));
 import { loadEnv } from "../lib/env";
@@ -85,7 +86,7 @@ const send = async (conversation: string | null, text: string, ip?: string) => {
 };
 
 describe.skipIf(!localDb)("website chat (local database only)", () => {
-  it("says it is an AI assistant first, then books by approval only", async () => {
+  it.skipIf(REFERRALS_ONLY_DEMO)("says it is an AI assistant first, then books by approval only", async () => {
     const { conversation, lines } = await send(null, "Hi, I'd like to book a consult");
     expect(lines[0]).toMatchObject({ from: "assistant" });
     expect(lines[0].text).toMatch(/^Hi, I'm the AI assistant for /);

@@ -1,6 +1,7 @@
 // make_release_form through the shared tool runner (chat and MCP). Needs the
 // database only for "today"; nothing is written by the tool.
 import { afterAll, describe, expect, it } from "vitest";
+import { REFERRALS_ONLY_DEMO } from "../lib/features";
 import { loadEnv } from "../lib/env";
 
 loadEnv();
@@ -13,7 +14,7 @@ afterAll(async () => {
   if (hasDb) await closeDb();
 });
 
-describe.skipIf(!hasDb)("make_release_form", () => {
+describe.skipIf(REFERRALS_ONLY_DEMO || !hasDb)("make_release_form", () => {
   it("refuses without an expiration date and says why", async () => {
     const r = await runTool("make_release_form", { recipient: "Dr. Lee [Sample]" }, { by: "test" });
     expect(r.isError).toBe(true);

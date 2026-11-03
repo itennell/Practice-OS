@@ -6,6 +6,7 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { toolEnabled } from "../lib/features";
 import { loadEnv } from "../lib/env";
 import type { ChatParams } from "../lib/meta";
 import { NER_MODEL, modelCacheDir } from "../lib/aeon/phi-classifier";
@@ -69,7 +70,8 @@ afterAll(async () => {
 });
 
 describe.skipIf(!ready)("golden conversations (replayed)", () => {
-  it.each(SCENARIOS.map((s) => [s.name, s]))("%s", async (_name, scenario) => {
+  // The referrals-only demo (lib/features.ts) replays only conversations whose tools are switched on.
+  it.each(SCENARIOS.filter((s) => s.expectTools.every(toolEnabled)).map((s) => [s.name, s]))("%s", async (_name, scenario) => {
     const recorded = JSON.parse(
       await readFile(path.join(process.cwd(), "tests", "fixtures", "aeon-chat", `${scenario.name}.json`), "utf8"),
     ) as Recorded;

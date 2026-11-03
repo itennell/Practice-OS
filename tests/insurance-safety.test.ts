@@ -2,6 +2,7 @@
 // sent. Only her own change on the Insurance page records Applied, Pending
 // or Follow up, and the date she applied.
 import { afterAll, describe, expect, it, vi } from "vitest";
+import { REFERRALS_ONLY_DEMO } from "../lib/features";
 // The PHI name finder is a local model; these checks are about what gets saved, not what it reads.
 vi.mock("../lib/aeon/guard", () => ({ guard: vi.fn(async (t: string) => ({ ok: true, text: t })), REFUSAL: {} }));
 import { z } from "zod";
@@ -15,7 +16,7 @@ const hasDb = Boolean(process.env.DATABASE_URL);
 const tool = TOOLS_BY_NAME.get("update_payer_application")!;
 const parse = (status: string) => z.object(tool.input).safeParse({ payer: "BCBSIL", status });
 
-describe("update_payer_application can never record a sent application", () => {
+describe.skipIf(REFERRALS_ONLY_DEMO)("update_payer_application can never record a sent application", () => {
   it("leaves out exactly the waiting statuses: applied, pending, follow_up", () => {
     expect(tool).toBeDefined();
     expect([...CHAT_SET_STATUSES, ...WAITING].sort()).toEqual([...STATUSES].sort());
@@ -37,7 +38,7 @@ describe("update_payer_application can never record a sent application", () => {
   });
 });
 
-describe.skipIf(!hasDb)("update_payer_application through runTool", async () => {
+describe.skipIf(REFERRALS_ONLY_DEMO || !hasDb)("update_payer_application through runTool", async () => {
   const { closeDb, db } = await import("../lib/db");
   const { savePayerApplication } = await import("../lib/payers/store");
   const made: string[] = [];

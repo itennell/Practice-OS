@@ -13,7 +13,7 @@ import { ListCard, ListRow } from "@/components/shared/list-card";
 import { TextField } from "@/components/shared/settings-controls";
 import { ButtonLink, buttonClass, chipClass } from "@/components/ui";
 import { KIND_LABEL } from "@/lib/documents/card";
-import { FILE_GROUPS, GROUP_LABEL, fileDetail, matchesSearch, type FileEntry, type FileGroup } from "@/lib/documents/file-entry";
+import { SHOWN_GROUPS, GROUP_LABEL, fileDetail, matchesSearch, type FileEntry, type FileGroup } from "@/lib/documents/file-entry";
 
 type Filter = "all" | FileGroup;
 
@@ -76,7 +76,7 @@ export function FilesList({ entries, capped = {} }: { entries: FileEntry[]; capp
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
   const shown = entries.filter((e) => (filter === "all" || e.group === filter) && matchesSearch(e, query.trim(), KIND_LABEL[e.card.kind]));
-  const groups = (filter === "all" ? FILE_GROUPS : [filter]).map((g) => ({ g, rows: shown.filter((e) => e.group === g) })).filter((x) => x.rows.length > 0);
+  const groups = (filter === "all" ? SHOWN_GROUPS : [filter]).map((g) => ({ g, rows: shown.filter((e) => e.group === g) })).filter((x) => x.rows.length > 0);
   const count = (f: Filter) => (f === "all" ? entries.length : entries.filter((e) => e.group === f).length);
 
   if (entries.length === 0) {
@@ -93,7 +93,7 @@ export function FilesList({ entries, capped = {} }: { entries: FileEntry[]; capp
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-3">
         <div role="group" aria-label="Show" className="flex flex-wrap gap-2">
-          {(["all", ...FILE_GROUPS] as Filter[]).map((f) => (
+          {(["all", ...SHOWN_GROUPS] as Filter[]).map((f) => (
             <button key={f} type="button" aria-pressed={filter === f} onClick={() => setFilter(f)} className={chipClass(filter === f, true)}>
               {f === "all" ? "All" : GROUP_LABEL[f]}
               <span className="ml-2 tabular-nums">{count(f)}</span>

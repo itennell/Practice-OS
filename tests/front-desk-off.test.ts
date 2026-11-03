@@ -6,7 +6,7 @@ import { CONNECTION_CARDS } from "../components/connections/registry";
 import { APPROVAL_KINDS } from "../lib/approval-kinds";
 import { shouldAutoRun } from "../lib/approval-policy";
 import { chatTools, TOOLS, TOOLS_BY_NAME, runTool } from "../lib/aeon/tools";
-import { FRONT_DESK_APPROVAL_KINDS, FRONT_DESK_ENABLED, FRONT_DESK_TOOLS, PHONE_ALERTS_ENABLED, PHONE_ENABLED } from "../lib/features";
+import { FRONT_DESK_APPROVAL_KINDS, FRONT_DESK_ENABLED, FRONT_DESK_TOOLS, PHONE_ALERTS_ENABLED, PHONE_ENABLED, REFERRALS_ONLY_DEMO } from "../lib/features";
 import { checkFrontDesk } from "../lib/frontdesk/check";
 import { startFrontDeskPoller } from "../lib/frontdesk/poller";
 import { flatten, HELPERS, QUESTIONS } from "../lib/onboarding/chapters";
@@ -24,7 +24,7 @@ describe.skipIf(FRONT_DESK_ENABLED)("Front Desk is off", () => {
       expect(TOOLS_BY_NAME.has(name)).toBe(false);
       expect(chatNames).not.toContain(name);
     }
-    expect(names).toContain("morning_brief"); // the rest are untouched
+    expect(names).toContain(REFERRALS_ONLY_DEMO ? "draft_outreach" : "morning_brief"); // the rest are untouched
   });
 
   it("names only real approval kinds", () => {
@@ -44,7 +44,7 @@ describe.skipIf(FRONT_DESK_ENABLED)("Front Desk is off", () => {
   });
 
   it("drops Front Desk from the menu; no phone or Cal.com card while phone alerts are off too", () => {
-    expect(PRACTICE.map((l) => l.label)).toEqual(["Admin", "Files", "Approvals", "Referrals", "Media"]);
+    expect(PRACTICE.map((l) => l.label)).toEqual(REFERRALS_ONLY_DEMO ? ["Referrals", "Approvals", "Files"] : ["Admin", "Files", "Approvals", "Referrals", "Media"]);
     expect(PRACTICE.some((l) => l.href === "/front-desk")).toBe(false);
     const ids = CONNECTION_CARDS.map((c) => c.id);
     expect(ids.includes("phone")).toBe(PHONE_ENABLED); // the alerts-only line comes back with PHONE_ALERTS_ENABLED

@@ -4,6 +4,7 @@
 // changes in the caption too; and a Psychology Today rewrite keeps her own answers.
 // No model calls: Muse is a fixture.
 import { describe, expect, it, vi } from "vitest";
+import { REFERRALS_ONLY_DEMO } from "../lib/features";
 vi.mock("../lib/audit", () => ({ audit: vi.fn(async () => {}) }));
 vi.mock("../lib/aeon/guard", () => ({ guard: vi.fn(async (t: string) => ({ ok: true, text: t })), REFUSAL: {} }));
 
@@ -198,7 +199,7 @@ describe("review fixes: repairs never change her meaning", () => {
     }
   });
 
-  it("13. a rewrite only fills unanswered questions; an answered 'no consult' stays no", () => {
+  it.skipIf(REFERRALS_ONLY_DEMO)("13. a rewrite only fills unanswered questions; an answered 'no consult' stays no", () => {
     const saved = { ...FACTS.answers, focus: "anxiety", approach: "", freeConsultMinutes: 0 as const, consultAsked: true };
     expect(onlyUnanswered(saved, { focus: "seed text", approach: "CBT", freeConsultMinutes: 30 })).toEqual({ approach: "CBT" });
     expect(onlyUnanswered({ ...saved, consultAsked: false }, { freeConsultMinutes: 15 })).toEqual({ freeConsultMinutes: 15 });

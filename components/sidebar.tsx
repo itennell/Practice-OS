@@ -12,7 +12,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Avatar } from "@/components/shared/avatar";
-import { FRONT_DESK_ENABLED } from "@/lib/features";
+import { FRONT_DESK_ENABLED, REFERRALS_ONLY_DEMO } from "@/lib/features";
 import { EMPTY_MENU, type MenuData } from "@/lib/ui/menu-types";
 import { cn } from "@/lib/utils";
 import { Orb } from "./ui";
@@ -27,14 +27,21 @@ const FOCUS = "outline-none focus-visible:outline-2 focus-visible:-outline-offse
 
 type PracticeLink = { href: string; label: string; icon: LucideIcon; count?: keyof MenuData["counts"]; countWord?: string };
 
-export const PRACTICE: PracticeLink[] = [
-  { href: "/admin", label: "Admin", icon: ClipboardList, count: "admin", countWord: "need you" },
-  { href: "/files", label: "Files", icon: FolderOpen },
-  { href: "/approvals", label: "Approvals", icon: Inbox, count: "approvals", countWord: "waiting" },
-  { href: "/referrals", label: "Referrals", icon: Users },
-  { href: "/media", label: "Media", icon: Camera },
-  ...(FRONT_DESK_ENABLED ? [{ href: "/front-desk", label: "Front Desk", icon: Phone }] : []), // paused: lib/features.ts
-];
+export const PRACTICE: PracticeLink[] = REFERRALS_ONLY_DEMO
+  ? [
+      // Referrals-only demo (lib/features.ts): Admin and Media are hidden.
+      { href: "/referrals", label: "Referrals", icon: Users },
+      { href: "/approvals", label: "Approvals", icon: Inbox, count: "approvals", countWord: "waiting" },
+      { href: "/files", label: "Files", icon: FolderOpen },
+    ]
+  : [
+      { href: "/admin", label: "Admin", icon: ClipboardList, count: "admin", countWord: "need you" },
+      { href: "/files", label: "Files", icon: FolderOpen },
+      { href: "/approvals", label: "Approvals", icon: Inbox, count: "approvals", countWord: "waiting" },
+      { href: "/referrals", label: "Referrals", icon: Users },
+      { href: "/media", label: "Media", icon: Camera },
+      ...(FRONT_DESK_ENABLED ? [{ href: "/front-desk", label: "Front Desk", icon: Phone }] : []), // paused: lib/features.ts
+    ];
 
 const isAt = (pathname: string, href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
@@ -84,7 +91,15 @@ function MenuBody({ data, chatId, onNavigate }: { data: MenuData; chatId: string
       <div className="flex flex-col gap-0.5">
         <button type="button" onClick={newChat} className={row(false)}>
           <Plus aria-hidden size={16} strokeWidth={1.75} className="shrink-0" />
-          New chat
+          <span className="flex-1 text-left">New chat</span>
+          {/* Referrals-only demo: a missed crisis alert, since Admin is hidden (lib/ui/menu.ts). */}
+          {data.counts.urgent > 0 && (
+            <span className="inline-flex items-center gap-2 text-small font-semibold text-[var(--danger-fg)] tabular-nums">
+              <span aria-hidden className="size-[7px] rounded-full bg-[var(--danger-fg)]" />
+              {data.counts.urgent}
+              <span className="sr-only"> urgent: Aeon showed the 988 message in your chat</span>
+            </span>
+          )}
         </button>
         <label className="flex min-h-touch items-center gap-2.5 rounded-[var(--radius-control)] px-2.5 text-[var(--menu-muted)] hover:bg-[var(--menu-hover)] focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-[var(--menu-focus)] focus-within:outline-solid">
           <Search aria-hidden size={16} strokeWidth={1.75} className="shrink-0" />

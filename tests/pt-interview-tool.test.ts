@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { REFERRALS_ONLY_DEMO } from "../lib/features";
 import { DANA } from "./media-fixtures";
 
 vi.mock("../lib/audit", () => ({ audit: vi.fn(async () => {}) }));
@@ -13,7 +14,7 @@ const run = async (input: Record<string, unknown>) => {
   return JSON.parse((r.content[0] as { text: string }).text);
 };
 
-describe("pt_profile_interview step check", () => {
+describe.skipIf(REFERRALS_ONLY_DEMO)("pt_profile_interview step check", () => {
   it("refuses an answer for a step she hasn't reached", async () => {
     saveStep.mockClear();
     const out = await run({ step: "therapyTypes", answer: ["Gottman Method"] });

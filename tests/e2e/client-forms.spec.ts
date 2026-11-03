@@ -3,6 +3,9 @@ import { expect, test, type Download, type Page } from "@playwright/test";
 import { execSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import * as mupdf from "mupdf";
+import { REFERRALS_ONLY_DEMO } from "../../lib/features";
+
+test.skip(REFERRALS_ONLY_DEMO, "Hidden in the referrals-only demo (lib/features.ts); these run when REFERRALS_ONLY_DEMO is false.");
 
 // Admin › Client forms (lib/client-forms): the library lists every template, each
 // opens with its required-elements check, downloads as a real PDF with her

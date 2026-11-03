@@ -3,6 +3,7 @@
 // "a client of mine who…" is never written as asked.
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { REFERRALS_ONLY_DEMO } from "../lib/features";
 import { closeDb, db } from "../lib/db";
 import type { ChatFn } from "../lib/instagram/critic";
 import { PILLARS } from "../lib/instagram/pillars";
@@ -306,7 +307,7 @@ describe.skipIf(!hasDb)("a draft after the marketing interview", () => {
   }, 180_000); // each memory passes the local client-detail guard
 });
 
-describe.skipIf(!hasDb)("after 'Not for me'", () => {
+describe.skipIf(REFERRALS_ONLY_DEMO || !hasDb)("after 'Not for me'", () => {
   it("nothing about Instagram runs, lists or counts, her post answers are cleared, and switching branches starts clean", async () => {
     const { instagramQuestions, loadInstagramPrefs, saveInstagramPrefs, DEFAULT_PREFS } = await import("../lib/instagram/onboarding");
     const { listApprovals } = await import("../lib/approvals");

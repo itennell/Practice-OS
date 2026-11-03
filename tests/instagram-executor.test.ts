@@ -4,6 +4,7 @@
 // Database tests: run only when DATABASE_URL is set (a throwaway local Postgres).
 import { readFileSync } from "node:fs";
 import { afterAll, describe, expect, it, vi } from "vitest";
+import { REFERRALS_ONLY_DEMO } from "../lib/features";
 import { approve } from "../lib/approvals";
 import { closeDb, db } from "../lib/db";
 import { toInstagramJpeg } from "../lib/instagram/image";
@@ -34,7 +35,7 @@ afterAll(async () => {
   await closeDb();
 });
 
-describe.skipIf(!hasDb)("instagram_post executor (no publishing)", () => {
+describe.skipIf(REFERRALS_ONLY_DEMO || !hasDb)("instagram_post executor (no publishing)", () => {
   it.each([["true"], ["false"]])("DRY_RUN=%s: marks the post ready, audits it, and never calls Instagram or the relay", async (dry) => {
     process.env.DRY_RUN = dry;
     const fetchSpy = vi.spyOn(globalThis, "fetch");

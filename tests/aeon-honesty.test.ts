@@ -4,6 +4,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
+import { toolEnabled } from "../lib/features";
 import { loadEnv } from "../lib/env";
 
 loadEnv();
@@ -116,7 +117,7 @@ describe("tool results carry no instructions", () => {
     ["look_up_rules", { query: "Illinois LCPC CE hours" }],
     ["deadlines_in_month", {}],
     ["get_practice_settings", {}],
-  ])("%s %j", async (name, args) => {
+  ].filter(([name]) => toolEnabled(name as string)) as [string, Record<string, unknown>][])("%s %j", async (name, args) => {
     const t = TOOLS_BY_NAME.get(name)!;
     const { z } = await import("zod");
     const result = await t.run(z.object(t.input).parse(args) as never, { by: "chat:honesty-test" });

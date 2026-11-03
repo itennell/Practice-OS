@@ -3,6 +3,7 @@
 // "draft the second one" turns idea 2 into a pending approval. Models stubbed.
 import sharp from "sharp";
 import { afterAll, describe, expect, it } from "vitest";
+import { REFERRALS_ONLY_DEMO } from "../lib/features";
 import { closeDb, db } from "../lib/db";
 import { runTool } from "../lib/aeon/tools";
 import { breaksNeverShow, checkIdeas, draftIdea, fixedIdeas, latestIdeas, NEUTRAL_PICTURE, planDays, postIdeas } from "../lib/instagram/coach";
@@ -154,7 +155,7 @@ describe.skipIf(!hasDb)("ideas from her saved answers, then a draft", () => {
     await instagramQuestions.save({ account: "has", posts_per_week: "3" }); // "Not for me" cleared her answers
   });
 
-  it("the view-only demo copy refuses every Instagram writer: no rows, no approvals, no Muse", async () => {
+  it.skipIf(REFERRALS_ONLY_DEMO)("the view-only demo copy refuses every Instagram writer: no rows, no approvals, no Muse", async () => {
     const count = async () => Number((await db()`select count(*) as n from practice_os.posts`)[0].n) + Number((await db()`select count(*) as n from practice_os.approvals`)[0].n);
     const before = await count();
     for (const [name, args] of [

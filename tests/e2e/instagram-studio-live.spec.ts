@@ -2,6 +2,9 @@ import { expect, test } from "@playwright/test";
 import { execFileSync, execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import sharp from "sharp";
+import { REFERRALS_ONLY_DEMO } from "../../lib/features";
+
+test.skip(REFERRALS_ONLY_DEMO, "Hidden in the referrals-only demo (lib/features.ts); these run when REFERRALS_ONLY_DEMO is false.");
 
 // The Instagram studio end to end against live Muse (writer, safety check, picture
 // and picture check). Runs only with PLAYWRIGHT_LIVE=1 and MODEL_API_KEY set (the

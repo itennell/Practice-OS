@@ -4,6 +4,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport, getDefaultEnvironment } from "@modelcontextprotocol/sdk/client/stdio.js";
 import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { REFERRALS_ONLY_DEMO, toolEnabled } from "../lib/features";
 import { loadEnv } from "../lib/env";
 
 loadEnv();
@@ -91,7 +92,7 @@ describe.skipIf(!sql)("queue_approval", () => {
   });
 });
 
-describe.skipIf(!sql)("morning_brief", () => {
+describe.skipIf(REFERRALS_ONLY_DEMO || !sql)("morning_brief", () => {
   it("is listed as read-only", async () => {
     const { tools } = await client.listTools();
     const tool = tools.find((t) => t.name === "morning_brief");
@@ -126,7 +127,7 @@ describe.skipIf(!sql)("morning_brief", () => {
   });
 });
 
-describe.skipIf(!sql)("admin tools", () => {
+describe.skipIf(REFERRALS_ONLY_DEMO || !sql)("admin tools", () => {
   const call = async (name: string, args: Record<string, unknown> = {}) => {
     const res = await client.callTool({ name, arguments: args });
     const [first] = res.content as { type: string; text: string }[];
@@ -212,7 +213,7 @@ describe.skipIf(!sql)("shared tool registry", () => {
     const { runTool } = await import("../lib/aeon/tools");
     const { closeDb } = await import("../lib/db");
     try {
-      for (const name of ["status", "morning_brief", "caqh_prep"]) {
+      for (const name of ["status", "morning_brief", "caqh_prep"].filter(toolEnabled)) { // the referrals-only demo hides two (lib/features.ts)
         const viaMcp = await client.callTool({ name, arguments: {} });
         const viaChat = await runTool(name, {}, { by: "chat:test" });
         expect({ content: viaChat.content, structuredContent: viaChat.structuredContent }).toEqual({

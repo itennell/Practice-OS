@@ -4,6 +4,9 @@ import { execSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { parse } from "dotenv";
 import { shown, typeDate } from "../helpers/controls";
+import { REFERRALS_ONLY_DEMO } from "../../lib/features";
+
+test.skip(REFERRALS_ONLY_DEMO, "Hidden in the referrals-only demo (lib/features.ts); these run when REFERRALS_ONLY_DEMO is false.");
 
 // `next start` reads .env itself, so the server's database is a shared one when either the
 // shell or .env names a DATABASE_URL; with neither, it is the built-in database on this computer.

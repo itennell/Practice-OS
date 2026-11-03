@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { afterAll, describe, expect, it } from "vitest";
 import { loadEnv } from "../lib/env";
-import { FRONT_DESK_ENABLED } from "../lib/features";
+import { FRONT_DESK_ENABLED, REFERRALS_ONLY_DEMO } from "../lib/features";
 
 // Front Desk is paused (lib/features.ts): what the database sees. Runs only with a database,
 // and only while the switch is off.
@@ -32,7 +32,7 @@ afterAll(async () => {
 
 describe.skipIf(FRONT_DESK_ENABLED || !hasDb)("Front Desk is off (database)", () => {
   it("hides its approvals from lists and the menu count, without deleting them", async () => {
-    const normal = await make("test_note");
+    const normal = await make(REFERRALS_ONLY_DEMO ? "referral_letter" : "test_note"); // the demo lists only referral kinds
     const withNormal = (await loadMenuData()).counts.approvals;
     const fd = await make("text_consult_options");
     const listed = (await listApprovals({ includeDecided: true, limit: 500 })).map((a) => a.id);
@@ -65,7 +65,10 @@ describe.skipIf(FRONT_DESK_ENABLED || !hasDb)("Front Desk is off (database)", ()
     const needs = await loadNeeds();
     expect(needs[0]).toMatchObject({ kind: "urgent_alert", tier: 1 });
     expect(needs[0].title).toMatch(/988/);
-    expect((await loadMenuData()).counts.admin).toBeGreaterThan(0);
+    // Admin and its menu count are hidden in the referrals-only demo; Home shows the item there (app/(app)/page.tsx).
+    const admin = (await loadMenuData()).counts.admin;
+    if (REFERRALS_ONLY_DEMO) expect(admin).toBe(0);
+    else expect(admin).toBeGreaterThan(0);
   });
 
   it("with phone alerts off, texts no one even when an alert cell is saved", async () => {

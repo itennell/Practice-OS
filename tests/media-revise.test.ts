@@ -3,6 +3,7 @@
 // Postgres; every model call is a fixture, and the client-detail guard is stubbed
 // (it has its own tests) so no name-finder model is needed.
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { REFERRALS_ONLY_DEMO } from "../lib/features";
 vi.mock("../lib/aeon/guard", async (orig) => ({ ...(await orig<typeof import("../lib/aeon/guard")>()), guard: vi.fn(async (t: string) => ({ ok: true, text: t })) }));
 const makeProject = vi.hoisted(() => vi.fn());
 vi.mock("../lib/studio/store", async (orig) => ({ ...(await orig<typeof import("../lib/studio/store")>()), makeProject }));
@@ -68,7 +69,7 @@ afterAll(async () => {
   await closeDb();
 });
 
-describe.skipIf(!hasDb)("a chat edit revises the waiting post", () => {
+describe.skipIf(REFERRALS_ONLY_DEMO || !hasDb)("a chat edit revises the waiting post", () => {
   it("'change it to Wednesday' updates the same post and approval; no second approval", async () => {
     const { postId, approvalId } = await waitingPost();
     const before = await pending();
@@ -100,7 +101,7 @@ describe.skipIf(!hasDb)("a chat edit revises the waiting post", () => {
   });
 });
 
-describe.skipIf(!hasDb)("revising never half-changes or touches the wrong post", () => {
+describe.skipIf(REFERRALS_ONLY_DEMO || !hasDb)("revising never half-changes or touches the wrong post", () => {
   it("a post that's no longer pending is never changed", async () => {
     const { postId, approvalId } = await waitingPost();
     await db()`update practice_os.approvals set status = 'rejected', decided_at = now() where id = ${approvalId}`;
@@ -163,7 +164,7 @@ describe.skipIf(!hasDb)("revising never half-changes or touches the wrong post",
   });
 });
 
-describe.skipIf(!hasDb)("chat routing to the studio", () => {
+describe.skipIf(REFERRALS_ONLY_DEMO || !hasDb)("chat routing to the studio", () => {
   it("stops at the daily cap with a plain message", async () => {
     const [{ n }] = await db()<{ n: number }[]>`select count(*)::int as n from practice_os.studio_projects where created_at >= date_trunc('day', now())`;
     const doc = emptyDoc("post", "cap");
