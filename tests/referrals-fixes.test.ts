@@ -487,7 +487,7 @@ describe.skipIf(!hasDb)("review fixes against the database", () => {
     expect(plan.reach_out.some((p) => p.id === id)).toBe(false);
     expect(plan.letters_waiting).toBeGreaterThanOrEqual(1);
     expect((await lettersReady()).some((r) => r.id === id)).toBe(false);
-    await db()`update practice_os.approvals set decided_at = now() - interval '3 days' where id = ${approvalId}`;
+    await db()`update practice_os.approvals set decided_at = (((now() at time zone 'America/Chicago')::date - 3) + time '12:00') at time zone 'America/Chicago' where id = ${approvalId}`;
     const ready = await lettersReady();
     expect(ready.find((r) => r.id === id)).toMatchObject({ days: 3 });
     const text = summarize({
