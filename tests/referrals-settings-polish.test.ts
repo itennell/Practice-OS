@@ -407,10 +407,10 @@ describe.skipIf(!hasDb)("referrals against the database", () => {
     const letter = "Dear Doctor,\n\nI'm Dana Reyes, LCPC, in Lincoln Park. I see new and expecting parents and adults. Would you be open to a 15-minute call to talk about how we might work together?\n\nDana Reyes, LCPC";
     const chat = (async () => ({ choices: [{ message: { content: JSON.stringify({ subject: "Introduction", letter }) } }] })) as never;
     const r = await runTool("draft_outreach", { top: 3 }, { by: BY, chat });
-    const out = body(r) as { from: string; letters: { to: string; approval_id?: string }[] };
+    const out = body(r) as { from: string; letters: { to: { card_name: string }; approval_id?: string }[] };
     approvals.push(...out.letters.flatMap((l) => (l.approval_id ? [l.approval_id] : [])));
     expect(out.from).toBe("referral_outreach_plan");
-    expect(out.letters.map((l) => l.to)).toEqual(expected);
+    expect(out.letters.map((l) => l.to.card_name)).toEqual(expected);
   });
 });
 

@@ -6,7 +6,9 @@
 //      (each tool result is guarded before the model sees it)
 //   4. guard on Aeon's reply before anyone sees or stores it
 // Request shapes follow cookbook 03_tool_calling.ipynb, as scripts/smoke.ts does.
+import { isUuid } from "../../app/api/approvals/responses";
 import { audit } from "../audit";
+import { db } from "../db";
 import { practiceToday } from "../compliance/store";
 import { chat as metaChat, readToolCalls, type ChatParams } from "../meta";
 import { CRISIS_REPLY, alertCrisis, checkCrisis } from "../safety";
@@ -176,14 +178,33 @@ export function honestReply(text: string, attempts: Attempt[]): string {
   return out;
 }
 
-function approvalIdsOf(result: ToolResult): string[] {
+/**
+ * The approvals a tool queued. `ids`: its structured `approval_id` or `approval_ids[]` ("letters
+ * for my top 3"), set by the tool's own code. `fromText`: an `"approval_id": "<uuid>"` key in its
+ * JSON text, which a tool result can carry from anywhere (a note, a file), so the reply keeps those
+ * only when they are pending approvals created during this reply (verifiedApprovals).
+ */
+export function approvalIdsOf(result: ToolResult): { ids: string[]; fromText: string[] } {
   const ids = new Set<string>();
   const structured = result.structuredContent?.approval_id;
-  if (typeof structured === "string") ids.add(structured);
+  if (typeof structured === "string" && isUuid(structured)) ids.add(structured);
+  const many = result.structuredContent?.approval_ids;
+  if (Array.isArray(many)) for (const id of many) if (typeof id === "string" && isUuid(id)) ids.add(id);
+  const fromText = new Set<string>();
   for (const block of result.content) {
-    for (const m of block.text.matchAll(/"?approval_id"?:\s*"?([0-9a-f-]{36})/g)) ids.add(m[1]);
+    for (const m of block.text.matchAll(/"approval_id":\s*"([0-9a-f-]{36})"/gi)) if (isUuid(m[1]) && !ids.has(m[1])) fromText.add(m[1]);
   }
-  return [...ids];
+  return { ids: [...ids], fromText: [...fromText] };
+}
+
+/** Of these ids found in tool text, the pending approvals created since this reply started. */
+export async function verifiedApprovals(ids: string[], since: Date): Promise<string[]> {
+  if (!ids.length) return [];
+  const rows = await db()<{ id: string }[]>`
+    select id from practice_os.approvals
+     where id in ${db()(ids)} and status = 'pending' and created_at >= ${new Date(since.getTime() - 5_000)}`.catch(() => []);
+  const ok = new Set(rows.map((r) => r.id));
+  return ids.filter((id) => ok.has(id));
 }
 
 export async function respond(message: string, opts: RespondOptions): Promise<Reply> {
@@ -213,6 +234,10 @@ export async function respond(message: string, opts: RespondOptions): Promise<Re
   const steps: Step[] = [];
   const attempts: Attempt[] = [];
   const approvalIds: string[] = [];
+  // Ids found only in a tool's text: kept when they are pending approvals made during this reply.
+  const textIds: string[] = [];
+  const started = new Date();
+  const allIds = async () => [...new Set([...approvalIds, ...(await verifiedApprovals(textIds, started))])];
   // Her own words, for the plain-code checks inside tools (a fee's session length, a fuzzy date, who she helps).
   const said = [...(opts.history ?? []).filter((t) => t.role === "clinician").slice(-SAID_TURNS).map((t) => t.content), message];
 
@@ -226,9 +251,9 @@ export async function respond(message: string, opts: RespondOptions): Promise<Re
       const out = await guard(text, "reply");
       if (!out.ok) {
         await audit({ actor: "safety", action: "reply_held_back", subjectType: "chat", details: { kind: out.kind, by: opts.by } });
-        return { kind: "answer", text: HELD_BACK, steps, approvalIds };
+        return { kind: "answer", text: HELD_BACK, steps, approvalIds: await allIds() };
       }
-      return { kind: "answer", text: out.text, steps, approvalIds };
+      return { kind: "answer", text: out.text, steps, approvalIds: await allIds() };
     }
     messages.push(reply);
     for (const call of calls) {
@@ -255,10 +280,12 @@ export async function respond(message: string, opts: RespondOptions): Promise<Re
         ok: !failure,
         ...(cards.length ? { documents: cards } : {}),
       });
-      approvalIds.push(...approvalIdsOf(result));
+      const found = approvalIdsOf(result);
+      approvalIds.push(...found.ids);
+      textIds.push(...found.fromText);
       const text = result.content.map((b) => b.text).join("\n");
       messages.push({ role: "tool", tool_call_id: call.id, content: text.length > MAX_TOOL_TEXT ? `${text.slice(0, MAX_TOOL_TEXT)}\n[cut short]` : text });
     }
   }
-  return { kind: "answer", text: OUT_OF_STEPS, steps, approvalIds };
+  return { kind: "answer", text: OUT_OF_STEPS, steps, approvalIds: await allIds() };
 }
