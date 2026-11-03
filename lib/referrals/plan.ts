@@ -66,8 +66,9 @@ const LAST_WORDS: Record<Contact["kind"], string> = {
   sent_letter: "you sent the letter",
   replied: "they replied",
   note: "a note",
-  referred: "they referred someone",
-  referred_out: "you referred someone to them",
+  // No "someone" beside a date: the reply guard reads "someone on 2026-10-25" as a person's birth date.
+  referred: "they sent you a referral",
+  referred_out: "you sent them a referral",
 };
 
 /** Cards whose follow-up date is within `days` (overdue included), soonest first. */

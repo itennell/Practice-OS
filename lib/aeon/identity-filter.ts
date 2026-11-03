@@ -194,13 +194,18 @@ export function notFuture(d: Ymd, today = new Date()): boolean {
   return Number.isNaN(when.getTime()) || when.getTime() <= today.getTime();
 }
 
+const REFERRAL_LOGGED =
+  /\b(?:they|she|he|the office|their office)\s+(?:referred|sent)\s+(?:you\s+|her\s+|me\s+)?(?:someone|somebody|a client|a patient|a referral)(?:\s+(?:to\s+(?:you|her|me)|over))?\b|\byou\s+(?:referred\s+someone\s+to\s+them|sent\s+them\s+a\s+referral)\b/gi;
+
 function hasBirthDate(text: string, today = new Date()): boolean {
   return sentences(keysAsWords(text)).some((s) => {
     const dates = datesIn(s);
     // "born on the fourteenth of March": a birth word and a month, written out.
     if (dates.length === 0) return BIRTH_WORDS.test(s) && MONTH_WORD.test(s);
     if (BIRTH_WORDS.test(s)) return true;
-    const person = PERSON_REF.test(s) || VISIT_WORDS.test(s);
+    // A referral logged on a day ("they referred someone on 2026-10-25") is practice business, not a person's date.
+    const rest = s.replace(REFERRAL_LOGGED, " ");
+    const person = PERSON_REF.test(rest) || VISIT_WORDS.test(rest);
     // Any full date before 2010, unless it's her own career ("licensed 03/12/2008").
     if (dates.some((d) => d.y >= 1900 && d.y < 2010) && (person || !CAREER_WORDS.test(s))) return true;
     // A past date next to a person or a visit ("Her son (3-14-15)", "(3/14/2015) canceled her visit").
@@ -278,8 +283,29 @@ const OWN_SIGNAL =
   /\b(?:my|our|this|her|his|their)\s+(?:client|patient)\b|\b(?:came|come|comes|coming)\s+in\b|\bcancel(?:s|ed|led|ing)?\b|\bresched\w*|\bno[- ]?shows?\b|\bmissed\b|\binvoices?\b|\bowes?\b|\bbalance\b|\bstruggl\w*|\bdiagnos\w*|\bdob\b|\bborn\b|\bwants?\b|\bprefers?\b(?!\s+to\s+(?:send|write|draft|post|batch|do|handle|mail|e-?mail|fax|text|reach|follow|block|keep|work))|\bcall(?:s|ed)?\s+(?:\w+\s+)?back\b|\b(?:after|before)\s+\d|\b(?:her|his|their)\s+(?:\w+\s+){0,2}?(?:slot|appointment|appt|session|visit|consult|intake|therapy|therapist|treatment|meds|medication)s?\b/i;
 const CLIENT_SIGNAL = new RegExp(`${OWN_SIGNAL.source}|\\b(?:visits?|appointments?|appts?|sessions?|consults?|intake|checked\\s+in|paid|late|copays?|superbills?|good faith estimates?|GFE)\\b`, "i");
 
+// A professional's caseload, a group: "her patients often deal with grief", "newly diagnosed patients",
+// "their families". Health words there describe who that professional serves, not one person.
+const CASELOAD = /\b(?:her|his|their|its)\s+(?:\w+\s+)?(?:patients|clients|families|caseload|population)\b/gi;
+const DIAGNOSED_GROUP =
+  /\b(?:newly|recently)\s+diagnosed\s+(?:\w+\s+)?(?:patients|adults|people|families|women|men|kids|children|teens|clients|parents)\b|\bdiagnosed\s+(?:patients|adults|people|families)\b/gi;
+/** The sentence with a professional's caseload and "newly diagnosed patients" read as a plain group. */
+export function groupsAsPlain(sentence: string): string {
+  // "a good partner" is a referral partner, not someone's partner.
+  return sentence
+    .replace(DIAGNOSED_GROUP, "patients")
+    .replace(CASELOAD, "the caseload")
+    .replace(/\b(?:a|an)\s+(?:good|great|strong|natural|referral|possible|likely|solid)\s+(?:referral\s+)?partner\b/gi, "a colleague");
+}
+/** Health words only about a caseload or a diagnosed group, with no one person left in the sentence. */
+function caseloadOnly(sentence: string): boolean {
+  const plain = groupsAsPlain(sentence);
+  return (sentence.search(CASELOAD) >= 0 || sentence.search(DIAGNOSED_GROUP) >= 0) && !ONE_CLIENT.test(plain) && !/\b(?:has|had|have|was|were|got|is|are)\s+(?:been\s+|just\s+|recently\s+)?diagnos\w*/i.test(plain);
+}
+
 /** A sentence that treats someone as a client. `own`: her own name, judged more loosely. */
 export function clientLike(sentence: string, own = false): boolean {
+  // "Emilie Blair could be a good partner since her patients often deal with grief": her caseload.
+  if (caseloadOnly(sentence) && !(own ? OWN_SIGNAL : CLIENT_SIGNAL).test(groupsAsPlain(sentence).replace(/\bdiagnos\w*/gi, " "))) return false;
   // A professional's work ("Emilie Blair, MS, CGC works with families after a
   // cancer diagnosis") talks about diagnoses without anyone having one.
   const pro = PROFESSIONAL_CREDENTIAL.test(sentence) && (PRACTICE_TOPIC.test(sentence) || PROFESSIONAL_WORK.test(sentence));
@@ -534,11 +560,15 @@ export function namedCondition(name: string, text: string): boolean {
   const medical =
     new RegExp(`(?<![\\p{L}\\p{N}])${who}(?:'s|’s)?\\b(?:\\W+(?!${PRACTICE_VERB})\\w+){0,3}?\\W+(?:${HAS}|is|was|just|recently|started|starting|finished|began|getting|undergoing|receiving|going\\s+through)\\b(?:\\W+(?!${PRACTICE_VERB})\\w+){0,2}?\\W+${MEDICAL_SOURCE}`, "iu").test(plain) ||
     new RegExp(`(?<![\\p{L}\\p{N}])${who}(?:'s|’s)\\s+(?:[\\p{L}-]+\\s+)?${MEDICAL_SOURCE}`, "iu").test(plain);
-  return medical || has.test(text) || owns.test(text) || (DIAGNOSED.test(text) && new RegExp(`(?<![\\p{L}\\p{N}])${who}`, "iu").test(text));
+  // "Try Emilie Blair; she's newly diagnosed patients' first stop": the diagnosed are her caseload, not her.
+  const diagnosedText = caseloadOnly(text) ? groupsAsPlain(text) : text;
+  return medical || has.test(text) || owns.test(text) || (DIAGNOSED.test(diagnosedText) && new RegExp(`(?<![\\p{L}\\p{N}])${who}`, "iu").test(text));
 }
 
 function hasDiagnosis(text: string): boolean {
-  return sentences(text).some((sentence) => {
+  return sentences(text).some((raw) => {
+    // A professional's caseload ("her patients deal with grief", "newly diagnosed patients") is a group.
+    const sentence = caseloadOnly(raw) ? groupsAsPlain(raw) : raw;
     const population = populationSentence(sentence);
     if (ICD10.test(sentence) || DIAGNOSED.test(sentence)) return !population || ICD10.test(sentence);
     if (medicalAboutSomeone(sentence)) return true;
