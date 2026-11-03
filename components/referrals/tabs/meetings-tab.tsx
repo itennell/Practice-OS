@@ -43,10 +43,10 @@ export function MeetingsTab({ data, onOpenPartner }: CrmTabProps = {}) {
     if (!today) return;
     const ctl = new AbortController();
     // The calendar's API allows 62 days at most: the last 55 and the week ahead. No calendar yet (404): the log alone.
-    const { from, to } = meetingRange(today, 54, 7);
+    const { from, to } = meetingRange(today, 54, 7, data?.timeZone ?? "America/Chicago");
     getMeetings<MeetingBits>(from, to, ctl.signal).then((m) => !ctl.signal.aborted && setMeetings(m ?? []));
     return () => ctl.abort();
-  }, [today]);
+  }, [today, data?.timeZone]);
 
   const cards = useMemo(() => data?.cards ?? [], [data]);
   const items = useMemo(() => (data ? timelineItems(cards, data.contacts, meetings, { timeZone: data.timeZone }) : []), [cards, data, meetings]);

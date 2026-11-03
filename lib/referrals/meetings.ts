@@ -130,9 +130,12 @@ async function refuseClash(tx: postgres.TransactionSql, starts: Date, ends: Date
 
 /** Why Aeon may not plan a meeting with this card (do-not-contact, Not a fit), or null. */
 export async function meetingBlocked(
-  source: Pick<ReferralSource, "name" | "npi" | "stage"> & Partial<Pick<ReferralSource, "organization" | "npi_type" | "address" | "city" | "zip">>,
-  sql: postgres.Sql = db(),
+  source: Pick<ReferralSource, "name" | "npi" | "stage"> & Partial<Pick<ReferralSource, "organization" | "npi_type" | "address" | "city" | "zip" | "sensitive">>,
+  sql?: postgres.Sql,
 ): Promise<string | null> {
+  // A sensitive (DV/SA) organization: no meeting at a place, ever (checked first, with no database read).
+  if (source.sensitive) return `${source.name} is an organization Aeon keeps private, so I won't plan a meeting with them. Reach them through their public line only.`;
+  sql ??= db();
   if (isSuppressed(source, await suppressedList(sql))) return `${source.name} is on your do-not-contact list, so I won't plan a meeting with them.`;
   if (source.stage === "not_a_fit") return `${source.name} is in Not a fit, so I won't plan a meeting with them. Move the card back first if that changed.`;
   return null;

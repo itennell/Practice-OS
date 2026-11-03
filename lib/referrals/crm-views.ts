@@ -3,6 +3,7 @@
 // its filters, the map's pins, and the day-by-day timeline. Pure and small, so
 // the tabs (client) and the tests share it. "They referred someone" rows carry a
 // date only: nothing here ever reads or shows who a client was.
+import { zonedTime } from "../frontdesk/calendar/zone";
 import { CATEGORY_LABELS } from "./categories";
 import { CONTACT_LABEL, type ContactKind } from "./contact-kinds";
 import type { Contact } from "./contacts";
@@ -20,8 +21,11 @@ export function addDays(iso: string, days: number): string {
 }
 
 /** The day (YYYY-MM-DD) an instant falls on in the practice's time zone. */
-export function dayIn(timeZone: string, at: string | Date): string {
-  const d = typeof at === "string" ? new Date(at) : at;
+export function dayIn(timeZone: string, at: string | Date | null | undefined): string {
+  // Postgres "2026-11-03 15:00:00+00" reads in every browser once the space is a T.
+  const d = at instanceof Date ? at : typeof at === "string" ? new Date(at.replace(/^(\d{4}-\d{2}-\d{2}) /, "$1T").replace(/([+-]\d{2})$/, "$1:00")) : null;
+  // A date the browser can't read gives no day (never "Invalid Date" or a throw).
+  if (!d || Number.isNaN(d.getTime())) return "";
   try {
     return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
   } catch {
@@ -151,7 +155,7 @@ export function latestActivity(
     detail: APPROVAL_STATUS[a.status] ?? a.status,
     kind: "approval" as const,
   }));
-  return [...fromLog, ...fromApprovals].sort((a, b) => b.day.localeCompare(a.day)).slice(0, max);
+  return [...fromLog, ...fromApprovals.filter((a) => a.day)].sort((a, b) => b.day.localeCompare(a.day)).slice(0, max);
 }
 
 // ---- Board: five columns -----------------------------------------------------
@@ -199,13 +203,15 @@ export type BoardMove =
   | { do: "stage"; stage: Stage }
   /** Into Referring: she confirms, and a dated "they referred someone" entry is logged (which also makes it connected). */
   | { do: "log_referral" }
-  /** Out of Referring into Met: the referral is in her log, so the card can't leave it by a drag. */
-  | { do: "explain" };
+  /** Out of Referring (to any column): the referral is in her log, so the card can't leave it by a drag. */
+  | { do: "explain" }
+  /** Not a fit into Referring: she moves them back first; no referral is logged for a card set aside. */
+  | { do: "refuse" };
 
 export function boardMove(from: BoardColumn, to: BoardColumn): BoardMove {
   if (from === to) return { do: "none" };
-  if (to === "referring") return { do: "log_referral" };
-  if (from === "referring" && to === "met") return { do: "explain" };
+  if (from === "referring") return { do: "explain" };
+  if (to === "referring") return from === "not_a_fit" ? { do: "refuse" } : { do: "log_referral" };
   return { do: "stage", stage: COLUMN_STAGE[to] };
 }
 
@@ -419,7 +425,16 @@ export function groupByDay(items: TimelineItem[]): { day: string; items: Timelin
     .map(([day, list]) => ({ day, items: [...list].sort((a, b) => b.at.localeCompare(a.at)) }));
 }
 
-/** The meetings API range around today: what the timeline and "This week" ask for (62 days at most). */
-export function meetingRange(today: string, back: number, ahead: number): { from: string; to: string } {
-  return { from: `${addDays(today, -back)}T00:00:00Z`, to: `${addDays(today, ahead)}T23:59:59Z` };
+/** Midnight at the start of a day in her practice's time zone (the calendar's dayStart). */
+function zoneDayStart(day: string, timeZone: string): Date {
+  const [y, m, d] = day.split("-").map(Number);
+  return zonedTime(y, m, d, 0, 0, timeZone);
+}
+
+/**
+ * The meetings API range around today, as instants: from the start of the first day to the
+ * start of the day after the last, in her practice's time zone (62 days at most).
+ */
+export function meetingRange(today: string, back: number, ahead: number, timeZone: string): { from: string; to: string } {
+  return { from: zoneDayStart(addDays(today, -back), timeZone).toISOString(), to: zoneDayStart(addDays(today, ahead + 1), timeZone).toISOString() };
 }

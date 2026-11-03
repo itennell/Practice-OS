@@ -131,7 +131,8 @@ export async function outreachPlan(sql: postgres.Sql = db(), max = NEW_PER_WEEK,
   let waiting = 0;
   let letters_waiting = 0;
   const fresh = cards.filter((c) => {
-    if (c.stage !== "found" || due.has(c.id) || isSuppressed(c, blocked)) return false;
+    // A sensitive (DV/SA) organization is reached through its public line only: never a "reach out" letter.
+    if (c.stage !== "found" || c.sensitive || due.has(c.id) || isSuppressed(c, blocked)) return false;
     if (letterWaiting(letters[c.id])) {
       letters_waiting++;
       return false;

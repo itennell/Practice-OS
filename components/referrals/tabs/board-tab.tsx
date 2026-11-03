@@ -120,7 +120,9 @@ export function BoardTab({ data, onOpenPartner, onChanged }: CrmTabProps = {}) {
     const m = boardMove(from, to);
     if (m.do === "stage") void setStage(card, m.stage, to);
     else if (m.do === "log_referral") setConfirmFor(id);
-    else if (m.do === "explain") say(`${card.name} is in Referring because you logged a referral from them. To undo it, delete that entry in their contact log.`, "info");
+    else if (m.do === "explain")
+      say(`${card.name} is in Referring because you logged a referral from them. To move them, open their card: delete that referral in the contact log, or use Move to there.`, "info");
+    else if (m.do === "refuse") say(`${card.name} is in Not a fit, so no referral is logged. Move them back to Found first if that changed.`, "info");
   }
 
   async function logReferral(id: string) {
@@ -128,7 +130,9 @@ export function BoardTab({ data, onOpenPartner, onChanged }: CrmTabProps = {}) {
     if (!card) return;
     try {
       const view = await postJson<CardView>(`/api/referrals/${id}/contacts`, { kind: "referred", happened_on: localToday() });
-      logged(view, `Logged that ${card.name} referred someone today. They're in Referring now. ${REFERRED_NOTE}`);
+      // Say where the card really is now (the server decides the stage).
+      const now = COLUMN_LABEL[columnFor(view.card, view.contacts)];
+      logged(view, `Logged that ${card.name} referred someone today. They're in ${now} now. ${REFERRED_NOTE}`);
     } catch (err) {
       say(err instanceof Error ? err.message : "Couldn't log that.", "error");
     }

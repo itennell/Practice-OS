@@ -10,6 +10,7 @@ import { db } from "../db";
 import { loadMediaFacts } from "../media/facts";
 import { listPayerApplications, WAITING } from "../payers/store";
 import type { ScriptFacts } from "./call-script";
+import type { ApprovalBits } from "./crm-views";
 import { nicheWords } from "./outreach";
 import { outreachPlan } from "./plan";
 import { practiceFacts, type ReferralSource } from "./store";
@@ -34,6 +35,22 @@ export async function referralCounts(cards: Pick<ReferralSource, "stage">[], sql
     waiting: waiting?.n ?? 0,
     referredThisMonth: referred?.n ?? 0,
   };
+}
+
+/**
+ * The newest referral approvals for Overview › Latest activity. Times are ISO instants in UTC
+ * ("2026-11-03T15:00:00Z") so every browser reads them; never Postgres's "2026-11-03 15:00:00+00".
+ */
+export async function recentReferralApprovals(sql: postgres.Sql = db(), limit = 8): Promise<ApprovalBits[]> {
+  const rows = await sql<ApprovalBits[]>`
+    select id, kind, title, status,
+           to_char(created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as created_at,
+           to_char(decided_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as decided_at
+      from practice_os.approvals
+     where kind like 'referral%'
+     order by coalesce(decided_at, created_at) desc
+     limit ${limit}`;
+  return [...rows];
 }
 
 /** Her practice for the call script: her own settings and profile, nothing guessed. */
