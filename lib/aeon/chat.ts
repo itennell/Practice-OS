@@ -7,6 +7,7 @@ import { loadApprovalSettings } from "../approval-settings";
 import { db } from "../db";
 import { respond, type RespondOptions, type Reply, type Step, type Turn } from "./agent";
 import { safeTitle, shownTitle } from "./chat-title";
+import { withContext, type AskContext } from "../referrals/ask-context";
 
 export type Conversation = {
   id: string;
@@ -68,6 +69,13 @@ export async function sendMessage(input: {
   /** The mode showing under the chat box when she sent it. */
   mode?: ApprovalMode;
   chat?: RespondOptions["chat"];
+  /**
+   * Where she asked from (the Referrals Ask Aeon box): added under her words for the model only
+   * (lib/referrals/ask-context.ts). Her saved message and the chat's title are her words alone.
+   */
+  context?: AskContext;
+  /** What Aeon is doing right now ("Checking 3 partners' public listings"), for a progress line. */
+  onProgress?: RespondOptions["onProgress"];
 }): Promise<{ conversationId: string | null; reply: Reply }> {
   const existing = input.conversationId ? await getConversation(input.conversationId) : null;
   if (input.conversationId && !existing) throw new Error("No conversation with that id.");
@@ -79,12 +87,14 @@ export async function sendMessage(input: {
     : (input.mode ?? existing?.conversation.approval_mode ?? (await loadApprovalSettings()).mode);
 
   // Tools record who asked: the conversation when there is one, "chat:new" for its first message.
-  const reply = await respond(input.text, {
+  const forModel = input.context ? withContext(input.text, input.context.tab, input.context.picked) : input.text;
+  const reply = await respond(forModel, {
     history,
     by: `chat:${existing?.conversation.id ?? "new"}`,
     viewOnly: input.viewOnly,
     mode,
     chat: input.chat,
+    onProgress: input.onProgress,
   });
   if (reply.kind !== "answer") return { conversationId: existing?.conversation.id ?? null, reply };
 

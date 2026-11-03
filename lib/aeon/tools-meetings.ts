@@ -1,11 +1,13 @@
 // The Referrals calendar for Aeon (chat and MCP), spread into TOOLS in tools.ts:
 // plan a coffee, call, meeting or lunch talk with someone on her board, and read
-// what is planned. Planning never writes the calendar: it proposes a time from her
-// open slots (lib/referrals/meetings.ts findOpenSlots) and queues one
+// what is planned. Planning never writes the calendar itself: it proposes a time from
+// her open slots (lib/referrals/meetings.ts findOpenSlots) and queues one
 // referral_meeting approval; only its executor (lib/executors/referral_meeting.ts)
-// saves the meeting, once she approves. Nothing is sent to the partner.
+// saves the meeting, once she approves, or at once when her mode runs this kind
+// (Bypass). The tool then reports what really happened (meetingOutcome). Nothing is
+// sent to the partner.
 import { z } from "zod";
-import { queueApprovalOnce } from "../approvals";
+import { approvalOutcome, queueApprovalOnce, type ApprovalOutcome } from "../approvals";
 import { practiceTimeZone, practiceToday } from "../compliance/store";
 import { checkNote, isDay, screenedNote } from "../referrals/contacts";
 import {
@@ -58,6 +60,52 @@ async function lookIn(input: { from?: string; to?: string }) {
   return { tz, today, fromDay, toDay, range: daysRange(fromDay < today ? today : fromDay, toDay, tz) };
 }
 
+type Planned = {
+  approval_id: string;
+  created: boolean;
+  proposed: { with: string; kind: string; when: string; minutes: number; location: string | null };
+  also_open: string[];
+};
+
+/**
+ * The tool's answer from the approval's real state: booked (her mode ran it, with the time),
+ * waiting for her OK, or failed. Never "waiting" for a meeting already on her calendar.
+ */
+export function meetingOutcome(o: ApprovalOutcome | null, p: Planned): ToolResult {
+  const sent = "nothing: she tells them herself";
+  if (o?.status === "done") {
+    return text({
+      booked: true,
+      on_her_calendar: true,
+      waiting_for_her: false,
+      ran_on_its_own: o.ran_on_its_own,
+      approval_id: p.approval_id,
+      meeting: p.proposed,
+      sent,
+      say:
+        o.result_note ??
+        `${p.proposed.kind} with ${p.proposed.with} is on her Referrals calendar for ${p.proposed.when}.`,
+      about:
+        "Her approval mode let this run without her tap, so it is ALREADY on her Referrals calendar. Say it is booked, with the time. " +
+        "Never say it is waiting for her OK or in her Approvals.",
+    });
+  }
+  if (o?.status === "failed" || o?.status === "rejected") {
+    return text({ ok: false, booked: false, waiting_for_her: false, approval_id: p.approval_id, error: o.error ?? "The meeting couldn't be saved." });
+  }
+  return text({
+    queued: true,
+    booked: false,
+    waiting_for_her: true,
+    approval_id: p.approval_id,
+    ...(p.created ? {} : { already_waiting: true }),
+    proposed: p.proposed,
+    also_open: p.also_open,
+    where: "her Approvals",
+    sent,
+  });
+}
+
 export const MEETING_TOOLS: AeonTool[] = [
   {
     name: "plan_referral_meeting",
@@ -65,7 +113,8 @@ export const MEETING_TOOLS: AeonTool[] = [
     description:
       "When she wants to set up a coffee, call, meeting or lunch talk with someone on her Referrals board ('set up coffee with Quillmere next " +
       "week'): finds the card, picks the first open time still ahead in her office hours (her open days, 9 to 5 unless she saved other hours, in her " +
-      "time zone, skipping meetings already planned) or checks the time she named, and puts it in her approvals. Nothing goes on her calendar until she approves, and nothing is sent: " +
+      "time zone, skipping meetings already planned) or checks the time she named, and puts it in her approvals. Nothing goes on her calendar until she approves (unless her mode runs it at once: then the result " +
+      "says booked: true and it is ALREADY on her calendar; say so, with the time, never that it waits), and nothing is sent: " +
       "she tells the partner herself. Pass starts_at only for a time she said (ISO with offset, like 2026-11-05T10:00:00-06:00); otherwise pass " +
       "from/to days if she named them. Tell her the proposed time and the other open times in `also_open`. Notes are about the meeting (where, " +
       "what to bring), never about a client. Name the card as she said it or pass its id; several matches come back as ask_which: list them and ask which.",
@@ -81,7 +130,7 @@ export const MEETING_TOOLS: AeonTool[] = [
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     label: "Planned a referral meeting",
-    // Only queues an approval; the executor saves the meeting once she approves.
+    // Only queues an approval; the executor saves the meeting once she approves (or her mode runs it).
     changesData: false,
     run: (async (input: PlanInput, ctx: ToolContext) => {
       const found = resolveCard(input.partner, await listSources());
@@ -145,14 +194,12 @@ export const MEETING_TOOLS: AeonTool[] = [
         notes: payload.notes,
       };
       const { id, created } = await queueApprovalOnce({ kind: "referral_meeting", title, preview, payload, createdBy: ctx.by }, { payloadField: "plan_key", value: payload.plan_key });
-      return text({
-        queued: true,
+      // Her mode may have run it already (Bypass runs this kind): say what really happened.
+      return meetingOutcome(await approvalOutcome(id), {
         approval_id: id,
-        ...(created ? {} : { already_waiting: true }),
+        created,
         proposed: { with: card.name, kind: MEETING_LABEL[input.kind], when, minutes, location: input.location ?? null },
         also_open: slots.filter((s) => s.start.getTime() !== start.getTime()).slice(0, 3).map((s) => meetingLabel(s.start, look.tz)),
-        where: "her Approvals",
-        sent: "nothing: she tells them herself",
       });
     }) as never,
   },
