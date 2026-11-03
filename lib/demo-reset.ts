@@ -10,14 +10,18 @@ import { specialtiesForNiche } from "./referrals/settings";
 
 /** The fictional demo practice's niche: oncology / serious illness / end of life, and that niche's kinds. */
 export const DEMO_NICHE = "oncology_serious_illness";
+/** Her office ZIP (Lincoln Park, Chicago): the demo searches around it. */
+export const DEMO_ZIP = "60614";
 export const DEMO_REFERRAL_KINDS: string[] = specialtiesForNiche(DEMO_NICHE);
 
 // What `npm run db:reset` (scripts/db-reset.ts) does once it has checked which
 // database it is on: empties the demo-data tables, reseeds the fictional Dana
 // Reyes practice, removes the files of the documents it emptied, and writes one
-// `demo_reset` audit row. Never touches settings, connections, audit_log
-// (append-only; it only adds that row), model_calls or any schema other than
-// practice_os.
+// `demo_reset` audit row. It also sets Dana's demo niche, its kinds and home ZIP
+// in referral_settings (her own choices otherwise; on the fictional demo practice
+// they are demo data). Never touches settings, connections, audit_log
+// (append-only; it only adds that row), model_calls, the do-not-contact lists,
+// referral_fetch_cache or any schema other than practice_os.
 
 export const DEMO_TABLES = [
   "clinician_profile",
@@ -87,9 +91,14 @@ export type ResetResult = {
   clearedCrisisAlerts: number;
 };
 
+const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
+const SUPABASE_HOST = /(?:^|\.)(?:supabase\.co|pooler\.supabase\.com)$/i;
+
 /**
- * Which project a database URL belongs to: the Supabase pooler user is "postgres.<ref>";
- * the built-in database (127.0.0.1 or localhost) reports as "local".
+ * Which project a database URL belongs to. "local": the built-in database, only on
+ * 127.0.0.1 or localhost (a "postgres" or "postgres.local" user). A Supabase ref: the
+ * pooler user "postgres.<ref>" or the direct host "db.<ref>.supabase.co", only on a
+ * *.supabase.co or *.pooler.supabase.com host. Anything else is null: no reset runs there.
  */
 export function projectRefOf(databaseUrl: string): string | null {
   let url: URL;
@@ -98,8 +107,13 @@ export function projectRefOf(databaseUrl: string): string | null {
   } catch {
     return null;
   }
-  const isLocalHost = url.hostname === "127.0.0.1" || url.hostname === "localhost";
-  return url.username.split(".")[1] ?? (isLocalHost ? "local" : (url.hostname.split(".")[1] ?? null));
+  const host = url.hostname.toLowerCase();
+  const userRef = url.username.split(".")[1] || null;
+  if (LOCAL_HOSTS.has(host)) return !userRef || userRef === "local" ? "local" : null;
+  if (!SUPABASE_HOST.test(host)) return null;
+  if (userRef) return userRef === "local" ? null : userRef;
+  const direct = host.match(/^db\.([a-z0-9]+)\.supabase\.co$/);
+  return direct?.[1] ?? null;
 }
 
 /** Why a reset must not run against this URL, or null when it may. The project must equal SUPABASE_PROJECT_REF. */
@@ -145,7 +159,7 @@ async function reset(sql: postgres.Sql, dir: string): Promise<ResetResult> {
     // reset, but on the fictional demo practice these two are demo data: the demo leads with them.
     await tx`
       insert into practice_os.referral_settings (id, home_zip, specialties, niche_preset)
-      values (true, '60614', ${DEMO_REFERRAL_KINDS}, ${DEMO_NICHE})
+      values (true, ${DEMO_ZIP}, ${DEMO_REFERRAL_KINDS}, ${DEMO_NICHE})
       on conflict (id) do update set niche_preset = excluded.niche_preset, specialties = excluded.specialties, updated_at = now()`;
     // The [Sample] posts' finished pictures, so the demo post can be approved.
     for (const post of SEED_POSTS) {

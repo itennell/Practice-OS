@@ -19,6 +19,7 @@ import https from "node:https";
 import { BlockList, isIP, type LookupFunction } from "node:net";
 import { Readable } from "node:stream";
 import type postgres from "postgres";
+import { STORED_KEY_PREFIXES } from "../sources/stored-keys";
 
 export const USER_AGENT = "Practice-OS/0.1 (+https://github.com/itennell/Practice-OS)";
 const SPACING_MS = 1000;
@@ -228,12 +229,26 @@ async function writeCache(url: string, entry: CacheEntry, sql?: postgres.Sql): P
     values (${url}, ${entry.status}, ${entry.etag}, ${entry.lastModified}, ${entry.body}, ${fetchedAt})
     on conflict (url) do update set status = excluded.status, etag = excluded.etag,
       last_modified = excluded.last_modified, body = excluded.body, fetched_at = excluded.fetched_at`;
-  // Nothing older than a week is ever used, and the table stays small.
-  const cutoff = new Date(entry.fetchedAt - PAGE_TTL);
-  await sql`delete from practice_os.referral_fetch_cache where fetched_at < ${cutoff}`;
+  await pruneFetchCache(sql, entry.fetchedAt);
+}
+
+/**
+ * Nothing older than a week is ever used, and the table stays small. The NPI Registry
+ * pages and map points (lib/referrals/sources/stored-cache.ts) keep their own lifetimes
+ * and prune themselves, so they are left out here, by key prefix.
+ */
+export async function pruneFetchCache(sql: postgres.Sql, now: number): Promise<void> {
+  const cutoff = new Date(now - PAGE_TTL);
+  const [nppes, census] = STORED_KEY_PREFIXES;
+  await sql`
+    delete from practice_os.referral_fetch_cache
+     where fetched_at < ${cutoff}
+       and left(url, ${nppes.length}) <> ${nppes} and left(url, ${census.length}) <> ${census}`;
   await sql`
     delete from practice_os.referral_fetch_cache where url in (
-      select url from practice_os.referral_fetch_cache order by fetched_at desc, url offset ${CACHE_MAX_ROWS})`;
+      select url from practice_os.referral_fetch_cache
+       where left(url, ${nppes.length}) <> ${nppes} and left(url, ${census.length}) <> ${census}
+       order by fetched_at desc, url offset ${CACHE_MAX_ROWS})`;
 }
 
 /** Waits until this site's next turn: at least a second after the last request to it. */

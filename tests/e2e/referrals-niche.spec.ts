@@ -80,7 +80,7 @@ test("board: category chips show one kind at a time, and cards name the niche", 
   await page.goto("/referrals");
   const filter = page.getByRole("group", { name: "Show cards by kind" });
   await expect(filter.getByRole("button", { name: /^All/ })).toHaveAttribute("aria-pressed", "true");
-  const oncology = page.getByRole("listitem", { name: "[Sample] Lakeshore Oncology Group" });
+  const oncology = page.getByRole("listitem", { name: "[Sample] Quillmere Oncology Group" });
   await expect(oncology).toContainText("Fits your oncology & end-of-life focus (Medical specialists)");
   await filter.getByRole("button", { name: /^Medical specialists/ }).click();
   await expect(filter.getByRole("button", { name: /^Medical specialists/ })).toHaveAttribute("aria-pressed", "true");
