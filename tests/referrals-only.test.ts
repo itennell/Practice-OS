@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { NextRequest } from "next/server";
 import { afterAll, describe, expect, it, vi } from "vitest";
 import { loadEnv } from "../lib/env";
@@ -10,6 +10,7 @@ import {
   FRONT_DESK_TOOLS,
   hiddenInDemo,
   REFERRAL_DEMO_FILE_KINDS,
+  REFERRAL_DEMO_HIDDEN_API,
   REFERRAL_DEMO_HIDDEN_PAGES,
   REFERRAL_DEMO_SCREENS,
   REFERRAL_DEMO_TOOLS,
@@ -31,7 +32,11 @@ const { SUGGESTIONS, REFERRAL_DEMO_SUGGESTIONS } = await import("../lib/aeon/sug
 const { EMPLOYER_POLICY_LINE, flatten, QUESTIONS } = await import("../lib/onboarding/chapters");
 const { HELPER_QUESTIONS } = await import("../lib/onboarding/helper-questions");
 const { proxy } = await import("../proxy");
-const { toFileEntry } = await import("../lib/documents/file-entry");
+const { SHOWN_GROUPS, toFileEntry } = await import("../lib/documents/file-entry");
+const { SPECIALTIES } = await import("../lib/referrals/nppes");
+
+/** Listed ahead of their PR (lib/features.ts): the debrief tool lands with its own PR. */
+const COMING = ["debrief_meeting"];
 
 const ctx = {
   state: "IL",
@@ -56,7 +61,8 @@ const page = (pathname: string) => proxy(new NextRequest(`http://${HOST}${pathna
 describe("referrals-only demo: the allow-lists", () => {
   it("names only real tools, pages and kinds", () => {
     const src = readFileSync(new URL("../lib/aeon/tools.ts", import.meta.url), "utf8") + readFileSync(new URL("../lib/aeon/tools-referrals.ts", import.meta.url), "utf8") + readFileSync(new URL("../lib/aeon/tools-files.ts", import.meta.url), "utf8");
-    for (const name of REFERRAL_DEMO_TOOLS) expect(src, name).toContain(`name: "${name}"`);
+    for (const name of REFERRAL_DEMO_TOOLS) if (!COMING.includes(name) || src.includes(`name: "${name}"`)) expect(src, name).toContain(`name: "${name}"`);
+    for (const p of REFERRAL_DEMO_HIDDEN_API) expect(readdirSync(new URL(`../app${p}`, import.meta.url)).length, p).toBeGreaterThan(0);
     for (const p of REFERRAL_DEMO_HIDDEN_PAGES) expect(p).toMatch(/^\/[a-z-]+$/);
     expect(REFERRAL_DEMO_FILE_KINDS).toEqual(["uploaded", "referral_letter"]);
     expect(QUESTIONS.some((q) => q.id === "employer_policy")).toBe(true);
@@ -83,9 +89,22 @@ describe.skipIf(!REFERRALS_ONLY_DEMO)("referrals-only demo is on", () => {
     expect(hiddenInDemo("/api/admin")).toBe(false);
   });
 
+  it("answers 404 on the hidden helpers' API routes, GET and POST, and keeps the rest", () => {
+    const api = (method: string, p: string) =>
+      proxy(new NextRequest(`http://${HOST}${p}`, { method, headers: { host: HOST, origin: `http://${HOST}`, "sec-fetch-site": "same-origin", "content-type": "application/json" } }));
+    for (const p of ["/api/gfe/x", "/api/superbills", "/api/instagram/posts/x/image", "/api/growth/x", "/api/client-forms/x", "/api/studio/x", "/api/payers/x", "/api/credentialing", "/api/media/x", "/api/release-forms/pdf", "/api/obligations/x"]) {
+      expect(api("GET", p).status, p).toBe(404);
+      expect(api("POST", p).status, p).toBe(404);
+    }
+    for (const p of ["/api/admin/crisis-seen", "/api/approvals/x/approve", "/api/documents/x", "/api/referrals/find", "/api/chat", "/api/memories", "/api/settings/referrals"]) {
+      expect(api("POST", p).status, p).toBe(200);
+    }
+  });
+
   it("gives Aeon's chat and MCP only the referral and core tools", () => {
     const names = TOOLS.map((t) => t.name).sort();
-    expect(names).toEqual(REFERRAL_DEMO_TOOLS.filter((n) => !FRONT_DESK_TOOLS.includes(n)).slice().sort());
+    const built = (n: string) => !COMING.includes(n) || names.includes(n);
+    expect(names).toEqual(REFERRAL_DEMO_TOOLS.filter((n) => !FRONT_DESK_TOOLS.includes(n) && built(n)).slice().sort());
     for (const hidden of ["morning_brief", "draft_gfe", "caqh_prep", "draft_instagram_post", "set_fees", "build_website"]) expect(toolEnabled(hidden)).toBe(false);
     const chat = chatTools().map((t) => t.function.name);
     expect(chat).toContain("find_referral_sources");
@@ -98,14 +117,15 @@ describe.skipIf(!REFERRALS_ONLY_DEMO)("referrals-only demo is on", () => {
   it("lets queue_approval take only referral kinds", async () => {
     const queue = TOOLS.find((t) => t.name === "queue_approval")!;
     const kind = queue.input.kind as unknown as { options: string[] };
-    expect(kind.options).toEqual(["referral_letter"]);
+    expect(kind.options).toEqual(["referral_letter", "file_document"]); // file_upload queues file_document
     const r = await runTool("queue_approval", { kind: "gfe_issue", title: "x" }, { by: "mcp:test" });
     expect(r.isError).toBe(true);
   });
 
   it("shows only referral approvals: letters, and Aeon actions that wrap a referral tool", () => {
     expect(demoApprovalKind("referral_letter")).toBe(true);
-    for (const k of ["gfe_issue", "instagram_post", "state_rules", "test_note", "file_document", "website"]) expect(demoApprovalKind(k), k).toBe(false);
+    expect(demoApprovalKind("file_document")).toBe(true); // her uploads are hers
+    for (const k of ["gfe_issue", "instagram_post", "state_rules", "test_note", "website"]) expect(demoApprovalKind(k), k).toBe(false);
     expect(demoApprovalShown("aeon_action", "log_referral_contact")).toBe(true);
     expect(demoApprovalShown("aeon_action", "set_fees")).toBe(false);
     expect(demoApprovalShown("aeon_action", undefined)).toBe(false);
@@ -117,6 +137,8 @@ describe.skipIf(!REFERRALS_ONLY_DEMO)("referrals-only demo is on", () => {
     for (const k of ["gfe", "superbill", "client_form", "release_form", "instagram_post", "cms855i"]) expect(fileKindEnabled(k), k).toBe(false);
     const letter = toFileEntry({ id: "referral_letter:x", kind: "referral_letter", title: "Letter", status: "Waiting", topics: [] } as never, null);
     expect(letter && fileKindEnabled(letter.card.kind)).toBe(true);
+    // Only the chips those kinds fill: no empty Forms, Estimates, Insurance or Media.
+    expect(SHOWN_GROUPS).toEqual(["uploaded", "referrals"]);
   });
 
   it("takes the short onboarding path, ending on the employer reminder", () => {
@@ -124,7 +146,8 @@ describe.skipIf(!REFERRALS_ONLY_DEMO)("referrals-only demo is on", () => {
     expect(list.map((s) => s.id)).toEqual([...REFERRAL_DEMO_SCREENS]);
     // The home ZIP is asked even though her office ZIP is known (the office question is skipped).
     expect(list.find((s) => s.id === "referrals:home_zip")?.chapter).toBe("clients");
-    expect(list.find((s) => s.id === "state")?.chapter).toBe("license");
+    expect(list.find((s) => s.id === "referrals:specialties")?.chapter).toBe("clients");
+    expect(list.find((s) => s.id === "contact")?.help).toMatch(/letters/);
     const last = list.at(-1)!;
     expect(last).toMatchObject({ id: "employer_policy", kind: "yesno", help: EMPLOYER_POLICY_LINE });
     expect(EMPLOYER_POLICY_LINE).toMatch(/employer/);
@@ -136,7 +159,8 @@ describe.skipIf(!REFERRALS_ONLY_DEMO)("referrals-only demo is on", () => {
     expect(soul()).toContain(REFERRALS_DEMO_SOUL);
     expect(soul()).toMatch(/no clinical or mental health advice/i); // the hard rules stay
     expect(SUGGESTIONS).toEqual(REFERRAL_DEMO_SUGGESTIONS);
-    expect(SUGGESTIONS).toEqual(["Who should I reach out to this week?", "Find hospice and palliative care near me", "Debrief my coffee meeting", "Draft a letter to my top 3"]);
+    expect(SUGGESTIONS).toEqual(["Who should I reach out to this week?", "Find oncology and palliative care near me", "Debrief my coffee meeting", "Draft a letter to my top 3"]);
+    expect(SPECIALTIES.map((s) => s.id)).toContain("oncology"); // the second tile finds a real kind of provider
     const ids = CONNECTION_CARDS.map((c) => c.id);
     expect(ids).toContain("muse");
     expect(ids).not.toContain("google");
@@ -226,6 +250,9 @@ describe.skipIf(!REFERRALS_ONLY_DEMO || !hasDb)("referrals-only demo is on (data
     expect(pending.every((a) => a.kind === "referral_letter" || a.kind === "aeon_action")).toBe(true);
     expect((await loadMenuData()).counts.approvals).toBe(pending.length);
     expect((await listApprovalsById([letter, gfe, fees])).map((a) => a.id)).toEqual([letter]);
+    const { approve, decline } = await import("../lib/approvals");
+    expect(await approve(gfe, { by: "test" })).toEqual({ ok: false, reason: "not_found" });
+    expect(await decline(fees, { by: "test" })).toEqual({ ok: false, reason: "not_found" });
     const [row] = await db()`select status from practice_os.approvals where id = ${gfe}`;
     expect(row.status).toBe("pending"); // hidden, never deleted
     const menu = await loadMenuData();

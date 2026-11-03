@@ -7,7 +7,7 @@ const FULL_SUGGESTIONS = ["What needs me this week?", "Draft a Good Faith Estima
 /** The referrals-only demo's tiles (lib/features.ts). */
 export const REFERRAL_DEMO_SUGGESTIONS = [
   "Who should I reach out to this week?",
-  "Find hospice and palliative care near me",
+  "Find oncology and palliative care near me",
   "Debrief my coffee meeting",
   "Draft a letter to my top 3",
 ];

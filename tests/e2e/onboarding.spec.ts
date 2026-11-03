@@ -185,8 +185,7 @@ test("She can stop and pick up where she left off", async ({ page }) => {
   await step(page, /Which state/, () => pick(page, page, "State", "Illinois"));
   await step(page, /What kind of license/, () => radio(page, /LCPC/));
   await page.reload();
-  // The referrals-only demo's short path goes on to who she helps (lib/features.ts).
-  await expect(heading(page)).toHaveText(REFERRALS_ONLY_DEMO ? /Who do you help/ : /How do clients reach/);
+  await expect(heading(page)).toHaveText(/How do clients reach/);
   await page.getByRole("button", { name: "Back" }).click();
   await expect(page.getByRole("radio", { name: /LCPC/ })).toBeChecked();
 });
@@ -239,8 +238,21 @@ test("Referrals-only demo: the short path, ending on the employer reminder, then
   await step(page, /What's your practice called\?/, none, "skip");
   await step(page, /Which state/, () => pick(page, page, "State", "Illinois"));
   await step(page, /What kind of license/, () => radio(page, /LCPC/));
+  // Her work contact and office: letters need them for the reply line and the distance.
+  await expect(heading(page)).toHaveText(/How do clients reach/);
+  await expect(page.getByText(/so doctors can write back/)).toBeVisible();
+  await step(page, /How do clients reach/, async () => {
+    await page.getByLabel("Practice email").fill("dana@example.com");
+    await page.getByLabel("Phone number clients call").fill("(312) 555-0100");
+  });
+  await step(page, /office address/, async () => {
+    await page.getByLabel("Street address").fill("100 W Example St");
+    await page.getByLabel("City").fill("Chicago");
+    await page.getByLabel("ZIP code").fill("60614");
+  });
   await step(page, /Who do you help/, none, "skip");
   await step(page, /What ZIP code should Aeon search around/, () => page.getByLabel("ZIP code").fill("60614"));
+  await step(page, /Who would you like to hear from/, none, "skip");
   await expect(heading(page)).toHaveText(/Are you also employed somewhere/);
   await expect(page.getByText(/conflicts of interest/)).toBeVisible();
   expect(await seriousViolations(page)).toEqual([]);

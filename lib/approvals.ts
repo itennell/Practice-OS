@@ -80,7 +80,7 @@ export async function listApprovalsById(ids: string[]) {
 /** A Front Desk kind while Front Desk is paused (lib/features.ts): never listed, queued, approved or declined. */
 const pausedKind = (kind: string) => !FRONT_DESK_ENABLED && FRONT_DESK_APPROVAL_KINDS.includes(kind);
 
-/** Not shown in her lists or chat cards: a paused Front Desk kind, or one outside the referrals-only demo (lib/features.ts). */
+/** Hidden from her: a paused Front Desk kind, or one outside the referrals-only demo (lib/features.ts). Never listed, approved or declined. */
 const hiddenRow = (r: Pick<ApprovalRow, "kind" | "payload">) => pausedKind(r.kind) || !demoApprovalShown(r.kind, r.payload?.tool);
 
 function refusePaused(kind: string): void {
@@ -102,7 +102,7 @@ async function getRow(id: string) {
  */
 export async function approve(id: string, opts: { by: string; edit?: string; auto?: boolean }): Promise<ApproveResult> {
   const before = await getRow(id);
-  if (!before || pausedKind(before.kind)) return { ok: false, reason: "not_found" };
+  if (!before || hiddenRow(before)) return { ok: false, reason: "not_found" };
 
   let editedPayload: Record<string, unknown> | null = null;
   if (opts.edit !== undefined) {
@@ -150,9 +150,9 @@ export async function approve(id: string, opts: { by: string; edit?: string; aut
 }
 
 export async function decline(id: string, opts: { by: string }): Promise<ApproveResult> {
-  if (!FRONT_DESK_ENABLED) {
+  if (!FRONT_DESK_ENABLED || REFERRALS_ONLY_DEMO) {
     const current = await getRow(id);
-    if (current && pausedKind(current.kind)) return { ok: false, reason: "not_found" };
+    if (current && hiddenRow(current)) return { ok: false, reason: "not_found" };
   }
   const [row] = await db()<ApprovalRow[]>`
     update practice_os.approvals

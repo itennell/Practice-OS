@@ -1,5 +1,5 @@
 import { listConversations } from "../aeon/chat";
-import { loadNeeds } from "../admin/load";
+import { loadAlertFailures, loadNeeds } from "../admin/load";
 import { db } from "../db";
 import { visibleKind } from "../approvals";
 import { REFERRAL_DEMO_HIDDEN_PAGES, REFERRALS_ONLY_DEMO } from "../features";
@@ -20,11 +20,13 @@ const safe = async <T>(read: () => Promise<T>, fallback: T): Promise<T> => {
 };
 
 export async function loadMenuData(): Promise<MenuData> {
-  const [profile, waiting, needs, chats] = await Promise.all([
+  const [profile, waiting, needs, chats, alerts] = await Promise.all([
     safe(getProfile, null),
     safe(() => db()<{ n: number }[]>`select count(*)::int as n from practice_os.approvals where status = 'pending' and ${visibleKind()}`, [{ n: 0 }]),
     REFERRALS_ONLY_DEMO ? [] : safe(loadNeeds, []), // Admin is hidden in the referrals-only demo (lib/features.ts)
     safe(() => listConversations(30), []),
+    // Admin's crisis item has nowhere to show in the demo, so the chat row counts it instead.
+    REFERRALS_ONLY_DEMO ? safe(() => loadAlertFailures(), []) : [],
   ]);
   return {
     clinician: profile ? { name: profile.full_name, credential: profile.credential, isSample: profile.is_sample } : null,
@@ -32,6 +34,7 @@ export async function loadMenuData(): Promise<MenuData> {
       approvals: waiting[0]?.n ?? 0,
       // Only what is pressing (overdue, this week, blocking gaps), not every setup question.
       admin: needs.filter((n) => n.tier <= 3).length,
+      urgent: alerts.length,
     },
     chats: chats.map((c) => ({ id: c.id, title: c.title })),
     // Media stays for everyone, even when Instagram isn't for her. Only the referrals-only demo hides pages.

@@ -1,3 +1,4 @@
+import { REFERRAL_DEMO_FILE_KINDS, REFERRALS_ONLY_DEMO } from "../features";
 import { KIND_LABEL, type DocumentCard, type DocumentKind } from "./card";
 
 // The Files page (/files): every file she added and every one Aeon made, in one list.
@@ -31,6 +32,11 @@ export const GROUP_OF: Partial<Record<DocumentKind, FileGroup>> = {
   referral_letter: "referrals",
   instagram_post: "media",
 };
+
+/** The groups Files offers: in the referrals-only demo (lib/features.ts), only those its file kinds fill. */
+export const SHOWN_GROUPS: readonly FileGroup[] = FILE_GROUPS.filter(
+  (g) => !REFERRALS_ONLY_DEMO || REFERRAL_DEMO_FILE_KINDS.some((k) => GROUP_OF[k as DocumentKind] === g),
+);
 
 export type FileDownload = { href: string; label: string };
 

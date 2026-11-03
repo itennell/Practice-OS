@@ -79,10 +79,15 @@ export const REFERRAL_DEMO_TOOLS: readonly string[] = [
   "find_referral_cards",
   "set_do_not_contact",
   "revise_referral_letter",
+  // coming: the debrief PR adds this tool; listed now so it works once merged
+  "debrief_meeting",
 ];
 
-/** Approval kinds the referral tools queue themselves. aeon_action counts too when it wraps one of REFERRAL_DEMO_TOOLS. */
-export const REFERRAL_DEMO_APPROVAL_KINDS: readonly string[] = ["referral_letter"];
+/**
+ * Approval kinds the demo shows: what the referral tools queue, and file_document (file_upload's
+ * "keep this file" approval: her uploads are hers). aeon_action counts too when it wraps one of REFERRAL_DEMO_TOOLS.
+ */
+export const REFERRAL_DEMO_APPROVAL_KINDS: readonly string[] = ["referral_letter", "file_document"];
 
 /** Files page and document index kinds shown in the demo: her own uploads and referral letters. */
 export const REFERRAL_DEMO_FILE_KINDS: readonly string[] = ["uploaded", "referral_letter"];
@@ -91,7 +96,43 @@ export const REFERRAL_DEMO_FILE_KINDS: readonly string[] = ["uploaded", "referra
 export const REFERRAL_DEMO_HIDDEN_PAGES: readonly string[] = ["/admin", "/media", "/instagram", "/grow", "/front-desk"];
 
 /** Onboarding screens in the demo's short path, in order of QUESTIONS (lib/onboarding/chapters.ts). */
-export const REFERRAL_DEMO_SCREENS: readonly string[] = ["name", "muse-key", "practice_name", "state", "license", "who", "referrals:home_zip", "employer_policy"];
+export const REFERRAL_DEMO_SCREENS: readonly string[] = [
+  "name",
+  "muse-key",
+  "practice_name",
+  "state",
+  "license",
+  // her work contact and office: letters need them for the reply line and the distance
+  "contact",
+  "office",
+  "who",
+  "referrals:home_zip",
+  // who she'd like to hear from; the niche picker replaces it in a later PR
+  "referrals:specialties",
+  "employer_policy",
+];
+
+/**
+ * API routes of the hidden helpers: 404 in the demo (proxy.ts), so even the Vercel copy can't
+ * read their data. Crisis-seen, approvals, documents, referrals, chat, memories and settings stay.
+ */
+export const REFERRAL_DEMO_HIDDEN_API: readonly string[] = [
+  "/api/gfe",
+  "/api/superbills",
+  "/api/instagram",
+  "/api/growth",
+  "/api/client-forms",
+  "/api/studio",
+  "/api/payers",
+  "/api/credentialing",
+  "/api/media",
+  "/api/release-forms",
+  "/api/obligations",
+];
+
+/** An API route of a hidden helper while the demo is on. */
+export const hiddenApiInDemo = (pathname: string): boolean =>
+  REFERRALS_ONLY_DEMO && REFERRAL_DEMO_HIDDEN_API.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
 /** A page path the demo hides (never an API route). */
 export const hiddenInDemo = (pathname: string): boolean =>

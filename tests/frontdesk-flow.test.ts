@@ -3,6 +3,7 @@
 // It writes inquiries, approvals and bookings, and flips the Front Desk
 // switches, so it runs only on a local throwaway database (localhost).
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { REFERRALS_ONLY_DEMO } from "../lib/features";
 // These test Front Desk itself, so they run with it switched on (lib/features.ts).
 vi.mock("../lib/features", async (orig) => ({ ...(await orig<typeof import("../lib/features")>()), FRONT_DESK_ENABLED: true }));
 import { loadEnv } from "../lib/env";
@@ -132,7 +133,7 @@ const inquiryOf = async (p: string) => (await db()`select * from practice_os.inq
 const approvalsFor = async (inquiryId: string) =>
   db()`select kind, status, decided_by, error from practice_os.approvals where payload ->> 'inquiry_id' = ${inquiryId} order by created_at`;
 
-describe.skipIf(!localDb)("Front Desk flow (local database only)", () => {
+describe.skipIf(REFERRALS_ONLY_DEMO || !localDb)("Front Desk flow (local database only)", () => {
   it("a voicemail from Sam becomes an inquiry and a three-times text, sent on her rule", async () => {
     expect(await processVoicemail(vm(SAM, "Hi, it's Sam, I'd like to set up a first appointment."), phone)).toBe("done");
     const inq = await inquiryOf(SAM);

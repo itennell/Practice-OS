@@ -551,8 +551,14 @@ export const QUESTIONS: Question[] = [
   },
 ];
 
-/** Where each demo screen sits in the short path: state and license under "License and rules", the home ZIP under "Who you help". */
-const DEMO_CHAPTER: Record<string, ChapterId> = { state: "license", license: "license", "referrals:home_zip": "clients" };
+/** Where each demo screen sits in the short path: the Referrals questions go under "Who you help". */
+const DEMO_CHAPTER: Record<string, ChapterId> = { "referrals:home_zip": "clients", "referrals:specialties": "clients" };
+
+/** The demo's own words where the full interview talks about estimates and superbills. */
+export const DEMO_WORDS: Record<string, { help?: string; aeonSays: string }> = {
+  contact: { help: "Your practice email and phone. They go on your letters so doctors can write back.", aeonSays: "Doctors reply to these." },
+  office: { help: "If you only see clients by video, use the address where your practice gets mail.", aeonSays: "This tells doctors how close you are." },
+};
 
 const DEMO_HELLO =
   "Hi, I'm Aeon, your referrals partner. I help you find doctors and others who could send you clients, and keep up with them. This takes about 3 minutes.";
@@ -656,7 +662,7 @@ export function flatten(
   // Referrals-only demo (lib/features.ts): the short path. Other saved answers stay saved.
   return out
     .filter((s) => REFERRAL_DEMO_SCREENS.includes(s.id))
-    .map((s) => ({ ...s, chapter: DEMO_CHAPTER[s.id] ?? s.chapter, ...(s.id === "name" ? { aeonSays: DEMO_HELLO } : {}) }));
+    .map((s) => ({ ...s, chapter: DEMO_CHAPTER[s.id] ?? s.chapter, ...(s.id === "name" ? { aeonSays: DEMO_HELLO } : {}), ...DEMO_WORDS[s.id] }));
 }
 
 const HELPER_SAYS: Record<string, string> = {

@@ -8,7 +8,7 @@ import { getEstimate } from "../gfe/store";
 import { getSuperbill } from "../superbill/store";
 import { getStoredDocument } from "../uploads/store";
 import { fileKindEnabled } from "../features";
-import { sortFiles, toFileEntry, type FileEntry, type FileGroup } from "./file-entry";
+import { SHOWN_GROUPS, sortFiles, toFileEntry, type FileEntry, type FileGroup } from "./file-entry";
 import {
   clientFormCards,
   cms855iCard,
@@ -75,6 +75,8 @@ export async function listFiles(): Promise<FilesView> {
   if (money.length) capped.money = `Showing the newest ${money.join(" and ")}.`;
   if (full(letters, FILE_CAPS.letters)) capped.referrals = `Showing the newest ${FILE_CAPS.letters}.`;
   if (full(posts, FILE_CAPS.posts)) capped.media = `Showing the newest ${FILE_CAPS.posts}.`;
+  // A note only for a group the page shows (the referrals-only demo hides most: lib/features.ts).
+  for (const g of Object.keys(capped) as (keyof typeof capped)[]) if (!SHOWN_GROUPS.includes(g)) delete capped[g];
   // The referrals-only demo (lib/features.ts) shows only her uploads and referral letters.
   const shown = entries.filter((e): e is FileEntry => e !== null && fileKindEnabled(e.card.kind));
   return { entries: sortFiles(shown), capped };

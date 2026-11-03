@@ -2,6 +2,7 @@
 // show on the calendar, confirm. Runs only when DATABASE_URL is set; removes
 // everything it adds (audit_log rows stay; it is append-only).
 import { afterAll, describe, expect, it } from "vitest";
+import { REFERRALS_ONLY_DEMO } from "../lib/features";
 import { loadEnv } from "../lib/env";
 import { TEST_RULE_ID, sampleResearch } from "./helpers/researched-rule";
 
@@ -23,7 +24,7 @@ afterAll(async () => {
   await closeDb();
 });
 
-describe.skipIf(!hasDb)("researched state rules", () => {
+describe.skipIf(REFERRALS_ONLY_DEMO || !hasDb)("researched state rules", () => {
   it("approving saves the rule; it shows on the calendar marked for confirming; confirming makes it hers", async () => {
     const today = await practiceToday();
     const { ctx, results } = sampleResearch(today);

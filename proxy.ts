@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { hiddenInDemo } from "@/lib/features";
+import { hiddenApiInDemo, hiddenInDemo } from "@/lib/features";
 import { hiddenOnThisCopy, refusal } from "@/lib/request-guard";
 
 // Runs before every page and API route. On the clinician's computer it refuses
@@ -9,7 +9,8 @@ import { hiddenOnThisCopy, refusal } from "@/lib/request-guard";
 // demo, the hidden helpers' pages redirect to Home.
 export function proxy(request: NextRequest) {
   const api = request.nextUrl.pathname.startsWith("/api/");
-  if (hiddenOnThisCopy(request.nextUrl.pathname)) {
+  // The referrals-only demo's hidden helpers (lib/features.ts) answer 404 on their API routes too.
+  if (hiddenOnThisCopy(request.nextUrl.pathname) || hiddenApiInDemo(request.nextUrl.pathname)) {
     return api
       ? NextResponse.json({ error: "Not found." }, { status: 404 })
       : new NextResponse("Not found.", { status: 404, headers: { "content-type": "text/plain; charset=utf-8" } });

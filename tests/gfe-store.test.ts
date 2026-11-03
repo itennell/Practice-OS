@@ -3,6 +3,7 @@
 // federal holidays) and fees; every estimate made here is deleted afterwards.
 import * as mupdf from "mupdf";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { REFERRALS_ONLY_DEMO } from "../lib/features";
 import { loadEnv } from "../lib/env";
 import { WEEKDAYS } from "../lib/gfe/timing";
 
@@ -76,7 +77,7 @@ describe.skipIf(!hasDb)("saved Good Faith Estimates", () => {
     expect(store.estimateStatus(e!)).toBe("Waiting for you");
   });
 
-  it("approving marks it issued today and on time; a second approve is refused", async () => {
+  it.skipIf(REFERRALS_ONLY_DEMO)("approving marks it issued today and on time; a second approve is refused", async () => {
     const r = await draft();
     const res = await approve(r.approvalId, { by: "test" });
     expect(res.ok && res.approval.status).toBe("done");
@@ -88,7 +89,7 @@ describe.skipIf(!hasDb)("saved Good Faith Estimates", () => {
     expect(again.ok).toBe(false);
   });
 
-  it("declining leaves it unissued", async () => {
+  it.skipIf(REFERRALS_ONLY_DEMO)("declining leaves it unissued", async () => {
     const r = await draft();
     await decline(r.approvalId, { by: "test" });
     const e = await store.getEstimate(r.id);

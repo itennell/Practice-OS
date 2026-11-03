@@ -3,12 +3,14 @@ import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { CalendarDays, Inbox, TriangleAlert, Users } from "lucide-react";
+import { NeedPostButton } from "@/components/admin/need-post-button";
 import { AeonChat, type ChatEntry } from "@/components/aeon-chat";
 import { SUGGESTIONS } from "@/lib/aeon/suggestions";
 import { ListCard, ListRow } from "@/components/shared/list-card";
 import { chipClass } from "@/components/ui";
 import { getConversation } from "@/lib/aeon/chat";
 import { loadAlertFailures } from "@/lib/admin/load";
+import { crisisSeen } from "@/lib/admin/needs-next";
 import { listApprovals } from "@/lib/approvals";
 import { loadApprovalSettings } from "@/lib/approval-settings";
 import { morningBrief, type BriefItem } from "@/lib/compliance/brief";
@@ -31,11 +33,12 @@ async function Chat({ searchParams }: { searchParams: PageProps<"/">["searchPara
   await connection(); // read the database per request, never at build time
   const { c, ask } = await searchParams;
   const id = typeof c === "string" && /^[0-9a-f-]{36}$/i.test(c) ? c : null;
-  const [profile, found, settings, suggestions] = await Promise.all([
+  const [profile, found, settings, suggestions, alerts] = await Promise.all([
     getProfile(),
     id ? getConversation(id) : null,
     loadApprovalSettings(),
     suggestionsFor(),
+    REFERRALS_ONLY_DEMO ? loadAlertFailures().catch(() => []) : [],
   ]);
   // The first run opens on Aeon's onboarding interview until she finishes it.
   if (!profile?.onboarding_completed_at) redirect("/onboarding");
@@ -47,6 +50,9 @@ async function Chat({ searchParams }: { searchParams: PageProps<"/">["searchPara
     approvalIds: m.approval_ids,
   }));
   return (
+    <>
+      {/* Referrals-only demo: Admin is hidden, so inside a chat a missed crisis alert stays pinned here (the empty Home has it in Today). */}
+      {found && alerts[0] && <CrisisBanner id={alerts[0].id} />}
     <AeonChat
       key={found?.conversation.id ?? "new"}
       conversationId={found?.conversation.id ?? null}
@@ -59,6 +65,7 @@ async function Chat({ searchParams }: { searchParams: PageProps<"/">["searchPara
       // The Vercel demo copy is view only: the pill shows the mode but can't change it.
       modeReadOnly={Boolean(process.env.VERCEL)}
     />
+    </>
   );
 }
 
@@ -119,6 +126,32 @@ async function StartCards() {
   );
 }
 
+const CRISIS_TITLE = "Aeon showed the 988 message in your chat";
+const CRISIS_WHY = "A message mentioned danger or self-harm. Check your chat now.";
+
+/** "I checked", the same as Admin's crisis item (app/api/admin/crisis-seen). */
+function CrisisSeenButton({ id }: { id: string }) {
+  const action = crisisSeen(`urgent_alert:${id}`);
+  return "post" in action ? <NeedPostButton label={action.label} post={action.post} body={action.body} title={CRISIS_TITLE} /> : null;
+}
+
+/** Pinned above an open chat in the referrals-only demo while a crisis alert texted no one. */
+function CrisisBanner({ id }: { id: string }) {
+  return (
+    <section
+      aria-label="Urgent"
+      className="sticky top-14 z-10 mx-auto mb-4 flex w-full max-w-[720px] flex-wrap items-center gap-3 rounded-[20px] border border-[var(--danger-fg)] bg-[var(--color-card)] px-4 py-3 md:top-2 dark:bg-[var(--color-dark-card)]"
+    >
+      <TriangleAlert aria-hidden size={16} strokeWidth={1.75} className="shrink-0 text-[var(--danger-fg)]" />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <p className="text-small font-semibold">{CRISIS_TITLE}</p>
+        <p className="text-small text-[var(--fg-muted)]">{CRISIS_WHY}</p>
+      </div>
+      <CrisisSeenButton id={id} />
+    </section>
+  );
+}
+
 /**
  * The referrals-only demo's Today list (lib/features.ts): what's waiting for her OK and the referral
  * follow-ups due. Admin is hidden, so a crisis alert that texted no one shows here first instead.
@@ -138,12 +171,13 @@ async function ReferralStartCards() {
           </Link>
         }
       >
-        {alerts.length > 0 && (
+        {alerts[0] && (
           <ListRow
             accent
             icon={<TriangleAlert size={16} strokeWidth={1.75} />}
-            title="Aeon showed the 988 message in your chat"
-            detail="A message mentioned danger or self-harm. Check your chat now."
+            title={CRISIS_TITLE}
+            detail={CRISIS_WHY}
+            end={<CrisisSeenButton id={alerts[0].id} />}
           />
         )}
         {waiting.length > 0 ? (
