@@ -2,6 +2,7 @@
 // runs without her tap, then the same rule end to end against the database.
 import { readFileSync } from "node:fs";
 import { afterAll, describe, expect, it, vi } from "vitest";
+import { REFERRALS_ONLY_DEMO } from "../lib/features";
 // These test Front Desk itself, so they run with it switched on (lib/features.ts).
 vi.mock("../lib/features", async (orig) => ({ ...(await orig<typeof import("../lib/features")>()), FRONT_DESK_ENABLED: true }));
 import { APPROVAL_KINDS } from "../lib/approval-kinds";
@@ -81,7 +82,7 @@ async function statusOf(id: string) {
 }
 
 describe.skipIf(!hasDb)("end to end", () => {
-  it("Auto runs a routine approval at once and says so; Manual leaves it pending", async () => {
+  it.skipIf(REFERRALS_ONLY_DEMO)("Auto runs a routine approval at once and says so; Manual leaves it pending", async () => {
     const auto = await withOrigin({ mode: "auto" }, () => queueApproval({ kind: "test_note", title: "[Sample] auto", payload: { note: "x" }, createdBy: "test" }));
     const manual = await withOrigin({ mode: "manual" }, () => queueApproval({ kind: "test_note", title: "[Sample] manual", payload: { note: "x" }, createdBy: "test" }));
     made.push(auto, manual);
@@ -97,7 +98,7 @@ describe.skipIf(!hasDb)("end to end", () => {
     expect((await statusOf(id)).status).toBe("pending");
   });
 
-  it("Manual turns a change into an aeon_action she approves; then it runs once", async () => {
+  it.skipIf(REFERRALS_ONLY_DEMO)("Manual turns a change into an aeon_action she approves; then it runs once", async () => {
     const r = await runTool(
       "draft_superbill",
       { lines: [{ date_of_service: "2026-10-05", cpt: "90837", modifier: "95", pos: "10", cents: 17_500 }] },

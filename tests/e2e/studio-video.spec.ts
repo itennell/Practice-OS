@@ -5,6 +5,9 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { LIMIT, makeTestVideo, watchNetwork } from "./video-fixture";
+import { REFERRALS_ONLY_DEMO } from "../../lib/features";
+
+test.skip(REFERRALS_ONLY_DEMO, "Hidden in the referrals-only demo (lib/features.ts); these run when REFERRALS_ONLY_DEMO is false.");
 
 // The studio's video editor on its test page (/ui-lab/studio-video: an
 // in-memory document run through the real applyOps, no database). A short test

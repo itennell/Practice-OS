@@ -2,6 +2,7 @@
 // follows, Instagram branches three ways ("Not for me" skips the rest), her website
 // branches the same way, and every word reads at about a 6th-grade level.
 import { describe, expect, it } from "vitest";
+import { REFERRALS_ONLY_DEMO } from "../lib/features";
 import { flatten, QUESTIONS, teamDefaults, type Ctx } from "@/lib/onboarding/chapters";
 import { normalizeWebsite, resumeAt } from "@/lib/onboarding/store";
 import { ACCOUNT_STEPS, instagramQuestions, parsePrefs } from "@/lib/instagram/onboarding";
@@ -32,7 +33,7 @@ function tools(c: Partial<Ctx> = {}, ig: Record<string, unknown> = {}) {
     .map((s) => s.id);
 }
 
-describe("the marketing interview", () => {
+describe.skipIf(REFERRALS_ONLY_DEMO)("the marketing interview", () => {
   it("opens on how clients find her, then asks about Instagram before anything else", () => {
     expect(tools().slice(0, 3)).toEqual(["find_clients", "instagram:account", "website"]);
   });

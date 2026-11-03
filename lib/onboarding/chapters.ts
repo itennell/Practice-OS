@@ -6,7 +6,7 @@
 // Never asked, anywhere: a license number, SSN, date of birth, bank details or
 // anything about a client.
 
-import { FRONT_DESK_ENABLED, PHONE_ALERTS_ENABLED } from "../features";
+import { FRONT_DESK_ENABLED, PHONE_ALERTS_ENABLED, REFERRAL_DEMO_SCREENS, REFERRALS_ONLY_DEMO } from "../features";
 import type { HelperQuestion } from "./helper-questions";
 
 export const CHAPTERS = [
@@ -105,6 +105,14 @@ export type Question = {
   /** For "chips": the "not sure" option that clears the others. */
   exclusive?: string;
 };
+
+/**
+ * The employer conflict-of-interest reminder in the referrals-only demo's onboarding: "If you're also
+ * employed somewhere, check your employer's outside-practice and conflict-of-interest policy before
+ * reaching out to colleagues", in words that pass the onboarding reading-level test.
+ */
+export const EMPLOYER_POLICY_LINE =
+  "If you work for an employer too, check its rules on outside work and conflicts of interest. Do this before you reach out to colleagues.";
 
 const insured = (c: Ctx) => c.insurance === "some" || c.insurance === "planning";
 const isIL = (c: Ctx) => c.state === "IL";
@@ -529,7 +537,25 @@ export const QUESTIONS: Question[] = [
     help: "Each helper works for you, and I keep an eye on all of them.",
     aeonSays: "Here's who helps you, and who starts first.",
   },
+
+  // Referrals-only demo (lib/features.ts): the short path ends here. Saved with the other
+  // answers; nothing else reads it.
+  {
+    id: "employer_policy",
+    chapter: "clients",
+    kind: "yesno",
+    ask: "Are you also employed somewhere, besides your practice?",
+    help: EMPLOYER_POLICY_LINE,
+    aeonSays: "One thing to check before you reach out to colleagues.",
+    appliesWhen: () => REFERRALS_ONLY_DEMO,
+  },
 ];
+
+/** Where each demo screen sits in the short path: state and license under "License and rules", the home ZIP under "Who you help". */
+const DEMO_CHAPTER: Record<string, ChapterId> = { state: "license", license: "license", "referrals:home_zip": "clients" };
+
+const DEMO_HELLO =
+  "Hi, I'm Aeon, your referrals partner. I help you find doctors and others who could send you clients, and keep up with them. This takes about 3 minutes.";
 
 /** Questions that only set up Front Desk; left out while it is paused. */
 const FRONT_DESK_QUESTIONS = new Set(["text_missed_callers"]);
@@ -608,7 +634,9 @@ export function flatten(
     for (const block of opts.helpers ?? []) {
       if ((block.after ?? "uses_texting") !== q.id) continue;
       for (const hq of block.questions) {
-        if (hq.appliesWhen && opts.basics && !hq.appliesWhen(opts.basics, opts.mine?.[block.helper] ?? {})) continue;
+        // The demo's short path always asks for the home ZIP: it skips the office address question.
+        const demoAsks = REFERRALS_ONLY_DEMO && REFERRAL_DEMO_SCREENS.includes(`${block.helper}:${hq.id}`);
+        if (!demoAsks && hq.appliesWhen && opts.basics && !hq.appliesWhen(opts.basics, opts.mine?.[block.helper] ?? {})) continue;
         out.push({
           id: `${block.helper}:${hq.id}`,
           chapter: "tools",
@@ -624,7 +652,11 @@ export function flatten(
     }
     for (const x of opts.extra ?? []) if (x.after === q.id) out.push(x.screen);
   }
-  return out;
+  if (!REFERRALS_ONLY_DEMO) return out;
+  // Referrals-only demo (lib/features.ts): the short path. Other saved answers stay saved.
+  return out
+    .filter((s) => REFERRAL_DEMO_SCREENS.includes(s.id))
+    .map((s) => ({ ...s, chapter: DEMO_CHAPTER[s.id] ?? s.chapter, ...(s.id === "name" ? { aeonSays: DEMO_HELLO } : {}) }));
 }
 
 const HELPER_SAYS: Record<string, string> = {

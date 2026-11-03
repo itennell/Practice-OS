@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { execSync } from "node:child_process";
+import { REFERRALS_ONLY_DEMO } from "../../lib/features";
 
 // Documents in the chat (lib/documents, lib/uploads). Isaiah's Oct 28 conversation is
 // replayed from its recorded model replies (tests/fixtures/aeon-chat/show-documents.json),
@@ -17,6 +18,7 @@ async function axeViolations(page: Page) {
 }
 
 test("Isaiah's question gets document cards, not a request to upload", async ({ page }) => {
+  test.skip(REFERRALS_ONLY_DEMO, "Admin documents are hidden in the referrals-only demo (lib/features.ts).");
   const id = execSync("npx tsx scripts/seed-chat.ts show-documents", { encoding: "utf8" }).trim().split("\n").at(-1)!;
   await page.goto(`/?c=${id}`);
   const log = page.getByRole("log", { name: "Conversation" });

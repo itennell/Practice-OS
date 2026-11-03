@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { execSync } from "node:child_process";
-import { FRONT_DESK_ENABLED, PHONE_ALERTS_ENABLED } from "../../lib/features";
+import { FRONT_DESK_ENABLED, PHONE_ALERTS_ENABLED, REFERRALS_ONLY_DEMO } from "../../lib/features";
 import { pick, typeDate } from "../helpers/controls";
 
 // Aeon's onboarding interview on a fresh install: every screen checked with axe, a full
@@ -61,6 +61,7 @@ const none = async () => {};
 
 
 test("A new clinician sets up the whole practice, and the home page lists what she put off", async ({ page }) => {
+  test.skip(REFERRALS_ONLY_DEMO, "The referrals-only demo takes the short path (lib/features.ts).");
   test.setTimeout(240_000);
   freshInstall();
   await page.goto("/");
@@ -184,7 +185,8 @@ test("She can stop and pick up where she left off", async ({ page }) => {
   await step(page, /Which state/, () => pick(page, page, "State", "Illinois"));
   await step(page, /What kind of license/, () => radio(page, /LCPC/));
   await page.reload();
-  await expect(heading(page)).toHaveText(/How do clients reach/);
+  // The referrals-only demo's short path goes on to who she helps (lib/features.ts).
+  await expect(heading(page)).toHaveText(REFERRALS_ONLY_DEMO ? /Who do you help/ : /How do clients reach/);
   await page.getByRole("button", { name: "Back" }).click();
   await expect(page.getByRole("radio", { name: /LCPC/ })).toBeChecked();
 });
@@ -222,6 +224,29 @@ test("Dana's demo practice is already set up, so the app opens on the chat", asy
   execSync("npm run db:reset", { stdio: "ignore" });
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1, name: /^(Good (morning|afternoon|evening)|Hello)\b/ })).toBeVisible();
-  await page.goto("/onboarding?q=fees");
-  await expect(heading(page)).toHaveText(/What do you charge/);
+  await page.goto(REFERRALS_ONLY_DEMO ? "/onboarding?q=who" : "/onboarding?q=fees");
+  await expect(heading(page)).toHaveText(REFERRALS_ONLY_DEMO ? /Who do you help/ : /What do you charge/);
+});
+
+test("Referrals-only demo: the short path, ending on the employer reminder, then Home with referral tiles", async ({ page }) => {
+  test.skip(!REFERRALS_ONLY_DEMO, "Runs while the referrals-only demo is on (lib/features.ts).");
+  test.setTimeout(120_000);
+  freshInstall();
+  await page.goto("/onboarding");
+  await expect(page.getByText(/your referrals partner/)).toBeVisible();
+  await step(page, /What's your name\?/, () => page.getByLabel("Your name").fill("Dana Reyes"));
+  await step(page, /Connect Aeon's brain/, none, "skip");
+  await step(page, /What's your practice called\?/, none, "skip");
+  await step(page, /Which state/, () => pick(page, page, "State", "Illinois"));
+  await step(page, /What kind of license/, () => radio(page, /LCPC/));
+  await step(page, /Who do you help/, none, "skip");
+  await step(page, /What ZIP code should Aeon search around/, () => page.getByLabel("ZIP code").fill("60614"));
+  await expect(heading(page)).toHaveText(/Are you also employed somewhere/);
+  await expect(page.getByText(/conflicts of interest/)).toBeVisible();
+  expect(await seriousViolations(page)).toEqual([]);
+  await radio(page, "No");
+  await page.getByRole("button", { name: "Finish setup" }).click();
+  await expect(page).toHaveURL(/127\.0\.0\.1:3100\/$/, { timeout: 20_000 });
+  await expect(page.getByRole("button", { name: "Who should I reach out to this week?" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open Referrals" })).toBeVisible();
 });

@@ -1,7 +1,7 @@
 import { audit } from "./audit";
 import { db } from "./db";
 import { isDryRun } from "./env";
-import { FRONT_DESK_APPROVAL_KINDS, FRONT_DESK_ENABLED } from "./features";
+import { demoApprovalShown, FRONT_DESK_APPROVAL_KINDS, FRONT_DESK_ENABLED, REFERRAL_DEMO_APPROVAL_KINDS, REFERRAL_DEMO_TOOLS, REFERRALS_ONLY_DEMO } from "./features";
 import { editableField, executors } from "./executors";
 import type { ApprovalKind } from "./approval-kinds";
 import { currentOrigin, shouldAutoRun } from "./approval-policy";
@@ -39,13 +39,18 @@ export function toView(row: ApprovalRow): ApprovalView {
 }
 
 /**
+ * In the referrals-only demo (lib/features.ts) only referral approvals show: referral letters
+ * and Aeon actions that wrap a referral tool.
+ *
  * Instagram posts stay out of her lists and counts once she said Instagram isn't for
  * her (onboarding's marketing interview): nothing about Instagram nags her after that.
  */
 export const visibleKind = () =>
   db()`not (kind = 'instagram_post' and exists (
          select 1 from practice_os.clinician_profile where onboarding_answers -> 'instagram' ->> 'account' = 'no'))
-       and (${FRONT_DESK_ENABLED} or kind <> all(${db().array([...FRONT_DESK_APPROVAL_KINDS])}))`;
+       and (${FRONT_DESK_ENABLED} or kind <> all(${db().array([...FRONT_DESK_APPROVAL_KINDS])}))
+       and (${!REFERRALS_ONLY_DEMO} or kind = any(${db().array([...REFERRAL_DEMO_APPROVAL_KINDS])})
+            or (kind = 'aeon_action' and payload ->> 'tool' = any(${db().array([...REFERRAL_DEMO_TOOLS])})))`;
 
 /** Pending first, then the most recent decisions. */
 export async function listApprovals(opts: { includeDecided?: boolean; limit?: number } = {}) {
@@ -68,12 +73,15 @@ export async function listApprovals(opts: { includeDecided?: boolean; limit?: nu
 export async function listApprovalsById(ids: string[]) {
   if (ids.length === 0) return [];
   const rows = await db()<ApprovalRow[]>`select * from practice_os.approvals where id in ${db()(ids)}`;
-  const byId = new Map(rows.filter((r) => !pausedKind(r.kind)).map((r) => [r.id, toView(r)]));
+  const byId = new Map(rows.filter((r) => !hiddenRow(r)).map((r) => [r.id, toView(r)]));
   return ids.flatMap((id) => byId.get(id) ?? []);
 }
 
 /** A Front Desk kind while Front Desk is paused (lib/features.ts): never listed, queued, approved or declined. */
 const pausedKind = (kind: string) => !FRONT_DESK_ENABLED && FRONT_DESK_APPROVAL_KINDS.includes(kind);
+
+/** Not shown in her lists or chat cards: a paused Front Desk kind, or one outside the referrals-only demo (lib/features.ts). */
+const hiddenRow = (r: Pick<ApprovalRow, "kind" | "payload">) => pausedKind(r.kind) || !demoApprovalShown(r.kind, r.payload?.tool);
 
 function refusePaused(kind: string): void {
   if (pausedKind(kind)) throw new Error(`Front Desk is paused, so a ${kind} approval can't be queued.`);

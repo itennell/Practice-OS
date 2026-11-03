@@ -2,15 +2,18 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
-import { CalendarDays, Inbox } from "lucide-react";
+import { CalendarDays, Inbox, TriangleAlert, Users } from "lucide-react";
 import { AeonChat, type ChatEntry } from "@/components/aeon-chat";
 import { SUGGESTIONS } from "@/lib/aeon/suggestions";
 import { ListCard, ListRow } from "@/components/shared/list-card";
 import { chipClass } from "@/components/ui";
 import { getConversation } from "@/lib/aeon/chat";
+import { loadAlertFailures } from "@/lib/admin/load";
 import { listApprovals } from "@/lib/approvals";
 import { loadApprovalSettings } from "@/lib/approval-settings";
 import { morningBrief, type BriefItem } from "@/lib/compliance/brief";
+import { REFERRALS_ONLY_DEMO } from "@/lib/features";
+import { referralFollowUps } from "@/lib/referrals/plan";
 import { getProfile } from "@/lib/profile";
 import { StillToSetUp } from "../onboarding/still-to-set-up";
 
@@ -49,7 +52,7 @@ async function Chat({ searchParams }: { searchParams: PageProps<"/">["searchPara
       conversationId={found?.conversation.id ?? null}
       initialMessages={messages}
       firstName={profile?.full_name.split(" ")[0] ?? null}
-      start={<StartCards />}
+      start={REFERRALS_ONLY_DEMO ? <ReferralStartCards /> : <StartCards />}
       suggestions={suggestions}
       ask={typeof ask === "string" && !found ? ask.slice(0, 500) : undefined}
       mode={found?.conversation.approval_mode ?? settings.mode}
@@ -116,8 +119,76 @@ async function StartCards() {
   );
 }
 
+/**
+ * The referrals-only demo's Today list (lib/features.ts): what's waiting for her OK and the referral
+ * follow-ups due. Admin is hidden, so a crisis alert that texted no one shows here first instead.
+ */
+async function ReferralStartCards() {
+  const [followUps, approvals, alerts] = await Promise.all([referralFollowUps().catch(() => []), listApprovals(), loadAlertFailures().catch(() => [])]);
+  const waiting = approvals.filter((a) => a.status === "pending");
+  const soon = followUps.slice(0, 3);
+  return (
+    <>
+      <ListCard
+        id="today-heading"
+        label="Today"
+        action={
+          <Link href="/referrals" className="inline-flex min-h-touch items-center text-small font-semibold text-[var(--link)] underline-offset-4 hover:underline">
+            Open Referrals
+          </Link>
+        }
+      >
+        {alerts.length > 0 && (
+          <ListRow
+            accent
+            icon={<TriangleAlert size={16} strokeWidth={1.75} />}
+            title="Aeon showed the 988 message in your chat"
+            detail="A message mentioned danger or self-harm. Check your chat now."
+          />
+        )}
+        {waiting.length > 0 ? (
+          <ListRow
+            accent
+            icon={<Inbox size={16} strokeWidth={1.75} />}
+            title={`${waiting.length} waiting for your OK`}
+            detail={waiting.length > 1 ? `${waiting[0].title}, and ${waiting.length - 1} more` : waiting[0].title}
+            end={
+              <Link href="/approvals" className={chipClass(true, false, "font-semibold")}>
+                Review
+              </Link>
+            }
+          />
+        ) : (
+          <ListRow icon={<Inbox size={16} strokeWidth={1.75} />} title="Nothing needs your OK" detail="Aeon asks here before any letter goes out." />
+        )}
+        {soon.length === 0 ? (
+          <ListRow icon={<Users size={16} strokeWidth={1.75} />} title="No follow-ups due in the next 7 days" />
+        ) : (
+          soon.map((f) => (
+            <ListRow
+              key={f.id}
+              icon={<Users size={16} strokeWidth={1.75} />}
+              title={`Follow up with ${f.name}`}
+              detail={f.last ?? f.stage}
+              end={<span className="text-small text-[var(--fg-muted)]">{followUpWords(f.days_left)}</span>}
+            />
+          ))
+        )}
+      </ListCard>
+      <StillToSetUp />
+    </>
+  );
+}
+
+function followUpWords(days: number): string {
+  if (days < 0) return `Overdue by ${-days} day${days === -1 ? "" : "s"}`;
+  if (days === 0) return "Due today";
+  return `Due in ${days} day${days === 1 ? "" : "s"}`;
+}
+
 /** Chips under the message box, from what is actually waiting; the fixed three fill any gap. */
 async function suggestionsFor(): Promise<string[]> {
+  if (REFERRALS_ONLY_DEMO) return [...SUGGESTIONS]; // the referral tiles (lib/aeon/suggestions.ts)
   const approvals = await listApprovals().catch(() => []);
   const waiting = approvals.filter((a) => a.status === "pending").length;
   const picks = ["What needs me this week?", waiting > 0 ? "What's waiting for my OK?" : null, "Draft a Good Faith Estimate"].filter(

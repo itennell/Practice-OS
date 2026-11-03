@@ -2,6 +2,7 @@ import { listConversations } from "../aeon/chat";
 import { loadNeeds } from "../admin/load";
 import { db } from "../db";
 import { visibleKind } from "../approvals";
+import { REFERRAL_DEMO_HIDDEN_PAGES, REFERRALS_ONLY_DEMO } from "../features";
 import { getProfile } from "../profile";
 import type { MenuData } from "./menu-types";
 
@@ -22,7 +23,7 @@ export async function loadMenuData(): Promise<MenuData> {
   const [profile, waiting, needs, chats] = await Promise.all([
     safe(getProfile, null),
     safe(() => db()<{ n: number }[]>`select count(*)::int as n from practice_os.approvals where status = 'pending' and ${visibleKind()}`, [{ n: 0 }]),
-    safe(loadNeeds, []),
+    REFERRALS_ONLY_DEMO ? [] : safe(loadNeeds, []), // Admin is hidden in the referrals-only demo (lib/features.ts)
     safe(() => listConversations(30), []),
   ]);
   return {
@@ -33,7 +34,7 @@ export async function loadMenuData(): Promise<MenuData> {
       admin: needs.filter((n) => n.tier <= 3).length,
     },
     chats: chats.map((c) => ({ id: c.id, title: c.title })),
-    // Nothing is hidden today: Media stays for everyone, even when Instagram isn't for her.
-    hidden: [],
+    // Media stays for everyone, even when Instagram isn't for her. Only the referrals-only demo hides pages.
+    hidden: REFERRALS_ONLY_DEMO ? [...REFERRAL_DEMO_HIDDEN_PAGES] : [],
   };
 }

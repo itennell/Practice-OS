@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui";
-import { CHAPTERS, progressFor, type Screen, type Stage } from "@/lib/onboarding/chapters";
+import { REFERRALS_ONLY_DEMO } from "@/lib/features";
+import { CHAPTERS as ALL_CHAPTERS, progressFor, type Screen, type Stage } from "@/lib/onboarding/chapters";
 import type { ConnectionStatus } from "@/components/connections/registry";
 import type { OnboardingState } from "@/lib/onboarding/store";
 import { emptyValue, Field, isAnswered, toAnswer } from "./fields";
@@ -223,6 +224,8 @@ function OnboardingFlow({ initial, connections, startAt }: Props & { startAt?: s
 
   const busy = status.kind === "saving";
   const Slot = screen.kind === "slot" ? SLOT_COMPONENTS[screen.id] : null;
+  // The referrals-only demo's short path (lib/features.ts) lists only the chapters it uses.
+  const CHAPTERS = REFERRALS_ONLY_DEMO ? ALL_CHAPTERS.filter((c) => screens.some((s) => s.chapter === c.id)) : ALL_CHAPTERS;
   const chapterIndex = CHAPTERS.findIndex((c) => c.id === screen.chapter);
 
   return (

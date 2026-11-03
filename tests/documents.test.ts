@@ -2,6 +2,7 @@
 // open_document and create_document. Pure checks first, then the seeded demo
 // practice through the shared tool runner (chat and MCP).
 import { afterAll, describe, expect, it } from "vitest";
+import { REFERRALS_ONLY_DEMO } from "../lib/features";
 import { loadEnv } from "../lib/env";
 import { cardsFrom, documentCardSchema, type DocumentCard } from "../lib/documents/card";
 import { credentialingCards, deadlineCard, rankDocuments } from "../lib/documents/index";
@@ -115,7 +116,7 @@ describe("credentialing documents", () => {
   });
 });
 
-describe.skipIf(!hasDb)("document tools on the demo practice", async () => {
+describe.skipIf(REFERRALS_ONLY_DEMO || !hasDb)("document tools on the demo practice", async () => {
   const { closeDb, db } = await import("../lib/db");
   const { runTool } = await import("../lib/aeon/tools");
   const { respond } = await import("../lib/aeon/agent");

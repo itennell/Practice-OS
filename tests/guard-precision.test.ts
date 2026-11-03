@@ -8,6 +8,7 @@ import { blankNames, guard, titleCase } from "../lib/aeon/guard";
 import { OFFICIAL_PHONES, checkIdentity } from "../lib/aeon/identity-filter";
 import { NER_MODEL, isNameLike, modelCacheDir } from "../lib/aeon/phi-classifier";
 import { FREE_TEXT_TOOLS, TOOLS_BY_NAME } from "../lib/aeon/tools";
+import { toolEnabled } from "../lib/features";
 import { ALLOWED } from "./fixtures/phi-corpus";
 import { LEAKS, LEAK_ALLOWED, LEAK_DOCS } from "./fixtures/guard-leaks";
 
@@ -113,8 +114,8 @@ describe("rules: topics pass, a person's details are refused", () => {
   });
 
   it("every free-text tool is a real tool", () => {
-    // Front Desk tools are paused (lib/features.ts), so they are not in the registry right now.
-    for (const name of FREE_TEXT_TOOLS) if (!name.startsWith("front_desk_")) expect(TOOLS_BY_NAME.has(name), name).toBe(true);
+    // Front Desk tools are paused and the referrals-only demo hides most (lib/features.ts), so only switched-on ones are in the registry.
+    for (const name of FREE_TEXT_TOOLS) if (toolEnabled(name)) expect(TOOLS_BY_NAME.has(name), name).toBe(true);
   });
 });
 

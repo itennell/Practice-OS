@@ -1,12 +1,14 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { execSync } from "node:child_process";
+import { REFERRALS_ONLY_DEMO, hiddenInDemo } from "../../lib/features";
 
 test.beforeEach(() => {
   execSync("npm run db:reset", { stdio: "ignore" });
 });
 
 test("Approve a test note: Waiting for you, then Done", async ({ page }) => {
+  test.skip(REFERRALS_ONLY_DEMO, "Test notes are hidden in the referrals-only demo (lib/features.ts).");
   await page.goto("/approvals");
   const card = page.getByRole("listitem", { name: "[Sample] Test note: hello from Aeon" });
   await expect(card.getByText("Waiting for you")).toBeVisible();
@@ -16,6 +18,7 @@ test("Approve a test note: Waiting for you, then Done", async ({ page }) => {
 });
 
 test("The failing note ends as Failed with its error", async ({ page }) => {
+  test.skip(REFERRALS_ONLY_DEMO, "Test notes are hidden in the referrals-only demo (lib/features.ts).");
   await page.goto("/approvals");
   const card = page.getByRole("listitem", { name: "[Sample] Test note: this one fails on purpose" });
   await card.getByRole("button", { name: "Approve", exact: true }).click();
@@ -25,6 +28,7 @@ test("The failing note ends as Failed with its error", async ({ page }) => {
 });
 
 test("Every seeded approval works in test mode, except the one that fails on purpose", async ({ page }) => {
+  test.skip(REFERRALS_ONLY_DEMO, "Test notes are hidden in the referrals-only demo (lib/features.ts).");
   // The demo has to survive db:reset: each [Sample] approval, once approved, ends Done.
   await page.goto("/approvals");
   const pending = page.getByRole("listitem").filter({ has: page.getByRole("button", { name: "Approve", exact: true }) });
@@ -47,6 +51,7 @@ test("Every seeded approval works in test mode, except the one that fails on pur
 });
 
 test("Edit then approve runs the edited text", async ({ page }) => {
+  test.skip(REFERRALS_ONLY_DEMO, "Test notes are hidden in the referrals-only demo (lib/features.ts).");
   await page.goto("/approvals");
   const card = page.getByRole("listitem", { name: "[Sample] Test note: hello from Aeon" });
   await card.getByRole("button", { name: "Edit then approve" }).click();
@@ -56,13 +61,14 @@ test("Edit then approve runs the edited text", async ({ page }) => {
 });
 
 test("Decline marks it Declined", async ({ page }) => {
+  test.skip(REFERRALS_ONLY_DEMO, "Test notes are hidden in the referrals-only demo (lib/features.ts).");
   await page.goto("/approvals");
   const card = page.getByRole("listitem", { name: "[Sample] Test note: hello from Aeon" });
   await card.getByRole("button", { name: "Decline" }).click();
   await expect(page.getByRole("listitem", { name: "[Sample] Test note: hello from Aeon" }).getByText("Declined")).toBeVisible();
 });
 
-for (const path of ["/", "/approvals", "/admin", "/admin/deadlines", "/settings"]) {
+for (const path of ["/", "/approvals", "/admin", "/admin/deadlines", "/settings"].filter((p) => !hiddenInDemo(p))) {
   test(`No serious accessibility issues on ${path}`, async ({ page }) => {
     await page.goto(path);
     await page.waitForLoadState("networkidle");
@@ -73,8 +79,21 @@ for (const path of ["/", "/approvals", "/admin", "/admin/deadlines", "/settings"
 }
 
 test("Screenshots of Home and the failed state", async ({ page }, info) => {
+  test.skip(REFERRALS_ONLY_DEMO, "Test notes are hidden in the referrals-only demo (lib/features.ts).");
   await page.goto("/approvals");
   await page.getByRole("listitem", { name: "[Sample] Test note: this one fails on purpose" }).getByRole("button", { name: "Approve", exact: true }).click();
   await expect(page.getByText("Failed", { exact: true })).toBeVisible();
   await page.screenshot({ path: `test/screens/approvals-${info.project.name}.png`, fullPage: true });
+});
+
+test("Referrals-only demo: only the referral letter waits, and Admin pages open Home", async ({ page }) => {
+  test.skip(!REFERRALS_ONLY_DEMO, "Runs while the referrals-only demo is on (lib/features.ts).");
+  await page.goto("/approvals");
+  await expect(page.getByRole("listitem", { name: "[Sample] Intro letter to Lakeview Family Medicine" })).toBeVisible();
+  await expect(page.getByRole("listitem", { name: /Test note/ })).toHaveCount(0);
+  await expect(page.getByRole("listitem", { name: /GFE-2026/ })).toHaveCount(0);
+  for (const hidden of ["/admin", "/admin/deadlines", "/media", "/media/instagram"]) {
+    await page.goto(hidden);
+    await expect(page).toHaveURL(/127\.0\.0\.1:3100\/$/);
+  }
 });

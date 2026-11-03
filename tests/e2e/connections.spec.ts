@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { FRONT_DESK_ENABLED } from "../../lib/features";
+import { FRONT_DESK_ENABLED, REFERRALS_ONLY_DEMO } from "../../lib/features";
 import { expect, test } from "@playwright/test";
 
 // Settings › Connections: the page shell, the Muse key card and the Google card.
@@ -18,9 +18,13 @@ test("Connections lists each helper with its Connect button", async ({ page }) =
   await expect(muse.getByRole("button", { name: "Check and connect" })).toBeEnabled();
 
   const google = page.getByRole("region", { name: "Google" });
-  await expect(google.getByText("Not connected")).toBeVisible();
+  // The referrals-only demo (lib/features.ts) shows only the Muse card: Gmail is cut.
+  if (REFERRALS_ONLY_DEMO) {
+    await expect(google).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "Instagram", exact: true })).toHaveCount(0);
+  } else await expect(google.getByText("Not connected")).toBeVisible();
   // Google buttons only show on a copy with its own Google client (otherwise the card says "later").
-  if (process.env.GOOGLE_CLIENT_ID) {
+  if (process.env.GOOGLE_CLIENT_ID && !REFERRALS_ONLY_DEMO) {
     // Each Connect button is a small form that POSTs to the start route with its scopes.
     const formOf = (name: string) => google.locator("form").filter({ has: page.getByRole("button", { name }) });
     await expect(formOf("Connect Gmail drafts")).toHaveAttribute("action", "/api/connect/google/start");
@@ -51,6 +55,7 @@ const axeSerious = async (page: import("@playwright/test").Page) => {
 };
 
 test("Google says it comes later on a copy with no Google client", async ({ page }) => {
+  test.skip(REFERRALS_ONLY_DEMO, "No Google card in the referrals-only demo (lib/features.ts).");
   test.skip(Boolean(process.env.GOOGLE_CLIENT_ID), "This copy has a Google client.");
   await page.goto("/settings/connections");
   const google = page.getByRole("region", { name: "Google" });
@@ -59,6 +64,7 @@ test("Google says it comes later on a copy with no Google client", async ({ page
 });
 
 test("Instagram needs no connection: Aeon writes posts with her, she posts them", async ({ page }) => {
+  test.skip(REFERRALS_ONLY_DEMO, "No Instagram card in the referrals-only demo (lib/features.ts).");
   await page.goto("/settings/connections");
   const ig = page.getByRole("region", { name: "Instagram", exact: true });
   await expect(ig.getByText("No connection needed. Aeon writes posts with you; you post them yourself.")).toBeVisible();

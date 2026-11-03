@@ -5,13 +5,15 @@ import { stat } from "node:fs/promises";
 import { AeonFiles, type AeonFile } from "@/components/aeon-files";
 import { AlertPhoneSetting } from "@/components/alert-phone-setting";
 import { OfficeSettings } from "@/components/office-settings";
+import { ReferralZipSetting } from "@/components/referral-zip-setting";
 import { ButtonLink, GlassCard, PageHeader } from "@/components/ui";
 import { listMemories, memoryMarkdown } from "@/lib/aeon/memory";
 import { MEMORY_CAP_CHARS, usedChars } from "@/lib/aeon/memory-ops";
 import { SOUL_PATH, soul } from "@/lib/aeon/soul";
 import { loadPracticeSettings } from "@/lib/gfe/store";
 import { DefaultModeSetting, FrontDeskRules } from "@/components/approval-settings";
-import { FRONT_DESK_ENABLED, PHONE_ALERTS_ENABLED } from "@/lib/features";
+import { FRONT_DESK_ENABLED, PHONE_ALERTS_ENABLED, REFERRALS_ONLY_DEMO } from "@/lib/features";
+import { getReferralSettings } from "@/lib/referrals/settings";
 import { alertPhone } from "@/lib/frontdesk/crisis";
 import { loadApprovalSettings } from "@/lib/approval-settings";
 
@@ -26,7 +28,11 @@ export default function Page() {
           <h2 id="connections-heading" className="text-section font-semibold">
             Connections
           </h2>
-          <p className="max-w-[52ch] text-[var(--fg-muted)]">Aeon&rsquo;s Muse key, Google, Instagram and a phone line for urgent alerts. Each one turns on with a Connect button.</p>
+          <p className="max-w-[52ch] text-[var(--fg-muted)]">
+            {REFERRALS_ONLY_DEMO
+              ? "Aeon’s Muse key: the brain Aeon thinks with."
+              : "Aeon’s Muse key, Google, Instagram and a phone line for urgent alerts. Each one turns on with a Connect button."}
+          </p>
         </div>
         <ButtonLink variant="quiet" href="/settings/connections">
           Open Connections
@@ -35,7 +41,8 @@ export default function Page() {
       <Suspense fallback={<div aria-hidden className="h-96 max-w-3xl animate-pulse rounded-[24px] bg-[var(--hairline)]" />}>
         <Modes />
         {PHONE_ALERTS_ENABLED && <Alerts />}
-        <Office />
+        {/* Referrals-only demo (lib/features.ts): a Referrals section instead of office hours and fees. */}
+        {REFERRALS_ONLY_DEMO ? <Referrals /> : <Office />}
       </Suspense>
       <Suspense fallback={<div aria-hidden className="h-64 max-w-3xl animate-pulse rounded-[24px] bg-[var(--hairline)]" />}>
         <Aeon />
@@ -92,6 +99,25 @@ async function Alerts() {
         </p>
       </div>
       <AlertPhoneSetting last4={phone ? phone.slice(-4) : null} />
+    </GlassCard>
+  );
+}
+
+// Settings > Referrals: her home ZIP. The niche picker (who she'd like to hear from) goes in
+// the slot below in a later PR.
+async function Referrals() {
+  await connection(); // read the database per request, never at build time
+  const saved = await getReferralSettings().catch(() => null);
+  return (
+    <GlassCard aria-labelledby="referrals-heading" className="flex max-w-3xl flex-col gap-4 p-6 md:p-8">
+      <div className="flex flex-col gap-1">
+        <h2 id="referrals-heading" className="text-section font-semibold">
+          Referrals
+        </h2>
+        <p className="max-w-[60ch] text-[var(--fg-muted)]">Where Aeon looks for doctors and others who could send you clients.</p>
+      </div>
+      <ReferralZipSetting initial={saved?.searchZip ?? null} />
+      {/* REFERRAL_NICHE_PICKER_SLOT: the niche picker goes here (later PR). */}
     </GlassCard>
   );
 }

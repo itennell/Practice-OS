@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { FRONT_DESK_ENABLED } from "../../lib/features";
+import { FRONT_DESK_ENABLED, REFERRALS_ONLY_DEMO } from "../../lib/features";
 import { execSync } from "node:child_process";
 
 // Manual, Auto and Bypass: the pill under the chat box, the ask bar above it,
@@ -57,6 +57,7 @@ function seededChat() {
 }
 
 test("The ask bar: Aeon needs your approval, Approve or Not now", async ({ page }) => {
+  test.skip(REFERRALS_ONLY_DEMO, "The seeded Good Faith Estimate chat's asks are hidden in the referrals-only demo (lib/features.ts).");
   await page.goto(`/?c=${seededChat()}`);
   const bar = page.getByRole("region", { name: "Waiting for your approval" });
   await expect(bar).toContainText("Aeon needs your approval. Can Aeon get this done for you?");

@@ -13,6 +13,7 @@ import {
   webChatClientIp,
 } from "../lib/frontdesk/webchat-rate-limit";
 import { proxy } from "../proxy";
+import { REFERRALS_ONLY_DEMO } from "../lib/features";
 
 const request = (method: "GET" | "POST", headers: Record<string, string>, body?: string, base = "http://localhost:3000") =>
   new Request(`${base}/api/website-chat?c=not-a-chat`, { method, headers, body });
@@ -78,8 +79,9 @@ describe("website chat is local-only", () => {
     expect((await POST(request("POST", json, JSON.stringify({ text: "hi" }), base))).status).toBe(404);
     expect(proxy(new NextRequest(`${base}/website-chat`)).status).toBe(404);
     expect(proxy(new NextRequest(`${base}/api/website-chat?c=x`)).status).toBe(404);
-    // Other pages are untouched there.
-    expect(proxy(new NextRequest(`${base}/front-desk`)).status).toBe(200);
+    // Other pages are untouched there (the referrals-only demo sends hidden pages Home: lib/features.ts).
+    expect(proxy(new NextRequest(`${base}/front-desk`)).status).toBe(REFERRALS_ONLY_DEMO ? 307 : 200);
+    expect(proxy(new NextRequest(`${base}/referrals`)).status).toBe(200);
   });
 
   it("answers on her own computer", async () => {
