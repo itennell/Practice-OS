@@ -306,7 +306,7 @@ export function ownContext(sentence: string): boolean {
 // A sentence where a provider on her board belongs: their card, a letter,
 // outreach, their office, specialty or NPI. Only here is a board name directory data.
 const REFERRAL_CONTEXT =
-  /\b(cards?|board|letters?|referr\w*|refers?|NPI|NPPES|outreach|practice|office|address|speciali[sz]\w*|specialt\w*|accepting|e-?mail|phone|fax|follow[- ]?ups?|call log|contact\w*|providers?|directory|status|colleagues?|network|introduc\w*|reach(?:ed)?\s+out|stage|column|pipeline|do not contact|LCSW|LICSW|LCPC|LPC|LMFT|MD|PhD|PsyD|chaplains?|reverend|navigators?|genetic\s+counsel\w*|social\s+workers?|oncolog\w*|hospice|palliative|miles?\s+away|\d+(?:\.\d+)?\s*mi)\b/i;
+  /\b(cards?|board|letters?|referr\w*|refers?|NPI|NPPES|outreach|practice|office|address|speciali[sz]\w*|specialt\w*|accepting|e-?mail|phone|fax|follow[- ]?ups?|call log|contact\w*|providers?|directory|status|colleagues?|network|introduc\w*|reach(?:ed)?\s+out|coffee|meet|meeting|confirm\w*|chat|stage|column|pipeline|do not contact|LCSW|LICSW|LCPC|LPC|LMFT|MD|PhD|PsyD|chaplains?|reverend|navigators?|genetic\s+counsel\w*|social\s+workers?|oncolog\w*|hospice|palliative|miles?\s+away|\d+(?:\.\d+)?\s*mi)\b/i;
 // A professional's credential after a name ("Brittany Keiser, MS, CGC", "Renata
 // Ostrowski, RN", "Rev. Tobias Wren"). Case-sensitive, so "do" and "ms" as words don't count.
 export const PROFESSIONAL_CREDENTIAL =
@@ -416,7 +416,7 @@ const POSSESSIVE_MEDICAL = new RegExp(
 // ("she treats breast cancer", "he has worked with cancer patients") is not having it.
 const PRACTICE_VERB = "(?:treat|help|work|serv|support|see|focus|speciali[sz]|train|offer|care\\s+for|car(?:e|es|ing)\\s+for)";
 const PRONOUN_MEDICAL = new RegExp(
-  `\\b(?:he|she)\\b(?:['’]s\\b|(?:\\W+(?!${PRACTICE_VERB})\\w+){0,1}?\\W+(?:${HAS}|is|was|just|recently|started|starting|finished|began|getting|undergoing|receiving|going\\s+through)\\b)(?:\\W+(?!${PRACTICE_VERB})\\w+){0,3}?\\W+${MEDICAL_SOURCE}`,
+  `\\b(?:he|she)\\b(?:['’]s\\b|(?:\\W+(?!${PRACTICE_VERB})\\w+){0,1}?\\W+(?:${HAS}|is|was|just|recently|started|starting|finished|began|getting|undergoing|receiving|going\\s+through)\\b)(?:\\W+(?!${PRACTICE_VERB})\\w+){0,5}?\\W+${MEDICAL_SOURCE}`,
   "iu",
 );
 
@@ -468,7 +468,7 @@ const NOT_AN_AGE =
   "(?![\\p{N}:.]|\\s*(?:%|percent|minutes?|mins?|miles?|mi\\b|hours?|hrs?|am\\b|pm\\b|o['’]?clock|dollars|sessions?|times|days?|weeks?|months?|years?\\s+(?:in|of|since|ago)|people|clients|patients|referrals|cards|letters|pages?))";
 const AGE_Q = new RegExp(
   `${AGE_WORDS}|\\bin\\s+(?:her|his|their)\\s+(?:early\\s+|mid\\s+|late\\s+)?(?:\\d0['’]?s|twenties|thirties|forties|fifties|sixties|seventies|eighties|nineties)\\b|` +
-    `\\baged?\\s+\\d{1,3}\\b|,\\s*\\d{2}\\s*,|\\b(?:is|was|turned|turns|turning)\\s+(?:only\\s+|about\\s+|almost\\s+|nearly\\s+)?\\d{1,3}${NOT_AN_AGE}|['’]s\\s+\\d{1,3}${NOT_AN_AGE}`,
+    `\\baged?\\s+\\d{1,3}\\b|,\\s*\\d{2}\\s*,|,\\s*\\d{2}\\s*[.!?]?\\s*$|\\b(?:is|was|turned|turns|turning)\\s+(?:only\\s+|about\\s+|almost\\s+|nearly\\s+)?\\d{1,3}${NOT_AN_AGE}|['’]s\\s+\\d{1,3}${NOT_AN_AGE}`,
   "iu",
 );
 const JOB_Q =
@@ -492,6 +492,15 @@ function escapeRe(s: string): string {
  * neighbourhood (`places`, from her profile) are not a detail.
  */
 export function indirectIdentifiers(sentence: string, places: readonly string[] = []): boolean {
+  return identifyingDetails(sentence, places, 2);
+}
+
+/** In memory one detail is enough: "My client is 61, Tuesdays work best" keeps a fact about one client. */
+export function pinnedClientForMemory(sentence: string, places: readonly string[] = []): boolean {
+  return identifyingDetails(sentence, places, 1);
+}
+
+function identifyingDetails(sentence: string, places: readonly string[], needed: number): boolean {
   const strong = CLIENT_CUE.test(sentence) || seenPerson(sentence);
   if (!strong && !WEAK_CUE.test(sentence)) return false;
   let s = sentence;
@@ -501,7 +510,7 @@ export function indirectIdentifiers(sentence: string, places: readonly string[] 
   const place = PLACE_Q.test(s);
   const condition = DIAGNOSIS.test(s) || mentionsMedical(s);
   const details = Number(age) + Number(job) + Number(place);
-  if (strong) return details >= 2 || (details >= 1 && condition);
+  if (strong) return details >= needed || (details >= 1 && condition);
   if (age) return job || place || condition;
   return condition && (job || place) && !PRACTICE_TOPIC.test(s) && !PROFESSIONAL_CREDENTIAL.test(s);
 }
@@ -551,7 +560,7 @@ export function clinicalForMemory(text: string, places: readonly string[] = []):
       // A medical condition about one person, a client pinned down by details, a
       // "Tuesday 4pm client", or a condition tied to a day or time ("chemo Tuesdays at 4").
       medicalAboutSomeone(s) ||
-      indirectIdentifiers(s, places) ||
+      pinnedClientForMemory(s, places) ||
       TIMESLOT_CLIENT.test(s) ||
       (mentionsMedical(s) && TIME_CUE.test(s) && !populationSentence(s)),
   );

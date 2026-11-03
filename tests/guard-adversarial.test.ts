@@ -22,7 +22,7 @@ const allow = {
 /** What the plain-code rules alone say, on the cleaned text and each leet reading. */
 function rulesRefuse(text: string, at: string): boolean {
   const plain = normalizeForCheck(text);
-  const flat = (v: string) => [v, v.replace(/[ \t]*\n+[ \t]*/g, " ")];
+  const flat = (v: string) => [v, v.replace(/[ \t]*\n+[ \t]*(?:(?:[-*•]|\d+[.)])\s+)?/g, " ")];
   return [plain, ...leetVariants(plain)]
     .flatMap(flat)
     .some((v) => !checkIdentity(v, allow).ok || (at === "memory" && clinicalForMemory(v, allow.places)));

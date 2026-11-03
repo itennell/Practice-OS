@@ -94,6 +94,9 @@ function wholeOf(words: string[], list: string[]): boolean {
 
 const TITLE_BEFORE = /\b(?:Dr|Doctor)\.?\s+$/i;
 
+const COMMANDS =
+  "mark|move|log|draft|e-?mail|call|text|add|find|show|remove|archive|message|remind|schedule|send|write|open|update|edit|invite|ask|tell|contact|check|follow\\s+up\\s+with";
+const COMMAND_AT_START = new RegExp(`^\\s*(?:please\\s+)?(?:${COMMANDS})\\b`, "i");
 const COMMAND_BEFORE_NAME =
   /^(?:mark|move|log|draft|e-?mail|call|text|add|find|show|remove|archive|message|remind|schedule|send|write|open|update|edit|invite|ask|tell|contact|check|follow\s+up\s+with)\s+(.+)$/i;
 const STAFF_AFTER =
@@ -148,10 +151,13 @@ export function judgePerson(name: string, text: string, allow: Allowlist): Perso
     if (clean && ownWhole) continue;
     if (clean && ownPart && ownContext(s)) continue;
     const titled = at >= 0 && TITLE_BEFORE.test(text.slice(Math.max(0, at - 8), at));
-    if (clean && (boardWhole || boardPart) && (referralContext(s) || (boardPart && titled))) continue;
+    // A command to her about a board name ("Text Brittany Keiser to confirm coffee") is referral work.
+    const command = COMMAND_AT_START.test(s) && !clientLike(s);
+    if (clean && (boardWhole || boardPart) && (referralContext(s) || command || (boardPart && titled))) continue;
     if (at >= 0 && colleagueAt(text, at, name) && !condition) continue;
     // A partner's staff by first name ("Jen at the front desk handles it"), outside any client sentence.
-    if (at >= 0 && words.length === 1 && staffAt(text, at, name) && !condition && !clientLike(s) && !MY_CLIENT.test(s)) continue;
+    // Never with a health word or diagnosis in the sentence ("Jen at the front desk is pregnant").
+    if (at >= 0 && words.length === 1 && staffAt(text, at, name) && !condition && !clientLike(s) && !MY_CLIENT.test(s) && !mentionsDiagnosis(s) && !mentionsMedical(s)) continue;
     if (condition || clientLike(s)) return { verdict: "refuse", kind: mentionsDiagnosis(s) ? "diagnosis" : "client_name" };
     blank = true;
   }
@@ -404,7 +410,8 @@ async function checkOnce(text: string, at: GuardPoint, list: Allowlist, opts: Gu
   // where only lines broken mid-sentence are joined (a list stays a list).
   const joined = light ? plain : joinBrokenLines(plain);
   if (!light) {
-    const flat = plain.replace(/[ \t]*\n+[ \t]*/g, " ");
+    // List markers go too, so "My client has\n1. PTSD" reads as one sentence.
+    const flat = plain.replace(/[ \t]*\n+[ \t]*(?:(?:[-*•]|\d+[.)])\s+)?/g, " ");
     if (flat !== plain) {
       const again = checkIdentity(flat, list);
       if (!again.ok) return { ok: false, kind: again.kind };
