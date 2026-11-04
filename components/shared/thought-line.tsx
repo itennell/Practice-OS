@@ -1,20 +1,17 @@
 "use client";
 
-// Thought Line (UI-014): shown while Aeon works through something the
-// clinician should see: a shimmering "Thinking…" line with tiny chrome Aeon
-// droplets dancing beside it, a timer, and an expandable list of steps; it settles into a done
-// label ("Drafted 3 posts") and folds the steps away.
-// Steps must be plain-English summaries of real work from actual job
-// progress: never raw model reasoning, never invented progress.
-// Use Status Mark for item status and Thought Line for Aeon's own work.
-// Adapted from React Bits Thought Line (MIT, reactbits.dev/c/micro/thought-line):
-// chrome Aeon droplets as the glyph, lucide icons, Caseload colours, finished steps turn muted
-// instead of fading (so they keep 4.5:1), a 44px toggle with a focus ring.
+// Thought Line (UI-014): the line that says what Aeon is doing right now, with
+// an optional list of real tasks under it. Original Practice-OS code (written
+// 2026-11-04).
+//
+// While working: a small breathing orb, the label with a slow glint moving
+// through it, and a running timer. When the work ends the line settles into
+// what happened ("Drafted 3 posts", or "Done in 4.2s") and, by default, folds
+// its task list away; the list can be opened again. Screen readers hear the
+// label and the result through a polite status region.
 
-import { useEffect, useId, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { AeonDroplets } from "./aeon-droplets";
+import { useEffect, useId, useRef, useState } from "react";
 import { StatusMark } from "./status-mark";
 import { STEP_WORDS, normalizeSteps, type ThoughtStep } from "./thought-line-steps";
 import { formatTenths, spokenTenths } from "./thought-line-time";
@@ -39,6 +36,38 @@ export type ThoughtLineProps = {
   className?: string;
 };
 
+/** Tenths of a second since `working` last turned on, ticking while it stays on. */
+function useWorkClock(working: boolean, onSettle?: (seconds: number) => void) {
+  const [tenths, setTenths] = useState(0);
+  const finished = useRef<number | null>(null);
+  const settleRef = useRef(onSettle);
+  useEffect(() => {
+    settleRef.current = onSettle;
+  });
+
+  useEffect(() => {
+    if (!working) return;
+    const begin = performance.now();
+    const read = () => Math.floor((performance.now() - begin) / 100);
+    const id = window.setInterval(() => setTenths(read()), 100);
+    return () => {
+      window.clearInterval(id);
+      finished.current = read();
+      setTenths(finished.current);
+    };
+  }, [working]);
+
+  // Runs after the clock above has stopped, so it reports the final time once.
+  useEffect(() => {
+    if (working || finished.current === null) return;
+    const final = finished.current;
+    finished.current = null;
+    settleRef.current?.(final / 10);
+  }, [working]);
+
+  return tenths;
+}
+
 export function ThoughtLine({
   working,
   label = "Thinking…",
@@ -47,129 +76,95 @@ export function ThoughtLine({
   showTimer = true,
   collapseOnSettle = true,
   onSettle,
-  className,
+  className = "",
 }: ThoughtLineProps) {
-  const [open, setOpen] = useState(true);
-  const [tenths, setTenths] = useState(0);
-  const startedAt = useRef(0);
-  const listId = useId();
-  const hasSteps = steps.length > 0;
-  const settleRef = useRef(onSettle);
-  useEffect(() => {
-    settleRef.current = onSettle;
-  });
+  const tenths = useWorkClock(working, onSettle);
+  const tasks = normalizeSteps(steps, working);
+  const hasTasks = tasks.length > 0;
+  const boxId = useId();
 
-  // When work starts: reset the timer and open the steps. When it ends: fold them.
-  // (Adjusted during render, as React recommends, rather than in an effect.)
-  const [prevWorking, setPrevWorking] = useState(working);
-  if (working !== prevWorking) {
-    setPrevWorking(working);
-    if (working) {
-      setTenths(0);
-      setOpen(true);
-    } else if (collapseOnSettle) {
-      setOpen(false);
-    }
+  // Open while working; on settle fold away if asked. A line that is already
+  // settled when it first shows starts folded the same way.
+  const [open, setOpen] = useState(working || !collapseOnSettle);
+  const [seen, setSeen] = useState(working);
+  if (seen !== working) {
+    setSeen(working);
+    if (working) setOpen(true);
+    else if (collapseOnSettle) setOpen(false);
   }
 
-  // The timer ticks only while working; the last tick is the final time.
-  useEffect(() => {
-    if (!working) return;
-    startedAt.current = performance.now();
-    const id = setInterval(() => setTenths(Math.floor((performance.now() - startedAt.current) / 100)), 100);
-    return () => clearInterval(id);
-  }, [working]);
+  const ranAtAll = tenths > 0;
+  const settledText = doneLabel ?? (ranAtAll ? `Done in ${formatTenths(tenths)}` : "Done");
+  const headline = working ? label : settledText;
+  const spoken = working ? label : doneLabel ?? (ranAtAll ? `Done in ${spokenTenths(tenths)}` : "Done");
 
-  const settledOnce = useRef(working);
-  useEffect(() => {
-    if (settledOnce.current && !working) settleRef.current?.(Math.floor((performance.now() - startedAt.current) / 100) / 10);
-    settledOnce.current = working;
-  }, [working]);
-
-  const done = doneLabel ?? (showTimer ? "Done in" : "Done");
-  const announce = working ? label : showTimer && !doneLabel ? `${done} ${spokenTenths(tenths)}` : done;
-
-  const head = (
-    <>
-      <AeonDroplets working={working} />
-      <span
-        className={cn("transition-colors duration-300", working ? "thought-shimmer text-[var(--fg-muted)]" : "text-[var(--fg)]")}
-      >
-        {working ? label : done}
-      </span>
-      {showTimer && (
-        <span aria-hidden className="text-[var(--fg-muted)] tabular-nums">
-          {formatTenths(tenths)}
-        </span>
-      )}
-      {hasSteps && (
-        <ChevronDown
-          aria-hidden
-          size="1em"
-          className={cn("text-[var(--fg-muted)] transition-transform duration-200", open && "rotate-180")}
-        />
-      )}
-    </>
+  const glyph = working ? (
+    <span aria-hidden className="orb size-3.5 shrink-0" />
+  ) : (
+    <StatusMark status={tasks.some((t) => t.status === "failed") ? "failed" : "done"} size={16} decorative />
   );
 
+  const timer = showTimer && (working || ranAtAll) && (
+    <span aria-hidden className="ml-1 shrink-0 tabular-nums text-small text-[var(--fg-muted)]">
+      {formatTenths(tenths)}
+    </span>
+  );
+
+  const words = <span className={`min-w-0 ${working ? "working-glint" : "text-[var(--fg)]"}`}>{headline}</span>;
+
   return (
-    <div className={cn("flex w-full max-w-xl flex-col items-start text-body font-medium [&>div[id]]:self-stretch", className)}>
-      {hasSteps ? (
+    <div className={`flex flex-col text-body ${className}`}>
+      <span role="status" className="sr-only">
+        {spoken}
+      </span>
+
+      {hasTasks ? (
         <button
           type="button"
           aria-expanded={open}
-          aria-controls={listId}
-          onClick={() => setOpen((v) => !v)}
-          className="-mx-2 inline-flex min-h-touch items-center gap-[0.4em] rounded-full px-2 text-left hover:bg-[var(--hairline)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--focus-ring)] focus-visible:outline-solid"
+          aria-controls={boxId}
+          onClick={() => setOpen((o) => !o)}
+          className="-mx-2 flex min-h-touch items-center gap-2.5 self-start rounded-full px-2 text-left hover:bg-[var(--chip-off-bg)]"
         >
-          {head}
-          <span className="sr-only">{open ? " Hide steps" : " Show steps"}</span>
+          {glyph}
+          {words}
+          {timer}
+          <span className="sr-only">{open ? ", Hide steps" : ", Show steps"}</span>
+          <ChevronDown
+            aria-hidden
+            size={16}
+            className={`shrink-0 text-[var(--fg-muted)] transition-transform duration-200 motion-reduce:transition-none ${open ? "rotate-180" : ""}`}
+          />
         </button>
       ) : (
-        <div className="inline-flex min-h-touch items-center gap-[0.4em]">{head}</div>
+        <p className="flex min-h-touch items-center gap-2.5">
+          {glyph}
+          {words}
+          {timer}
+        </p>
       )}
-      <span role="status" className="sr-only">
-        {announce}
-      </span>
-      {hasSteps && (
+
+      {hasTasks && (
         <div
-          id={listId}
-          className={cn(
-            // Folds to zero height, then turns invisible so no edge or shadow peeks through.
-            "grid transition-[grid-template-rows,visibility] duration-300 ease-[var(--ease-soft-out)] motion-reduce:transition-none",
-            open ? "visible grid-rows-[1fr]" : "invisible grid-rows-[0fr]",
-          )}
-          aria-hidden={!open}
+          id={boxId}
+          className="grid transition-[grid-template-rows,visibility] duration-200 ease-out motion-reduce:transition-none"
+          style={{ gridTemplateRows: open ? "1fr" : "0fr", visibility: open ? "visible" : "hidden" }}
         >
-          {/* No padding on the folding part itself: padding would stay visible at zero height. */}
-          <div className="-mx-2 min-h-0 overflow-hidden">
-            <div className="px-2 pt-1 pb-4">
-              {/* The task box: a raised card under the line, one row per task. */}
-              <ol className="tile divide-y divide-[var(--hairline)] px-3.5 py-1 sm:px-4">
-                {normalizeSteps(steps, working).map((step, i) => (
-                  <li
-                    key={`${i}-${step.label}`}
-                    className="flex items-center gap-3 py-2 font-normal motion-safe:animate-[pill-open_220ms_var(--ease-soft-out)]"
-                  >
-                    <StatusMark status={step.status} size="1.1em" decorative />
-                    <span className="min-w-0">
-                      <span
-                        className={cn(
-                          "block text-small",
-                          step.status === "pending" && "text-[var(--fg-muted)]",
-                          step.status === "running" && "font-semibold text-[var(--fg)]",
-                          step.status === "done" && "text-[var(--fg)]",
-                          step.status === "failed" && "font-medium text-[var(--danger-fg)]",
-                        )}
-                      >
-                        {step.label}
-                        <span className="sr-only">, {STEP_WORDS[step.status]}</span>
-                      </span>
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            </div>
+          <div className="min-h-0 overflow-hidden">
+            <ol className="ml-[7px] flex flex-col gap-1.5 border-l border-[var(--hairline)] py-1 pl-4">
+              {tasks.map((t, i) => (
+                <li
+                  key={`${i}-${t.label}`}
+                  className={`flex items-center gap-2 text-small ${t.status === "pending" ? "text-[var(--fg-muted)]" : t.status === "failed" ? "text-[var(--status-failed-fg)]" : "text-[var(--fg)]"}`}
+                >
+                  <StatusMark status={t.status} size={14} decorative />
+                  <span className={t.status === "running" ? "working-glint" : undefined}>
+                    {t.label}
+                    <span className="sr-only">, {STEP_WORDS[t.status]}</span>
+                  </span>
+                </li>
+              ))}
+            </ol>
           </div>
         </div>
       )}

@@ -4,9 +4,9 @@ Walked on 2026-10-28 in Isaiah's signed-in Cal.com account, read-only: nothing w
 
 **License note.** Cal.com is AGPL-3.0. This file records patterns, measurements and impressions only. No Cal.com code, icons, logos, fonts or exact layouts go into Practice-OS; everything is rebuilt from our own components (docs/ui-elements.md) and tokens (app/globals.css).
 
-**Viewport note.** The Chrome window was locked at 757 x 862 CSS px during the walk (resize refused), so Cal.com served its phone/tablet layout: top bar plus a floating bottom dock instead of the left nav. The desktop left nav is described from Isaiah's own screenshot of the Cal.ai home and is marked *desktop, from Isaiah's screenshot* below. Desktop captures are added (`d*.jpg`) if a wider window becomes available.
+**Viewport note.** The Chrome window was locked at 757 x 862 CSS px during the walk (resize refused), so Cal.com served its phone/tablet layout: top bar plus a floating bottom dock instead of the left nav. The desktop left nav is described from Isaiah's own screenshot of the Cal.ai home and is marked *desktop, from Isaiah's screenshot* below.
 
-Screenshots: `docs/research/calcom-ui-study/` (`m` = 757px layout, dark unless named `-light`).
+Screenshots: removed from the repo on 2026-11-04 (they are Cal.com's copyright). The file names in the headings below (`m` = 757px layout, dark unless named `-light`) are kept only as labels for the notes.
 
 ## 1. The overall feel in one paragraph
 
