@@ -1,9 +1,6 @@
 // Offline checks of lib/meta.ts parsing against real replies saved by `npm run smoke`.
 import { readFile } from "node:fs/promises";
-import { parseImageStream, type ResponsesEvent } from "@meta-sam/parser";
-import sharp from "sharp";
 import { describe, expect, it } from "vitest";
-import { cutoutPng } from "../lib/cutout";
 import {
   MetaApiError,
   assertAllowedModel,
@@ -12,7 +9,6 @@ import {
   readGrounded,
   readToolCalls,
   transcriptText,
-  validateSegmentation,
 } from "../lib/meta";
 import { normalizeWords, wordErrorRate } from "../lib/wer";
 
@@ -66,33 +62,6 @@ describe("image", () => {
 
   it("throws when there is no image in the reply", () => {
     expect(() => extractImage({ output: [{ type: "message" }] })).toThrow(MetaApiError);
-  });
-});
-
-describe("SAM cut-out", () => {
-  it("parses the saved stream and builds a correctly placed cut-out", async () => {
-    const events: ResponsesEvent[] = await fixture("sam_events");
-    async function* replay() {
-      for (const e of events) yield e;
-    }
-    const result = await parseImageStream(replay()).finalResult;
-    validateSegmentation(result);
-
-    // A plain 1080x1080 image stands in for the headshot; only the mask matters here.
-    const image = await sharp({ create: { width: 1080, height: 1080, channels: 3, background: "#888888" } })
-      .jpeg()
-      .toBuffer();
-    const { png, alpha, width, transparentShare } = await cutoutPng(image, result);
-    const meta = await sharp(png).metadata();
-    const at = (x: number, y: number) => alpha[Math.floor(y * width) * width + Math.floor(x * width)];
-
-    expect(meta.channels).toBe(4);
-    expect(transparentShare).toBeGreaterThan(0.1);
-    expect(transparentShare).toBeLessThan(0.9);
-    expect(at(0.5, 0.5)).toBe(255); // face
-    expect(at(0.5, 0.9)).toBe(255); // shoulders
-    expect(at(0.03, 0.03)).toBe(0); // background corners
-    expect(at(0.97, 0.03)).toBe(0);
   });
 });
 

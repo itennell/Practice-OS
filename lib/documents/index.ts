@@ -333,49 +333,10 @@ export async function listReferralLetters(limit = 30, id?: string): Promise<Lett
      limit ${limit}`.catch(() => []);
 }
 
-/** An Instagram post Aeon wrote (practice_os.posts). Ideas and blocked drafts are left out. */
-export type PostRow = { id: string; headline: string | null; caption: string; status: string; has_image: boolean; is_sample: boolean; created_at: Date };
-
-const POST_STATUS: Record<string, string> = {
-  draft: "Draft",
-  pending_approval: "Waiting for you",
-  ready: "Ready to post",
-  scheduled: "Ready to post",
-  publishing: "Ready to post",
-  published: "Posted",
-  failed: "Failed",
-};
-
-export function instagramPostCard(p: PostRow): DocumentCard {
-  const made = new Date(p.created_at).toISOString().slice(0, 10);
-  const firstLine = p.caption.split("\n")[0].trim();
-  return card({
-    id: `instagram_post:${p.id}`,
-    kind: "instagram_post",
-    title: (p.headline?.trim() || firstLine || "Instagram post").slice(0, 160),
-    subtitle: `Written ${niceDate(made)}${p.has_image ? " · with its picture" : ""}`,
-    status: POST_STATUS[p.status] ?? "Draft",
-    topics: words(p.headline, firstLine, "instagram post caption picture media social"),
-    open: "/media/instagram",
-    needs_her: p.status === "pending_approval" ? "Approve it in Approvals, then post it yourself from the Instagram app." : null,
-    is_sample: p.is_sample,
-  });
-}
-
-export async function listInstagramPosts(limit = 30, id?: string): Promise<PostRow[]> {
-  const sql = db();
-  return sql<PostRow[]>`
-    select id, headline, caption, status, image_jpeg is not null as has_image, is_sample, created_at
-      from practice_os.posts
-     where status not in ('idea', 'blocked') and ${id ? sql`id = ${id}` : sql`true`}
-     order by created_at desc
-     limit ${limit}`.catch(() => []);
-}
-
 /** Every document Practice-OS holds or can make, built from the live rows. */
 export async function allDocuments(): Promise<DocumentCard[]> {
   const today = await practiceToday();
-  const [deadlines, estimates, bills, apps, profile, caqh, uploads, clientForms, letters, posts] = await Promise.all([
+  const [deadlines, estimates, bills, apps, profile, caqh, uploads, clientForms, letters] = await Promise.all([
     deadlinesView(365),
     listEstimates(20),
     listSuperbills(20).catch(() => []),
@@ -385,7 +346,6 @@ export async function allDocuments(): Promise<DocumentCard[]> {
     listStoredDocuments(30),
     clientFormCards().catch(() => []),
     listReferralLetters(10),
-    listInstagramPosts(10),
   ]);
   const cards = [
     ...deadlines.due.map((o) => deadlineCard(o, today)),
@@ -400,7 +360,6 @@ export async function allDocuments(): Promise<DocumentCard[]> {
     ...allGuides().map(guideCard),
     ...uploads.map(uploadedCard),
     ...letters.map(referralLetterCard),
-    ...posts.map(instagramPostCard),
   ];
   // The referrals-only demo (lib/features.ts) shows only her uploads and referral letters.
   return cards.filter((c) => fileKindEnabled(c.kind));
@@ -422,7 +381,6 @@ const KIND_WORDS: Record<DocumentKind, string[]> = {
   uploaded: ["uploaded", "added", "contract", "letter", "certificate", "w9", "malpractice", "fee", "schedule"],
   referral_letter: ["referral", "referrals", "letter", "letters", "intro", "introduction", "outreach"],
   referral_debrief: ["debrief", "coffee", "meeting", "met", "referral", "partner"],
-  instagram_post: ["instagram", "post", "posts", "caption", "picture", "social"],
 };
 
 export type FindQuery = { query?: string; kind?: DocumentKind; payer?: string; due_within_days?: number };
@@ -517,10 +475,6 @@ export async function openDocument(id: string): Promise<DocumentCard | null> {
     case "referral_letter": {
       const [l] = UUID.test(key) ? await listReferralLetters(1, key) : [];
       return l ? referralLetterCard(l) : null;
-    }
-    case "instagram_post": {
-      const [p] = UUID.test(key) ? await listInstagramPosts(1, key) : [];
-      return p ? instagramPostCard(p) : null;
     }
     case "guide": {
       const g = /^[a-z0-9-]+$/.test(key) ? getGuide(key) : null;

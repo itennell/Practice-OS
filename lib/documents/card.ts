@@ -21,7 +21,6 @@ export const DOCUMENT_KINDS = [
   "uploaded",
   "referral_letter",
   "referral_debrief",
-  "instagram_post",
 ] as const;
 export type DocumentKind = (typeof DOCUMENT_KINDS)[number];
 
@@ -40,7 +39,6 @@ export const KIND_LABEL: Record<DocumentKind, string> = {
   uploaded: "Your document",
   referral_letter: "Referral letter",
   referral_debrief: "Coffee debrief",
-  instagram_post: "Instagram post",
 };
 
 /** A link inside the app: one leading slash, never "//" (another site) or a backslash. */

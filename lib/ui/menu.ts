@@ -37,7 +37,7 @@ export async function loadMenuData(): Promise<MenuData> {
       urgent: alerts.length,
     },
     chats: chats.map((c) => ({ id: c.id, title: c.title })),
-    // Media stays for everyone, even when Instagram isn't for her. Only the referrals-only demo hides pages.
+    // Only the referrals-only demo hides pages.
     hidden: REFERRALS_ONLY_DEMO ? [...REFERRAL_DEMO_HIDDEN_PAGES] : [],
   };
 }

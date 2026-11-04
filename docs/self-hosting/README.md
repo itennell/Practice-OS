@@ -2,18 +2,13 @@
 
 Practice-OS is free and open source. Each practice runs its own copy on its own computer, with its own accounts. Nobody runs a central Practice-OS service, and nobody else holds her data or her keys.
 
-Instagram needs no connection: Aeon writes posts with her and she posts them herself.
-
 These pages are for the AI agent doing the setup and for anyone setting it up by hand. Each one has the same steps the app shows in **Settings › Connections**, where every step is checked as she goes.
 
-Start with [INSTALL.md](../../INSTALL.md). Then, only for the helpers she wants:
+Start with [INSTALL.md](../../INSTALL.md). Then:
 
 | Page | For | Cost | Time |
 |---|---|---|---|
 | [muse.md](muse.md) | Aeon (required) | Pay per use, on her own Meta account | 5 minutes |
-| [calcom.md](calcom.md) | Front Desk consult times | Cal.com's free plan works | 10 minutes |
-| [phone.md](phone.md) | Front Desk voicemails and texts | Twilio: about $2 a month plus use | 20 minutes, then 3 to 15 business days for texting approval |
-| [google.md](google.md) | Gmail drafts | Free | Later: not ready yet |
 
 `npm run doctor` shows where each one stands (`npm run doctor -- --json` for an agent).
 

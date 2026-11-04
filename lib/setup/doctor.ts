@@ -74,24 +74,6 @@ export function museCheck(fromEnv: boolean, saved: ConnectFacts): SetupCheck {
   return { ...base, state: "todo", say: "No Muse key yet, so Aeon can't answer.", fix: "In the app: Settings › Connections › Aeon (Meta Muse). See docs/self-hosting/muse.md." };
 }
 
-export function calcomCheck(saved: ConnectFacts): SetupCheck {
-  const base = { id: "calcom", label: "Cal.com (consult times)", required: false };
-  if (saved?.connected) return { ...base, state: "ok", say: `Cal.com is connected${saved.accountLabel ? ` (${saved.accountLabel})` : ""}.` };
-  return { ...base, state: "later", say: "Cal.com isn't connected. Only Front Desk needs it.", fix: "Settings › Connections › Cal.com. See docs/self-hosting/calcom.md." };
-}
-
-/** `alertsOnly`: Front Desk is paused (lib/features.ts), so the line is only for urgent alerts to her own cell. */
-export function phoneCheck(saved: ConnectFacts, alertsOnly = false): SetupCheck {
-  if (alertsOnly) {
-    const base = { id: "phone", label: "Phone for urgent alerts", required: false };
-    if (saved?.connected) return { ...base, state: "ok", say: `Aeon can text your own cell if something urgent comes up${saved.accountLabel ? ` (${saved.accountLabel})` : ""}.` };
-    return { ...base, state: "later", say: "No phone line for urgent alerts. Optional: without one, Aeon shows the 988 message in the chat and tells you in the app.", fix: "Settings › Connections › Urgent alerts to your phone. See docs/self-hosting/phone.md." };
-  }
-  const base = { id: "phone", label: "Practice phone", required: false };
-  if (saved?.connected) return { ...base, state: "ok", say: `The practice phone is connected${saved.accountLabel ? ` (${saved.accountLabel})` : ""}.` };
-  return { ...base, state: "later", say: "No practice phone yet. Only Front Desk needs it.", fix: "See docs/self-hosting/phone.md." };
-}
-
 export function dryRunCheck(dryRun: boolean): SetupCheck {
   return dryRun
     ? { id: "dry-run", label: "Test mode", state: "ok", say: "Test mode is on: nothing is really sent, posted or booked.", required: false }

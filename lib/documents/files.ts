@@ -13,12 +13,9 @@ import {
   clientFormCards,
   cms855iCard,
   gfeCard,
-  instagramPostCard,
-  listInstagramPosts,
   listReferralLetters,
   openDocument,
   payerCard,
-  type PostRow,
   referralLetterCard,
   releaseTemplateCards,
   superbillCard,
@@ -31,7 +28,7 @@ import {
 export * from "./file-entry";
 
 /** How many of each source the page reads; a source that fills its cap shows "Showing the newest N". */
-export const FILE_CAPS = { uploads: 200, estimates: 100, superbills: 100, letters: 50, posts: 50 } as const;
+export const FILE_CAPS = { uploads: 200, estimates: 100, superbills: 100, letters: 50 } as const;
 
 export type FilesView = {
   entries: FileEntry[];
@@ -39,12 +36,10 @@ export type FilesView = {
   capped: Partial<Record<FileGroup, string>>;
 };
 
-const postDownload = (p: PostRow) => (p.has_image ? { href: `/api/instagram/posts/${p.id}/image?download=1`, label: "Download picture" } : null);
-
 /** Every file, newest first. Each source is read on its own, so one that fails leaves the rest. */
 export async function listFiles(): Promise<FilesView> {
   const safe = <T,>(p: Promise<T>, fallback: T) => p.catch(() => fallback);
-  const [today, uploads, estimates, bills, apps, profile, clientForms, letters, posts] = await Promise.all([
+  const [today, uploads, estimates, bills, apps, profile, clientForms, letters] = await Promise.all([
     practiceToday(),
     safe(listStoredDocuments(FILE_CAPS.uploads), []),
     safe(listEstimates(FILE_CAPS.estimates), []),
@@ -53,7 +48,6 @@ export async function listFiles(): Promise<FilesView> {
     safe(loadCredentialingProfile(), null),
     safe(clientFormCards(), []),
     safe(listReferralLetters(FILE_CAPS.letters), []),
-    safe(listInstagramPosts(FILE_CAPS.posts), []),
   ]);
   const isSample = profile?.isSample ?? false;
   const entries = [
@@ -66,7 +60,6 @@ export async function listFiles(): Promise<FilesView> {
     ...clientForms.map((c) => toFileEntry(c, null)),
     ...releaseTemplateCards(isSample).map((c) => toFileEntry(c, null)),
     ...letters.map((l) => toFileEntry(referralLetterCard(l), l.created_at)),
-    ...posts.map((p) => toFileEntry(instagramPostCard(p), p.created_at, postDownload(p))),
   ];
   const full = (rows: unknown[], cap: number) => rows.length >= cap;
   const capped: FilesView["capped"] = {};
@@ -74,7 +67,6 @@ export async function listFiles(): Promise<FilesView> {
   const money = [full(estimates, FILE_CAPS.estimates) && `${FILE_CAPS.estimates} estimates`, full(bills, FILE_CAPS.superbills) && `${FILE_CAPS.superbills} superbills`].filter(Boolean);
   if (money.length) capped.money = `Showing the newest ${money.join(" and ")}.`;
   if (full(letters, FILE_CAPS.letters)) capped.referrals = `Showing the newest ${FILE_CAPS.letters}.`;
-  if (full(posts, FILE_CAPS.posts)) capped.media = `Showing the newest ${FILE_CAPS.posts}.`;
   // A note only for a group the page shows (the referrals-only demo hides most: lib/features.ts).
   for (const g of Object.keys(capped) as (keyof typeof capped)[]) if (!SHOWN_GROUPS.includes(g)) delete capped[g];
   // The referrals-only demo (lib/features.ts) shows only her uploads and referral letters.
@@ -111,10 +103,6 @@ export async function getFile(id: string): Promise<FileEntry | null> {
     case "referral_letter": {
       const [l] = uuid ? await listReferralLetters(1, key) : [];
       return l ? toFileEntry(referralLetterCard(l), l.created_at) : null;
-    }
-    case "instagram_post": {
-      const [p] = uuid ? await listInstagramPosts(1, key) : [];
-      return p ? toFileEntry(instagramPostCard(p), p.created_at, postDownload(p)) : null;
     }
     case "cms855i":
     case "client_form":

@@ -66,15 +66,6 @@ describe("file entries", () => {
   });
 });
 
-describe("Instagram post cards", () => {
-  it("shows an approved (ready) post as ready to post, not a draft", async () => {
-    const { instagramPostCard } = await import("../lib/documents/index");
-    const post = { id: "00000000-0000-4000-8000-0000000000bb", headline: "[Sample] How to book", caption: "x", has_image: true, is_sample: true, created_at: new Date("2026-11-01") };
-    expect(instagramPostCard({ ...post, status: "ready" }).status).toBe("Ready to post");
-    expect(instagramPostCard({ ...post, status: "draft" }).status).toBe("Draft");
-  });
-});
-
 describe("read_document text", () => {
   it("returns a short file whole", () => {
     expect(capText("A short lease.")).toEqual({ text: "A short lease.", cut: false });

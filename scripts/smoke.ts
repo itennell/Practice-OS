@@ -12,12 +12,10 @@ import {
   generateImage,
   pdfPart,
   readToolCalls,
-  segmentImage,
   transcribe,
   transcriptText,
   searchGrounded,
 } from "../lib/meta";
-import { cutoutPng } from "../lib/cutout";
 import { wordErrorRate } from "../lib/wer";
 import { SAMPLE_CLIENT_NAME, makeSamplePdf } from "./make-sample-pdf";
 
@@ -142,26 +140,6 @@ await step("3. muse-image-1.0 headshot", async () => {
   const meta = await sharp(await readFile("test/headshot.jpg")).metadata();
   check(meta.format === "jpeg" && meta.width === 1080, `Saved file is ${meta.format} ${meta.width}px`);
   return `source ${(await sharp(image).metadata()).format} -> test/headshot.jpg format ${meta.format}, ${meta.width}x${meta.height} | tokens ${response.usage?.total_tokens}`;
-});
-
-// 4. Segmentation (cookbook 07_sam/01_api_basics/typescript/sam-api.ts).
-await step("4. sam-3.1 cut-out", async () => {
-  const headshot = await readFile("test/headshot.jpg");
-  const { result, usage, events } = await segmentImage("smoke.cutout", headshot, "image/jpeg", "person");
-  await saveFixture("sam_events", events);
-  const { png, alpha, width, height, transparentShare: transparent } = await cutoutPng(headshot, result);
-  await writeFile("test/headshot-cutout.png", png);
-  const meta = await sharp(png).metadata();
-  check(meta.hasAlpha === true, "Cut-out has no alpha channel.");
-  check(transparent > 0.1 && transparent < 0.9, `Transparent share ${(transparent * 100).toFixed(1)}% is outside 10-90%.`);
-  // A headshot's subject fills the bottom-center and the top corners are background.
-  // This catches a scrambled mask, which can still have a plausible transparent share.
-  const at = (x: number, y: number) => alpha[Math.floor(y * height) * width + Math.floor(x * width)];
-  check(at(0.5, 0.9) === 255 && at(0.5, 0.5) === 255, "Center and bottom-center of the cut-out are not opaque.");
-  check(at(0.03, 0.03) === 0 && at(0.97, 0.03) === 0, "Top corners of the cut-out are not transparent.");
-  const masks = result.records.filter((r) => r.kind === "mask").length;
-  const images = (usage as { images_processed?: number } | null)?.images_processed;
-  return `${masks} mask(s) | test/headshot-cutout.png alpha ${meta.hasAlpha}, ${(transparent * 100).toFixed(1)}% transparent | tokens ${usage?.total_tokens ?? "not reported"} (images processed: ${images ?? "-"})`;
 });
 
 // 5. Transcription (cookbook 06_muse_voice/01_voice_api_fundamentals/utils.py).

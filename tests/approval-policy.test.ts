@@ -1,10 +1,8 @@
 // Manual, Auto and Bypass (lib/approval-policy.ts): the plain-code rule for what
 // runs without her tap, then the same rule end to end against the database.
 import { readFileSync } from "node:fs";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 import { REFERRALS_ONLY_DEMO } from "../lib/features";
-// These test Front Desk itself, so they run with it switched on (lib/features.ts).
-vi.mock("../lib/features", async (orig) => ({ ...(await orig<typeof import("../lib/features")>()), FRONT_DESK_ENABLED: true }));
 import { APPROVAL_KINDS } from "../lib/approval-kinds";
 import { BAA_IN_PLACE, capForMcp, KIND_POLICY, shouldAutoRun, withOrigin } from "../lib/approval-policy";
 import { loadEnv } from "../lib/env";
@@ -36,26 +34,11 @@ describe("the rule", () => {
     for (const kind of APPROVAL_KINDS) expect(shouldAutoRun(kind, undefined)).toBe(false);
   });
 
-  it("Front Desk follows its own rule: a missed-caller text, only while the switch is on", () => {
-    const on = { text_missed_callers: true, book_by_text: true, send_reminders: true };
-    const off = { text_missed_callers: false, book_by_text: false, send_reminders: false };
-    expect(shouldAutoRun("sms_reply", { rule: "front_desk", rules: on })).toBe(true);
-    expect(shouldAutoRun("sms_reply", { rule: "front_desk", rules: off })).toBe(false);
-    expect(shouldAutoRun("instagram_post", { rule: "front_desk", rules: on })).toBe(false);
-    expect(shouldAutoRun("text_consult_options", { rule: "front_desk", rules: on })).toBe(true);
-    expect(shouldAutoRun("text_consult_options", { rule: "front_desk", rules: { ...on, text_missed_callers: false } })).toBe(false);
-    for (const kind of ["consult_booking", "consult_reschedule", "consult_cancel"] as const) {
-      expect(shouldAutoRun(kind, { rule: "front_desk", rules: on })).toBe(true);
-      expect(shouldAutoRun(kind, { rule: "front_desk", rules: { ...on, book_by_text: false } })).toBe(false);
-    }
-    expect(shouldAutoRun("gfe_issue", { rule: "front_desk", rules: on })).toBe(false);
-  });
-
   it("outside agents over MCP never get Bypass", () => {
     expect([capForMcp("manual"), capForMcp("auto"), capForMcp("bypass")]).toEqual(["manual", "auto", "auto"]);
   });
 
-  it("no clinician-only executor can reach Gmail or Twilio (Aeon never sends to a patient)", () => {
+  it("no clinician-only executor can send anything (Aeon never sends to a patient)", () => {
     for (const kind of APPROVAL_KINDS.filter((k) => KIND_POLICY[k].tier === "clinician_only")) {
       const src = readFileSync(new URL(`../lib/executors/${kind}.ts`, import.meta.url), "utf8");
       expect(src, kind).not.toMatch(/twilio|gmail|sendMail|messages\.create|fetch\(/i);

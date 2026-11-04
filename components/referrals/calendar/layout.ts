@@ -5,7 +5,7 @@
 // position is read from the wall clock in that zone (zonedTime / localDate), never
 // by adding hours to an instant, so a DST change never shifts a block or a day.
 
-import { localDate, zonedTime } from "@/lib/frontdesk/calendar/zone";
+import { localDate, zonedTime } from "@/lib/zone";
 
 export type CalendarView = "day" | "week" | "month";
 export type Range = { from: Date; to: Date };

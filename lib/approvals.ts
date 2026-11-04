@@ -1,9 +1,9 @@
 import { audit } from "./audit";
 import { db } from "./db";
 import { isDryRun } from "./env";
-import { demoApprovalShown, FRONT_DESK_APPROVAL_KINDS, FRONT_DESK_ENABLED, REFERRAL_DEMO_APPROVAL_KINDS, REFERRAL_DEMO_TOOLS, REFERRALS_ONLY_DEMO } from "./features";
+import { demoApprovalShown, REFERRAL_DEMO_APPROVAL_KINDS, REFERRAL_DEMO_TOOLS, REFERRALS_ONLY_DEMO } from "./features";
 import { editableField, executors } from "./executors";
-import type { ApprovalKind } from "./approval-kinds";
+import { APPROVAL_KINDS, type ApprovalKind } from "./approval-kinds";
 import { currentOrigin, shouldAutoRun } from "./approval-policy";
 import type { ApprovalRow } from "./executors/types";
 
@@ -42,13 +42,10 @@ export function toView(row: ApprovalRow): ApprovalView {
  * In the referrals-only demo (lib/features.ts) only referral approvals show: referral letters
  * and Aeon actions that wrap a referral tool.
  *
- * Instagram posts stay out of her lists and counts once she said Instagram isn't for
- * her (onboarding's marketing interview): nothing about Instagram nags her after that.
+ * Rows of kinds the app no longer has (the removed Media and Front Desk helpers) never show.
  */
 export const visibleKind = () =>
-  db()`not (kind = 'instagram_post' and exists (
-         select 1 from practice_os.clinician_profile where onboarding_answers -> 'instagram' ->> 'account' = 'no'))
-       and (${FRONT_DESK_ENABLED} or kind <> all(${db().array([...FRONT_DESK_APPROVAL_KINDS])}))
+  db()`kind = any(${db().array([...APPROVAL_KINDS])})
        and (${!REFERRALS_ONLY_DEMO} or kind = any(${db().array([...REFERRAL_DEMO_APPROVAL_KINDS])})
             or (kind = 'aeon_action' and payload ->> 'tool' = any(${db().array([...REFERRAL_DEMO_TOOLS])})))`;
 
@@ -77,14 +74,14 @@ export async function listApprovalsById(ids: string[]) {
   return ids.flatMap((id) => byId.get(id) ?? []);
 }
 
-/** A Front Desk kind while Front Desk is paused (lib/features.ts): never listed, queued, approved or declined. */
-const pausedKind = (kind: string) => !FRONT_DESK_ENABLED && FRONT_DESK_APPROVAL_KINDS.includes(kind);
+/** A kind the app no longer has (the removed Media and Front Desk helpers): never listed, queued, approved or declined. */
+const removedKind = (kind: string) => !(APPROVAL_KINDS as readonly string[]).includes(kind);
 
-/** Hidden from her: a paused Front Desk kind, or one outside the referrals-only demo (lib/features.ts). Never listed, approved or declined. */
-const hiddenRow = (r: Pick<ApprovalRow, "kind" | "payload">) => pausedKind(r.kind) || !demoApprovalShown(r.kind, r.payload?.tool);
+/** Hidden from her: a removed kind, or one outside the referrals-only demo (lib/features.ts). Never listed, approved or declined. */
+const hiddenRow = (r: Pick<ApprovalRow, "kind" | "payload">) => removedKind(r.kind) || !demoApprovalShown(r.kind, r.payload?.tool);
 
-function refusePaused(kind: string): void {
-  if (pausedKind(kind)) throw new Error(`Front Desk is paused, so a ${kind} approval can't be queued.`);
+function refuseRemoved(kind: string): void {
+  if (removedKind(kind)) throw new Error(`Practice-OS has no ${kind} approvals.`);
 }
 
 export type ApproveResult =
@@ -150,10 +147,8 @@ export async function approve(id: string, opts: { by: string; edit?: string; aut
 }
 
 export async function decline(id: string, opts: { by: string }): Promise<ApproveResult> {
-  if (!FRONT_DESK_ENABLED || REFERRALS_ONLY_DEMO) {
-    const current = await getRow(id);
-    if (current && hiddenRow(current)) return { ok: false, reason: "not_found" };
-  }
+  const current = await getRow(id);
+  if (current && hiddenRow(current)) return { ok: false, reason: "not_found" };
   const [row] = await db()<ApprovalRow[]>`
     update practice_os.approvals
        set status = 'rejected', decided_at = now(), decided_by = ${opts.by}
@@ -171,7 +166,7 @@ export async function decline(id: string, opts: { by: string }): Promise<Approve
  * The only way agents and tools add work (AGENTS.md > Approvals): one INSERT
  * with status 'pending' and an audit line. It runs the executor right away only
  * when the mode or helper rule it was queued under allows that kind
- * (lib/approval-policy.ts); decided_by then says "auto:<mode>" or "auto:front_desk".
+ * (lib/approval-policy.ts); decided_by then says "auto:<mode>".
  */
 export async function queueApproval(input: {
   kind: ApprovalKind;
@@ -180,7 +175,7 @@ export async function queueApproval(input: {
   payload?: Record<string, unknown>;
   createdBy: string;
 }): Promise<string> {
-  refusePaused(input.kind);
+  refuseRemoved(input.kind);
   const [row] = await db()<{ id: string }[]>`
     insert into practice_os.approvals (kind, title, preview, payload, status, created_by)
     values (${input.kind}, ${input.title}, ${db().json((input.preview ?? {}) as never)},
@@ -203,7 +198,7 @@ async function finishQueuedApproval(
   });
   const origin = currentOrigin();
   if (shouldAutoRun(input.kind, origin)) {
-    await approve(id, { by: `auto:${origin && "mode" in origin ? origin.mode : "front_desk"}`, auto: true });
+    await approve(id, { by: `auto:${origin?.mode}`, auto: true });
   }
 }
 
@@ -224,7 +219,7 @@ export async function queueApprovalOnce(
   /** The statuses that count as the same approval still open. */
   open: readonly ("pending" | "running")[] = ["pending", "running"],
 ): Promise<{ id: string; created: boolean }> {
-  refusePaused(input.kind);
+  refuseRemoved(input.kind);
   const result = (await db().begin(async (sql) => {
     await sql`select pg_advisory_xact_lock(hashtext(${`${input.kind}:${dedupe.payloadField}:${dedupe.value}`}))`;
     const [existing] = await sql<{ id: string }[]>`

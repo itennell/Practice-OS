@@ -5,7 +5,6 @@ import { danaFacts } from "./compliance/demo";
 import { practiceToday, syncCalendar } from "./compliance/store";
 import { removeDocumentFiles, type RemovedDocument } from "./uploads/cleanup";
 import { dataDir } from "./uploads/store";
-import { SEED_POSTS } from "../scripts/seed-posts";
 import { specialtiesForNiche } from "./referrals/settings";
 
 /** The fictional demo practice's niche: oncology / serious illness / end of life, and that niche's kinds. */
@@ -42,6 +41,8 @@ export const DEMO_TABLES = [
   "referral_contacts",
   // Referrals calendar (047): planned coffees, calls and talks.
   "referral_meetings",
+  // Tables of the removed Media and Front Desk helpers: unused now, kept until a later
+  // migration drops them. Emptying them on reset keeps no old demo rows around.
   "posts",
   // Instagram studio (021)
   "post_research",
@@ -163,12 +164,6 @@ async function reset(sql: postgres.Sql, dir: string): Promise<ResetResult> {
       insert into practice_os.referral_settings (id, home_zip, specialties, niche_preset)
       values (true, ${DEMO_ZIP}, ${DEMO_REFERRAL_KINDS}, ${DEMO_NICHE})
       on conflict (id) do update set home_zip = excluded.home_zip, niche_preset = excluded.niche_preset, specialties = excluded.specialties, updated_at = now()`;
-    // The [Sample] posts' finished pictures, so the demo post can be approved.
-    for (const post of SEED_POSTS) {
-      if (!post.picture) continue;
-      const jpeg = await readFile(`db/seed/posts/${post.id}.jpg`);
-      await tx`update practice_os.posts set image_jpeg = ${jpeg}, alt_text = ${`[Sample] Picture with the words: ${post.headline}`} where id = ${post.id}`;
-    }
   });
   // Only after the rows are gone for good: a failed reset keeps every file.
   const removedFiles = await removeDocumentFiles(removed, dir);

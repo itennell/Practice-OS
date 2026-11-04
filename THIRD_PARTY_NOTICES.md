@@ -9,13 +9,13 @@ This file was checked on 2026-11-04 against the repo files, `node_modules/<packa
 These need a decision or a fix. Items marked **Resolved** were fixed on 2026-11-04 and stay listed so the history is clear.
 
 1. **Resolved 2026-11-04: the six former React Bits files were rewritten from scratch.** `components/agent-blob/blob-canvas.tsx`, `components/shared/prompt-bar.tsx`, `components/shared/spring-check.tsx`, `components/shared/status-mark.tsx`, `components/shared/thought-line.tsx` and `components/shared/voice-pill.tsx` had been adapted from React Bits, whose license is MIT plus the Commons Clause (no redistribution "as a ported version"), which conflicts with the AGPL. They were rewritten as original Practice-OS code on 2026-11-04, clean room: the old file bodies and the React Bits source were not opened; the rewrite worked only from the exported names and props, the call sites, the tests and the project's own design notes. They keep the same names and props and are now covered by the AGPL like the rest of the app. Still open: `components/shared/liquid-ether.tsx` says it takes only the idea of React Bits Liquid Ether and is "a fresh, smaller version written for Practice-OS"; whether any React Bits code is in it is **[UNCONFIRMED]** (no side-by-side comparison was done).
-2. **`@meta-sam/parser` (runtime dependency) uses Meta's custom SAM License**, not an open-source license. It adds use restrictions (trade controls, no ITAR or military use, no reverse engineering) and requires a copy of the license with any redistribution. The AGPL does not allow added restrictions on a combined work. Practice-OS does not ship this package (npm downloads it on install), so the repo itself is fine, but anyone who distributes a bundled build is distributing SAM Materials under Meta's terms. Options: keep it as a separately installed dependency (current state) and say so, or replace it with own parsing code.
+2. **Resolved 2026-11-04: `@meta-sam/parser` removed.** It used Meta's custom SAM License (use restrictions the AGPL does not allow on a combined work). It was only needed for the Media helper's SAM cut-outs, which were removed with Media, so the package is no longer a dependency.
 3. **Resolved 2026-11-04: Illinois license data (ODbL) is attributed by name.** `lib/referrals/sources/state-license.ts` reads IDFPR's "Professional Licensing" open data (data.illinois.gov `pzzh-kp68`, Open Database License, attribution "IDFPR"). The sources line in the app (`components/referrals/evidence-box.tsx`) now says "Illinois Department of Financial and Professional Regulation (IDFPR), via data.illinois.gov, ODbL 1.0".
 4. **OpenStreetMap (ODbL 1.0) attribution is in place;** share-alike is not triggered today. The app shows "© OpenStreetMap contributors (ODbL)" with a link to openstreetmap.org/copyright wherever OSM data shows (`lib/referrals/evidence/merge.ts`, `components/referrals/evidence-box.tsx`, `components/referrals/place-finder.tsx`), Aeon is told to include it in chat (`lib/aeon/tools-referrals.ts`), and the MapLibre map shows the tile attribution automatically. Facts from OSM are saved in each clinician's own database. If a Practice-OS operator ever publishes a database built from those facts, ODbL share-alike applies to that database.
 5. **Resolved 2026-11-04: Cal.com screenshots removed.** The 22 screenshots in `docs/research/calcom-ui-study/` (Cal.com's work) were deleted from the repo. The written notes (`docs/research/calcom-ui-study.md`, `docs/research/aeon-calcom-design-mapping.md`) are our own words and stay; they still name the old image files, as labels only. The images remain in the repository's past commits.
 6. **Resolved 2026-11-04: own app icon.** `app/favicon.ico` was the Next.js starter's "N" logo (a Vercel trademark). It and the new `app/icon.png` are now Aeon's orb, drawn in code by `scripts/make-icon.ts` (a radial gradient #ffffff, #E3D9FF, #8E7CF8, #4E69DA rendered with sharp).
 7. **Meta model terms.** The four Muse models are called through Meta's hosted API; nothing from them is distributed. Use is governed by Meta's API and developer terms, which were not read for this file **[UNCONFIRMED]**: who owns generated images and text, and any limits on health-related use, should be checked before a public release.
-8. **Nothing found that is non-commercial, "no derivatives", SSPL, or unlicensed** in the dependency tree: every one of the 764 entries in `package-lock.json` declares a license. coss ui (AGPL), React Bits and React Bits Pro: **no code found** (see section 2; `liquid-ether.tsx` is the one unconfirmed case).
+8. **Nothing found that is non-commercial, "no derivatives", SSPL, or unlicensed** in the dependency tree: every one of the 755 entries in `package-lock.json` declares a license. coss ui (AGPL), React Bits and React Bits Pro: **no code found** (see section 2; `liquid-ether.tsx` is the one unconfirmed case).
 
 ## 1. Software dependencies
 
@@ -26,9 +26,7 @@ Versions and licenses below are read from each package's own `package.json` in `
 | Package | Version | License | Repository |
 |---|---|---|---|
 | @base-ui/react | 1.9.0 | MIT | https://github.com/mui/base-ui |
-| @fontsource/inter | 5.2.8 | OFL-1.1 | https://github.com/fontsource/font-files |
 | @huggingface/transformers | 4.3.1 | Apache-2.0 | https://github.com/huggingface/transformers.js |
-| @meta-sam/parser | 0.0.13 | SEE LICENSE IN LICENSE | https://github.com/meta-models/meta-sam |
 | @modelcontextprotocol/sdk | 1.32.2 | MIT | https://github.com/modelcontextprotocol/typescript-sdk |
 | clsx | 2.1.1 | MIT | https://github.com/lukeed/clsx |
 | date-fns | 4.4.0 | MIT | https://github.com/date-fns/date-fns |
@@ -37,11 +35,9 @@ Versions and licenses below are read from each package's own `package.json` in `
 | lucide-react | 1.61.0 | ISC | https://github.com/lucide-icons/lucide |
 | mammoth | 1.12.3 | BSD-2-Clause | https://github.com/mwilliamson/mammoth.js |
 | maplibre-gl | 6.14.0 | BSD-3-Clause | https://github.com/maplibre/maplibre-gl-js |
-| mediabunny | 1.61.5 | MPL-2.0 | https://github.com/Vanilagy/mediabunny |
 | motion | 12.43.0 | MIT | https://github.com/motiondivision/motion |
 | next | 16.4.3 | MIT | https://github.com/vercel/next.js |
 | openai | 4.104.0 | Apache-2.0 | https://github.com/openai/openai-node |
-| opentype.js | 1.3.4 | MIT | https://github.com/opentypejs/opentype.js |
 | pdf-lib | 1.17.1 | MIT | https://github.com/Hopding/pdf-lib |
 | postgres | 3.4.9 | Unlicense | https://github.com/porsager/postgres |
 | react | 19.3.0 | MIT | https://github.com/react/react |
@@ -63,7 +59,6 @@ Versions and licenses below are read from each package's own `package.json` in `
 | @playwright/test | 1.64.1 | Apache-2.0 | https://github.com/microsoft/playwright |
 | @tailwindcss/turbopack | 4.3.3 | MIT | https://github.com/tailwindlabs/tailwindcss |
 | @types/node | 20.19.43 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped |
-| @types/opentype.js | 1.3.10 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped |
 | @types/react | 19.3.0 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped |
 | @types/react-dom | 19.3.0 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped |
 | @types/three | 0.180.0 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped |
@@ -75,20 +70,10 @@ Versions and licenses below are read from each package's own `package.json` in `
 | typescript | 5.9.3 | Apache-2.0 | https://github.com/microsoft/TypeScript |
 | vitest | 4.1.12 | MIT | https://github.com/vitest-dev/vitest |
 
-#### Connect relay (`relay/package.json`)
-
-A separate small Vercel project. Its licenses were read from the npm registry (`npm view`) for `@vercel/blob` and from the root install for `sharp`.
-
-| Package | Version | License | Repository |
-|---|---|---|---|
-| @vercel/blob | 2.8.2 | Apache-2.0 | https://github.com/vercel/storage |
-| sharp | 0.35.5 | Apache-2.0 | https://github.com/lovell/sharp |
-
 #### Notes on specific dependencies
 
-- `@meta-sam/parser`: Meta's SAM License (custom, use restrictions). See Open issue 2.
 - `mupdf` (dev only, used in tests and scripts): AGPL-3.0-or-later. Compatible with this project's AGPL-3.0.
-- `mediabunny` (runtime, browser video export) and `@axe-core/playwright` (dev): MPL-2.0, file-level copyleft. Compatible; changes to their own files would have to stay MPL.
+- `@axe-core/playwright` (dev): MPL-2.0, file-level copyleft. Compatible; changes to their own files would have to stay MPL.
 - `sharp` ships prebuilt libvips binaries (`@img/sharp-libvips-*`) under LGPL-3.0-or-later. They are installed as separate packages and loaded dynamically, which LGPL allows.
 - `embedded-postgres` (MIT wrapper) downloads platform packages (`@embedded-postgres/<platform>`, MIT) that contain PostgreSQL server binaries. PostgreSQL itself is under the PostgreSQL License (permissive) **[UNCONFIRMED: no PostgreSQL license file found inside the platform package]**.
 - `jszip` (transitive) is offered as MIT or GPL-3.0-or-later; MIT is used.
@@ -97,22 +82,20 @@ A separate small Vercel project. Its licenses were read from the npm registry (`
 
 ### Transitive licenses (summary)
 
-Counted from `package-lock.json` (lockfileVersion 3), which lists 764 packages including optional per-platform builds that are never all installed at once. 324 of them are needed at runtime, the rest only for building and testing.
+Counted from `package-lock.json` (lockfileVersion 3), which lists 755 packages including optional per-platform builds that are never all installed at once. 316 of them are needed at runtime, the rest only for building and testing. (Recounted 2026-11-04 after the Media and Front Desk removal.)
 
 | License | All packages | Runtime only |
 |---|---|---|
-| MIT | 592 | 225 |
+| MIT | 586 | 220 |
 | Apache-2.0 | 44 | 24 |
 | ISC | 36 | 22 |
-| MPL-2.0 | 27 | 1 |
+| MPL-2.0 | 26 | 0 |
 | BSD-3-Clause | 20 | 18 |
 | BSD-2-Clause | 16 | 9 |
 | LGPL-3.0-or-later (sharp's libvips builds) | 10 | 10 |
 | Apache-2.0 AND LGPL-3.0-or-later (sharp builds) | 4 | 4 |
 | 0BSD | 2 | 2 |
-| OFL-1.1 | 1 | 1 |
 | (MIT OR Apache-2.0) | 1 | 1 |
-| SEE LICENSE IN LICENSE (`@meta-sam/parser`, SAM License) | 1 | 1 |
 | BlueOak-1.0.0 | 1 | 0 |
 | Python-2.0 (`argparse`) | 1 | 0 |
 | CC-BY-4.0 (`caniuse-lite`) | 1 | 1 |
@@ -184,20 +167,17 @@ Called through the Meta Model API at `https://api.meta.ai/v1` by `lib/meta.ts`, 
 | Practices' own websites | `lib/referrals/email/fetch.ts` | Read at runtime for a public contact email; robots.txt honored, honest User-Agent | The source page is shown with the fact |
 | Firecrawl (self-hosted) | `tests/rule-sources.test.ts`, optional `FIRECRAWL_URL` in `.env.example`; `lib/compliance/rules/il.ts` notes the Illinois sources were read through it | Firecrawl is AGPL-3.0 (github.com/firecrawl/firecrawl). It runs as a separate server reached over HTTP; none of its code is in this repo | Not user-facing |
 
-Other services the app talks to when the clinician connects them (not data sources, nothing of theirs is in the repo): Google (sign-in, Calendar free/busy, Gmail drafts), Instagram Graph API, Twilio, Cal.com, and Vercel Blob (relay). Each is used under that company's own terms with her own account.
+Other services the app talks to (not data sources, nothing of theirs is in the repo): the Meta model API, with the clinician's own Muse key, under Meta's terms.
 
 ## 5. Fonts, icons and assets
 
 | Item | Source | License |
 |---|---|---|
 | Inter (UI font) | Loaded by `next/font/google` in `app/layout.tsx` (self-hosted at build time) | SIL Open Font License 1.1 |
-| Inter (post graphics) | `@fontsource/inter` woff files, drawn with opentype.js in `lib/instagram/graphic.ts` | SIL Open Font License 1.1 |
 | Icons | `lucide-react` | ISC |
 | `app/favicon.ico`, `app/icon.png` | Aeon's orb, drawn by plain code (`scripts/make-icon.ts`, sharp), 2026-11-04 | Own work |
 | `public/demo/dana-reyes-headshot.jpg` | Generated with `muse-image-1.0` (commit 7176b0a) | Model output; ownership per Meta's terms **[UNCONFIRMED]** |
-| `db/seed/posts/*.jpg` | Drawn by plain code (`scripts/make-seed-posts.ts`): gradient plus Inter text | Own work (Inter under OFL) |
 | `docs/screenshots/**`, `tests/e2e/*-snapshots/**` | Screenshots of Practice-OS itself | Own work |
-| `docs/sms/opt-in-proof.png` | Image for Twilio's SMS opt-in review (commit 248467a) | Assumed own work **[UNCONFIRMED]** |
 | `lib/forms/cms855i-05-23.pdf` | CMS | Public domain (see section 2) |
 
 ## 6. AI-assisted authorship
@@ -214,7 +194,6 @@ Isaiah is the author and copyright holder of the project as a whole. AI-written 
 ## License texts
 
 - MIT (shadcn/ui, meta-model-cookbook and most dependencies): permission is granted free of charge to use, copy, modify, merge, publish, distribute, sublicense and sell, provided the copyright notice and permission notice are included. Full text: https://opensource.org/license/mit. Copyright notices: shadcn/ui, "Copyright (c) 2023 shadcn"; meta-model-cookbook, "Copyright (c) Meta Platforms, Inc. and affiliates".
-- SAM License (Meta): `node_modules/@meta-sam/parser/LICENSE` after install.
 - SIL Open Font License 1.1: https://openfontlicense.org.
 - Open Database License 1.0: https://opendatacommons.org/licenses/odbl/1-0/.
 - Every dependency's own license file is in `node_modules/<package>/` after `npm install`.

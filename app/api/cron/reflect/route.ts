@@ -1,13 +1,11 @@
 import { timingSafeEqual } from "node:crypto";
 import { connection } from "next/server";
 import { sweepIdle, tidyUp } from "@/lib/aeon/reflect";
-import { purgeWebChatsIfDue } from "@/lib/frontdesk/webchat-retention";
 
 // Aeon's daily reflection pass (vercel.json crons). Vercel sends
 // "Authorization: Bearer <CRON_SECRET>"; anything else is refused. Reflects
 // every quiet conversation not yet reflected, then tidies memory (merges
-// look-alike notes, retires stale ones), and deletes website chats past their
-// 30 days. Counts only in the reply, never text.
+// look-alike notes, retires stale ones). Counts only in the reply, never text.
 export const maxDuration = 300;
 
 function fromCron(request: Request): boolean {
@@ -30,9 +28,8 @@ export async function GET(request: Request) {
     console.error(`[reflect] cron tidy: ${err instanceof Error ? err.message : String(err)}`);
     return null;
   });
-  const purged = await purgeWebChatsIfDue(new Date(), { force: true }); // logs its own failures
   return Response.json(
-    { purgedWebChats: purged, reflected: sweep.reflected, failed: sweep.failed, tidied: tidy?.status === "done" ? tidy.counts : null },
+    { reflected: sweep.reflected, failed: sweep.failed, tidied: tidy?.status === "done" ? tidy.counts : null },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

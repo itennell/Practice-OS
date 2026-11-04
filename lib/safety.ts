@@ -1,6 +1,6 @@
 // The crisis check (AGENTS.md > Illinois HB 1806 and > Approvals). Plain code,
 // no model: it runs before any model call on every chat message, and later on
-// every Front Desk text and voicemail transcript. Any mention of self-harm,
+// every file and referral note she adds. Any mention of self-harm,
 // suicide or danger gets CRISIS_REPLY. It never judges intent, so a negation
 // ("not suicidal") routes too, and it never echoes the message back.
 
@@ -456,50 +456,19 @@ export function checkNoteCrisis(text: string): CrisisResult {
 }
 
 /**
- * The crisis check fired in the chat or on a file she added: the caller shows
- * CRISIS_REPLY, and this texts an urgent alert to her own verified phone and
- * writes both to audit_log (AGENTS.md > Approvals: the one path that skips
- * approvals). Never includes the words that triggered it. Front Desk has its own
- * caller-facing version (lib/frontdesk/crisis.ts) and shares the alert phone.
+ * The crisis check fired in the chat, on a file she added or on a referral note: the
+ * caller shows CRISIS_REPLY, and this writes the alert to audit_log (AGENTS.md >
+ * Approvals: the one path that skips approvals). Practice-OS has no phone line, so the
+ * alert is the urgent item at the top of Admin (lib/admin/load.ts reads the
+ * crisis_alert_failed row) and on the menu count; it never fails silently. Never
+ * includes the words that triggered it.
  */
-export type CrisisSource = "chat" | "upload" | "media" | "referral_note";
+export type CrisisSource = "chat" | "upload" | "referral_note";
 
 export async function alertCrisis(input: { source: CrisisSource; category: CrisisCategory; by: string }): Promise<{ alerted: boolean }> {
   const { audit } = await import("./audit");
-  const { alertPhone } = await import("./frontdesk/crisis");
-  const { sendText } = await import("./frontdesk/store");
   await audit({ actor: "safety", action: "crisis_detected", subjectType: input.source, details: { category: input.category, by: input.by } });
-  // Phone alerts are off (lib/features.ts): text no one; the urgent item at the top of Admin is the alert.
-  const { PHONE_ALERTS_ENABLED, FRONT_DESK_ENABLED } = await import("./features");
-  if (!PHONE_ALERTS_ENABLED && !FRONT_DESK_ENABLED) {
-    await audit({ actor: "safety", action: "crisis_alert_failed", subjectType: input.source, details: { error: "phone alerts are off" } });
-    return { alerted: false };
-  }
-  const to = await alertPhone().catch(() => null);
-  if (!to) {
-    await audit({ actor: "safety", action: "crisis_alert_failed", subjectType: input.source, details: { error: "no alert phone (settings.alert_phone or CLINICIAN_ALERT_PHONE)" } });
-    return { alerted: false };
-  }
-  const what =
-    input.source === "chat"
-      ? "A message in your chat with Aeon"
-      : input.source === "upload"
-        ? "A file added in your chat with Aeon"
-        : input.source === "referral_note"
-          ? "A note typed on your Referrals board"
-          : "Something typed on the Media page";
-  try {
-    await sendText({
-      to,
-      body: `URGENT from Practice-OS: ${what} mentioned danger or self-harm. Aeon showed the 988/911 message. Please check now.`,
-      inquiryId: null,
-      actor: "safety",
-      action: "crisis_alert_sent",
-      force: true,
-    });
-    return { alerted: true };
-  } catch (e) {
-    await audit({ actor: "safety", action: "crisis_alert_failed", subjectType: input.source, details: { error: String(e) } });
-    return { alerted: false };
-  }
+  // No text goes out: the urgent Admin item is the alert.
+  await audit({ actor: "safety", action: "crisis_alert_failed", subjectType: input.source, details: { error: "no phone alerts: shown as an urgent item in Admin" } });
+  return { alerted: false };
 }

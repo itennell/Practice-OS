@@ -74,7 +74,6 @@ All calls go through `lib/meta.ts` (base URL `https://api.meta.ai/v1`, her own k
 |---|---|
 | `muse-spark-1.3` | Aeon's chat and tool calls (`lib/aeon/agent.ts`), drafting outreach letters (`lib/referrals/outreach.ts`), filling the partner profile from a cleaned debrief through one tool call (`lib/referrals/debrief.ts`) and the memory reflection pass (`lib/aeon/reflect.ts`). The partner ranking and the call scripts are plain code. |
 | `muse-voice-transcribe-1.0` | Transcribes the coffee debrief (`lib/referrals/debrief.ts`) and the dictation mic in the message box. |
-| `muse-image-1.0` | Images for the Media helper (`lib/growth/image.ts`, `lib/instagram/graphic.ts`), which is switched off in this demo. |
 
 ## Architecture
 
@@ -100,7 +99,7 @@ One npm package: a Next.js App Router app, shared code in `lib/`, and an MCP ser
 
 Practice-OS is free and each practice hosts its own copy. There is no central service.
 
-Tell any AI coding agent: "install Practice-OS from this repo". It follows [INSTALL.md](INSTALL.md), asks for each account in plain words, and opens the app at http://localhost:3000. Step-by-step guides for each service are in [docs/self-hosting](docs/self-hosting/README.md).
+Tell any AI coding agent: "install Practice-OS from this repo". It follows [INSTALL.md](INSTALL.md), asks for each account in plain words, and opens the app at http://localhost:3000. The guide for her Muse key and the self-hosting notes are in [docs/self-hosting](docs/self-hosting/README.md).
 
 By hand, with Node 20 or newer:
 
@@ -118,10 +117,9 @@ The walk-through for the video is in [docs/demo-script.md](docs/demo-script.md).
 
 ## Roadmap
 
-Referrals is the first helper. **Admin** (license and CE calendar, credentialing, Good Faith Estimates, superbills, client forms) and **Media** (Psychology Today profile, a one-page website, practice-logistics posts) are built and switched off for this demo by `REFERRALS_ONLY_DEMO` in [lib/features.ts](lib/features.ts). Set it to `false` to get the full app.
+Practice-OS ships two helpers: **Referrals and Admin** (license and CE calendar, credentialing, insurance, Good Faith Estimates, superbills, client forms). Both are on. `REFERRALS_ONLY_DEMO` in [lib/features.ts](lib/features.ts) can still switch Admin off for a referrals-only demo.
 
 - Admin's compliance rules each carry a jurisdiction, an official source URL, a quote and a last-checked date. Federal and Illinois rules ship verified; other states are researched by Aeon and marked "Aeon researched, please confirm" until she confirms them.
-- Front Desk (practice phone line, voicemail, consult booking) is paused behind `FRONT_DESK_ENABLED`.
 - Next: Aeon plugs into the business tools she already uses (bookkeeping, payroll, storage) through MCP.
 
 ## Built for the Meta Global AI Developer Hackathon
@@ -129,14 +127,6 @@ Referrals is the first helper. **Admin** (license and CE calendar, credentialing
 Everything in this repository was built from scratch during the Meta Global AI Developer Hackathon (Indie track, theme: Build for Your World), October 26 to November 4, 2026. The day-by-day record is in [docs/BUILD_LOG.md](docs/BUILD_LOG.md).
 
 Practice-OS is built by **Caseload** (a sole proprietorship).
-
-## Text messages
-
-The Front Desk helper is paused and hidden in the app for now. When on, it texts people who call a practice line and leave a voicemail, to offer times for a free consultation. Scheduling only, never marketing. Reply STOP to opt out, HELP for help. Message and data rates may apply. During the demo, the practice (Reyes Counseling) is fictional and texts go only to the developer's own phone.
-
-- [Privacy Policy](docs/privacy-policy.md)
-- [Terms & Conditions](docs/terms.md)
-- [How SMS opt-in works](docs/sms-opt-in.md)
 
 ## License
 

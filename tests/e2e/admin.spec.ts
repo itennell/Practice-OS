@@ -173,6 +173,15 @@ test("Old links go to Admin", async ({ page }) => {
   }
 });
 
+test("Admin is in the menu, and the removed Media and Front Desk pages are 404s", async ({ page, request }) => {
+  await page.goto("/");
+  await expect(page.getByRole("link", { name: /^Admin/ }).first()).toBeVisible();
+  for (const p of ["/media", "/media/instagram", "/media/grow", "/media/website", "/instagram", "/grow", "/front-desk", "/website-chat"]) {
+    const res = await request.get(p, { maxRedirects: 0 });
+    expect(res.status(), p).toBe(404);
+  }
+});
+
 test("The crisis item tops Admin until she presses I checked", async ({ page }) => {
   // Sends a crisis phrase, which writes permanent audit rows: built-in database only.
   test.skip(!serverUsesBuiltInDb, "The server would use a shared DATABASE_URL: run with no DATABASE_URL in the shell or .env.");

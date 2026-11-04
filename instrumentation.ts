@@ -18,13 +18,4 @@ export async function register() {
   await loadMuseKey();
 
   // Background jobs that need the database go below this line (never on the Vercel copy).
-
-  // Front Desk (lib/frontdesk/poller.ts): check her phone company every minute
-  // while the app is open. Off on Vercel and when FRONT_DESK_POLL=off.
-  // Paused (lib/features.ts): nothing polls her phone company.
-  const { FRONT_DESK_ENABLED } = await import("./lib/features");
-  if (FRONT_DESK_ENABLED && !process.env.VERCEL) {
-    const { startFrontDeskPoller } = await import("./lib/frontdesk/poller");
-    startFrontDeskPoller(); // starts a timer and returns; never awaited
-  }
 }

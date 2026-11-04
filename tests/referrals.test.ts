@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
 import fixture from "./fixtures/nppes-60614.json";
-import { NeedsConnectError } from "../lib/connect";
-import { createDraft, gmailToken, mimeMessage } from "../lib/referrals/gmail";
 import { checkLetter } from "../lib/referrals/outreach";
 import { haversineMiles, nearbyZips, zipCenters, zipDistance } from "../lib/referrals/geo";
 import {
@@ -116,39 +114,3 @@ describe("letter rules (no fees, gifts or anything of value)", () => {
   });
 });
 
-describe("Gmail draft message", () => {
-  it("is RFC 2822 with To, Subject and a base64 body; no From, no Bcc", () => {
-    const raw = mimeMessage("test-inbox@example.com", "Introduction — Reyes Counseling", "Hi\nthere");
-    expect(raw).toMatch(/^To: test-inbox@example.com\r\n/);
-    expect(raw).toContain("Subject: =?UTF-8?B?");
-    expect(raw).not.toMatch(/^(From|Bcc|Cc):/m);
-    expect(Buffer.from(raw.split("\r\n\r\n")[1], "base64").toString()).toBe("Hi\r\nthere");
-    expect(() => mimeMessage("dr@clinic.com, other@x.com", "s", "b")).toThrow();
-  });
-  it("asks lib/connect for gmail.compose only, and turns 'not connected' into plain words", async () => {
-    const asked: unknown[] = [];
-    expect(await gmailToken((async (p: string, s: string[]) => (asked.push([p, s]), "tok")) as never)).toBe("tok");
-    expect(asked).toEqual([["google", ["https://www.googleapis.com/auth/gmail.compose"]]]);
-    const notConnected = (async () => {
-      throw new NeedsConnectError("google", ["https://www.googleapis.com/auth/gmail.compose"]);
-    }) as never;
-    await expect(gmailToken(notConnected)).rejects.toThrow(/^Connect Google first: open Settings › Connections/);
-    const down = (async () => {
-      throw new Error("Couldn't reach Google just now.");
-    }) as never;
-    await expect(gmailToken(down)).rejects.toThrow("Couldn't reach Google just now.");
-  });
-
-  it("posts the draft to users.drafts.create and treats 401 as not connected", async () => {
-    const calls: { url: string; body: string }[] = [];
-    const ok = (async (url: string, init: RequestInit) => {
-      calls.push({ url, body: String(init.body) });
-      return new Response(JSON.stringify({ id: "r-1", message: { id: "m-1" } }));
-    }) as typeof fetch;
-    expect(await createDraft("tok", { to: "a@example.com", subject: "s", body: "b" }, ok)).toEqual({ draftId: "r-1", messageId: "m-1" });
-    expect(calls[0].url).toBe("https://gmail.googleapis.com/gmail/v1/users/me/drafts");
-    expect(JSON.parse(calls[0].body).message.raw).toMatch(/^[A-Za-z0-9_-]+$/);
-    const denied = (async () => new Response("", { status: 401 })) as unknown as typeof fetch;
-    await expect(createDraft("tok", { to: "a@example.com", subject: "s", body: "b" }, denied)).rejects.toThrow(/Connect Google first/);
-  });
-});

@@ -4,7 +4,7 @@ A walk-through of Aeon's Referrals helper for the hackathon video, about 3 minut
 
 ## Before recording
 
-1. In `lib/features.ts`, `REFERRALS_ONLY_DEMO` is `true` (the app shows only Referrals, the chat, Approvals, Files, Memory and Settings).
+1. In `lib/features.ts`, `REFERRALS_ONLY_DEMO` is `false` (the app shows Admin, Referrals, the chat, Approvals, Files, Memory and Settings).
 2. Run `npm run db:reset` so the practice starts clean with the oncology niche and its [Sample] partners.
 3. Run `npm run demo:warm` so the public directories for 60614 are cached and the map fills at once.
 4. Run `npm run demo:check`. Every line should pass; fix anything it flags before recording.
@@ -55,4 +55,3 @@ A therapist in solo practice fills her caseload through relationships with other
 
 - Don't say HIPAA compliant. Say: client details are refused before the model sees them, and records stay on her computer.
 - Don't promise a number of referrals, clients or a time to a full caseload.
-- Don't show Front Desk, Admin or Media; they are switched off for this demo.

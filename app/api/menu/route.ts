@@ -1,14 +1,12 @@
 import { after, connection } from "next/server";
 import { isViewOnly } from "@/lib/aeon/demo";
 import { sweepIdle, tidyIfDue } from "@/lib/aeon/reflect";
-import { purgeWebChatsIfDue } from "@/lib/frontdesk/webchat-retention";
 import { loadMenuData } from "@/lib/ui/menu";
 
 // The chat menu refreshes its counts and recent chats from here after she moves
 // around or sends a message. Like /api/conversations, opening it also reflects any
 // conversation that has gone quiet and once a day tidies memory (AGENTS.md > Aeon's
-// memory), after the answer is sent, and deletes website chats past their 30
-// days (lib/frontdesk/webchat-retention.ts). Demo visitors on the Vercel copy never start that.
+// memory), after the answer is sent. Demo visitors on the Vercel copy never start that.
 export const maxDuration = 120;
 
 export async function GET(request: Request) {
@@ -18,7 +16,6 @@ export async function GET(request: Request) {
     after(async () => {
       await sweepIdle().catch((err) => console.error(`[reflect] sweep: ${err instanceof Error ? err.message : String(err)}`));
       await tidyIfDue().catch((err) => console.error(`[reflect] tidy: ${err instanceof Error ? err.message : String(err)}`));
-      await purgeWebChatsIfDue(); // logs its own failures
     });
   }
   return Response.json(data, { headers: { "Cache-Control": "no-store" } });

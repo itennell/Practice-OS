@@ -11,7 +11,7 @@ import { audit } from "../audit";
 import { memoryMarkdown, relevantMemories } from "../aeon/memory";
 import { soul } from "../aeon/soul";
 import { db } from "../db";
-import { loadMediaFacts } from "../media/facts";
+import { loadPracticeFacts } from "./practice-facts";
 import { chat } from "../meta";
 import { getProfile } from "../profile";
 import { allPayers } from "../payers/catalog";
@@ -67,7 +67,7 @@ export type LetterFacts = {
   applied_pending: string[];
   /** She listed fees for clients who pay themselves. */
   private_pay: boolean;
-  /** She offers a sliding scale (her Psychology Today answer or client-form policies); null when she hasn't said. */
+  /** She offers a sliding scale (her client-form policies); null when she hasn't said. */
   sliding_scale: boolean | null;
   /** Who she helps, as groups of people (never clients): this chat's search and her "Who you help" answer. */
   who_she_helps: string[];
@@ -118,7 +118,7 @@ export async function letterFacts(
 ): Promise<LetterFacts> {
   const [profile, media, log, payers, practice] = await Promise.all([
     getProfile().catch(() => null),
-    loadMediaFacts().catch(() => null),
+    loadPracticeFacts().catch(() => null),
     contactsFor([source.id]).catch(() => ({}) as Awaited<ReturnType<typeof contactsFor>>),
     listPayerApplications().catch(() => []),
     practiceFacts().catch(() => ({ focus: [] as Focus[], state: null, niche: null, selfPay: false })),
@@ -138,8 +138,8 @@ export async function letterFacts(
     who_she_helps: focus.map((f) => FOCUS_WORDS[f]),
     focus,
     niche: nicheWords(practice.niche),
-    // Her own saved answer (Media › "How many years have you been in practice?"): the only source of years.
-    years_in_practice: media?.answers.yearsInPractice ?? null,
+    // Her own saved answer (saved earlier as "How many years have you been in practice?"): the only source of years.
+    years_in_practice: media?.yearsInPractice ?? null,
     // Each note is checked again with the chat's full privacy check; one that fails never reaches Muse.
     her_log: await Promise.all(
       (log[source.id] ?? []).slice(0, 5).map(async (c) => ({ what: CONTACT_LABEL[c.kind], on: c.happened_on, note: await screenedNote(c.note, check) })),

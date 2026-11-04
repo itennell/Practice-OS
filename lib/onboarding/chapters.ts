@@ -6,7 +6,7 @@
 // Never asked, anywhere: a license number, SSN, date of birth, bank details or
 // anything about a client.
 
-import { FRONT_DESK_ENABLED, PHONE_ALERTS_ENABLED, REFERRAL_DEMO_SCREENS, REFERRALS_ONLY_DEMO } from "../features";
+import { REFERRAL_DEMO_SCREENS, REFERRALS_ONLY_DEMO } from "../features";
 import type { HelperQuestion } from "./helper-questions";
 
 export const CHAPTERS = [
@@ -38,10 +38,9 @@ export type Ctx = {
   /** How new clients find her now (FIND_OPTIONS values). */
   findClients: string[];
   website: Channel | null;
-  instagram: Channel | null;
 };
 
-/** For Instagram and a website: has one, would like one, or not for her. */
+/** For a website: has one, would like one, or not for her. */
 export type Channel = "has" | "wants" | "no";
 
 export type Kind =
@@ -132,13 +131,13 @@ export const STAGE_OPTIONS: Option[] = [
 ];
 
 export const FIND_OPTIONS: Option[] = [
-  { value: "directories", label: "Psychology Today or other lists" },
+  { value: "directories", label: "Online directories" },
   { value: "insurance_panels", label: "Insurance company lists" },
   { value: "doctors", label: "Doctors who send people to me" },
   { value: "website", label: "My website" },
   { value: "google", label: "Google search" },
   { value: "word_of_mouth", label: "Word of mouth" },
-  { value: "social", label: "Instagram or other social media" },
+  { value: "social", label: "Social media" },
   { value: "not_sure", label: "I'm not sure yet" },
 ];
 
@@ -214,15 +213,6 @@ export const QUESTIONS: Question[] = [
     help: "If you only see clients by video, use the address where your practice gets mail.",
     aeonSays: "Estimates, superbills and release forms all need it.",
     blocks: "Good Faith Estimates and superbills need an address.",
-  },
-  {
-    id: "alert_phone",
-    chapter: "you",
-    kind: "phone",
-    ask: "What's your own cell phone number?",
-    help: "Only for urgent alerts, like when someone writes to me that they're in danger. It's never shared.",
-    aeonSays: "If something urgent comes in, I text you right away.",
-    blocks: "Urgent alerts need your cell number.",
   },
 
   // 2 · License and rules
@@ -456,10 +446,9 @@ export const QUESTIONS: Question[] = [
     options: STAGE_OPTIONS,
   },
 
-  // 6 · Connect your tools. It opens on how clients find her, then Instagram's own
-  // branching questions (lib/instagram/onboarding.ts, slotted in after find_clients),
-  // then her website. Other helper sessions' questions go after "Do you text clients?"
-  // (lib/onboarding/helper-questions.ts); flatten() slots them in.
+  // 6 · Your tools. It opens on how clients find her. The helpers'
+  // own questions go after "Do you text clients?" (lib/onboarding/helper-questions.ts);
+  // flatten() slots them in.
   {
     id: "find_clients",
     chapter: "tools",
@@ -469,36 +458,6 @@ export const QUESTIONS: Question[] = [
     aeonSays: "This helps me pick which helpers to start first.",
     options: FIND_OPTIONS,
     exclusive: "not_sure",
-  },
-  {
-    id: "website",
-    chapter: "tools",
-    kind: "choice",
-    ask: "Do you have a website for your practice?",
-    aeonSays: "A website helps people find you on Google.",
-    options: [
-      { value: "has", label: "Yes, I have one" },
-      { value: "wants", label: "No, but I'd like one" },
-      { value: "no", label: "No, a website isn't for me" },
-    ],
-    later: { when: "wants", ask: "Make a practice website" },
-    appliesWhen: (c) => !c.findClients.includes("website"),
-  },
-  {
-    id: "website_url",
-    chapter: "tools",
-    kind: "url",
-    ask: "What is your website address?",
-    aeonSays: "I'll put it in posts and letters.",
-    appliesWhen: (c) => c.findClients.includes("website") || c.website === "has",
-  },
-  {
-    id: "connect",
-    chapter: "tools",
-    kind: "connect",
-    ask: "Connect your tools",
-    help: "Each one is a single button. You can do any of these later in Settings.",
-    aeonSays: "Connect what you already use, and I'll do the busywork in it.",
   },
   {
     id: "uses_texting",
@@ -516,16 +475,8 @@ export const QUESTIONS: Question[] = [
     kind: "mode",
     ask: "How should I ask before I do things?",
     help: "You can change this any time, even for one chat.",
-    aeonSays: "Nothing goes to a client, an insurer or Instagram unless your setting allows it.",
+    aeonSays: "Nothing goes to a client or an insurer unless your setting allows it.",
     options: MODE_OPTIONS,
-  },
-  {
-    id: "text_missed_callers",
-    chapter: "asks",
-    kind: "yesno",
-    ask: "When you miss a call, may I text the caller your open consult times?",
-    help: "Only times and booking, never advice. You can turn this off later.",
-    aeonSays: "This is your Front Desk's own rule.",
   },
 
   // 8 · Your team
@@ -563,9 +514,6 @@ export const DEMO_WORDS: Record<string, { help?: string; aeonSays: string }> = {
 const DEMO_HELLO =
   "Hi, I'm Aeon, your referrals partner. I help you find doctors and others who could send you clients, and keep up with them. This takes about 3 minutes.";
 
-/** Questions that only set up Front Desk; left out while it is paused. */
-const FRONT_DESK_QUESTIONS = new Set(["text_missed_callers"]);
-
 /** A question as the screen gets it: no functions, words filled in. */
 export type Screen = {
   id: string;
@@ -580,7 +528,7 @@ export type Screen = {
   required?: boolean;
   later?: { when: string; ask: string };
   exclusive?: string;
-  /** For "connect": cards left out (Instagram). For "team": helpers left out (Instagram after "Not for me"). */
+  /** For "connect": cards left out. For "team": helpers left out. */
   hide?: string[];
   /** For "team": which helpers start switched on, from her stage and answers. */
   defaults?: Record<HelperId, boolean>;
@@ -617,8 +565,6 @@ export function flatten(
   const out: Screen[] = [];
   for (const q of QUESTIONS) {
     if (q.appliesWhen && !q.appliesWhen(c)) continue;
-    if (!FRONT_DESK_ENABLED && FRONT_DESK_QUESTIONS.has(q.id)) continue; // paused: lib/features.ts; saved answers stay
-    if (!PHONE_ALERTS_ENABLED && q.id === "alert_phone") continue; // no phone work for now (lib/features.ts)
     out.push({
       id: q.id,
       chapter: q.chapter,
@@ -632,10 +578,7 @@ export function flatten(
       required: q.required,
       later: q.later,
       exclusive: q.exclusive,
-      // No connect button for Instagram in onboarding (publishing is cut for now), and after
-      // "Not for me" the Instagram helper isn't offered on the team screen either.
-      ...(q.kind === "connect" ? { hide: ["instagram"] } : {}),
-      ...(q.kind === "team" ? { defaults: teamDefaults(c), ...(c.instagram === "no" ? { hide: ["instagram"] } : {}) } : {}),
+      ...(q.kind === "team" ? { defaults: teamDefaults(c) } : {}),
     });
     for (const block of opts.helpers ?? []) {
       if ((block.after ?? "uses_texting") !== q.id) continue;
@@ -667,8 +610,6 @@ export function flatten(
 
 const HELPER_SAYS: Record<string, string> = {
   referrals: "This is for your Referrals helper.",
-  instagram: "This is for your Instagram helper.",
-  front_desk: "This is for your Front Desk.",
   admin: "This is for your Admin helper.",
 };
 
@@ -685,31 +626,18 @@ export function progressFor(screens: Screen[], index: number): { chapter: Chapte
 }
 
 /** Which helpers start first for her stage (AGENTS.md > How the clinician uses it). */
-export type HelperId = "admin" | "referrals" | "instagram" | "front_desk";
-export const HELPERS: { id: HelperId; name: string; does: string }[] = ([
+export type HelperId = "admin" | "referrals";
+export const HELPERS: { id: HelperId; name: string; does: string }[] = [
   { id: "admin", name: "Admin", does: "Keeps your deadlines, forms and insurance sign-ups on track" },
   { id: "referrals", name: "Referrals", does: "Finds local referral sources and drafts letters for you to send" },
-  { id: "instagram", name: "Instagram", does: "Plans and drafts posts about booking, fees and your first session" },
-  { id: "front_desk", name: "Front Desk", does: "Answers missed calls and texts with consult times" },
-] as { id: HelperId; name: string; does: string }[]).filter((h) => FRONT_DESK_ENABLED || h.id !== "front_desk");
+];
 
 export function firstFor(stage: Stage | null): { helpers: HelperId[]; focus: string } {
-  if (!FRONT_DESK_ENABLED) {
-    // Three helpers while Front Desk is paused (lib/features.ts).
-    switch (stage) {
-      case "middle":
-        return { helpers: ["referrals", "instagram"], focus: "You're building your caseload, so I'll start with referrals and getting you in front of people." };
-      case "late":
-        return { helpers: ["admin"], focus: "Your practice is established, so I'll start with your deadlines, forms and insurance dates." };
-      default:
-        return { helpers: ["admin", "referrals"], focus: "You're just opening, so I'll start with setup, credentialing prep and finding referral sources." };
-    }
-  }
   switch (stage) {
     case "middle":
-      return { helpers: ["referrals", "instagram", "front_desk"], focus: "You're building your caseload, so I'll start with referrals, Instagram and your Front Desk." };
+      return { helpers: ["referrals"], focus: "You're building your caseload, so I'll start with referrals and getting you in front of people." };
     case "late":
-      return { helpers: ["front_desk", "admin"], focus: "Your practice is established, so I'll start with your Front Desk, your deadlines and a waitlist." };
+      return { helpers: ["admin"], focus: "Your practice is established, so I'll start with your deadlines, forms and insurance dates." };
     default:
       return { helpers: ["admin", "referrals"], focus: "You're just opening, so I'll start with setup, credentialing prep and finding referral sources." };
   }
@@ -717,13 +645,11 @@ export function firstFor(stage: Stage | null): { helpers: HelperId[]; focus: str
 
 /**
  * Which helpers start switched on: her stage's picks, plus Referrals when doctors or
- * word of mouth send her clients, and Instagram only when she has or wants an account.
+ * word of mouth send her clients.
  */
-export function teamDefaults(c: Pick<Ctx, "stage" | "findClients" | "instagram">): Record<HelperId, boolean> {
+export function teamDefaults(c: Pick<Ctx, "stage" | "findClients">): Record<HelperId, boolean> {
   const on = new Set<HelperId>(["admin", ...firstFor(c.stage).helpers]);
   if (c.findClients.some((x) => x === "doctors" || x === "word_of_mouth")) on.add("referrals");
-  if (c.instagram === "has" || c.instagram === "wants") on.add("instagram");
-  if (c.instagram === "no") on.delete("instagram");
   return Object.fromEntries(HELPERS.map((h) => [h.id, on.has(h.id)])) as Record<HelperId, boolean>;
 }
 

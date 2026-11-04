@@ -64,64 +64,7 @@ insert into practice_os.referral_settings (id, home_zip, specialties)
 values (true, '60614', array['family_medicine', 'internal_medicine'])
 on conflict (id) do nothing;
 
--- Pictures for 301 and 302 are loaded by db:reset from db/seed/posts/<id>.jpg (scripts/make-seed-posts.ts).
-insert into practice_os.posts (id, topic, headline, caption, status, is_sample) values
-  ('00000000-0000-4000-8000-000000000301', 'first_session', '[Sample] What happens at a first session',
-   E'[Sample] What happens at a first session? We go over paperwork, scheduling and fees, and you can ask any questions about how sessions work.\n\nDana Reyes, LCPC (fictional demo practice)',
-   'pending_approval', true),
-  ('00000000-0000-4000-8000-000000000302', 'fees_superbills', '[Sample] Superbills for out-of-network care',
-   E'[Sample] Paying out of network? We can give you a superbill to send to your insurance for possible reimbursement.\n\nDana Reyes, LCPC (fictional demo practice)',
-   'draft', true),
-  ('00000000-0000-4000-8000-000000000303', 'how_to_book', '[Sample] How to book a free consult',
-   E'[Sample] Booking a free 15-minute consult takes a minute: call or text the practice number and pick a time.\n\nDana Reyes, LCPC (fictional demo practice)',
-   'idea', true);
-
-insert into practice_os.inquiries (id, channel, contact_name, contact_phone, contact_email, summary, status, ai_disclosed_at, is_sample) values
-  ('00000000-0000-4000-8000-000000000401', 'voicemail', '[Sample] Sam Example', '+13125550101', null,
-   '[Sample] Wants to book a consultation.', 'booked', now() - interval '2 days', true),
-  ('00000000-0000-4000-8000-000000000402', 'sms', '[Sample] Riley Example', '+13125550102', null,
-   '[Sample] Asked about superbills and availability.', 'new', now() - interval '3 hours', true),
-  ('00000000-0000-4000-8000-000000000403', 'web_chat', '[Sample] Jordan Example', null, 'jordan@example.com',
-   '[Sample] Asked whether couples sessions are offered.', 'needs_clinician', now() - interval '1 day', true);
-
-insert into practice_os.messages (id, inquiry_id, direction, channel, body, created_at, is_sample) values
-  ('00000000-0000-4000-8000-000000000501', '00000000-0000-4000-8000-000000000401', 'inbound', 'voicemail',
-   '[Sample] Hi, this is Sam. I''d like to book a consultation. My number is 555-0101. Thanks.', now() - interval '2 days', true),
-  ('00000000-0000-4000-8000-000000000502', '00000000-0000-4000-8000-000000000401', 'outbound', 'sms',
-   '[Sample] Hi Sam, this is the AI assistant for Reyes Counseling. Open consult times: Tue 6:00 PM, Wed 6:30 PM, Thu 5:30 PM. Reply with the one that works.',
-   now() - interval '2 days' + interval '2 minutes', true),
-  ('00000000-0000-4000-8000-000000000503', '00000000-0000-4000-8000-000000000401', 'inbound', 'sms',
-   '[Sample] Wed works.', now() - interval '2 days' + interval '20 minutes', true),
-  ('00000000-0000-4000-8000-000000000504', '00000000-0000-4000-8000-000000000402', 'inbound', 'sms',
-   '[Sample] Hi, do you give superbills? And do you have evening times?', now() - interval '3 hours', true),
-  ('00000000-0000-4000-8000-000000000505', '00000000-0000-4000-8000-000000000403', 'inbound', 'web_chat',
-   '[Sample] Do you offer couples sessions?', now() - interval '1 day', true),
-  ('00000000-0000-4000-8000-000000000506', '00000000-0000-4000-8000-000000000403', 'outbound', 'web_chat',
-   '[Sample] Hi, I''m the AI assistant for Reyes Counseling. I''ll pass that question to Dana and she''ll reply by email.',
-   now() - interval '1 day' + interval '1 minute', true);
-
-insert into practice_os.consult_bookings (id, inquiry_id, calendar_provider, external_id, reference, starts_at, ends_at, status, contact_name, contact_phone, is_sample) values
-  ('00000000-0000-4000-8000-000000000601', '00000000-0000-4000-8000-000000000401', 'calcom', 'sample-booking-1', 'FD-1001',
-   ((current_date + 2) + time '18:30') at time zone 'America/Chicago',
-   ((current_date + 2) + time '18:45') at time zone 'America/Chicago',
-   'booked', '[Sample] Sam Example', '+13125550101', true);
-
-insert into practice_os.faqs (id, question, answer, sort_order, is_sample) values
-  ('00000000-0000-4000-8000-000000000701', '[Sample] How much is a session?',
-   '[Sample] Sessions are $150, paid at the time of the session.', 1, true),
-  ('00000000-0000-4000-8000-000000000702', '[Sample] Do you take insurance?',
-   '[Sample] Not yet. We can give you a superbill to submit for possible out-of-network reimbursement.', 2, true),
-  ('00000000-0000-4000-8000-000000000703', '[Sample] Do you offer telehealth?',
-   '[Sample] Yes, for clients located in Illinois, plus in-person sessions in Lincoln Park.', 3, true),
-  ('00000000-0000-4000-8000-000000000704', '[Sample] How do I book a consult?',
-   '[Sample] Call or text the practice number, or use the chat on the website, and pick a free 15-minute consult time.', 4, true);
-
-insert into practice_os.alerts (id, kind, inquiry_id, message, is_sample) values
-  ('00000000-0000-4000-8000-000000000801', 'deadline', null, '[Sample] CAQH re-attestation is due in 21 days.', true),
-  ('00000000-0000-4000-8000-000000000802', 'question', '00000000-0000-4000-8000-000000000403',
-   '[Sample] Jordan Example asked whether you offer couples sessions.', true);
-
--- Three pending approvals, one per helper that acts outside the app.
+-- Pending approvals: a referral letter and two test notes.
 insert into practice_os.approvals (id, kind, title, preview, payload, created_by, is_sample) values
   ('00000000-0000-4000-8000-000000000901', 'referral_letter',
    '[Sample] Intro letter to Juniper Row Family Medicine',
@@ -131,16 +74,6 @@ insert into practice_os.approvals (id, kind, title, preview, payload, created_by
    '{"referral_source_id": "00000000-0000-4000-8000-000000000201", "subject": "[Sample] Introducing Reyes Counseling in Lincoln Park",
      "letter": "[Sample] Dear Juniper Row Family Medicine team,\n\nI''m Dana Reyes, a licensed clinical professional counselor, and I recently opened Reyes Counseling in Lincoln Park, a few blocks from your office. I see adults working through stress at work and big life changes, in person and by video, with weekday and evening times.\n\nWhen one of your patients asks about talking with a counselor nearby, I''d be glad to be one of the names you share. Would you be open to a 15-minute call in the next few weeks so we can introduce ourselves and talk about how we might work together?\n\nThank you for the care you give this neighborhood.\n\nDana Reyes, LCPC (fictional demo practice)\nReyes Counseling PLLC"}'::jsonb,
    'aeon:referrals', true),
-  ('00000000-0000-4000-8000-000000000902', 'instagram_post',
-   '[Sample] Post: What happens at a first session',
-   '{"caption_excerpt": "[Sample] What happens at a first session? We go over paperwork, scheduling and fees...", "account": "@practiceos_"}'::jsonb,
-   '{"post_id": "00000000-0000-4000-8000-000000000301"}'::jsonb,
-   'aeon:instagram', true),
-  ('00000000-0000-4000-8000-000000000903', 'sms_reply',
-   '[Sample] Text Riley Example open consult times',
-   '{"to": "[Sample] Riley Example", "body": "[Sample] Hi Riley, this is the AI assistant for Reyes Counseling. Yes, superbills are available. Open consult times: Tue 6:00 PM, Thu 5:30 PM."}'::jsonb,
-   '{"inquiry_id": "00000000-0000-4000-8000-000000000402", "to": "+13125550102", "body": "[Sample] Hi Riley, this is the AI assistant for Reyes Counseling. Yes, superbills are available. Open consult times: Tue 6:00 PM, Thu 5:30 PM."}'::jsonb,
-   'aeon:front_desk', true),
   ('00000000-0000-4000-8000-000000000904', 'test_note',
    '[Sample] Test note: hello from Aeon',
    '{"note": "[Sample] Hello from Aeon. Approving this only writes one line to the audit log."}'::jsonb,
@@ -152,9 +85,6 @@ insert into practice_os.approvals (id, kind, title, preview, payload, created_by
    '{"note": "[Sample] Approving this shows what a failed action looks like.", "fail": true}'::jsonb,
    'aeon', true);
 
--- The pending post points at its approval, as saveDraft does for real drafts.
-update practice_os.posts set approval_id = '00000000-0000-4000-8000-000000000902'
- where id = '00000000-0000-4000-8000-000000000301';
 
 -- [Sample] credentialing profile (migration 007): CAQH ProView order, no license number.
 -- The NPI passes the check digit but NPPES has no one with it; the TIN starts with 00.

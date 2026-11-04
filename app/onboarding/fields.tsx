@@ -1,7 +1,6 @@
 "use client";
 
 import { Plus } from "lucide-react";
-import { useEffect, useState } from "react";
 import { CONNECTION_CARDS, type ConnectionStatus } from "@/components/connections/registry";
 import { DateField } from "@/components/shared/date-field";
 import { SettingRadio, SettingSelect, SettingSwitch, TextAreaField, TextField } from "@/components/shared/settings-controls";
@@ -9,7 +8,6 @@ import { Button, chipClass, Orb } from "@/components/ui";
 import { STATES } from "@/lib/compliance/states";
 import { firstFor, HELPERS, type Screen, type Stage } from "@/lib/onboarding/chapters";
 import type { SetupItem } from "@/lib/onboarding/store";
-import { FALLBACK_SAMPLES, type StyleSample } from "@/lib/instagram/style-samples";
 
 // One control per kind of answer, built only from the shared controls
 // (docs/ui-elements.md). Each takes the current value and reports a new one.
@@ -74,7 +72,6 @@ export function emptyValue(s: Screen, stage: Stage | null, homeState: string | n
       return [];
     case "helper": {
       const q = s.helper?.question;
-      if (q?.kind === "style") return { pick: "", example: "" };
       return q?.kind === "choices" && q.multi ? [] : q?.kind === "yesno" ? null : "";
     }
     default:
@@ -119,7 +116,6 @@ export function isAnswered(s: Screen, v: unknown): boolean {
     case "chips":
       return Array.isArray(v) && v.length > 0;
     case "helper":
-      if (s.helper?.question.kind === "style") return Boolean(o.pick || String(o.example ?? "").trim());
       return Array.isArray(v) ? v.length > 0 : typeof v === "boolean" || Boolean(String(v ?? "").trim());
     default:
       return Boolean(String(v ?? "").trim());
@@ -179,43 +175,6 @@ function ChipGroup({ label, options, value, exclusive, onChange }: { label: stri
           {x.label}
         </ChipToggle>
       ))}
-    </div>
-  );
-}
-
-/** Three [Sample] captions on the same topic, from Muse when it's ready, else the fixed three. */
-function StyleField({ value, onChange, error }: { value: Record<string, unknown>; onChange: (v: unknown) => void; error?: string }) {
-  const [samples, setSamples] = useState<StyleSample[] | null>(null);
-  useEffect(() => {
-    let live = true;
-    // Never more than about 10 seconds on this screen: then the fixed three show.
-    fetch("/api/onboarding/style-samples", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}", signal: AbortSignal.timeout(10_000) })
-      .then((r) => r.json())
-      .then((d: { samples?: StyleSample[] }) => live && setSamples(d.samples?.length === 3 ? d.samples : FALLBACK_SAMPLES))
-      .catch(() => live && setSamples(FALLBACK_SAMPLES));
-    return () => {
-      live = false;
-    };
-  }, []);
-  return (
-    <div className="flex flex-col gap-3">
-      {samples ? (
-        <SettingRadio
-          label="Each one says how to book a first visit"
-          value={String(value.pick ?? "")}
-          onValueChange={(v) => onChange({ ...value, pick: v })}
-          options={samples.map((x) => ({ value: x.id, label: x.label, description: `[Sample] ${x.text}` }))}
-        />
-      ) : (
-        <p className="text-body text-[var(--fg-muted)]">Aeon is writing three samples for you…</p>
-      )}
-      <TextAreaField
-        label="Or paste a post or bio you like (optional)"
-        value={String(value.example ?? "")}
-        onChange={(e) => onChange({ ...value, example: e.target.value })}
-        maxLength={600}
-        error={error}
-      />
     </div>
   );
 }
@@ -559,7 +518,6 @@ export function Field({ screen: s, value, onChange, setupItems, stage, homeState
             <SettingRadio label={label} value={String(value ?? "")} onValueChange={(v) => onChange(v)} options={q.options} />
           </div>
         );
-      if (q.kind === "style") return <StyleField value={o} onChange={onChange} error={error} />;
       if (q.kind === "yesno") return <SettingRadio label={label} value={yn(value)} onValueChange={(v) => onChange(v === "yes")} options={YES_NO} />;
       if (q.kind === "text")
         return <TextAreaField label="Your answer" value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} maxLength={q.maxLength ?? 400} error={error} />;

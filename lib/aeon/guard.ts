@@ -160,6 +160,10 @@ export function judgePerson(name: string, text: string, allow: Allowlist, herWor
     const clean = !clientLike(s, true) && !condition;
     if (clean && ownWhole) continue;
     if (clean && ownPart && ownContext(s)) continue;
+    // A whole card name from her board in what code or Aeon wrote (a tool result's "name" field, a
+    // brief's list line), with no health, personal or client detail beside it: it is the card.
+    // Never for her own words: there a board name still needs referral context.
+    if (!herWords && clean && boardWhole && !PERSONAL_MATTER.test(s) && !mentionsDiagnosis(s) && !mentionsMedical(s) && !medicalAboutSomeone(s)) continue;
     const titled = at >= 0 && TITLE_BEFORE.test(text.slice(Math.max(0, at - 8), at));
     // A command to her about a board name ("Text Brittany Keiser to confirm coffee") is referral work.
     const command = COMMAND_AT_START.test(s) && !clientLike(s);
@@ -777,8 +781,42 @@ export function withoutCalendarWords(names: string[], text: string): string[] {
 // checks read "[id]" in its place (normalizeForCheck).
 const UUID_ANYWHERE = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
 
+/**
+ * The organisations on her Referrals board ("Marrowpine Grief Center", "Hospice of the Lakes",
+ * "Northside Oncology Group"), each replaced by a neutral "the office" for the checks. A care word
+ * inside an org's own name is the office's name, not a diagnosis about a person, even when a
+ * partner's name sits in the same sentence (a code-built brief or list). People on the board are
+ * never masked: "Dr. Alex Example has cancer" is still judged. Only for tool results and Aeon's
+ * replies; her typed messages and memories are read as written.
+ */
+export function maskBoardOrgs(plain: string, list: Allowlist): string {
+  const people = new Set((list.partners ?? []).map((p) => p.toLowerCase()));
+  const orgs = new Set<string>();
+  for (const n of list.directory ?? []) {
+    // Only organisations: a card that reads as a person's name is judged as a person.
+    if (people.has(n.toLowerCase()) || looksLikePerson(n)) continue;
+    for (const v of [n, n.replace(/^\[sample\]\s*/i, "")]) if (v.trim().split(/\s+/).length >= 2) orgs.add(v.trim());
+  }
+  let out = plain;
+  // Longest first, so "Hospice of the Lakes Bereavement" goes before "Hospice of the Lakes".
+  for (const o of [...orgs].sort((a, b) => b.length - a.length)) {
+    out = out.replace(new RegExp(`(?<![\\p{L}\\p{N}])${escape(o)}(?![\\p{L}\\p{N}])`, "giu"), "the office");
+  }
+  return out;
+}
+
+/** The copy every check reads: cleaned, and for tool results and replies with board orgs masked. */
+function checkCopy(text: string, at: GuardPoint, list: Allowlist): string {
+  if (at === "tool_result") return maskBoardOrgs(normalizeForCheck(text).replace(/\\n/g, "\n"), list);
+  if (at === "reply") return maskBoardOrgs(normalizeForCheck(text), list);
+  return normalizeForCheck(text);
+}
+
 async function checkOnce(text: string, at: GuardPoint, list: Allowlist, opts: GuardOptions): Promise<GuardResult> {
-  const plain = normalizeForCheck(text);
+  // Board organisations are masked only in what code or Aeon writes (tool results, replies).
+  // A tool result's JSON keeps a text field's line breaks as the two characters "\n": the checks
+  // read them as the line breaks they are, so one line of a code-built list isn't judged with the next.
+  const plain = checkCopy(text, at, list);
   const light = at === "tool_result" && !opts.fullRules;
   // Her own words (her message, a memory) get the business-only rules around a partner's first name.
   const herWords = at === "message" || at === "memory";
@@ -902,7 +940,7 @@ async function checkOnce(text: string, at: GuardPoint, list: Allowlist, opts: Gu
   // written differently ("Kévin", hidden characters) can survive. Check again:
   // if any stranger is still there, withhold the whole result.
   try {
-    const again = normalizeForCheck(redacted);
+    const again = checkCopy(redacted, at, list);
     if (withoutCalendarWords(await findNames(again), again).some((n) => isNameLike(n) && !isAllowedPerson(n, again, list, herWords))) return { ok: false, kind: "client_name" };
   } catch {
     return { ok: false, kind: "unavailable" };

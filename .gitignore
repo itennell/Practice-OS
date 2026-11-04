@@ -67,8 +67,6 @@ aeon/MEMORY.md
 
 # The built-in database, its generated keys and its backups (lib/local-db.ts)
 /.data/
-/relay/node_modules/
-/relay/.vercel/
 
 # The app log when INSTALL.md starts it in the background
 /dev.log

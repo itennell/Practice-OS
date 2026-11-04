@@ -1,10 +1,8 @@
 // Approve flow against the live database. Runs only when DATABASE_URL is set.
 // Each test creates its own approval (created_by 'test') and deletes it after.
 // The audit rows it writes stay, because audit_log is append-only.
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 import { REFERRALS_ONLY_DEMO } from "../lib/features";
-// These test Front Desk itself, so they run with it switched on (lib/features.ts).
-vi.mock("../lib/features", async (orig) => ({ ...(await orig<typeof import("../lib/features")>()), FRONT_DESK_ENABLED: true }));
 import { loadEnv } from "../lib/env";
 
 loadEnv();
@@ -53,11 +51,12 @@ describe.skipIf(REFERRALS_ONLY_DEMO || !hasDb)("approve flow", () => {
     expect((await auditActions(id)).map((r) => r.action)).toEqual(["approval_approved", "approval_failed"]);
   });
 
-  it("ends failed, with the executor's words, when the payload is incomplete", async () => {
+  it("never runs or declines an old row of a removed helper's kind (the database CHECK still allows it)", async () => {
     const id = await makeApproval("web_chat_reply", {});
-    const res = await approve(id, { by: "test" });
-    expect(res.ok && res.approval.status).toBe("failed");
-    expect(res.ok && res.approval.error).toBe("payload needs inquiry_id and body.");
+    expect(await approve(id, { by: "test" })).toMatchObject({ ok: false, reason: "not_found" });
+    expect(await decline(id, { by: "test" })).toMatchObject({ ok: false, reason: "not_found" });
+    const [row] = await db()`select status from practice_os.approvals where id = ${id}`;
+    expect(row.status).toBe("pending");
   });
 
   it("edit then approve runs the edited text and logs before and after", async () => {

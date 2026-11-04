@@ -106,59 +106,9 @@ NPPES needs no key in a live test, caps results at **200 per request**, and its 
 
 Also considered: [krayin/laravel-crm](https://github.com/krayin/laravel-crm) (MIT, but PHP, needs 3 GB+ of RAM and documents no API), plus [espocrm/espocrm](https://github.com/espocrm/espocrm) and [frappe/crm](https://github.com/frappe/crm), which are both **AGPL-3.0**. Skip [openreferral/hsds-transformer](https://github.com/openreferral/hsds-transformer), which is archived.
 
-### Instagram: Meta's publishing API, Postiz as the study object, safe-messaging rules
+*Removed on 2026-11-04: Instagram research. Practice-OS no longer includes it.*
 
-Meta's Content Publishing API needs an Instagram **professional** account. On the "Instagram API with Instagram Login" path it uses the `instagram_business_basic` and `instagram_business_content_publish` scopes on host `graph.instagram.com`. Publishing has three steps: create a container, poll `status_code` (Meta recommends once a minute for up to 5 minutes), then publish. Meta fetches media from a **public URL**, and images must be JPEG ([Meta Content Publishing](https://developers.facebook.com/docs/instagram-platform/content-publishing)).
-
-Format limits:
-- Carousels hold up to 20 items, with no Reels and no per-item captions.
-- Images must have an aspect ratio between 4:5 and 1.91:1, so make carousel slides **1080×1350**.
-- Reels are 9:16 MP4/MOV, 3 seconds to 15 minutes, 300 MB maximum.
-- `alt_text` is supported on images ([Meta media reference](https://developers.facebook.com/docs/instagram-platform/instagram-graph-api/reference/ig-user/media)).
-
-Meta's docs give both **100 and 50** as the 24-hour publishing cap, so plan for 50 ([Meta Content Publishing](https://developers.facebook.com/docs/instagram-platform/content-publishing)).
-
-| Repo / API | License | Stars | Recency | What it does | Tech stack | Borrow for therapists | Health data / HIPAA | 1-week difficulty |
-|---|---|---|---|---|---|---|---|---|
-| [gitroomhq/postiz-app](https://github.com/gitroomhq/postiz-app) | **AGPL-3.0** | ~36.7k–37.8k | v2.23.0, 04 Aug [R]; push 2026-10-24 [V] | Agentic social scheduler with public API and MCP; IG feed, carousel, Reels, Stories ([Postiz IG docs](https://docs.postiz.com/providers/instagram)) | Next.js, NestJS, Prisma/Postgres, Temporal | **The reference for your connector**: provider abstraction, `now`/`schedule` post type, `tags` for content pillars, upload endpoint, rate-limit config ([API docs](https://docs.postiz.com/public-api/introduction)). Study it; don't copy it | None by design; captions are the risk | Easy (study) |
-| [gitroomhq/postiz-agent](https://github.com/gitroomhq/postiz-agent) | **AGPL-3.0** | ~543 | push 2026-10-22 [V] | Agent skill, CLI and hosted MCP; README lists **"Muse"** as a supported host | Node CLI, hosted MCP | How a social skill plus MCP pairing is packaged for many agent hosts | Same as Postiz | Easy |
-| [langchain-ai/social-media-agent](https://github.com/langchain-ai/social-media-agent) | MIT | ~2.9k | [U] | Drafts posts, interrupts for human edit/accept/reject, then schedules | TypeScript, LangGraph, Supabase | The "clinician approves every post" state machine | None | Medium |
-| [vercel/satori](https://github.com/vercel/satori) | **MPL-2.0 (file-level copyleft)** | ~13.8k | [U] | HTML/CSS → SVG | TypeScript | Branded JSX carousel slides → JPEG at 1080×1350 | None | Easy |
-| [harry0703/MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo) | MIT | ~133.8k | v1.3.9, 21 Oct [R] | Topic → script → TTS → b-roll → captioned 9:16 video; REST API | Python, ffmpeg, faster-whisper | Reel microservice; restrict stock footage to avoid distress imagery | None | Medium |
-| [remotion-dev/remotion](https://github.com/remotion-dev/remotion) + [template-tiktok](https://github.com/remotion-dev/template-tiktok) | **Remotion License: free only for organizations with ≤3 employees** ([LICENSE](https://github.com/remotion-dev/remotion/blob/main/LICENSE.md)) | ~67.4k / ~278 | [U] | Programmatic React video; word-by-word captions | TypeScript/React | Branded reel templates (hook card, myth vs fact) in your own stack | None | Medium |
-| [m-bain/whisperX](https://github.com/m-bain/whisperX) | BSD-2-Clause | ~24.8k | README cites a 2026 update [U] | Word-level timestamps | Python | Captions on the clinician's own talking-head reels | Never run it on client audio | Easy |
-| [facebookresearch/sam3](https://github.com/facebookresearch/sam3) | **SAM License (custom)** | ~11.2k | SAM 3.1, 2026-03-27 [V] | Segment and track objects in images and video | Python/PyTorch | Background cut-out behind the clinician; scores well with Meta judges | Never run it on client imagery | Medium |
-| [meta-llama/PurpleLlama](https://github.com/meta-llama/PurpleLlama) | MIT tools; **Llama Community License on models** | ~4.4k | [U] | Llama Guard classifiers; S11 covers suicide and self-harm ([model card](https://huggingface.co/meta-llama/Llama-Guard-3-8B)) | Python | Second safety check on drafts | Content classifier only | Medium |
-| [fbsamples/reels_publishing_apis](https://github.com/fbsamples/reels_publishing_apis) | **Meta Platform Policy license** | 76 | [U] | Official Reels publishing sample | Mixed | Read the container → poll → publish flow; don't reuse | None | Easy (reference) |
-
-Also considered: [inovector/mixpost](https://github.com/inovector/mixpost) (MIT, but PHP, and its API appears to be a Pro feature). [crewAIInc/crewAI-examples](https://github.com/crewAIInc/crewAI-examples) is archived with no license, so borrow only the strategist → copywriter → critic idea. No open repo implements safe-messaging rules for suicide content. Write your own rules from [SAVE's recommendations](https://www.save.org/media/media-recommendations/) and [Orygen #chatsafe](https://orygen.org.au/Training/Resources/Self-harm-and-suicide-prevention/Guidelines/chatsafe-A-young-person-s-guide-for-communicatin). Every suicide-related post should include 988 and no method details.
-
-### Front desk: the best receptionist designs are AGPL, so rebuild their patterns
-
-The strongest open receptionists are copyleft. Rebuild their patterns in TypeScript:
-
-- From **DeskRoute**: offer only open slots long enough for the service, **re-check availability right before booking**, and queue questions the agent can't answer for the owner. Each answer becomes a permanent Q&A entry ([DeskRoute](https://github.com/PrabhatMattoo/DeskRoute)).
-- From **AIReceptionist**: a consent preamble and a sweeper that deletes old recordings ([AIReceptionist](https://github.com/kirklandsig/AIReceptionist)).
-- From **SeldonFrame**: its "quote-guard" against invented prices, rebuilt as a fee-guard ([SeldonFrame](https://github.com/seldonframe/seldonframe)).
-
-No open repo implements mental-health screening with crisis routing. Under HB 1806 the front desk should not attempt any screening (see section 8).
-
-| Repo / API | License | Stars | Recency | What it does | Tech stack | Borrow for therapists | Health data / HIPAA | 1-week difficulty |
-|---|---|---|---|---|---|---|---|---|
-| [PrabhatMattoo/DeskRoute](https://github.com/PrabhatMattoo/DeskRoute) | **AGPL-3.0 (owner/license disputed; verify)** | 9 | topic page 2026-09-18 [U] | Phone receptionist for appointment businesses | TypeScript, LiveKit Agents, Postgres/Drizzle, Hono | Re-check before booking; escalation → Q&A memory; AI disclosure at call start | No HIPAA claim | Medium (patterns) |
-| [Hiberius/whatsapp-receptionist](https://github.com/Hiberius/whatsapp-receptionist) | MIT | ~15–27 | topic page 2026-10-18 [U] | Text and voice-note receptionist with booking and human handoff | Claude, Google Calendar, Supabase RLS + pgvector | Handoff: status flip, email with a deep link to the clinician, acknowledgement to the client. Same stack | No HIPAA claim | Medium |
-| [kirklandsig/AIReceptionist](https://github.com/kirklandsig/AIReceptionist) | **AGPL-3.0** | ~116–146 | topic page 2026-10-08 [U] | Voice receptionist, Calendar booking, SIP transfer | Python, LiveKit, OpenAI Realtime | Consent preamble; retention sweeper; confirm before booking | Records by default | Medium |
-| [seldonframe/seldonframe](https://github.com/seldonframe/seldonframe) | **AGPL-3.0** | ~63 | topic page 2026-10-09 [U] | Multi-channel front office (voice, SMS, chat, email) | Next.js 16, Drizzle | Fee-guard; booking-policy enforcement; `take_message` | No HIPAA claim | Hard (patterns) |
-| [pipecat-ai/pipecat](https://github.com/pipecat-ai/pipecat) | BSD-2-Clause | ~16.8k | v1.7.0, 1 Aug [R] | Voice agents with Twilio/Telnyx serializers; Flows built in | Python; OpenAI-compatible LLM services | Cascaded STT → Muse Spark → TTS phone line (stretch goal) | BAAs depend on telephony and STT/TTS vendors | Medium |
-| [livekit/agents](https://github.com/livekit/agents) | Apache-2.0 (**turn detector under the LiveKit Model License**) | ~13.0k | 1.7.1, 27 Aug [R] | Realtime voice with SIP | Python | Base layer under DeskRoute | LiveKit Cloud BAA on Scale/Enterprise only ([LiveKit](https://livekit.com/security)) | Medium |
-| [livekit-examples/python-agents-examples](https://github.com/livekit-examples/python-agents-examples) | **Not shown; check LICENSE** | ~312 | Anam tutorial 2026-02-20 [V] | `medical_office_triage`, patient intake, `warm_handoff` | Python + Next.js | One field at a time → confirm → `update_field` → read back → `submit_form` ([LiveKit blog](https://livekit.com/blog/build-healthcare-intake-assistant-anam-avatar)) | Tutorial doesn't mention HIPAA | Easy–Medium |
-| [dograh-hq/dograh](https://github.com/dograh-hq/dograh) | BSD-2-Clause | ~5.6k | v1.47.0, 2026-09-15 [V] | Self-hosted Vapi/Retell alternative with visual flows and MCP | BYO LLM/STT/TTS | Clinician-editable call script | Self-host; no HIPAA claim | Medium |
-| [Cal.com hosted MCP](https://www.developersdigest.tech/mcp-servers/calcom) | Hosted service | n/a | n/a | 72 booking tools at `mcp.cal.com` | OAuth 2.1, Streamable HTTP | `get_availability`, `create_booking` for consults | BAA free on Enterprise / Orgs with 15+ users, else **$300/mo** ([Cal.com HIPAA](https://cal.com/compliance/hipaa)) | Easy |
-| [nspady/google-calendar-mcp](https://github.com/nspady/google-calendar-mcp) | MIT | ~1.2k | push 2026-10-13 [V] | Calendar events and free/busy | TypeScript | Slot offering from the clinician's calendar | No PHI without a Google BAA | Easy |
-| [calcom/cal.diy](https://github.com/calcom/cal.diy) | MIT (AGPL until Apr 2026) | ~49.4k | 2026-10-19 [V] | Self-hosted scheduling | Next.js, Prisma | Booker UI; **Workflows (reminders) removed**, so build reminders yourself ([Cal.com blog](https://cal.com/blog/cal-diy-open-source-to-closed-source)) | "Non-production" warning; no BAA | Medium |
-| [Twilio](https://www.twilio.com/en-us/hipaa) | Commercial | n/a | n/a | Phone numbers, SMS, Voice, Media Streams | Webhooks | The public endpoint for calls and texts | BAA only on Security/Enterprise Edition; SMS, Voice and Media Streams are eligible ([eligible list](https://twilio.com/content/dam/twilio-com/global/en/other/hippa/pdf/HIPAA-Eligible-Services.pdf)) | Easy |
-
-Skip [vocodedev/vocode-core](https://github.com/vocodedev/vocode-core), which is seeking maintainers. [bolna-ai/bolna](https://github.com/bolna-ai/bolna) is MIT and documents a custom LLM base URL, but it is also "looking for maintainers." Intake form builders such as [Formbricks](https://github.com/formbricks/formbricks), [OpnForm](https://github.com/JhumanJ/OpnForm) and [HeyForm](https://github.com/heyform/heyform) are all **AGPL** at the core, so build intake as native Supabase forms or FHIR questionnaires instead.
+*Removed on 2026-11-04: Front desk research. Practice-OS no longer includes it.*
 
 ### Credentialing: public data plus deterministic form filling
 
@@ -291,15 +241,13 @@ The market is split. **EHRs** charge monthly and run the clinical record and cla
 | Insurance networks | Alma $95–125/mo, credentials under **Alma's tax ID** ([ChoosingTherapy](https://www.choosingtherapy.com/alma-for-therapists-review/)). Headway: no fee, undisclosed take rate, $2.3B valuation ([Sacra](https://sacra.com/c/headway/)). Grow: free, undisclosed share, $80–120/session estimates. Rula: $70–90 per clinical hour. SonderMind: free, 2% instant payout ([ChoosingTherapy](https://www.choosingtherapy.com/?p=105117)) | Credentialing, contracting, billing, some directory exposure | Independent credentialing under the clinician's own NPI/TIN, cash-pay and OON work, the front-door phone line ([AInora](https://ainora.lt/blog/grow-therapy-ai-review-alternatives-2026)), audit and clawback exposure ([Headway](https://headway.co/resources/what-is-a-clawback)) |
 | Credentialing services | DIY outsourcing $150–300 per payer or $500–1,500 per package ([SimplePractice](https://www.simplepractice.com/resource/hidden-costs-diy-insurance-credentialing-solo-therapists/)). Klarity: $50 deposit per panel + 3.9% of paid claims, 24-month term ([ChoosingTherapy](https://www.choosingtherapy.com/best-credentialing-service/)). Medallion is enterprise-only ([Kaizen](https://www.kaizenautomation.com/blog/medallion-credentialing-reviews)). Assured raised $19M for AI credentialing aimed at organizations ([Fierce](https://www.fiercehealthcare.com/finance/startup-assured-banks-19m-series-ai-native-credientialing-provider-enrollment)) | Applications, CAQH, follow-up | Solo owners priced out of enterprise tools; percentage-of-claims pricing on top of everything else |
 | AI scribes | Mentalyc $19.99–69.99, Upheal free–$69, Blueprint from $29, Freed $99, Quill $20 ([Supanote](https://supanote.ai/blog/best-ai-tools-for-mental-health-professionals)). Eleos targets community behavioral health ([STAT](https://www.statnews.com/2025/01/22/eleos-behavioral-health-tech-clinical-documentation-startup-fundraise/)) | Notes | Everything else. **Notes are commoditized: don't compete there** |
-| AI front desk | Assort ($120M Series C, $1.2B valuation; ortho, cardiology). Hello Patient ($22.5M; urgent care) ([Fierce](https://www.fiercehealthcare.com/health-tech/hello-patient-secures-225m-investors-bet-ai-voice-agent-growth)). Therapist-focused Frontdesk and AInora don't publish prices | Booking, intake, eligibility | Low-volume, high-stakes therapy inquiries; Illinois-compliant logistics-only scripts |
-| Directories and websites | Psychology Today $29.95/mo; GoodTherapy $30.95–49.95; Zencare $59–69 + $80 setup ([Mentalyc](https://www.mentalyc.com/blog/best-therapist-directories)). Brighter Vision ~$69–149 ([ChoosingTherapy](https://www.choosingtherapy.com/best-website-builder-for-therapists/)) | Passive discovery | Referral relationships, social content, inquiry follow-up |
 | Bookkeeping | Heard $129–169/mo ([ChoosingTherapy](https://www.choosingtherapy.com/best-credentialing-service/)) | Books and taxes | Quarterly-tax reminders tied to practice cash flow |
 
 From these prices, a lean solo stack costs about **$140–165/mo** and a full stack about **$610/mo** before credentialing. That is arithmetic from the cited prices, not survey data.
 
 The bigger economic cost is empty slots during the 2–6 month credentialing ramp. Networks also have a structural reason **not** to help clinicians build independently credentialed or cash-pay caseloads, because that business leaves their platform. That leaves room for a neutral co-owner that sits above the silos. Its moat is the unified practice state (deadlines, panels, pipeline, claims) plus a guidance layer. The risk is that SimplePractice, with 250,000+ practitioners, bolts on a growth agent. Speed and a niche such as oncology and serious illness are the near-term defenses.
 
-## 5. Recommended repo architecture and the Instagram connector
+## 5. Recommended repo architecture
 
 ### Evaluation of the chosen architecture
 
@@ -323,8 +271,6 @@ caseload-builder/
 ├── CLAUDE.md                  # thin pointer to AGENTS.md (also used by other hosts' equivalents)
 ├── skills/
 │   ├── referrals/SKILL.md     # NPPES sweep → score → draft → approval → follow-up; references/ethics.md
-│   ├── instagram/SKILL.md     # pillar calendar → draft → critic (safe-messaging, license line) → schedule_post
-│   ├── front-desk/SKILL.md    # config + scripts only; runtime is the hosted service (PHI)
 │   ├── credentialing/SKILL.md # profile → payer packets → CAQH prep → status polling; never attests
 │   ├── billing/SKILL.md       # eligibility → scrub → claim → ERA → denial explainer; GFE/superbill (PHI)
 │   ├── compliance-calendar/SKILL.md  # obligations table, IL rule pack, CE gap analysis
@@ -332,53 +278,19 @@ caseload-builder/
 │   └── how-do-i/SKILL.md      # guidance layer; references/illinois/*.md (PLLC, NPI, CAQH, PECOS, IMPACT…)
 ├── mcp-server/                # TypeScript, stdio + Streamable HTTP
 │   └── src/tools/ nppes.ts, cms-enrollment.ts, obligations.ts, approvals.ts, pdf-fill.ts,
-│                  gfe.ts, stedi.ts, claim-scrubber.ts, carc-explainer.ts, instagram-proxy.ts
-├── connectors/
-│   ├── instagram/             # Next.js on Vercel + Supabase: OAuth callback, token vault, cron publisher, remote MCP
-│   └── front-desk/            # Twilio SMS/voice webhooks, web chat, booking, crisis script (hosted, BAA tier)
-├── dashboard/                 # Next.js on localhost:3000: approvals inbox, deadlines, referrals Kanban, posts, credentialing, claims
-├── db/supabase/migrations/    # referral_sources, posts, obligations, credentialing_profile, payer_applications,
-│                              # approvals, audit_log, inquiries, claims (PHI tables only in the HIPAA project)
+│                  gfe.ts, stedi.ts, claim-scrubber.ts, carc-explainer.ts
+├── dashboard/                 # Next.js on localhost:3000: approvals inbox, deadlines, referrals Kanban, credentialing, claims
+├── db/supabase/migrations/    # referral_sources, obligations, credentialing_profile, payer_applications,
+│                              # approvals, audit_log, claims (PHI tables only in the HIPAA project)
 ├── data/                      # il-deadlines.json, cpt-rules.json (codes + own labels, no AMA text), carc.json, synthetic clinician
 ├── evals/                     # crisis-phrase tests, fee-guard tests, marketing-ethics critic tests, HB 1806 transcript checks
 └── docs/
     ├── setup/ muse-code.md, claude-code.md, codex.md, gemini-cli.md
-    ├── instagram-meta-app.md   # dev mode, testers, business verification, app review checklist
     ├── phi-boundary.md         # which skills may touch PHI, required BAAs per vendor
     └── illinois-legal-notes.md # HB 1806, MHDDCA, 740 ILCS 92, PLLC (not legal advice)
 ```
 
-### Instagram connector design (your own Metricool-style service)
-
-The connector is **one Meta app** using **Instagram API with Instagram Login**. It requests `instagram_business_basic` and `instagram_business_content_publish` and calls `graph.instagram.com` ([Meta Content Publishing](https://developers.facebook.com/docs/instagram-platform/content-publishing)).
-
-**Components:**
-- **OAuth callback.** A Vercel route exchanges the authorization code for a token.
-- **Token store.** Each clinician's token is stored encrypted in Supabase, with the key held outside the table.
-- **Long-lived token refresh.** A job refreshes the 60-day token before it expires. The exact refresh endpoint and window come from general knowledge and were not verified in these notes, so check Meta's docs.
-- **Public media bucket.** A Supabase Storage bucket, because Meta cURLs media from a public URL. Use unguessable paths and delete each file after it publishes.
-- **Publisher.** A pg_cron or Vercel Cron job claims due posts and runs create container → poll `status_code` once a minute for up to 5 minutes → `media_publish`. It records each outcome and respects a **50-per-24-hour** cap, checkable via `content_publishing_limit` ([Meta](https://developers.facebook.com/docs/instagram-platform/content-publishing)).
-- **Remote MCP server** exposing `create_post` (always creates a draft), `schedule_post` (queues an approval), `list_scheduled` and `get_insights`. It uses Streamable HTTP with OAuth 2.1, the same pattern as Cal.com's hosted MCP ([listing](https://www.developersdigest.tech/mcp-servers/calcom)).
-
-**What to borrow from Postiz.** Study it for the provider abstraction, the now/schedule semantics, `tags` for content pillars, the upload endpoint and the configurable rate limit ([Postiz API](https://docs.postiz.com/public-api/introduction)). Don't copy its AGPL code.
-
-**Scope.** The connector posts only. It does not read DMs or comments. That keeps it PHI-free and avoids the vulnerable-solicitation risk under NASW 4.07(a) ([NASW](https://www.socialworkers.org/About/Ethics/Code-of-Ethics/Code-of-Ethics-English/Social-Workers-Ethical-Responsibilities-as-Professionals)).
-
-**Meta review path.** During the hackathon the app stays in development mode, and only accounts added as developers or testers can publish. Going public requires **business verification** and **App Review** for the advanced publishing permission, the same gate Postiz's self-hosters face ([Postiz IG docs](https://docs.postiz.com/providers/instagram)). Prepare these for review:
-- a screencast of the full OAuth → draft → approve → publish flow
-- a privacy policy and data-deletion endpoint
-- an explanation that the app publishes only the clinician's own educational content
-
-Those review requirements come from general knowledge of Meta's process and were not verified in these notes.
-
-**Fallbacks.** Until review clears, Postiz Cloud (whose own Meta app holds the permissions) or Metricool's MCP can publish for real users. Metricool exposes `createScheduledPostForReview` and `sendScheduledPostForReview`, the same draft-then-review pattern, though that was observed only in this session's tool list.
-
-**Content rules** (enforced by a critic step and `evals/`):
-- No client stories, composites or testimonial requests (APA 5.05, NASW 4.07(b), ACA C.3.b) ([APA](https://www.apa.org/ethics/code)).
-- Accurate credentials auto-inserted (NASW 4.06(c)).
-- 988 and no method details on any suicide-related post.
-- No outcome guarantees.
-- Meta's AI-generated label set on AI imagery ([media reference](https://developers.facebook.com/docs/instagram-platform/instagram-graph-api/reference/ig-user/media)).
+*Removed on 2026-11-04: Instagram connector design. Practice-OS no longer includes it.*
 
 ## 6. Three starting points carry the most weight
 
@@ -420,14 +332,7 @@ The hackathon runs **Mon Oct 26 to Wed Nov 4, 2026**. The plan below fits the co
 - Build the NPPES taxonomy sweep across `606*` ZIPs, plus flatten and Luhn validation.
 - Score fit by shared population and distance.
 - Build the Kanban board in the dashboard.
-- Draft outreach as an educational introduction offering a 15-minute call, then create a 7-day follow-up task. Send through Gmail only after approval.
-
-**Day 4 (Oct 29): Instagram connector.**
-- Build the OAuth callback, encrypted tokens, public media bucket, cron publisher and remote MCP tools.
-- Add the pillar planner (psychoeducation, myth vs fact, what therapy is like, clinician intro, logistics).
-- Render Satori carousels at 1080×1350.
-- Add the critic, with Llama Guard S11 as a second check.
-- Publish to a tester account.
+- Draft outreach as an educational introduction offering a 15-minute call, then create a 7-day follow-up task. She sends it from her own email after approval.
 
 **Day 5 (Oct 30): credentialing and paperwork.**
 - Build the structured profile and pdf-lib filling of one real payer PDF.
@@ -441,13 +346,6 @@ The hackathon runs **Mon Oct 26 to Wed Nov 4, 2026**. The plan below fits the co
 - Build a deterministic claim scrubber covering 90785, crisis-code conflicts, POS/modifier and timely filing.
 - Submit a test 837P to `STEDI` with a `STEDI_DENIED_` member ID.
 - Fetch the 835 and map CARC/RARC codes to plain-English next steps from [X12's CARC list](https://x12.org/codes/claim-adjustment-reason-codes).
-
-**Day 7 (Nov 1): front desk.**
-- Build a hosted Twilio SMS webhook and web chat (local tunnel for the demo) that collects logistics fields one at a time with a read-back, in the LiveKit style.
-- Add the fee-guard and the DeskRoute-style escalation that turns answers into Q&A entries.
-- Book through Cal.com MCP or Google free/busy, re-checking availability before booking.
-- Hard-code the crisis script.
-- Add an AI disclosure on first contact.
 
 **Nov 2–4: buffer.**
 - Run the evals: crisis phrases, attempts to draw out therapeutic content, fee hallucination.
@@ -466,10 +364,6 @@ The hackathon runs **Mon Oct 26 to Wed Nov 4, 2026**. The plan below fits the co
 Each item links to a `how-do-i` page. On camera, the CAQH item is clearly labeled: "I've prepared your updated malpractice face sheet and checklist. You must log in and click Attest yourself."
 
 **1:10, referrals.** "Find me oncology and primary-care referral sources within 3 miles." Live NPPES results fill the Discovered column. Three outreach drafts land in the Inbox. Dana edits one line and approves it, and it sends from her Gmail. A follow-up task appears for day 7.
-
-**2:00, Instagram.** The planner proposes a week of posts. One draft says "a client of mine told me…" The critic blocks it and rewrites it as general psychoeducation with her license line, plus 988 because the topic touches hopelessness. Dana approves, and the post publishes to her tester Instagram account through the connector's `schedule_post` tool. Cut to the phone showing the live post.
-
-**2:50, front desk.** A synthetic prospect texts: "Do you take BCBS PPO and have evenings?" The agent answers only from approved Q&A, offers two re-checked slots, books a free consult and sends the intake packet link. A second synthetic texter writes a phrase that matches the crisis list. The agent sends the fixed 988/911 message once, stops the conversation, and pages Dana. On screen: "No empathy responses, no assessment, by design (Illinois HB 1806)."
 
 **3:40, billing.** In the hosted billing service, Stedi mock eligibility returns a copay. A test claim to `STEDI` comes back as a **denied** 835. The co-owner translates the CARC code into plain English, shows which scrubber rule would have caught it, and drafts a corrected claim for approval. Dana has a self-pay client booking for next week, so a **Good Faith Estimate** is generated within the 1-business-day window and queued for her fee confirmation.
 
@@ -491,14 +385,6 @@ What it bans:
 
 The licensed professional must keep "full responsibility for all interactions, outputs, and data use." Fines run up to **$10,000 per violation**, and IDFPR investigates. If AI is used while sessions are recorded or transcribed, the client needs written notice and explicit, revocable consent (§15(b)).
 
-Design implications for the front desk:
-1. Only logistics: hours, fees, insurance accepted, scheduling, paperwork.
-2. No empathetic phrasing at all. Use a neutral template such as "Thanks, Dana will follow up."
-3. No sentiment, urgency or "fit" scoring of inquiries. That risks counting as emotion detection.
-4. Crisis handling is a deterministic keyword trigger that sends a fixed 988/911 message and pages the clinician, with no assessment. Have counsel confirm that a keyword trigger is not "detecting mental states."
-5. Clinician approval before anything client-facing that is not a template.
-6. AI disclosure on first contact.
-
 The Act's definition contains a tension: administrative tasks "do not involve communication," yet the examples include drafting logistics messages. Read it as excluding *therapeutic* communication, and get counsel to confirm.
 
 **The agent never signs or attests.** Medicare requires "all individual practitioners" to e-sign their own certification statements ([CMS e-signature guide](https://CMS.gov/files/document/e-signature-how-guide.pdf)). In CAQH, only the provider logs in and clicks Attest ([BCBSIL QuickRef](https://www.bcbsil.com/docs/provider/il/network/credentialing/PR-QuickRef.pdf)). Browser agents should prefill and stop. Unverified payer-portal terms, CAPTCHAs and MFA make unattended submission both fragile and risky anyway.
@@ -513,9 +399,7 @@ The Act's definition contains a tension: administrative tasks "do not involve co
 | Google Cloud | Yes | Listed services only; Gemini Developer API not listed | [Google](https://docs.cloud.google.com/security/compliance/hipaa) |
 | Supabase | Yes | Hosted only, BAA + HIPAA add-on | [Supabase](https://supabase.com/docs/guides/security/hipaa-compliance) |
 | Vercel | Yes | Pro add-on (since Sep 2025) | [Vercel](https://vercel.com/changelog/hipaa-baas-are-now-available-to-pro-teams) |
-| Twilio | Yes | Security/Enterprise Edition; eligible products only | [Twilio](https://www.twilio.com/en-us/hipaa) |
 | Stedi | Yes | Pay-as-you-go plan | [Stedi](https://www.stedi.com/pricing) |
-| Cal.com | Yes | Free on Enterprise / Orgs with 15+ users, else $300/mo | [Cal.com](https://cal.com/compliance/hipaa) |
 | Trigger.dev | Yes | Paid HIPAA add-on | [Trigger.dev](https://trigger.dev/changelog/hipaa-ready) |
 | **Stripe** | **No** | Payment-processing exemption only; keep diagnosis and CPT out of all fields | [HIPAA Journal](https://www.hipaajournal.com/is-stripe-hipaa-compliant/); [Paubox](https://paubox.com/blog/stripe-hipaa-compliant/) |
 
@@ -552,10 +436,6 @@ Six needs have no strong open-source or commercial answer for a solo or small-gr
 
 **A guidance layer for owners without business training.** For the 43% who never had business training, step-by-step Illinois playbooks tied to the clinician's own state and deadlines don't exist in any tool. Today they live in blog posts and association member areas.
 
-**Logistics-only front-desk scripts that comply with HB 1806.** Therapist AI receptionists market BAAs and EHR sync ([Frontdesk](https://www.myaifrontdesk.com/therapy/reports/best-ai-for-mental-health-practices-2026)). None advertises a design built around Illinois's ban on therapeutic communication and emotion detection.
-
-**Safe-messaging and ethics checks for clinician marketing.** No open repo implements suicide safe-messaging rules, testimonial bans or credential-accuracy checks for social content.
-
 **Denial explanation and a claim scrubber for psychotherapy codes.** The only open MCP for billing reference data is a 6-star, inactive project. A therapy-specific scrubber plus a CARC/RARC explainer, built on Stedi, is unclaimed.
 
 The things to avoid building are the crowded ones: notes and scribes, generic scheduling, and enterprise voice.
@@ -576,8 +456,6 @@ The things to avoid building are the crowded ones: notes and scribes, generic sc
 
 **Meta API terms on health data.** A third-party diff says the April 2025 Llama API terms banned submitting health information and the July 2026 version dropped that clause ([ConductAtlas](https://conductatlas.com/diff/meta/llama-api-terms-of-service/4537/4627/)). No BAA is documented either way.
 
-**Cal.com license.** Older notes call it ambiguous. Newer evidence says the public repo became MIT-licensed **Cal.diy** on Apr 15, 2026, without Workflows ([Cal.com blog](https://cal.com/blog/cal-diy-open-source-to-closed-source)).
-
 **DeskRoute owner and license.** The notes found PrabhatMattoo/DeskRoute under AGPL-3.0. The user previously mentioned a Flux690 owner under ISC. Check the LICENSE file and commit history before reusing any code.
 
 **LobbyStack.** It was found only on GitLab, described as MIT. The GitHub AGPL copy is unverified.
@@ -594,11 +472,6 @@ The things to avoid building are the crowded ones: notes and scribes, generic sc
 - Whether Meta signs a BAA or offers zero data retention for the Model API.
 - Whether Muse Code, Codex and Gemini CLI load `SKILL.md` folders natively, and Muse Code's MCP configuration format. "Muse Code" was not documented in the notes.
 - Muse Spark tool calling over Chat Completions with streaming.
-
-**Instagram**
-- Meta's long-lived token lifetime and refresh endpoint for Instagram Login.
-- The exact App Review and business-verification evidence required for `instagram_business_content_publish`.
-- The real daily publishing cap (50 vs 100).
 
 **Billing**
 - Stedi's current Real-Time Eligibility endpoint path.
@@ -696,31 +569,9 @@ Read on ilga.gov: [740 ILCS 110/5](https://www.ilga.gov/Documents/legislation/il
 
 **Not legal advice.** Have one practicing Illinois LCPC or health-law attorney read a sample before real clients sign it.
 
-## Front Desk phone providers (checked 2026-10-28)
+## Front Desk phone providers (removed)
 
-Each clinician brings her own business phone account; Practice-OS connects to it and never owns numbers. The desktop app checks for new voicemails and texts every minute while it is open, so a provider must let us **list** them by API. It can't rely only on webhooks, because a desktop app has no public URL. Sources are each company's own pages. **[U]** means not confirmed on a primary page. Cost assumes 1 number, about 200 texts and 30 one-minute voicemails a month.
-
-| | Spruce Health | Quo (ex-OpenPhone) | Twilio | Telnyx | RingCentral | Dialpad | Google Voice |
-|---|---|---|---|---|---|---|---|
-| Monthly cost | Basic $24/user, **Communicator $49** (lists "integrations and API access"; also shown under an "Add-on" heading [U]); $19.50 one-time SMS fee ([plans](https://sprucehealth.com/plans)) | Starter $15-19, **Business $23 annual / $33 monthly**; API texts $0.01 per segment ([pricing](https://www.quo.com/pricing)) | About $7 pay-as-you-go: number $1.15, SMS $0.0083 plus carrier fees, transcription $0.05/min ([SMS](https://www.twilio.com/en-us/sms/pricing/us), [voice](https://www.twilio.com/en-us/voice/pricing/us)), plus 10DLC $2/mo | About $5: number $1, SMS $0.004, STT $0.015/min ([SMS](https://telnyx.com/pricing/messaging), [voice](https://telnyx.com/pricing/call-control)) | RingEX Core $20, Advanced $25, Ultra $35, annual [U for monthly] ([plans](https://www.ringcentral.com/office/plansandpricing.html)) | Standard $15, **Pro $25** (API keys may need Pro [U]) ([pricing](https://www.dialpad.com/pricing/)) | Personal $0-20; Workspace add-on $10-30 plus Workspace ([Voice](https://workspace.google.com/products/voice/)) |
-| Free tier / trial | 14 days, **SMS off in trial** | 7 days; trial can't register for texting | Trial [U] | [U] | 14 days, **SMS off in trial** | 14 days | Personal Basic free |
-| Voicemail by API | Yes: a call item with a `voicemail` attachment (signed URL); list conversation items ([item](https://developer.sprucehealth.com/reference/conversationitem.md)) | Per call: `GET /v1/call-voicemails/{callId}`. **No list-voicemails endpoint**; find calls first ([doc](https://www.quo.com/docs/mdx/api-reference/calls/get-a-voicemail-for-a-call.md)) | No voicemail box built in. We set the greeting and `<Record>` on her number by API, then list Recordings | Same as Twilio (TeXML or Call Control) | Message store `messageType=VoiceMail`, audio attachment ([guide](https://developers.ringcentral.com/guide/notifications/event-filters/voicemail-message)) | Call List shows `recording_type: voicemail` ([doc](https://developers.dialpad.com/docs/downloading-call-recordings.md)) | **No API** |
-| Their own transcript | Yes: `GET /transcriptions/{id}` ([doc](https://developer.sprucehealth.com/reference/transcription.md)) | Yes: `transcript` field | Old Transcriptions API **deprecated** ([doc](https://www.twilio.com/docs/voice/api/recording-transcription)); we use Muse anyway | Paid STT | Yes, if switched on: `AudioTranscription` attachment | Only through a call event [U for REST] | n/a |
-| Send / list texts | Post to a conversation; list conversation items | `POST /v1/messages`, `GET /v1/messages` ([doc](https://www.quo.com/docs/mdx/api-reference/messages/send-a-text-message.md)) | Messages resource | Messages API | `POST .../sms`; message store `SMS` ([guide](https://developers.ringcentral.com/guide/messaging/sms/sending-sms)) | Send yes; **no REST list of inbound texts**, webhook only ([SMS events](https://developers.dialpad.com/docs/sms-events)) | **Terms forbid it** |
-| Webhook signature | HMAC-SHA256 `X-Spruce-Signature` ([doc](https://developer.sprucehealth.com/docs/webhooks-overview)) | Standard Webhooks HMAC-SHA256 ([doc](https://www.quo.com/docs/2026-03-30/webhooks-overview.md)) | HMAC-SHA1 `X-Twilio-Signature` ([doc](https://www.twilio.com/docs/usage/webhooks/webhooks-security)) | Ed25519 ([doc](https://developers.telnyx.com/docs/messaging/messages/receiving-webhooks)) | **No HMAC**; validation token only ([doc](https://developers.ringcentral.com/guide/notifications/webhooks/creating-webhooks)) | JWT HS256 if a secret is set ([doc](https://developers.dialpad.com/docs/event-subscriptions)) | none |
-| How the app connects | Pasted org token, **after she asks Spruce Support to turn on the API** ([overview](https://developer.sprucehealth.com/docs/overview.md)) | **Pasted API key** (Settings > API), no review ([auth](https://www.quo.com/docs/mdx/api-reference/authentication.md)) | Pasted API key SID and secret | Pasted API key | OAuth sign-in; a public app must graduate from sandbox, review time [U] ([register](https://developers.ringcentral.com/guide/getting-started/register-app)) | OAuth or pasted key; publishing by request form ([publish](https://developers.dialpad.com/docs/publish-your-app.md)) | n/a |
-| BAA | **Every plan, signed online at sign-up**, including voicemail transcription ([plans](https://sprucehealth.com/plans)) | Business/Scale only. **"Text messaging (SMS/MMS) is not a Covered Service"**; integrations also excluded ([HIPAA](https://support.quo.com/core-concepts/administration/hipaa-compliance)) | Security or Enterprise Edition only, through sales ([HIPAA](https://www.twilio.com/en-us/hipaa)) | Available on all plans [U page fetch] ([support](https://support.telnyx.com/en/articles/3347891-hipaa-baas-and-the-conduit-exception)) | Yes for covered entities, plan [U] ([PDF](https://assets.ringcentral.com/legal/rc-ringcentral-hipaa.pdf)) | Signed in the app by an admin; SMS carrier leg excluded [U] | Workspace Voice only, managed users ([list](https://docs.cloud.google.com/docs/security/compliance/hipaa)); not personal |
-| Automation terms | Org terms bar "automated means" unless agreed; the API is the agreed route [ask Spruce] ([terms](https://sprucehealth.com/terms-organizations)) | API texts priced and allowed | Allowed (developer platform) | Allowed | [U] | [U] | **AUP bans "sending messages via an automated process"** ([AUP](https://support.google.com/voice/answer/9230450)) |
-| Texting registration | **Spruce files it**; $19.50; over 60% approved in 24 h ([help](https://help.sprucehealth.com/hc/en-us/articles/23003285768219-How-to-Register-Your-Spruce-Business-Phone-Number)) | She files in the app (Trust center); $19.50 plus $1.50-3/mo; usually 5-7 business days, up to 30+ ([guide](https://support.quo.com/getting-started/carrier-registration/carrier-registration)) | She files a 10DLC brand and campaign; sole-proprietor path only without an EIN ([A2P](https://www.twilio.com/docs/messaging/compliance/a2p-10dlc)) | She files; brand vetting 1-7 business days ([quickstart](https://developers.telnyx.com/docs/messaging/10dlc/quickstart)) | She files in the portal; EIN needed; 3-month minimum ([FAQ](https://support.ringcentral.com/article-v2/TCR-business-registration-FAQ-partner.html?brand=Partner&product=RingEX&language=en_US)) | Admin files in the portal ([help](https://help.dialpad.com/docs/text-message-campaign-registry-for-dialpad-customers)) | n/a |
-| Bring her number | Port in 1-4 weeks, after registration ([help](https://help.sprucehealth.com/hc/en-us/articles/23003336179739-Creating-and-Transferring-Porting-Phone-and-Fax-Numbers-on-Spruce)) | Port in free, 3-7 business days ([help](https://support.quo.com/getting-started/porting/overview)) | Porting API in public beta ([doc](https://www.twilio.com/docs/phone-numbers/porting)) | Port in; FastPort same day where eligible ([doc](https://developers.telnyx.com/docs/numbers/porting)) | [U] | [U] | 10-30 business days ([help](https://support.google.com/a/answer/9049997)) |
-| Setup for a 70-95-year-old (1 easy, 5 hard) | **3**: health-care app she may already use; 1 pasted value; waits on a Support email | **3**: 1 pasted value; but she files texting registration herself | **4**: developer console, BAA through sales | **3-4**: developer console | **4**: enterprise portal | **4**: admin portal; inbound texts need a webhook | **5**: not possible |
-
-**Recommendation.**
-1. **First: Spruce Health.** It is built for clinicians, with a BAA on every plan that covers texts and voicemail transcripts. Spruce files the texting registration itself, usually within a day or two. The API can list voicemails, transcripts and texts, so per-minute checking works, and webhooks are signed if we add them later. The costs: $49 a month, and she must email Spruce Support once to turn the API on.
-2. **Fallback: Quo.** It is the easiest connect (one pasted key, no approval) and costs $23-33 a month. But its BAA does not cover texts or integrations, so it is the "no client details in texts" option. There's also no list-voicemails endpoint, so we find voicemails by listing calls.
-3. **Not chosen.** Twilio and Telnyx are developer consoles, too hard for her, and Twilio's BAA needs a sales contract. RingCentral and Dialpad need app review and admin portals, and RingCentral has unsigned webhooks. Dialpad can't list inbound texts. Google Voice has no API and its rules ban automation.
-
-**Risks before building.** The Spruce API needs a Support request, and SMS is off in the Spruce trial, so ask Spruce now for a demo account with the API and texting on, because Nov 3 is close. Ask Spruce whether the API is included in Communicator or is a paid add-on, what its rate limits are, and whether a once-a-minute check is fine under its "automated means" clause. Quo trials can't register for texting, so texts would fail with a 400 until registration is approved. The repo's old `.env.example` assumed a Practice-OS-owned Twilio number; it can stay as a developer-only adapter for tests and Isaiah's own demo line.
+*Removed on 2026-11-04: Front Desk phone provider research. Practice-OS no longer includes it.*
 
 ## Referral sources: repos, evidence, relationships, legal limits and the tier model (checked 2026-10-29)
 
@@ -858,90 +709,9 @@ Sensitivity note: the current code (lib/referrals/fit.ts) already uses 40 / 30 /
 - Several numbers are [search-only] (AAP survey, USPSTF, Wang 2003, EAP rates, Malowney). Do not put them in the app or on a pitch slide before opening the page.
 - Run `receipts` before any of this reaches a pitch deck.
 
-## Media presence: Psychology Today, other directories and a practice website (checked 2026-10-29)
+## Media presence (removed)
 
-Plain English summary: Psychology Today ($29.95 a month) is the main place clients find a therapist. It has no API, so Aeon cannot post for her; Aeon writes each part of the profile and she pastes it in. Psychology Today's terms allow AI-written text only if she reviews, fact-checks and personalizes it, so Aeon asks her a few questions only she can answer and drafts only from her own facts. The most important words are the first 200 characters of her first statement box, because that is all a client sees on the search results card. The same text, adjusted, fills Google Business Profile (free) and the other directories. For a website the default is Squarespace Core ($29 a month, paid yearly). Meta has no website builder. The field data and lint rules are in `docs/research/media-presence.json`. Not legal advice.
-
-### 1. How we looked, and what we did not do
-- Psychology Today has no public API, partner program or MCP. Its clinician help center is members-only (it answers 403) ([help center](https://psychologytoday.zendesk.com/hc/en-us)).
-- Its Terms of Use (effective 23 March 2026) ban scraping and crawling "by manual or automated" means ([PT terms](https://docs.psychologytoday.com/directory/terms/en/latest)). So we did not bulk-read profiles. We read 7 public Chicago profiles one by one in a browser (LMFT, LCSW x3, LPC, LCPC, PsyD) plus the Chicago results page ([results](https://www.psychologytoday.com/us/therapists/il/chicago)). We wrote down only structure and text lengths. No therapist's name or words are in this repo.
-- The terms' content standards also say: no copying other profiles; no AI-generated material unless it has been "carefully reviewed, fact-checked, and personalized"; no "inaccurate or exaggerated claims" about skills, credentials, insurance or pricing ([PT terms, section 7](https://docs.psychologytoday.com/directory/terms/en/latest)). This shapes the builder (section 6).
-
-### 2. Anatomy of a Psychology Today profile
-Order on the page, as seen on all 7 profiles:
-1. Header: name, credential line, optional pronouns, "Verified by Psychology Today", endorsement count, Email Me / Call Me, in-person or online, address, "My website".
-2. Personal Statement: three boxes. Longest seen: 633, 360 (exactly) and 348 characters. A third-party report of the live editor (verified 2026-04-15) gives 640 / 360 / 360 ("What can I help you with?", "What's my approach?", "About me"), plus a 140-character intro to new clients and notes of 300 (finances), 300 (credentials), 400 (top specialties) and 400 (types of therapy) ([Reframe Practice](https://reframepractice.com/answers/psychology-today/therapist-bio-examples)). One intro line we saw was exactly 140, and the longest notes we saw (282, 384) sit under those limits. The old separate tagline field is gone; the first statement box does that job.
-3. "My Practice at a Glance": built by Psychology Today from her picks: "I specialize in A, B and C" (her 3 top specialties), "$X Per Session, I accept insurance", "I see individuals, couples...".
-4. Finances: individual and couple fees, sliding scale, payment methods, insurance plans (and Out of Network), then her note.
-5. Qualifications: "Licensed by State of Illinois / number" (Psychology Today verifies it), years in practice, school and graduation year, additional credentials, then her note.
-6. Specialties and Expertise: exactly 3 top specialties ([Big Fish SEO](https://www.thebigfishseo.com/blog/how-to-optimize-psychology-today-profile/)), then an issues checklist (8 to 50 ticked on the profiles we read).
-7. Endorsements: written by other Psychology Today members, not clients, and not something she writes.
-8. Client Focus: age, participants (individuals, couples, families, groups), communities ("... allied"), ethnicity, faith, languages ("I also speak").
-9. Treatment Approach: types of therapy, then her note.
-10. Location: primary location, an additional location, then nearby cities, counties, ZIPs and neighborhoods.
-11. Bottom line: "Call for a free consultation now" with her phone, when the free-consult option is on. An intro video appeared on 2 of 7 profiles; the page also links her website ([join page](https://join.psychologytoday.com/us/signup)).
-
-The search card shows her photo, name, credential, Verified badge, endorsement count, city and ZIP, phone, an Email button, and the first statement box cut to 4 lines (CSS `line-clamp: 4`, 24px lines), so roughly 200 to 300 characters depending on screen width ([results](https://www.psychologytoday.com/us/therapists/il/chicago)). Search filters: specialties, insurance, types of therapy, age, ethnicity, gender and sexuality, language, faith, price, in person or online. Every filter is a tick box, so ticking her real specialties, insurance and ages matters as much as the words.
-
-### 3. What makes a profile work (evidence is thin)
-- Research is thin. One study: 44.5% of 238 therapy patients had looked up their therapist, mostly online, mainly for professional experience ([Eichenberg and Sawyer 2016, JMIR Mental Health](https://mental.jmir.org/2016/2/e22/)). We found no study testing which profile wording gets more calls.
-- Industry guides agree on: fees and how to pay up front, a real recent photo, who she helps in plain words, what a first session is like, and how to book ([Headway](https://headway.co/resources/psychology-today-profile-tips), [Ineffable Living](https://ineffableliving.com/what-do-clients-actually-want-from-a-therapist-website/)).
-- Psychology Today shows members their profile views and contacts ([join page](https://join.psychologytoday.com/us/signup)). That is the only real-world check of whether a profile works.
-
-### 4. Other places to list herself
-| Place | Cost | For whom | API | Reuse from PT |
-|---|---|---|---|---|
-| [Google Business Profile](https://support.google.com/business/answer/3038177) | Free | Practitioners at a verified location; a solo practice brand uses "[brand]: [name]" | Yes, with approval ([prereqs](https://developers.google.com/my-business/content/prereqs)) | 750-character description ([limit](https://support.google.com/business/answer/3039617)), no URLs, prices or promotions; name with no keywords |
-| [GoodTherapy](https://www.goodtherapy.org/for-professionals/welcome-new-practice.html) | $25.95/mo or $310/yr for practices 3 years old or less | Individual therapists | None found | All three boxes joined; it suggests a longer bio |
-| [Zencare](https://therapist.zencare.co/pricing) | From $59/mo + $80 setup | Licensed therapists | None found | Statement; it films an intro video |
-| [TherapyDen](https://www.therapyden.com/faq) | Free (not in search) or $30/mo | Mental health practitioners | None found | "About You" = the boxes joined |
-| [Open Path](https://openpathcollective.org/how-open-path-works/) | Free to her; client pays $65 once; she offers $40-70 slots | Licensed or pre-licensed, existing practice ([eligibility](https://openpathcollective.org/therapist-eligibility/)) | None found | Statement only; no booking links ([FAQ](https://openpathcollective.org/faqs-from-therapists/)) |
-| [Headway](https://help.headway.co/hc/en-us/articles/54117060370068-Understanding-the-marketplace-service-fee) | Free to join; $9.99 per new-client appointment from Nov 2026 | Insurance-credentialed clinicians | None found | Statement; no fee list (Headway bills insurance) |
-| [Alma](https://helloalma.com/for-providers/insurance/) | $95/mo billed yearly | Fully licensed, credentialed under Alma | None found | Statement |
-| [Grow Therapy](https://growtherapy.com/providers/) | No membership fee seen; paid per session | Active unrestricted license plus own malpractice insurance | None found | Their team builds the profile |
-| [Inclusive Therapists](https://www.inclusivetherapists.com/join) | $22/mo yearly or $29 monthly, 90 days free | Licensed or provisionally licensed; values questions ([FAQ](https://www.inclusivetherapists.com/faq/create-profile-join-directory)) | None found | Statement plus client focus |
-| [Therapy for Black Girls](https://therapyforblackgirls.com/start-here/) | $25/mo or $300/yr | Licensed private-practice therapists, vetted | None found | Statement plus client focus |
-| [Latinx Therapy](https://latinxtherapy.com/join/) | $10 or $23/mo, or $223/yr | Committed to cultural humility; free consult required | None found | Statement; Spanish listing on Standard and up |
-
-No directory has a public posting API, so every listing is copy and paste. GoodTherapy's standard tier prices, Zencare's eligibility rules and every directory's character limits are behind logins and not confirmed.
-
-### 5. Rules for what a profile or site may say (not legal advice)
-- LCSW and clinical psychologist: every advertisement must be true and not misleading, and must include the title or initials as on the license ([225 ILCS 20/17](https://www.ilga.gov/Legislation/ILCS/Articles?ActID=1295&ChapterID=24), [225 ILCS 15/26.5](https://www.ilga.gov/Legislation/ILCS/Articles?ActID=1294&ChapterID=24)).
-- LCPC and LPC: the Counselor Act has no advertising section and no title-in-ad rule. It makes "false or misleading advertising" grounds for discipline and protects the titles ([225 ILCS 107](https://www.ilga.gov/Legislation/ILCS/Articles?ActID=1324&ChapterID=24)). The counselor rules say advertising "shall not be deceptive, misleading, or false" ([68 Ill. Adm. Code 1375.225](https://ilga.gov/agencies/JCAR/EntirePart?titlepart=06801375)). We require the designation for every license type anyway.
-- No Illinois text requires a license number, and none bans testimonials or guarantees by name.
-- The ethics codes ban soliciting testimonials from clients and require accurate credentials and no promised results: [ACA 2014 C.3, C.4](https://www.counseling.org/docs/default-source/default-document-library/ethics/2014-aca-code-of-ethics.pdf), [NASW 4.06, 4.07](https://www.socialworkers.org/About/Ethics/Code-of-Ethics/Code-of-Ethics-English/Social-Workers-Ethical-Responsibilities-as-Professionals), [APA 5.01, 5.05](https://www.apa.org/ethics/code).
-- The FTC Endorsement Guides cover reviews, typical results and paid endorsements ([16 CFR 255](https://www.ecfr.gov/current/title-16/chapter-I/subchapter-B/part-255)).
-- Plain language: [plainlanguage.gov](https://www.plainlanguage.gov/about/definitions/), [CDC everyday words](https://stacks.cdc.gov/view/cdc/37678). The "grade 8 or lower" target comes from secondary sources, so it is a warning, not a block.
-- Our lint is stricter than the law on purpose: testimonials, client stories, guarantees, superlatives, "as featured in", incentives for reviews, advice and diagnosis, crisis words, any fact not in her saved details, and anything over the field limit are blocked. Softer outcome words and "24/7" or "same-day" are warnings. The full list with citations is in the JSON.
-
-### 6. What this means for the builder
-- Aeon drafts only from her saved facts (fees, insurance, license, who she helps, location) plus 3 or 4 short answers in her own words (why this work, what a first session is like). It never invents a credential, a year, a plan or a free consult.
-- Every field fits its limit. The first box puts the hook in its first 200 characters, and a preview shows exactly what the card will show.
-- Each field says "Read it and make it yours" before the paste steps, to meet Psychology Today's rule on AI text.
-- One fact sheet feeds every listing and the website, so name, address and phone match everywhere (Google matches listings on these).
-
-### 7. Website
-| Option | Cheapest plan with her own domain | BAA | Custom code (for the Google details block) | Take it with her |
-|---|---|---|---|---|
-| [Squarespace](https://www.squarespace.com/pricing) | Basic $19/mo yearly; Core $29/mo yearly ($39 monthly); free domain year one | Covers Acuity Scheduling only ([BAA](https://support.squarespace.com/hc/en-us/articles/360028867231-Acuity-Scheduling-and-HIPAA)) | Core and up ([code](https://support.squarespace.com/hc/en-us/articles/216107348-Code-based-customizations)) | Partial export |
-| [Wix](https://support.wix.com/en/article/enabling-hipaa-compliance-for-your-wix-site) | Light ~$17.77/mo yearly | Limited, Business plans and up | [Custom code](https://support.wix.com/en/article/embedding-custom-code-on-your-site) (plan not confirmed) | No export |
-| [Framer](https://www.framer.com/help/articles/framer-hipaa-compliance/) | Basic $10/mo | No | Yes (plan not confirmed) | No native export |
-| [Webflow](https://webflow.com/pricing) | Basic $15/mo yearly | No | Yes (plan not confirmed) | Code export on paid workspaces |
-| [Brighter Vision](https://www.brightervision.com/pricing/) | Start $78/mo yearly + $100 setup; built for her | Only with a Hushmail add-on ([HIPAA](https://www.brightervision.com/hipaa/)) | Not hers to edit | She owns her content |
-| [TherapySites](https://www.therapysites.com/pricing) | Core $69/mo + $199 design | Add-on | SEO from $99/mo | Loses content they wrote |
-| [Carrd](https://carrd.com/pro) | Pro Standard $19 per year | No | Pro embeds | Not checked |
-| Own site on Vercel or GitHub Pages | Vercel Hobby is non-commercial only, so Pro at $20/mo ([Vercel](https://vercel.com/docs/limits/fair-use-guidelines)); GitHub Pages bans running an online business ([GitHub](https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits)) | No | Full | Full |
-
-- Meta has no hosted website product. Muse Spark can write site code from a prompt inside Meta AI, with no hosting or domain ([Meta](https://about.fb.com/news/2026/04/introducing-muse-spark-meta-superintelligence-labs/)).
-- HIPAA: a basic site shows phone and email only, or links to a HIPAA-ready booking tool. No contact form that asks about health.
-- Google details block: schema.org has no Psychologist or counselor type. Use `MedicalBusiness`, a `LocalBusiness` subtype, with name and address (required) plus phone, url, hours and price range, and never `review` or `aggregateRating` ([schema.org](https://schema.org/MedicalBusiness), [Google](https://developers.google.com/search/docs/appearance/structured-data/local-business)). Check it with the [Rich Results Test](https://search.google.com/test/rich-results).
-- Pages: home, about, fees, FAQ, contact ([Design for Therapists](https://www.designfortherapists.com/therapist-website-checklist-must-have-pages-for-your-private-practice-website/), [Coral EHR](https://www.coralehr.com/website-toolkit/guides/what-to-put-on-therapy-website/); vendor guides, no neutral authority found). Accessibility basics: [WCAG 2.2 quick reference](https://www.w3.org/WAI/WCAG22/quickref/), [DOJ guidance](https://www.ada.gov/resources/web-guidance/).
-
-Recommendation:
-- **Default (no site yet): Squarespace Core, paid yearly.** It has the biggest template and help library and a 14-day trial with no card, and it is the cheapest plan that takes the Google details block. Aeon writes the five pages and the block; she pastes them.
-- **Already has one:** keep it and run the checklist (booking link, fees, consult offer, same name, address and phone, designation, no health form, 988 line, accessibility basics, details block if her builder allows code).
-- **Do it yourself:** a small static site that a coding agent builds and deploys on her own Vercel Pro. Only for someone who will always have an agent to edit it. Not built in the app now; the research does not show it beats the default for her.
-- **Done for you:** Brighter Vision, if she wants no work at all.
+*Removed on 2026-11-04: Media presence research (Psychology Today, directories, practice website). Practice-OS no longer includes it.*
 
 ## Insurance: every payer, every way to apply, by license (checked 2026-10-29)
 
@@ -1401,115 +1171,4 @@ Screeners (blank copies). Optional, any license. Free to copy.
 
 ---
 
-# Growth agent, Phase 1 findings (checked 2026-10-30; research, not legal advice)
-
-Why this exists: before Aeon grows the practice (ads, listings, website), the policies, APIs, ethics and costs below decide what it may automate. Every area keeps the same hard limits (bottom of this section). Anything marked UNCONFIRMED was not on a live official page today and must be re-checked before building on it. Prices may change; re-check every number at checkout.
-
-## 1. Google Ads healthcare and personalized-advertising policies
-
-A plain psychotherapy practice advertising consults is not listed in Google's special-certification buckets (those cover prescription-drug services, online pharmacies, telemedicine that facilitates prescribing, addiction treatment, US health insurance). Whether her exact wording triggers a certification or limited review is decided at review time — UNCONFIRMED until she runs it. Health is a Sensitive interest category: no advertiser-curated audiences (website-visitor lists, Customer Match–type uploads); plan for keyword + location targeting. Never imply knowledge of the viewer's condition, and never pass health details into Google tags or feeds.
-
-- Aeon can automate (drafts only, she approves): generic consult ad copy without condition claims; keyword pre-screen against certification triggers; a do-not-upload checklist for tags/feeds; consent/privacy wording drafts for counsel to approve; a disapproval log from her forwarded notices.
-- Needs her: Ads account creation and Terms, any certification application, tag installation decisions, any audience upload (default: never), disapproval appeals.
-- Costs: ad spend only (hers, per click, no published fixed price); possible LegitScript-type certification cost if triggered — UNCONFIRMED.
-- Risks: disapproval/suspension from condition-specific copy; confidentiality breach via tags/feeds; guarantee-style copy (ethics); credential leaks; mild lock-in.
-- Approvals: account creation, every ad/keyword set, any tag/audience/certification/budget change. Spend: a hard monthly account-level cap she chooses, no auto-increases; Aeon never changes budgets.
-- Sources (all HTTP 200, 2026-10-30): [Healthcare & medicines policy](https://support.google.com/adspolicy/answer/176031) · [Restricted targeting](https://support.google.com/adspolicy/answer/143465) · [Data collection and use](https://support.google.com/adspolicy/answer/6020956) · [US-states privacy compliance](https://support.google.com/google-ads/answer/9614122).
-
-## 2. Google Ads API access (2026 model)
-
-Developer tokens were sunset 2026-09-09: access is now per Google Cloud project, not per manager-account API Center. New path: enable the API in her Cloud project (automatic Test access: test accounts only, 15,000 ops/day), then apply for Explorer access (automated review; 2,880 prod ops/day + 15,000 test). Higher tiers Basic (15,000/day) and Standard (unlimited most services) need applications; Basic/Standard need brand verification, Standard review ~10 business days. Explorer blocks account creation, user management, planning and billing services. No per-call API fee published on the verified pages. Billing for ads is 100% her Ads account and card.
-
-- Aeon can automate (read-only, small scale): test-account reporting queries; draft production changes as approval items with exact payloads; spend/diagnostic monitoring with alerts (~50/80/100% of cap); quota/error log with backoff; application text and brand-verification checklist for her to submit.
-- Needs her: Cloud project ownership, OAuth/service-account grants, linking the project to her Ads account, her billing instrument, access applications and brand verification, every production write and billing change.
-- Costs: engineering time + her ad spend; no published API fee (UNCONFIRMED beyond "no fee published").
-- Risks: test-project calls to production error out; credential storage (server-side, least privilege, rotate); bulk-change blast radius (default read-only + drafts); Cloud-project owner roster discipline; low lock-in.
-- Approvals: project creation/linking, any OAuth grant, any access application, any production write, any billing change.
-- Sources (all HTTP 200, 2026-10-30): Google Ads API docs via [developers.google.com/google-ads/api](https://developers.google.com/google-ads/api) (onboarding, access levels, quotas, billing pages). Exact quota numbers above are per Cloud project per sliding 24h as published; re-check before building.
-
-## 3. Google Business Profile APIs
-
-The APIs manage account/location data with almost the UI's full features: business information, Posts, review data (list, reply, delete a reply), verification management, insights, admins, attributes/services, media upload, real-time (Pub/Sub) notifications, Ads integration. Access is per Cloud project and never extends to profiles she doesn't manage. New-profile verification is Google-determined (live video recording, live call, phone/SMS, email); a human on site performs it. Exact numeric quotas UNCONFIRMED (limits exist and are increasable per the FAQ). No per-call usage fee found — UNCONFIRMED, confirm terms before building.
-
-- Aeon can automate: stage hours/address/phone/category edits for approval then push; draft GBP Posts from logistics for approval; review digest + drafted replies (never auto-post); real-time notification surfacing; insights summaries for the morning brief.
-- Needs her: the API access request (domain email + live site, ~14-day review); OAuth grant as profile owner/manager; verification itself; every public word on reviews; admin/ownership changes.
-- Costs: engineering (OAuth app, token storage, review-draft UI); Cloud project free tier suffices; her verification time; no ad spend required.
-- Risks: OAuth tokens are high-value secrets (encrypt, least privilege, revocable); listing suspension on policy violations (keep human gate); review replies are forever (one PHI slip is an incident); re-verification can be demanded anytime; Google-side deprecations (isolate calls behind one module).
-- Approvals: OAuth and scope changes, first access request, every publish, admin/ownership changes, verification attempts.
-- Sources (all HTTP 200, 2026-10-30): [GBP APIs overview](https://developers.google.com/my-business) · [GBP FAQs](https://developers.google.com/my-business/content/faq) · [Review data](https://developers.google.com/my-business/content/review-data) · [Locations setup](https://developers.google.com/my-business/content/locations-setup) · [Verify your business](https://support.google.com/business/answer/7107242?hl=en) · [Video verification](https://support.google.com/business/answer/14271705?hl=en).
-
-## 4. Search Console API and site verification
-
-`searchanalytics.query()` exposes Performance data (queries, clicks, impressions, CTR, position; 25,000-row pages). Also site lists, sitemaps, URL inspection (tighter quotas). Verified quotas (page updated 2025-08-28): Search Analytics 1,200 QPM per site/user, 30,000,000 QPD + 40,000 QPM per project; URL inspection 2,000 QPD / 600 QPM per site; all other resources 20 QPS / 200 QPM per user. Free of charge, subject to limits. Verification a non-technical owner can do: HTML file, meta tag, GA code, Tag Manager snippet, Site Kit plugin for WordPress, or DNS TXT (only method covering a Domain property). Keep two verification methods and two owners she controls.
-
-- Aeon can automate: weekly plain-English visibility summaries; sitemap/indexing-error digests; click trend tracking with proposed tweaks for approval; token-health monitoring; batched exports for quarterly trends.
-- Needs her: verification itself (her host/registrar login); property type and role grants; GA/Tag Manager account creation; removals/redirects (per-change approval); recovery of orphaned properties.
-- Costs: free API; her domain/hosting already owned; quotas far beyond a single practice site.
-- Risks: verified-owner permission is powerful (guard credentials); query data may carry identifiable intent (store aggregates, never join with client records); token hygiene; unvetted third-party plugins (prefer Site Kit/host-native/DNS); mild lock-in (keep raw exports).
-- Approvals: verification attempts, owner/user grants, plugin/tag installs, sitemap/robots changes, external data sharing, removals/redirects.
-- Sources (all HTTP 200, 2026-10-30): [Search Console API](https://developers.google.com/webmaster-tools) · [Search analytics queries](https://developers.google.com/webmaster-tools/v1/how-tos/search_analytics) · [Usage limits](https://developers.google.com/webmaster-tools/limits) · [Pricing](https://developers.google.com/webmaster-tools/pricing) · [Site verification](https://support.google.com/webmasters/answer/9008080) · [Owners and permissions](https://support.google.com/webmasters/answer/7687615?hl=en).
-
-## 5. HHS/OCR tracking-technology guidance and the 2024 court decision
-
-OCR's bulletin "Use of Online Tracking Technologies" (Dec 1, 2022; revised Mar 18, 2024) treated IP-address-plus-visit-to-public-health-page as triggering HIPAA. On June 20, 2024 the N.D. of Texas in *AHA v. Becerra* vacated the bulletin only to that extent; the rest stands: authenticated pages still involve PHI; disclosures to tracking vendors need a BAA or authorization; pixels/analytics sending identifiers + health page views are disclosures. Server-side first-party measurement that never discloses PHI to a third party (self-hosted logs, aggregate cookieless counts, BAA vendor with identifiers stripped) remains allowed. (hhs.gov bot-screens automated fetches; vacatur confirmed via the bulletin's indexed text plus law-firm summaries. Appeal-dismissal timing UNCONFIRMED.)
-
-- Aeon can automate: tracker inventory with plain-language what-sends-where; tracker-removal/consent task lists for approval; checking whether a vendor signs a BAA (record, don't assume). NEVER auto-install pixels/analytics sending visitor IP + page views; never send appointment/intake/portal data to ad/analytics vendors; never treat the vacatur as clearance for authenticated/intake pages.
-- Needs her: keep-or-remove call on current pixels (under BAA or removal); signing any BAA; whether her site has authenticated areas; breach-risk call on past pixel fires; analytics account ownership.
-- Costs: no rule fee; vendor/tooling tiers, pixel-removal dev time, possible counsel review.
-- Risks: impermissible PHI disclosure; breach-notification duty; OCR enforcement on the intact remainder; state-law/FTC exposure; class-action risk; client-trust loss.
-- Approvals: any tracker change; any BAA; any new analytics tool; any intake/booking-page change; counsel engagement after suspected past disclosure.
-- Sources: [HHS OCR tracking bulletin](https://www.hhs.gov/hipaa/for-professionals/privacy/guidance/hipaa-online-tracking/index.html) (indexed text confirms June 20, 2024 vacatur; checked 2026-10-30).
-
-## 6. Ethics-code limits on testimonials, reviews, claims, solicitation
-
-APA 5.05: no soliciting testimonials from current therapy clients or the vulnerably influenced; 5.01 bars false/deceptive public statements. NASW 4.07: no uninvited solicitation of vulnerable prospects; no soliciting testimonial endorsements, including reuse permission, from current clients or vulnerable others. ACA 2014: broadest testimonial rule (current clients, former clients, vulnerable others per secondaries — section letter UNCONFIRMED), with implications discussion + permission. AAMFT: no testimonial-specific ban found in secondaries (numbering UNCONFIRMED); truthful advertising + confidentiality effectively bar client endorsements; no kickbacks for referrals. NBCC (2023): no soliciting testimonials from current clients, families, close friends, or former clients within 5 years (confirm in-PDF; older text said 2 years). Across codes: soliciting Google/Yelp reviews from clients counts as soliciting testimonials; public review replies must never confirm a treatment relationship; efficacy claims must be truthful with no guaranteed outcomes.
-
-- Aeon can automate: logistics-only marketing drafts with no outcome promises; flagging guarantee/ranking/superiority language; neutral review-response templates confirming nothing. NEVER request reviews/testimonials from current (or for counselors, former/vulnerable) clients; never publish client statements as endorsements without her documented consent; never offer/accept anything of value for referrals or reviews.
-- Needs her: which code(s) bind her (license + state board layer); whether an unsolicited review may be acknowledged; accuracy of every credential/specialty/outcome claim; consent + wording for any testimonial; her directory/review-site accounts and responses.
-- Costs: her time; possible ethics-counsel consult on complaints.
-- Risks: board discipline; ethics complaints; confidentiality breach via review replies; FTC exposure on false efficacy claims; trust loss.
-- Approvals: every public post/bio/listing; any review response; any client-statement use; any effectiveness/specialty/credential claim; any outreach letter.
-- Sources (all HTTP 200, 2026-10-30): [APA Ethics Code](https://www.apa.org/ethics/code) (5.05, 5.01) · [NASW Code 4.07](https://www.socialworkers.org/About/Ethics/Code-of-Ethics/Code-of-Ethics-English/Social-Workers-Ethical-Responsibilities-as-Professionals) · [ACA ethics](https://www.counseling.org/resources/ethics) · [AAMFT Code](https://www.aamft.org/Legal_Ethics/Code_of_Ethics.aspx) · [NBCC Code PDF](https://www.nbcc.org/assets/ethics/nbcccodeofethics.pdf). Section letters, AAMFT numbering and the NBCC 5-year window need in-source confirmation before quoting precisely.
-
-## 7. What therapist growth agencies and private-pay coaches sell (public pages only)
-
-Bundles: done-for-you local SEO + GBP management (retainers); website management + SEO add-on; Google Ads setup + management plus ad spend paid separately; one-off audits; coaching cohorts (3–12 months). Public prices seen today: SEO retainers ~$400–700+/mo entry (Therapy Flow $400/mo; Local SEO Therapists from ~$700/mo); ads management ~$390–420/mo plus $1,000–2,000/mo spend (Fully Booked Pros $420/mo + ≥$1,000 spend, 3-month minimum; Therapy Everywhere $499 consult then $390/mo); coaching ~$4,000–4,800/program (Abundance $3,999–$4,800). Realistic 12-month totals: SEO-only ~$4,800–8,400; ads ~$17,000–29,000 including spend. Agencies quoting only on sales calls are unnamed (UNCONFIRMED).
-
-- Aeon can automate: directory listing/renewal/completeness tracking; SEO page outlines and bio copy for her to paste; spend-vs-inquiries logging with cost-per-consult drift flags; coaching/contract date nudges; vendor comparison rows from public pages.
-- Needs her: signing/paying any contract (her card/signature); granting agencies account access; niche/fees/positioning choices; attending calls and approving voice copy; cancellations/chargebacks.
-- Costs: as above, vendor list prices before ad spend.
-- Needs her approval: every agency/coach purchase; flag retainers over $500/mo and programs over $2,000; ad spend needs its own monthly cap. Aeon never signs, pays, or grants access.
-- Risks: minimum-term retainers and agency-owned ad accounts (require client-owned accounts); no-BAA vendors must never get client detail; testimonial demands clashing with ethics (her call); unenforceable guarantee claims; auto-renew/installment fine print.
-- Sources (all HTTP 200, 2026-10-30): [Therapy Flow](https://mytherapyflow.com/website-and-seo-boost-program/) · [Local SEO Therapists](https://localseotherapists.com/) · [Fully Booked Pros](https://www.fullybookedpros.com/google-ads) · [Therapy Everywhere](https://therapyeverywhere.com/google-ads-psychologists-psychiatrists-therapists/) · [Abundance](https://www.abundancepracticebuilding.com/fill).
-
-## 8. Hosting options for a clinician-owned website
-
-Squarespace Basic $25/mo monthly or $19/mo annual (~$228/yr; 14-day trial, no free plan; free custom domain first year). WordPress.com Personal $9/mo monthly or $4/mo annual (~$48/yr; free plan exists with subdomain + ads; best portability via standard export). Google Sites $0 (login-gated check; domain ~$10–20/yr UNCONFIRMED; weakest exit path — expect a rebuild). Recommendation for a non-technical starter: WordPress.com Personal for cheapest custom-domain path with portability, Squarespace Basic for easiest polish, Google Sites only as a throwaway starter page.
-
-- Aeon can automate: full site copy drafts + image/alt-text checklists; plan comparisons against her needs; launch checklists (domain, SSL, analytics, backup, 988 line); renewal/SSL/broken-link monitoring; export/migration runbooks.
-- Needs her: account creation and payment; domain purchase, auto-renew, privacy protection; template and photo/copy approval; booking/email integrations; any BAA (prefer no health forms on site).
-- Costs: as above; domains renew yearly everywhere.
-- Risks: stop paying, site goes offline; designs don't port; contact forms collecting health detail (route to phone/booking only); WordPress plugin surface (keep minimal); builder-held domains complicate moves.
-- Approvals: platform choice and any paid plan; flag plans over $25/mo and upsells; Aeon never touches payment details.
-- Sources (all HTTP 200, 2026-10-30): [squarespace.com/pricing](https://www.squarespace.com/pricing) · [wordpress.com/pricing](https://wordpress.com/pricing/) · [sites.google.com/new](https://sites.google.com/new) (login-gated).
-
-## 9. Meta (Facebook and Instagram) ads for a therapy practice (checked 2026-11-02)
-
-Meta's Privacy Violations and Personal Attributes standard bars ads that assert or imply a person's physical or mental health, directly or indirectly; its own rejected example is "Do you have diabetes?". Ads about what a health service offers are allowed. Health-related detailed targeting options were removed from Ads Manager on 2022-01-19, and since early 2025 Meta limits the data it accepts from health and wellness sites (lower-funnel events such as Purchase). So Grow's Meta drafts use her city radius and adults 18+ only, optimize for link clicks, never ask for a pixel, and run the same plain-code check as the Google drafts. Special ad categories (housing, jobs, credit, politics) do not apply.
-
-- Sources: [Privacy Violations and Personal Attributes](https://transparency.meta.com/policies/ad-standards/objectionable-content/privacy-violations-personal-attributes) (fetched 2026-11-02) · [Removing certain ad targeting options](https://www.facebook.com/business/news/removing-certain-ad-targeting-options-and-expanding-our-ad-controls) (2021-11-09 announcement; date of removal per secondary summaries, UNCONFIRMED in-page) · health-and-wellness data limits per secondary summaries, UNCONFIRMED on a Meta page.
-
-## 10. Ad budgets as a real cap (checked 2026-11-02)
-
-Google: a campaign "might spend up to twice your average daily budget" on a given day, but over a month it "will have spent no more than 30.4 times your average daily budget". So Grow sets the daily budget to her monthly cap ÷ 30.4 and says so. Meta: a lifetime budget with an end date stops spending when it is used up, so Grow's Meta drafts use a lifetime budget equal to her monthly cap over a 30-day run. Grow doesn't draft for a cap under $150 a month (Aeon's floor, not a platform rule).
-
-- Sources: [About overdelivery and your average daily budget](https://support.google.com/google-ads/answer/2375423) (fetched 2026-11-02). Meta lifetime-budget behaviour is from Ads Manager's budget setting; no Meta help page was fetched (UNCONFIRMED in-page).
-
-## Hard limits (preserved for any Phase 2 build)
-
-- Never spend money without a clinician approval and a hard monthly cap.
-- Never claim guaranteed rankings or “HIPAA compliant.”
-- No client testimonials, client stories, clinical advice, condition targeting, or remarketing.
-- No tracking pixels; consult conversions are counted server-side without client details.
-- The site belongs to the clinician and must be exportable.
-- Build the private-pay planner first if Phase 2 is approved.
+*Removed on 2026-11-04: Growth agent (ads, website, private-pay planner) research. Practice-OS no longer includes it.*

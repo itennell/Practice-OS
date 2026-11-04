@@ -1,7 +1,7 @@
 import { forget, listMemories, remember, type MemoryKind } from "../aeon/memory";
 
 // One memory per onboarding fact: a new answer replaces the older memory that starts
-// with the same words ("Instagram post style:"), so Aeon never keeps two answers to
+// with the same words ("Practice website:"), so Aeon never keeps two answers to
 // one question. A memory that can't be saved never blocks her answer.
 export async function rememberLine(prefix: string, text: string, kind: MemoryKind = "fact"): Promise<void> {
   try {

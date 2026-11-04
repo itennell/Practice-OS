@@ -458,7 +458,7 @@ export const US_RULES: RuleInput[] = [
     caveat: "Compliance dates for parts of the 2024 rule were not checked.",
   },
 
-  // --- Texting (Front Desk) --------------------------------------------------
+  // --- Texting clients --------------------------------------------------
   {
     id: "us_a2p_10dlc",
     kind: "setup",
@@ -467,7 +467,7 @@ export const US_RULES: RuleInput[] = [
     title: "Register your practice number for texting",
     applies_to: { facts: { uses_texting: true } },
     schedule: { type: "setup", reask_days: 30 },
-    what_to_do: "Register a brand and campaign (A2P 10DLC) for your practice number before the Front Desk texts anyone. Unregistered texts are blocked, and review takes 3 weeks or more.",
+    what_to_do: "Register a brand and campaign (A2P 10DLC) for your practice number before you text anyone from it. Unregistered texts are blocked, and review takes 3 weeks or more.",
     you_must: "Submit the registration in Twilio.",
     source: src("Twilio docs: A2P 10DLC", "https://www.twilio.com/docs/messaging/compliance/a2p-10dlc", "from an application to the US must register for A2P 10DLC"),
     verified_by: "maintainer",
@@ -480,7 +480,7 @@ export const US_RULES: RuleInput[] = [
     title: "Someone asked to stop texts",
     applies_to: { facts: { uses_texting: true } },
     schedule: { type: "clock", event: "A caller asked to stop texts (stop, cancel, quit or similar)", business_days: 10 },
-    what_to_do: "Stop texting them within 10 business days (the Front Desk stops at once). One confirmation text is allowed.",
+    what_to_do: "Stop texting them within 10 business days. One confirmation text is allowed.",
     you_must: null,
     source: src("47 CFR 64.1200(a)(10), (a)(12)", "https://www.ecfr.gov/current/title-47/chapter-I/subchapter-B/part-64/subpart-L/section-64.1200", "any reasonable method"),
     verified_by: "maintainer",
