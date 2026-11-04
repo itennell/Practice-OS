@@ -131,11 +131,17 @@ export type PersonVerdict = { verdict: "ok" } | { verdict: "blank" } | { verdict
  * Anyone else is a stranger: refused when the sentence looks like a client's
  * (a visit, a bill, a condition), otherwise blanked where blanking is allowed.
  */
-export function judgePerson(name: string, text: string, allow: Allowlist): PersonVerdict {
+/**
+ * `herWords`: the text is hers (her chat message, or a memory). Only there do the
+ * business-only rules apply around a partner named by first name or surname (businessOnly,
+ * PERSONAL_MATTER, the next sentence). Tool results and replies the code builds itself
+ * ("Tue Aug 19, 9:00 am", "Maria Halvorsen, MS") are judged without them.
+ */
+export function judgePerson(name: string, text: string, allow: Allowlist, herWords = true): PersonVerdict {
   // "Mark Brittany Keiser as contacted": the name-finder can take the command
   // word as a first name. When the rest is a whole name on her list, judge that.
   const command = COMMAND_BEFORE_NAME.exec(name);
-  if (command && wholeOf(wordsOf(command[1]), allow.names)) return judgePerson(command[1], text, allow);
+  if (command && wholeOf(wordsOf(command[1]), allow.names)) return judgePerson(command[1], text, allow, herWords);
   const words = wordsOf(name);
   // Only titles or a sample label ("Rev.", "[Sample]"): no one is named.
   if (words.length === 0) return { verdict: "ok" };
@@ -161,7 +167,7 @@ export function judgePerson(name: string, text: string, allow: Allowlist): Perso
     // claim", "no-showed") or a next sentence leaning on it ("Plan lunch with Maria. Her son was arrested.").
     const partOnly = boardPart && !boardWhole;
     const after = at >= 0 && partOnly ? leaningNext(text, at) : null;
-    const personal = partOnly && (PERSONAL_MATTER.test(s) || !businessOnly(s) || (after !== null && !partnerSentenceClean(after, name)));
+    const personal = herWords && partOnly && (PERSONAL_MATTER.test(s) || !businessOnly(s) || (after !== null && !partnerSentenceClean(after, name)));
     if (clean && !personal && (boardWhole || boardPart) && (referralContext(s) || command || (boardPart && titled))) continue;
     if (at >= 0 && colleagueAt(text, at, name) && !condition) continue;
     // A partner's staff by first name ("Jen at the front desk handles it"), outside any client sentence.
@@ -174,8 +180,8 @@ export function judgePerson(name: string, text: string, allow: Allowlist): Perso
 }
 
 /** A name that passes where it stands (see judgePerson). */
-export function isAllowedPerson(name: string, text: string, allow: Allowlist): boolean {
-  return judgePerson(name, text, allow).verdict === "ok";
+export function isAllowedPerson(name: string, text: string, allow: Allowlist, herWords = true): boolean {
+  return judgePerson(name, text, allow, herWords).verdict === "ok";
 }
 
 // ---- partners named by first name or surname ------------------------------------
@@ -269,10 +275,11 @@ const BUSINESS_NOUN =
   "openings?|fees?|rates?|schedule|calendar|e-?mail|emails|number|phone|website|site|specialty|specialties|specialization|focus|niche|card|letters?|flyer|" +
   "brochures?|talk|lunch|coffee|meeting|meetings|call|intro|introduction|partnership|collaboration|workshop|event|events|program|programs|services|" +
   "front\\s+desk|desk|address|fax|hours|location|offices|department|unit|coordinator|manager|receptionist|scheduler|process|forms?|network|panel|panels|" +
-  "insurance\\s+panels?|board|newsletter|presentation|training|book|podcast|blog|outreach|contact|info|information|details|new\\s+clients|openings";
+  "insurance\\s+panels?|board|newsletter|presentation|training|book|podcast|blog|outreach|contact|info|information|details|new\\s+clients|openings|" +
+  "IOP|PHP|lunch-and-learn|lunch-and-learns|associate|associates|brochure|fee\\s+sheet|NPI|sliding\\s+scale|EHR|conference|webinar";
 const BUSINESS_NOUN_RE = new RegExp(`^(?:${BUSINESS_NOUN})$`, "i");
 /** Words that may come before a business noun ("her new practice", "his clinic's waitlist", "their intake process"). */
-const MODIFIER = /^(?:new|own|main|other|current|private|group|intake|referral|front|clinic|practice|office|team|lunch|quick|short|palliative|oncology|hospice|genetic|counseling|care|cancer|support|weekly|monthly|next|last|first|upcoming|free)$/i;
+const MODIFIER = /^(?:new|second|own|main|DBT|CBT|EMDR|ACT|teen|adolescent|adult|child|couples|family|parenting|grief|perinatal|trauma|skills|process|virtual|telehealth|evening|weekend|solo|other|current|private|group|intake|referral|front|clinic|practice|office|team|lunch|quick|short|palliative|oncology|hospice|genetic|counseling|care|cancer|support|weekly|monthly|next|last|first|upcoming|free)$/i;
 
 /** One to three words, read as a business noun phrase ("clinic's waitlist", "palliative care referrals"). */
 function businessPhrase(words: string[]): boolean {
@@ -310,6 +317,51 @@ const BUSINESS_CLAUSE = new RegExp(
   "u",
 );
 
+// News about a partner's practice, read as a whole clause up to its end (a comma, a stop, "and
+// she..."): the business phrase, then only time and place words ("next week", "in January", "to
+// Evanston", "on Thursdays"). Anything else after it ("on vacation in rehab", "because of her
+// breakdown") leaves the clause unread, so it refuses. A POSITIVE list, nothing else.
+const MONTH = "January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec";
+const WEEKDAY = "Mondays?|Tuesdays?|Wednesdays?|Thursdays?|Fridays?|Saturdays?|Sundays?|weekends?|weekdays?|mornings?|afternoons?|evenings?";
+const NOT_A_PLACE = "(?!(?:Rehab|Detox|Jail|Prison|Hospital|ICU|ER|Court|Treatment|Recovery)\\b)";
+const PAYER = "BCBS|BCBSIL|Blue\\s+Cross(?:\\s+Blue\\s+Shield)?|Aetna|Cigna|United(?:healthcare)?|UHC|Medicaid|Medicare|Tricare|Humana|Optum|Magellan|Meridian|CountyCare|most\\s+insurance|insurance";
+const FIELD =
+  "perinatal|postpartum|anxiety|depression|grief|bereavement|trauma|oncology|cancer|cancer-related|adolescent|teen|child|couples|family|LGBTQ\\+?|queer|trans|" +
+  "substance|substance-use|ADHD|OCD|eating|disorder|insurance|Medicaid|Medicare|older|adult|college|student|veteran|chronic|illness|hospice|palliative|end-of-life|new|self-pay";
+const ASKED_FOR = "brochure|fee\\s+sheet|NPI|availability|card|business\\s+card|rates|fees|sliding\\s+scale|flyer|website|info|CV|bio|intake\\s+forms?";
+const PRACTICE_NEWS_CLAUSE = [
+  `(?:opened|opening|opens|moved|moving|moves|hiring|hires|hired|starting|started|starts|leaving|left|leaves|switching|switched|expanding|expanded|growing|closing|closed|relocating|relocated)\\s+(?:(?:her|his|their|a|an|the)\\s+)?(?:(?:new|second|third|own|group|private|solo|teen|adolescent|adult|family|couples|weekend|evening|virtual|telehealth|DBT|CBT)\\s+){0,2}(?:practice|group|office|program|clinic|location|IOP|PHP|waitlist)`,
+  `(?:hiring|hires|hired|adding|added)\\s+(?:a|an|another|one|two)\\s+(?:new\\s+)?(?:associates?|therapists?|clinicians?|counselors?|interns?|billers?|receptionists?)`,
+  `(?:switching|switched|moving|moved)\\s+to\\s+(?:an?\\s+)?(?:new\\s+)?(?:EHR|telehealth|[A-Z][\\w-]+)`,
+  `on\\s+vacation`,
+  `out\\s+of\\s+(?:the\\s+)?office`,
+  `(?:out|away|off)(?=\\s+(?:until|through|till)\\b)`,
+  `asked\\s+(?:for|about)\\s+my\\s+(?:${ASKED_FOR})(?:\\s*(?:,|and)\\s*(?:my\\s+)?(?:${ASKED_FOR}))*`,
+  `(?:has|have|got|had)\\s+(?:some\\s+|a\\s+few\\s+|new\\s+|two\\s+|three\\s+)?(?:openings|availability|room|space|slots)`,
+  `(?:takes|accepts|taking|accepting|take|accept)\\s+(?:${PAYER})`,
+  `(?:presenting|presents|present|speaking|speaks|speak)\\s+at\\s+(?:the\\s+|a\\s+|an\\s+)?(?:(?:[A-Z][\\w-]*|counseling|therapy|clinical|regional|state|annual|national|local|spring|fall)\\s+){0,4}(?:conference|workshop|training|summit|meeting|event|grand\\s+rounds|webinar|lunch-and-learn)`,
+  `(?:(?:wants?|wanted|plans?|planning|hopes?|hoping)\\s+to\\s+)?(?:co-?lead|co-?leads|co-?leading|lead|leads|leading|host|hosts|hosting|run|runs|running)\\s+(?:a|an|the)\\s+(?:new\\s+)?(?:workshop|training|webinar|lunch-and-learn|consultation\\s+group)`,
+  `mentioned\\s+(?:a|an|the|her|his|their)\\s+(?:new\\s+)?(?:group|IOP|PHP|program|workshop|office|location|practice|associate|opening|training)`,
+  `(?:said|says|mentioned)\\s+(?:that\\s+)?(?:her|his|their)\\s+(?:front\\s+desk|office|staff|team|scheduler|biller|receptionist|office\\s+manager)\\s+(?:lost|has|needs|got|never\\s+got|didn['’]t\\s+get|sent|missed|wants)\\s+my\\s+(?:fax|referral|letter|e-?mail|brochure|card|forms?|NPI|fee\\s+sheet)`,
+  `(?:sees|gets|receives|see|get)\\s+(?:a\\s+lot\\s+of|lots\\s+of|many|mostly|plenty\\s+of)\\s+(?:(?:${FIELD})\\s+){1,3}referrals`,
+].join("|");
+const PRACTICE_NEWS_TAIL =
+  `(?:\\s+(?:next|this|last)\\s+(?:week|month|year|weekend|spring|summer|fall|winter)|\\s+(?:in|on|until|through|till|by|from|after|before|starting)\\s+(?:the\\s+)?(?:${MONTH}|${WEEKDAY}|spring|summer|fall|winter|the\\s+\\d{1,2}(?:st|nd|rd|th)?|\\d{1,2}\\/\\d{1,2})(?:\\s+\\d{1,2}(?:st|nd|rd|th)?)?|` +
+  `\\s+(?:to|in)\\s+${NOT_A_PLACE}[A-Z][\\w-]+(?:\\s+${NOT_A_PLACE}[A-Z][\\w-]+){0,2}|\\s+on\\s+(?:${WEEKDAY}|Zoom)|\\s+(?:soon|again|too|now|already|this\\s+week))*`;
+const PRACTICE_NEWS = new RegExp(
+  `^(?:['’](?:s|d|ll|re|ve)\\b|\\s+(?:is|are|was|were|will|would|can|could|might|may|should))?(?:\\s+(?:just|also|recently|now|still|finally|really|soon))*\\s+(?:${PRACTICE_NEWS_CLAUSE})${PRACTICE_NEWS_TAIL}(?=[.!?]?\\s*$|,?\\s+and\\s+(?:she|he|they)\\b)`,
+  "u",
+);
+// Field words name the referrals a partner sees, never a person's condition, only in this frame.
+const SEES_REFERRALS = new RegExp(
+  `\\b(?:she|he|they)\\s+(?:sees|gets|receives|see|get)\\s+(?:a\\s+lot\\s+of|lots\\s+of|many|mostly|plenty\\s+of)\\s+(?:(?:${FIELD})\\s+){1,3}referrals\\b(?=\\s*(?:[.,;!?]|$))`,
+  "giu",
+);
+/** The sentence with a partner's "sees a lot of perinatal anxiety referrals" read as plain referral talk. */
+export function withoutReferralFields(s: string): string {
+  return s.replace(SEES_REFERRALS, (m) => m.split(/\s+/)[0] + " sends referrals");
+}
+
 /** True when everything said about a person in this sentence is practice business. */
 export function businessOnly(s: string): boolean {
   if (/,\s*\d{1,3}\b/.test(s)) return false;
@@ -323,7 +375,14 @@ export function businessOnly(s: string): boolean {
     if (!businessPhrase(wordsAfter(s, (m.index ?? 0) + m[0].length))) return false;
   }
   for (const m of s.matchAll(/\b(?:she|he|they)\b/giu)) {
-    if (!BUSINESS_CLAUSE.test(s.slice((m.index ?? 0) + m[0].length))) return false;
+    const rest = s.slice((m.index ?? 0) + m[0].length);
+    if (PRACTICE_NEWS.test(rest)) continue;
+    const clause = BUSINESS_CLAUSE.exec(rest);
+    if (!clause) return false;
+    // A business clause ends the sentence, or hands over with ", and she/he/they" (judged on its
+    // own above). Any other fragment after a comma or semicolon ("..., Mercy Hospital") refuses.
+    const after = rest.slice(clause[0].length).split(/,?\s+and\s+(?=(?:she|he|they)\b)/i)[0];
+    if (/[,;:]/.test(after)) return false;
   }
   for (const m of s.matchAll(/\b(?:about|regarding|re:?|to\s+discuss|discuss(?:ing)?|on\s+the)\s+/giu)) {
     const ws = wordsAfter(s, (m.index ?? 0) + m[0].length, 5);
@@ -335,8 +394,9 @@ export function businessOnly(s: string): boolean {
   return true;
 }
 
-function partnerSentenceClean(s: string, said: string): boolean {
+function partnerSentenceClean(sentence: string, said: string, herWords = true): boolean {
   const who = escape(said);
+  const s = withoutReferralFields(sentence);
   return (
     !MY_CLIENT.test(s) &&
     !/\b(?:client|patient)\b/i.test(s) &&
@@ -344,8 +404,7 @@ function partnerSentenceClean(s: string, said: string): boolean {
     !mentionsDiagnosis(s) &&
     !mentionsMedical(s) &&
     !medicalAboutSomeone(s) &&
-    !PERSONAL_MATTER.test(s) &&
-    businessOnly(s) &&
+    (!herWords || (!PERSONAL_MATTER.test(s) && businessOnly(s))) &&
     !namedCondition(said, s) &&
     !new RegExp(`(?<![\\p{L}\\p{N}])${who}['’]s\\s+(?:[\\p{L}-]+\\s+)?(?:${RELATIVES})s?\\b`, "iu").test(s)
   );
@@ -366,7 +425,7 @@ export type PartnerMatch =
  * are one person and must all be on one card ("Maria Smith" is not Maria Helgeson);
  * words split by a comma, "and" or a colon are separate people.
  */
-export function partnerMatch(name: string, text: string, allow: Allowlist): PartnerMatch {
+export function partnerMatch(name: string, text: string, allow: Allowlist, herWords = true): PartnerMatch {
   const cards = partnerCards(allow);
   if (!cards.length) return { kind: "none" };
   const said = name
@@ -409,9 +468,9 @@ export function partnerMatch(name: string, text: string, allow: Allowlist): Part
       if (joined.some((t) => !cards.some((c) => c.words.includes(t.base)) && !COMMON_AFTER_NAME.test(t.base))) return { kind: "none" };
       const spoken = text.slice(group[0].at, group.at(-1)!.end);
       const sent = sentenceAt(text, group[0].at);
-      if (!partnerSentenceClean(sent, spoken)) return { kind: "none" };
+      if (!partnerSentenceClean(sent, spoken, herWords)) return { kind: "none" };
       const after = leaningNext(text, group[0].at);
-      if (after && !partnerSentenceClean(after, spoken)) return { kind: "none" };
+      if (herWords && after && !partnerSentenceClean(after, spoken)) return { kind: "none" };
       // The positive gate stays: a referral sentence, a command to her, or "Dr." before the name.
       // A first name never clears a sentence just because it lacks client words.
       const titledHere = TITLE_BEFORE.test(text.slice(Math.max(0, group[0].at - 8), group[0].at));
@@ -496,7 +555,7 @@ function joinSpacedLetters(text: string): string {
  * name. Used for checking only; what is saved is unchanged.
  */
 export function normalizeForCheck(text: string): string {
-  return foldTypos(joinSpacedLetters(foldLookalikes(text.normalize("NFKD").replace(/[\p{M}\p{Cf}]/gu, "").normalize("NFKC"))));
+  return foldTypos(joinSpacedLetters(foldLookalikes(text.replace(UUID_ANYWHERE, "[id]").normalize("NFKD").replace(/[\p{M}\p{Cf}]/gu, "").normalize("NFKC"))));
 }
 
 // Digits and symbols written for letters ("cl1ent S4rah K1ein", "p@tient",
@@ -654,7 +713,7 @@ async function withoutRefusedParts(text: string, list: Allowlist, opts: GuardOpt
     const restPlain = normalizeForCheck(rest);
     for (const p of dropped) {
       const plain = normalizeForCheck(p);
-      const found = [...(await findNames(plain)), ...(await findNames(titleCase(plain), { secondReads: false }))];
+      const found = [...withoutCalendarWords(await findNames(plain), plain), ...withoutCalendarWords(await findNames(titleCase(plain), { secondReads: false }), titleCase(plain))];
       for (const n of found.filter(isNameLike)) {
         if (wordsOf(n).some((w) => w.length > 1 && wholeWord(w, "i").test(restPlain))) return null;
       }
@@ -671,9 +730,58 @@ function joinBrokenLines(text: string): string {
   return text.replace(/([^.!?:;\s])[ \t]*\n+[ \t]*(?!(?:[-*•]|\d+[.)])\s)/g, "$1 ");
 }
 
+// Weekdays and months are never a person's name ("Tue Apr 15, 1:00 pm" in a meeting result:
+// the name-finder can read "Tue" as one, more often on some machines). Weekday names and the
+// abbreviations are always calendar words. Month names that are also first names (Jan, May,
+// June, April, August...) count only next to a day number ("May 5", "5th of June") or a weekday.
+const ALWAYS_CALENDAR = new Set(
+  "monday tuesday wednesday thursday friday saturday sunday mon tue tues wed thu thur thurs fri sat sun feb mar apr jun jul aug sep sept oct nov dec".split(" "),
+);
+const MONTH_NAMES = new Set("jan january february march april may june july august september october november december".split(" "));
+const WEEKDAY_WORD = "(?:mon(?:day)?|tue(?:s(?:day)?)?|wed(?:nesday)?|thu(?:r(?:s(?:day)?)?)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)";
+
+function calendarWord(token: string, text: string): boolean {
+  const bare = token.replace(/^[^\p{L}]+|[^\p{L}]+$/gu, "").toLowerCase();
+  if (ALWAYS_CALENDAR.has(bare)) return true;
+  if (!MONTH_NAMES.has(bare)) return false;
+  const spots = [...text.matchAll(new RegExp(`(?<![\\p{L}\\p{N}])${escape(bare)}(?![\\p{L}\\p{N}])`, "giu"))];
+  return (
+    spots.length > 0 &&
+    spots.every((m) => {
+      const at = m.index ?? 0;
+      const after = text.slice(at + m[0].length, at + m[0].length + 8);
+      const before = text.slice(Math.max(0, at - 14), at);
+      return (
+        /^\.?,?\s*\d{1,2}(?:st|nd|rd|th)?(?!\d)/.test(after) ||
+        /\d{1,2}(?:st|nd|rd|th)?\s+(?:of\s+)?$/i.test(before) ||
+        new RegExp(`\\b${WEEKDAY_WORD}\\.?,?\\s+$`, "i").test(before)
+      );
+    })
+  );
+}
+
+/** Name-finder hits with weekday and month words taken off their ends; hits that were only those are dropped. */
+export function withoutCalendarWords(names: string[], text: string): string[] {
+  const out: string[] = [];
+  for (const n of names) {
+    const words = n.split(/\s+/).filter(Boolean);
+    while (words.length && calendarWord(words[0], text)) words.shift();
+    while (words.length && calendarWord(words.at(-1)!, text)) words.pop();
+    if (words.length) out.push(words.join(" "));
+  }
+  return out;
+}
+
+// A UUID (an approval or card id the code puts in a tool result) is never a phone or record
+// number, but its hex digits ("...-e18592619355") read as a phone about 1 time in 200: the
+// checks read "[id]" in its place (normalizeForCheck).
+const UUID_ANYWHERE = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
+
 async function checkOnce(text: string, at: GuardPoint, list: Allowlist, opts: GuardOptions): Promise<GuardResult> {
   const plain = normalizeForCheck(text);
   const light = at === "tool_result" && !opts.fullRules;
+  // Her own words (her message, a memory) get the business-only rules around a partner's first name.
+  const herWords = at === "message" || at === "memory";
   const rules = light ? checkIdentity(plain, list, TOOL_RESULT_RULES) : checkIdentity(plain, list);
   if (!rules.ok) return { ok: false, kind: rules.kind };
   const detail = light ? personalDetail(plain, list) : null;
@@ -705,8 +813,8 @@ async function checkOnce(text: string, at: GuardPoint, list: Allowlist, opts: Gu
     // One name read across a sentence end ("coffee with Maria. Maria's PTSD is worse" gives
     // "Maria. Maria"): each side is judged on its own, at every place it appears.
     const split = (list: string[]) => list.flatMap((n) => n.split(/(?<!\b(?:Dr|Doctor|Mr|Mrs|Ms|Mx|Prof|Rev|Fr|St|\p{Lu}))[.!?]+\s+/u).map((p) => p.trim()).filter(Boolean));
-    names = split(names);
-    cased = split(cased);
+    names = withoutCalendarWords(split(names), plain);
+    cased = withoutCalendarWords(split(cased), titled);
   } catch (err) {
     if (err instanceof Error && err.name === "TooLongToCheck") return { ok: false, kind: "too_long" };
     console.error(`[guard] name-finder unavailable: ${err instanceof Error ? err.message : String(err)}`);
@@ -714,12 +822,33 @@ async function checkOnce(text: string, at: GuardPoint, list: Allowlist, opts: Gu
   }
   // A partner's first name or surname written in lowercase, which the name-finder can miss
   // ("maria no-showed again"), in a sentence about someone's own life or visits: refused.
-  if (at === "message" || at === "memory") {
+  if (herWords) {
     const cards = partnerCards(list);
     for (const t of tokensOf(plain)) {
       if (t.capital || !cards.some((c) => c.words.includes(t.base))) continue;
       const s = sentenceAt(plain, t.at);
       if (MY_CLIENT.test(s) || clientLike(s) || PERSONAL_MATTER.test(s) || !businessOnly(s)) return { ok: false, kind: "client_name" };
+    }
+    // A month that is also a first name ("June no-showed again", "May cried in session",
+    // "April's PTSD is worse"): the name-finder often misses it. Capitalized, not a date (no day
+    // number beside it, no weekday before it), in a client or personal sentence: refused like
+    // any unknown name. "meet in May", "follow up May 5" and "May I ask..." are not names.
+    for (const t of tokensOf(plain)) {
+      if (!t.capital || !MONTH_NAMES.has(t.base) || calendarWord(t.base, plain)) continue;
+      if (t.base === "may" && /^\s+(?:I|we|you|she|he|they)\b/i.test(plain.slice(t.end))) continue;
+      // "starting in June", "until April", "next May", "end of August": the month.
+      if (/\b(?:in|by|until|till|through|since|during|before|after|from|of|next|last|this|early|mid|late|starting|beginning|end\s+of)\s+$/i.test(plain.slice(Math.max(0, t.at - 16), t.at))) continue;
+      const s = sentenceAt(plain, t.at);
+      if (
+        MY_CLIENT.test(s) ||
+        clientLike(s) ||
+        PERSONAL_MATTER.test(s) ||
+        mentionsDiagnosis(s) ||
+        medicalAboutSomeone(s) ||
+        namedCondition(plain.slice(t.at, t.end), s)
+      ) {
+        return { ok: false, kind: mentionsDiagnosis(s) ? "diagnosis" : "client_name" };
+      }
     }
   }
   const strangers: string[] = [];
@@ -727,7 +856,7 @@ async function checkOnce(text: string, at: GuardPoint, list: Allowlist, opts: Gu
   // a name on two or more cards is asked about at her message, judged as before elsewhere.
   let ambiguous: { said: string; choices: string[] } | null = null;
   const asPartner = (n: string): boolean => {
-    const p = partnerMatch(n, plain, list);
+    const p = partnerMatch(n, plain, list, herWords);
     if (p.kind === "partners") return true;
     if (p.kind === "ambiguous" && at === "message" && opts.askWhichPartner) {
       ambiguous ??= { said: p.said, choices: p.choices };
@@ -737,9 +866,9 @@ async function checkOnce(text: string, at: GuardPoint, list: Allowlist, opts: Gu
   };
   for (const n of names.filter(isNameLike)) {
     if (asPartner(n)) continue;
-    const v = judgePerson(n, plain, list);
+    const v = judgePerson(n, plain, list, herWords);
     if (v.verdict === "refuse") return { ok: false, kind: v.kind };
-    const w = joined === plain ? v : judgePerson(n, joined, list);
+    const w = joined === plain ? v : judgePerson(n, joined, list, herWords);
     if (w.verdict === "refuse") return { ok: false, kind: w.kind };
     if (v.verdict === "blank" || w.verdict === "blank") strangers.push(n);
   }
@@ -755,7 +884,7 @@ async function checkOnce(text: string, at: GuardPoint, list: Allowlist, opts: Gu
       const capital = asWritten.split(/\s+/).filter((w) => /^\p{Lu}/u.test(w));
       if (capital.length > 0 && capital.length < asWritten.split(/\s+/).length && partOf(wordsOf(capital.join(" ")), list.names)) continue;
       if (asPartner(asWritten)) continue;
-      const v = judgePerson(asWritten, plain, list);
+      const v = judgePerson(asWritten, plain, list, herWords);
       if (v.verdict === "refuse") return { ok: false, kind: v.kind };
       if (v.verdict === "blank" && /\s/.test(n.trim())) strangers.push(asWritten);
     }
@@ -774,7 +903,7 @@ async function checkOnce(text: string, at: GuardPoint, list: Allowlist, opts: Gu
   // if any stranger is still there, withhold the whole result.
   try {
     const again = normalizeForCheck(redacted);
-    if ((await findNames(again)).some((n) => isNameLike(n) && !isAllowedPerson(n, again, list))) return { ok: false, kind: "client_name" };
+    if (withoutCalendarWords(await findNames(again), again).some((n) => isNameLike(n) && !isAllowedPerson(n, again, list, herWords))) return { ok: false, kind: "client_name" };
   } catch {
     return { ok: false, kind: "unavailable" };
   }

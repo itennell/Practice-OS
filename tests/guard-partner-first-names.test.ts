@@ -7,9 +7,9 @@ import { describe, expect, it } from "vitest";
 import { loadEnv } from "../lib/env";
 
 loadEnv();
-const { guard, partnerMatch, whichPartner, looksLikePerson, spokenName } = await import("../lib/aeon/guard");
+const { guard, partnerMatch, whichPartner, looksLikePerson, spokenName, withoutCalendarWords } = await import("../lib/aeon/guard");
 const { withContext } = await import("../lib/referrals/ask-context");
-const { COMMON_BOARD, REVIEW_MUST_PASS, REVIEW_MUST_REFUSE, ROUND2_MUST_PASS, ROUND2_MUST_REFUSE } = await import("./fixtures/partner-first-names");
+const { COMMON_BOARD, REVIEW_MUST_PASS, REVIEW_MUST_REFUSE, ROUND2_MUST_PASS, ROUND2_MUST_REFUSE, ROUND3_MUST_PASS, ROUND3_MUST_REFUSE, ROUND4_MUST_PASS, ROUND4_MUST_REFUSE } = await import("./fixtures/partner-first-names");
 const { DEMO_ALLOWED, MUST_REFUSE: ADVERSARIAL_REFUSE } = await import("./fixtures/guard-adversarial");
 
 const BOARD = ["[Sample] Maria Halvorsen, MS", "[Sample] Pamela Serrano Vidal, MD", "[Sample] Birinder Malhi, MD", "[Sample] Juniper Row Family Medicine"];
@@ -135,7 +135,7 @@ describe("board partners by first name or surname", () => {
   // The PR #153 review: one partner named John must never clear "John is grieving his father".
   const common = { names: [...OWN, ...COMMON_BOARD], contacts: [], directory: COMMON_BOARD };
 
-  it.each([...REVIEW_MUST_REFUSE, ...ROUND2_MUST_REFUSE])("review leak, still refused with common first names on the board: %s", async (m) => {
+  it.each([...REVIEW_MUST_REFUSE, ...ROUND2_MUST_REFUSE, ...ROUND3_MUST_REFUSE, ...ROUND4_MUST_REFUSE])("review leak, still refused with common first names on the board: %s", async (m) => {
     for (const text of [m, withContext(m, "Partners", PICKED)]) {
       const r = await guard(text, "message", common, ASK);
       expect(r.ok, text).toBe(false);
@@ -143,9 +143,90 @@ describe("board partners by first name or surname", () => {
     }
   }, T);
 
-  it.each([...REVIEW_MUST_PASS, ...ROUND2_MUST_PASS, ...MUST_PASS])("review must-pass with common first names on the board: %s", async (m) => {
+  it.each([...REVIEW_MUST_PASS, ...ROUND2_MUST_PASS, ...ROUND3_MUST_PASS, ...ROUND4_MUST_PASS, ...MUST_PASS])("review must-pass with common first names on the board: %s", async (m) => {
     expect(await guard(m, "message", common, ASK), m).toEqual({ ok: true, text: m });
     expect((await guard(withContext(m, "Partners", PICKED), "message", common, ASK)).ok, m).toBe(true);
+  }, T);
+
+  // CI on PR #154: plan_referral_meeting's result was withheld now and then. When anything in a
+  // tool result is blanked (here a stranger), the redacted text is checked again, and that check
+  // ran the business-only rules (", 9:00 am" read as a bare number) on code-built JSON. Those
+  // rules are for her own words only.
+  it("a tool result naming a partner by first name, with times, is kept after another name is blanked", async () => {
+    const result = JSON.stringify(
+      { queued: true, proposed: { with: "Maria", kind: "Meeting", when: "Tue Aug 19, 9:00 am" }, also_open: ["Tue Aug 19, 9:30 am", "Tue Aug 19, 10:00 am"], note: "Kevin Ortiz" },
+      null,
+      2,
+    );
+    const r = await guard(result, "tool_result", allow);
+    expect(r.ok, JSON.stringify(r)).toBe(true);
+    if (r.ok) {
+      expect(r.text).not.toContain("Kevin Ortiz");
+    }
+    // Her own message with the same shape is still judged by the business-only rules.
+    expect((await guard("coffee with Maria, 9", "message", allow, ASK)).ok).toBe(false);
+  }, T);
+
+  // The CI flake's real cause: a random approval id whose hex digits read as a phone number.
+  it("an approval id is never read as a phone number in a full-rules tool result", async () => {
+    for (const id of ["66d21f71-d43f-48ad-af3c-e18592619355", "4269c074-2ed9-4818-a928-1727490bef4a", "193793dc-f688-40c7-9ecf-ac6564798793"]) {
+      const text = JSON.stringify({ queued: true, approval_id: id, proposed: { with: "Birinder Malhi, MD", kind: "Meeting", when: "Tue Apr 15, 1:00 pm" } }, null, 2);
+      const r = await guard(text, "tool_result", allow, { fullRules: true });
+      expect(r, id).toEqual({ ok: true, text });
+    }
+    // A real phone number in the same place still refuses.
+    const phone = JSON.stringify({ note: "her cell is 312-555-0199" });
+    expect((await guard(phone, "tool_result", allow, { fullRules: true })).ok).toBe(false);
+  }, T);
+
+  // CI's name-finder read "Tue" in "Tue Apr 15, 1:00 pm" as a name and blanked it. Weekdays and
+  // months never count as names, whatever the model says.
+  const DAYS = ["Mon", "Tue", "Tues", "Wed", "Thu", "Thur", "Thurs", "Fri", "Sat", "Sun", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Sept", "Oct", "Nov", "Dec", "January", "April", "June", "August"];
+
+  it.each(DAYS.flatMap((d) => MONTHS.map((m) => [d, m])))("never a name: %s %s 15, 1:00 pm", (d, m) => {
+    const when = `${d} ${m} 15, 1:00 pm`;
+    const text = JSON.stringify({ proposed: { with: "Birinder Malhi, MD", when }, also_open: [`${d} ${m} 15, 1:30 pm`] });
+    expect(withoutCalendarWords([d, m, `${d} ${m}`, `${d} Kevin`], text)).toEqual(["Kevin"]);
+  });
+
+  it.each([...DAYS, ...MONTHS])("a meeting time with %s is kept whole in a tool result and a reply", async (w) => {
+    const when = DAYS.includes(w) ? `${w} Nov 17, 1:00 pm` : `Tue ${w} 17, 1:00 pm`;
+    const text = JSON.stringify({ queued: true, proposed: { with: "Birinder Malhi, MD", kind: "Meeting", when }, also_open: [when.replace("1:00", "1:30")] }, null, 2);
+    expect(await guard(text, "tool_result", allow, { fullRules: true })).toEqual({ ok: true, text });
+    const reply = `Your meeting with Birinder Malhi, MD is set for ${when}.`;
+    expect(await guard(reply, "reply", allow)).toEqual({ ok: true, text: reply });
+  }, T);
+
+  it("a month that is also a first name is still a name when it isn't a date", async () => {
+    expect(withoutCalendarWords(["May", "June", "April", "Jan"], "May and June and April and Jan all no-showed")).toEqual(["May", "June", "April", "Jan"]);
+    expect(withoutCalendarWords(["June"], "coffee on June 5")).toEqual([]);
+    expect((await guard("June Kowalski no-showed again", "message", allow, ASK)).ok).toBe(false);
+    expect((await guard("April Nguyen wants Tuesdays after 5", "message", allow, ASK)).ok).toBe(false);
+  }, T);
+
+  // The name-finder misses a bare month first name: refused by plain code, at message and memory.
+  it.each([
+    "June no-showed again",
+    "May cried in session",
+    "April's PTSD is worse",
+    "April wants Tuesdays after 5",
+    "August owes me for two sessions",
+    "my client June wants a meeting",
+    "January is struggling since her divorce",
+  ])("a bare month first name in a client sentence refuses: %s", async (m) => {
+    for (const at of ["message", "memory"] as const) {
+      const r = await guard(m, at, allow, ASK);
+      expect(r.ok, `${at}: ${m}`).toBe(false);
+    }
+  }, T);
+
+  it("a month that is a date, or a board partner named June, still passes", async () => {
+    const board = [...BOARD, "[Sample] June Park, LCSW"];
+    const withJune = { names: [...OWN, ...board], contacts: [], directory: board };
+    for (const m of ["coffee with June Park", "meet in May", "follow up May 5", "May I book a coffee with Maria?", "we start a grief group in June", "lunch talk with Pamela next April"]) {
+      expect((await guard(m, "message", withJune, ASK)).ok, m).toBe(true);
+    }
   }, T);
 
   it("every earlier adversarial must-refuse probe still refuses, with these partners on the board too", async () => {
