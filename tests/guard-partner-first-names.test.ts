@@ -9,7 +9,7 @@ import { loadEnv } from "../lib/env";
 loadEnv();
 const { guard, partnerMatch, whichPartner, looksLikePerson, spokenName } = await import("../lib/aeon/guard");
 const { withContext } = await import("../lib/referrals/ask-context");
-const { COMMON_BOARD, REVIEW_MUST_PASS, REVIEW_MUST_REFUSE, ROUND2_MUST_PASS, ROUND2_MUST_REFUSE } = await import("./fixtures/partner-first-names");
+const { COMMON_BOARD, REVIEW_MUST_PASS, REVIEW_MUST_REFUSE, ROUND2_MUST_PASS, ROUND2_MUST_REFUSE, ROUND3_MUST_PASS, ROUND3_MUST_REFUSE } = await import("./fixtures/partner-first-names");
 const { DEMO_ALLOWED, MUST_REFUSE: ADVERSARIAL_REFUSE } = await import("./fixtures/guard-adversarial");
 
 const BOARD = ["[Sample] Maria Halvorsen, MS", "[Sample] Pamela Serrano Vidal, MD", "[Sample] Birinder Malhi, MD", "[Sample] Juniper Row Family Medicine"];
@@ -135,7 +135,7 @@ describe("board partners by first name or surname", () => {
   // The PR #153 review: one partner named John must never clear "John is grieving his father".
   const common = { names: [...OWN, ...COMMON_BOARD], contacts: [], directory: COMMON_BOARD };
 
-  it.each([...REVIEW_MUST_REFUSE, ...ROUND2_MUST_REFUSE])("review leak, still refused with common first names on the board: %s", async (m) => {
+  it.each([...REVIEW_MUST_REFUSE, ...ROUND2_MUST_REFUSE, ...ROUND3_MUST_REFUSE])("review leak, still refused with common first names on the board: %s", async (m) => {
     for (const text of [m, withContext(m, "Partners", PICKED)]) {
       const r = await guard(text, "message", common, ASK);
       expect(r.ok, text).toBe(false);
@@ -143,7 +143,7 @@ describe("board partners by first name or surname", () => {
     }
   }, T);
 
-  it.each([...REVIEW_MUST_PASS, ...ROUND2_MUST_PASS, ...MUST_PASS])("review must-pass with common first names on the board: %s", async (m) => {
+  it.each([...REVIEW_MUST_PASS, ...ROUND2_MUST_PASS, ...ROUND3_MUST_PASS, ...MUST_PASS])("review must-pass with common first names on the board: %s", async (m) => {
     expect(await guard(m, "message", common, ASK), m).toEqual({ ok: true, text: m });
     expect((await guard(withContext(m, "Partners", PICKED), "message", common, ASK)).ok, m).toBe(true);
   }, T);

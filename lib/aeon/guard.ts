@@ -269,10 +269,11 @@ const BUSINESS_NOUN =
   "openings?|fees?|rates?|schedule|calendar|e-?mail|emails|number|phone|website|site|specialty|specialties|specialization|focus|niche|card|letters?|flyer|" +
   "brochures?|talk|lunch|coffee|meeting|meetings|call|intro|introduction|partnership|collaboration|workshop|event|events|program|programs|services|" +
   "front\\s+desk|desk|address|fax|hours|location|offices|department|unit|coordinator|manager|receptionist|scheduler|process|forms?|network|panel|panels|" +
-  "insurance\\s+panels?|board|newsletter|presentation|training|book|podcast|blog|outreach|contact|info|information|details|new\\s+clients|openings";
+  "insurance\\s+panels?|board|newsletter|presentation|training|book|podcast|blog|outreach|contact|info|information|details|new\\s+clients|openings|" +
+  "IOP|PHP|lunch-and-learn|lunch-and-learns|associate|associates|brochure|fee\\s+sheet|NPI|sliding\\s+scale|EHR|conference|webinar";
 const BUSINESS_NOUN_RE = new RegExp(`^(?:${BUSINESS_NOUN})$`, "i");
 /** Words that may come before a business noun ("her new practice", "his clinic's waitlist", "their intake process"). */
-const MODIFIER = /^(?:new|own|main|other|current|private|group|intake|referral|front|clinic|practice|office|team|lunch|quick|short|palliative|oncology|hospice|genetic|counseling|care|cancer|support|weekly|monthly|next|last|first|upcoming|free)$/i;
+const MODIFIER = /^(?:new|second|own|main|DBT|CBT|EMDR|ACT|teen|adolescent|adult|child|couples|family|parenting|grief|perinatal|trauma|skills|process|virtual|telehealth|evening|weekend|solo|other|current|private|group|intake|referral|front|clinic|practice|office|team|lunch|quick|short|palliative|oncology|hospice|genetic|counseling|care|cancer|support|weekly|monthly|next|last|first|upcoming|free)$/i;
 
 /** One to three words, read as a business noun phrase ("clinic's waitlist", "palliative care referrals"). */
 function businessPhrase(words: string[]): boolean {
@@ -310,6 +311,50 @@ const BUSINESS_CLAUSE = new RegExp(
   "u",
 );
 
+// News about a partner's practice, read as a whole clause up to its end (a comma, a stop, "and
+// she..."): the business phrase, then only time and place words ("next week", "in January", "to
+// Evanston", "on Thursdays"). Anything else after it ("on vacation in rehab", "because of her
+// breakdown") leaves the clause unread, so it refuses. A POSITIVE list, nothing else.
+const MONTH = "January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec";
+const WEEKDAY = "Mondays?|Tuesdays?|Wednesdays?|Thursdays?|Fridays?|Saturdays?|Sundays?|weekends?|weekdays?|mornings?|afternoons?|evenings?";
+const NOT_A_PLACE = "(?!(?:Rehab|Detox|Jail|Prison|Hospital|ICU|ER|Court|Treatment|Recovery)\\b)";
+const PAYER = "BCBS|BCBSIL|Blue\\s+Cross(?:\\s+Blue\\s+Shield)?|Aetna|Cigna|United(?:healthcare)?|UHC|Medicaid|Medicare|Tricare|Humana|Optum|Magellan|Meridian|CountyCare|most\\s+insurance|insurance";
+const FIELD =
+  "perinatal|postpartum|anxiety|depression|grief|bereavement|trauma|oncology|cancer|cancer-related|adolescent|teen|child|couples|family|LGBTQ\\+?|queer|trans|" +
+  "substance|substance-use|ADHD|OCD|eating|disorder|insurance|Medicaid|Medicare|older|adult|college|student|veteran|chronic|illness|hospice|palliative|end-of-life|new|self-pay";
+const ASKED_FOR = "brochure|fee\\s+sheet|NPI|availability|card|business\\s+card|rates|fees|sliding\\s+scale|flyer|website|info|CV|bio|intake\\s+forms?";
+const PRACTICE_NEWS_CLAUSE = [
+  `(?:opened|opening|opens|moved|moving|moves|hiring|hires|hired|starting|started|starts|leaving|left|leaves|switching|switched|expanding|expanded|growing|closing|closed|relocating|relocated)\\s+(?:(?:her|his|their|a|an|the)\\s+)?(?:(?:new|second|third|own|group|private|solo|teen|adolescent|adult|family|couples|weekend|evening|virtual|telehealth|DBT|CBT)\\s+){0,2}(?:practice|group|office|program|clinic|location|IOP|PHP|waitlist)`,
+  `(?:hiring|hires|hired|adding|added)\\s+(?:a|an|another|one|two)\\s+(?:new\\s+)?(?:associates?|therapists?|clinicians?|counselors?|interns?|billers?|receptionists?)`,
+  `(?:switching|switched|moving|moved)\\s+to\\s+(?:an?\\s+)?(?:new\\s+)?(?:EHR|telehealth|[A-Z][\\w-]+)`,
+  `on\\s+vacation`,
+  `out\\s+of\\s+(?:the\\s+)?office`,
+  `(?:out|away|off)(?=\\s+(?:until|through|till)\\b)`,
+  `asked\\s+(?:for|about)\\s+my\\s+(?:${ASKED_FOR})(?:\\s*(?:,|and)\\s*(?:my\\s+)?(?:${ASKED_FOR}))*`,
+  `(?:has|have|got|had)\\s+(?:some\\s+|a\\s+few\\s+|new\\s+|two\\s+|three\\s+)?(?:openings|availability|room|space|slots)`,
+  `(?:takes|accepts|taking|accepting|take|accept)\\s+(?:${PAYER})`,
+  `(?:presenting|presents|present|speaking|speaks|speak)\\s+at\\s+(?:the\\s+|a\\s+|an\\s+)?(?:(?:[A-Z][\\w-]*|counseling|therapy|clinical|regional|state|annual|national|local|spring|fall)\\s+){0,4}(?:conference|workshop|training|summit|meeting|event|grand\\s+rounds|webinar|lunch-and-learn)`,
+  `(?:(?:wants?|wanted|plans?|planning|hopes?|hoping)\\s+to\\s+)?(?:co-?lead|co-?leads|co-?leading|lead|leads|leading|host|hosts|hosting|run|runs|running)\\s+(?:a|an|the)\\s+(?:new\\s+)?(?:workshop|training|webinar|lunch-and-learn|consultation\\s+group)`,
+  `mentioned\\s+(?:a|an|the|her|his|their)\\s+(?:new\\s+)?(?:group|IOP|PHP|program|workshop|office|location|practice|associate|opening|training)`,
+  `(?:sees|gets|receives|see|get)\\s+(?:a\\s+lot\\s+of|lots\\s+of|many|mostly|plenty\\s+of)\\s+(?:(?:${FIELD})\\s+){1,3}referrals`,
+].join("|");
+const PRACTICE_NEWS_TAIL =
+  `(?:\\s+(?:next|this|last)\\s+(?:week|month|year|weekend|spring|summer|fall|winter)|\\s+(?:in|on|until|through|till|by|from|after|before|starting)\\s+(?:the\\s+)?(?:${MONTH}|${WEEKDAY}|spring|summer|fall|winter|the\\s+\\d{1,2}(?:st|nd|rd|th)?|\\d{1,2}\\/\\d{1,2})(?:\\s+\\d{1,2}(?:st|nd|rd|th)?)?|` +
+  `\\s+(?:to|in)\\s+${NOT_A_PLACE}[A-Z][\\w-]+(?:\\s+${NOT_A_PLACE}[A-Z][\\w-]+){0,2}|\\s+on\\s+(?:${WEEKDAY}|Zoom)|\\s+(?:soon|again|too|now|already|this\\s+week))*`;
+const PRACTICE_NEWS = new RegExp(
+  `^(?:['’](?:s|d|ll|re|ve)\\b|\\s+(?:is|are|was|were|will|would|can|could|might|may|should))?(?:\\s+(?:just|also|recently|now|still|finally|really|soon))*\\s+(?:${PRACTICE_NEWS_CLAUSE})${PRACTICE_NEWS_TAIL}\\s*(?:[.,;!?]|$|\\s+and\\s+(?=(?:she|he|they)\\b))`,
+  "u",
+);
+// Field words name the referrals a partner sees, never a person's condition, only in this frame.
+const SEES_REFERRALS = new RegExp(
+  `\\b(?:she|he|they)\\s+(?:sees|gets|receives|see|get)\\s+(?:a\\s+lot\\s+of|lots\\s+of|many|mostly|plenty\\s+of)\\s+(?:(?:${FIELD})\\s+){1,3}referrals\\b(?=\\s*(?:[.,;!?]|$))`,
+  "giu",
+);
+/** The sentence with a partner's "sees a lot of perinatal anxiety referrals" read as plain referral talk. */
+export function withoutReferralFields(s: string): string {
+  return s.replace(SEES_REFERRALS, (m) => m.split(/\s+/)[0] + " sends referrals");
+}
+
 /** True when everything said about a person in this sentence is practice business. */
 export function businessOnly(s: string): boolean {
   if (/,\s*\d{1,3}\b/.test(s)) return false;
@@ -323,7 +368,8 @@ export function businessOnly(s: string): boolean {
     if (!businessPhrase(wordsAfter(s, (m.index ?? 0) + m[0].length))) return false;
   }
   for (const m of s.matchAll(/\b(?:she|he|they)\b/giu)) {
-    if (!BUSINESS_CLAUSE.test(s.slice((m.index ?? 0) + m[0].length))) return false;
+    const rest = s.slice((m.index ?? 0) + m[0].length);
+    if (!BUSINESS_CLAUSE.test(rest) && !PRACTICE_NEWS.test(rest)) return false;
   }
   for (const m of s.matchAll(/\b(?:about|regarding|re:?|to\s+discuss|discuss(?:ing)?|on\s+the)\s+/giu)) {
     const ws = wordsAfter(s, (m.index ?? 0) + m[0].length, 5);
@@ -335,8 +381,9 @@ export function businessOnly(s: string): boolean {
   return true;
 }
 
-function partnerSentenceClean(s: string, said: string): boolean {
+function partnerSentenceClean(sentence: string, said: string): boolean {
   const who = escape(said);
+  const s = withoutReferralFields(sentence);
   return (
     !MY_CLIENT.test(s) &&
     !/\b(?:client|patient)\b/i.test(s) &&
