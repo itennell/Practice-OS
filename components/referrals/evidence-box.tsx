@@ -198,7 +198,7 @@ export function EvidenceBox({
           </dl>
         )}
         <p className="pb-2 text-[var(--fg-muted)]">
-          Sources: the NPI Registry, the CMS Medicare files, the CMS Provider Data Catalog, the state license list, OpenStreetMap (© OpenStreetMap contributors, ODbL) and their own website. Never Psychology Today or other directories.
+          Sources: the NPI Registry, the CMS Medicare files, the CMS Provider Data Catalog, the Illinois license list (Illinois Department of Financial and Professional Regulation (IDFPR), via data.illinois.gov, ODbL 1.0), OpenStreetMap (© OpenStreetMap contributors, ODbL) and their own website. Never Psychology Today or other directories.
         </p>
       </details>
       {ev?.stale && !checking && <p className="text-small text-[var(--fg-muted)]">It&rsquo;s been a while since the last check.</p>}

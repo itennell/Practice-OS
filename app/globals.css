@@ -378,25 +378,41 @@ textarea {
   }
 }
 
-/* The dictation pill sliding open beside the mic. */
-@keyframes pill-open {
-  from {
-    opacity: 0;
-    transform: translateX(8px) scale(0.96);
+/* Status Mark's turning arc while something runs. */
+@keyframes status-mark-turn {
+  to {
+    transform: rotate(360deg);
   }
 }
+.status-mark-turn {
+  animation: status-mark-turn 0.9s linear infinite;
+}
 
-/* Thought Line's working label: muted text with an accent sheen passing through. Still under reduced motion. */
-@utility thought-shimmer {
-  background: linear-gradient(100deg, var(--fg-muted) 35%, var(--accent-fg) 50%, var(--fg-muted) 65%) 0 0 / 250% 100%;
+/* The Thought Line label while Aeon works: muted words with a slow accent glint moving left to right. */
+@utility working-glint {
+  color: var(--fg-muted);
+  background: linear-gradient(90deg, transparent 0 40%, var(--accent-fg) 50%, transparent 60% 100%) 0 0 / 300% 100% no-repeat,
+    linear-gradient(var(--fg-muted), var(--fg-muted));
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  animation: shimmer 1.8s linear infinite;
+  animation: shimmer 2.2s ease-in-out infinite;
   @media (prefers-reduced-motion: reduce) {
     animation: none;
     background: none;
     -webkit-text-fill-color: currentColor;
+  }
+}
+
+/* Voice Pill: the recording pill grows out of the mic. */
+@keyframes voice-grow {
+  from {
+    opacity: 0;
+    clip-path: inset(0 0 0 100% round 9999px);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0 round 9999px);
   }
 }
 

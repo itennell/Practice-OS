@@ -1,28 +1,22 @@
 "use client";
 
-// Voice Pill (UI-015): the recording state for dictation in the Prompt Bar.
-// Tap the mic to start, tap again to stop (works on phones and keyboards).
-// While recording, a pill opens to the left with a live sound wave, a timer
-// and a Cancel button; Escape also cancels and the audio is thrown away.
-// Clinician only: the public website chat has no mic.
-// Adapted from React Bits Voice Pill (MIT, reactbits.dev/c/micro/voice-pill):
-// lucide icons, Caseload colours, a real Cancel button instead of only
-// slide-to-cancel, and a still wave when someone prefers reduced motion.
+// Voice Pill (UI-015): the mic button and the recording pill it opens.
+// Original Practice-OS code (written 2026-11-04).
+//
+// Tap the mic to start, tap the stop button to finish (a toggle, so it works
+// with a keyboard and on phones). While recording, a pill shows a level trace
+// of her voice and a timer; Cancel or Escape throws the recording away and
+// nothing is sent anywhere. Recording stops on its own at three minutes and
+// is handed over as if she had pressed stop. If the component goes away
+// mid-recording (she navigates off), the mic is released and nothing is
+// handed over. The finished audio is a mono 16-bit WAV (dictation-audio.ts).
 
-import { useEffect, useRef, useState } from "react";
-import { Mic, X } from "lucide-react";
-import { useReducedMotion } from "motion/react";
-import { cn } from "@/lib/utils";
+import { Mic, Square, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { recordingToWav } from "./dictation-audio";
 
-/** Longest dictation; recording stops on its own after this. */
+/** Longest recording; it stops and hands over at this point. */
 export const MAX_DICTATION_MS = 3 * 60 * 1000;
-
-const BARS = 28;
-const clock = (ms: number) => {
-  const s = Math.floor(ms / 1000);
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-};
 
 export type VoicePillProps = {
   /** The finished recording as a mono 16-bit WAV. */
@@ -38,221 +32,244 @@ export type VoicePillProps = {
   onRecordingChange?: (recording: boolean) => void;
 };
 
-type Live = {
+/** Number of level marks in the trace. */
+const TRACE = 24;
+/** How often a new level mark is taken, in ms. */
+const SAMPLE_MS = 70;
+
+type Session = {
   stream: MediaStream;
   recorder: MediaRecorder;
-  chunks: Blob[];
-  ctx: AudioContext;
-  analyser: AnalyserNode;
-  startedAt: number;
-  raf: number;
-  keep: boolean;
+  parts: Blob[];
+  audio: AudioContext;
+  meter: AnalyserNode;
+  began: number;
+  frame: number;
+  cap: number;
+  tick: number;
 };
+
+const minutes = (ms: number) => {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+};
+
+function micProblem(err: unknown): string {
+  const name = err instanceof DOMException ? err.name : "";
+  if (name === "NotAllowedError" || name === "SecurityError") return "The microphone is blocked. Allow it for this page in your browser, then try again.";
+  if (name === "NotFoundError" || name === "OverconstrainedError") return "No microphone was found. Plug one in, or type instead.";
+  if (name === "NotReadableError") return "Another app is using the microphone. Close it and try again.";
+  return "Couldn't start the microphone. Try again, or type instead.";
+}
 
 export function VoicePill({
   onRecorded,
   onError,
   disabled = false,
-  className,
-  startLabel = "Dictate",
-  stopLabel = "Stop and turn into text",
+  className = "",
+  startLabel = "Record",
+  stopLabel = "Stop recording",
   onRecordingChange,
 }: VoicePillProps) {
-  const reduce = useReducedMotion();
-  const [recording, setRecording] = useState(false);
-  const [starting, setStarting] = useState(false);
+  const [phase, setPhase] = useState<"idle" | "opening" | "recording">("idle");
   const [elapsed, setElapsed] = useState(0);
-  const live = useRef<Live | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const levels = useRef<number[]>([]);
-  const micRef = useRef<HTMLButtonElement>(null);
-  // False once the pill is gone: a microphone that is granted after that is switched off at once.
-  const mounted = useRef(false);
+  const session = useRef<Session | null>(null);
+  const alive = useRef(true);
+  const marks = useRef<(HTMLSpanElement | null)[]>([]);
+
+  // Latest callbacks without restarting anything when the parent re-renders.
+  const handlers = useRef({ onRecorded, onError, onRecordingChange });
   useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
+    handlers.current = { onRecorded, onError, onRecordingChange };
+  });
+
+  /** Release the mic and stop every timer. Safe to call twice. */
+  const release = useCallback((s: Session) => {
+    cancelAnimationFrame(s.frame);
+    window.clearTimeout(s.cap);
+    window.clearInterval(s.tick);
+    s.stream.getTracks().forEach((t) => t.stop());
+    void s.audio.close().catch(() => {});
   }, []);
 
-  const teardown = () => {
-    const l = live.current;
-    if (!l) return;
-    cancelAnimationFrame(l.raf);
-    l.stream.getTracks().forEach((t) => t.stop());
-    void l.ctx.close();
-    live.current = null;
-    setRecording(false);
-    onRecordingChange?.(false);
-  };
-
-  const draw = () => {
-    const l = live.current;
-    const canvas = canvasRef.current;
-    if (!l) return;
-    const now = performance.now();
-    setElapsed(now - l.startedAt);
-    if (now - l.startedAt >= MAX_DICTATION_MS) {
-      stop(true);
-      return;
-    }
-    const buf = new Uint8Array(l.analyser.frequencyBinCount);
-    l.analyser.getByteFrequencyData(buf);
-    let sum = 0;
-    for (let i = 1; i < 24; i++) sum += buf[i];
-    const level = Math.min(1, (sum / (23 * 255)) * 2.4);
-    levels.current.push(level);
-    if (levels.current.length > BARS) levels.current.shift();
-    if (canvas && !reduce) {
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
-      const { width, height } = canvas.getBoundingClientRect();
-      canvas.width = Math.round(width * dpr);
-      canvas.height = Math.round(height * dpr);
-      const g = canvas.getContext("2d");
-      if (g) {
-        g.clearRect(0, 0, canvas.width, canvas.height);
-        g.fillStyle = getComputedStyle(canvas).color;
-        const step = canvas.width / BARS;
-        const bw = Math.max(2 * dpr, step * 0.45);
-        levels.current.forEach((v, i) => {
-          const h = Math.max(bw, (0.12 + 0.88 * v) * canvas.height);
-          const x = canvas.width - (levels.current.length - i) * step + (step - bw) / 2;
-          g.globalAlpha = 0.35 + 0.65 * v;
-          g.beginPath();
-          g.roundRect(x, (canvas.height - h) / 2, bw, h, bw / 2);
-          g.fill();
-        });
-      }
-    }
-    l.raf = requestAnimationFrame(draw);
-  };
-
-  const start = async () => {
-    if (disabled || live.current || starting) return;
-    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-      onError?.("This browser can't record audio. Type your message instead.");
-      return;
-    }
-    setStarting(true);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
-      if (!mounted.current) {
-        // Closed (the debrief panel, a page change) while the browser was asking: never leave the mic on.
-        stream.getTracks().forEach((t) => t.stop());
-        return;
-      }
-      const ctx = new AudioContext();
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 256;
-      ctx.createMediaStreamSource(stream).connect(analyser);
-      const recorder = new MediaRecorder(stream);
-      const l: Live = { stream, recorder, chunks: [], ctx, analyser, startedAt: performance.now(), raf: 0, keep: false };
-      recorder.ondataavailable = (e) => e.data.size && l.chunks.push(e.data);
-      recorder.onstop = async () => {
-        const keep = l.keep;
-        const blob = new Blob(l.chunks, { type: recorder.mimeType });
-        teardown();
-        if (!keep || blob.size === 0) return;
-        try {
-          onRecorded(await recordingToWav(blob));
-        } catch {
-          onError?.("Couldn't read that recording. Try again, or type it.");
-        }
+  /** End the recording: keep = hand it over, otherwise throw it away. */
+  const end = useCallback(
+    (keep: boolean) => {
+      const s = session.current;
+      if (!s) return;
+      session.current = null;
+      s.recorder.onstop = () => {
+        release(s);
+        if (!keep || !alive.current) return;
+        const raw = new Blob(s.parts, { type: s.recorder.mimeType || "audio/webm" });
+        recordingToWav(raw)
+          .then((wav) => {
+            if (alive.current) handlers.current.onRecorded(wav);
+          })
+          .catch(() => {
+            if (alive.current) handlers.current.onError?.("Couldn't read that recording. Try again, or type instead.");
+          });
       };
-      live.current = l;
-      levels.current = [];
-      recorder.start(250);
-      setElapsed(0);
-      setRecording(true);
-      onRecordingChange?.(true);
-      l.raf = requestAnimationFrame(draw);
-    } catch {
-      if (mounted.current) onError?.("The microphone is blocked. Allow it in your browser's site settings, or type instead.");
-    } finally {
-      if (mounted.current) setStarting(false);
-    }
-  };
-
-  /** Stop recording. keep=true sends the audio on; false throws it away. */
-  function stop(keep: boolean) {
-    const l = live.current;
-    if (!l) return;
-    l.keep = keep;
-    if (l.recorder.state !== "inactive") l.recorder.stop();
-    else teardown();
-    micRef.current?.focus();
-  }
-
-  useEffect(() => {
-    if (disabled) stop(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- stop only when disabled turns on
-  }, [disabled]);
-  // Escape cancels while recording, wherever focus is.
-  useEffect(() => {
-    if (!recording) return;
-    const onEscape = (e: globalThis.KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      e.preventDefault();
-      stop(false);
-    };
-    window.addEventListener("keydown", onEscape);
-    return () => window.removeEventListener("keydown", onEscape);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- stop reads refs only
-  }, [recording]);
-  useEffect(
-    () => () => {
-      const l = live.current;
-      if (l) {
-        l.keep = false;
-        if (l.recorder.state !== "inactive") l.recorder.stop();
+      if (s.recorder.state !== "inactive") s.recorder.stop();
+      else s.recorder.onstop?.(new Event("stop"));
+      if (alive.current) {
+        setPhase("idle");
+        setElapsed(0);
+        handlers.current.onRecordingChange?.(false);
       }
     },
-    [],
+    [release],
   );
 
+  const begin = async () => {
+    if (disabled || phase !== "idle") return;
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      handlers.current.onError?.("This browser can't record audio. Type instead.");
+      return;
+    }
+    setPhase("opening");
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+    } catch (err) {
+      if (alive.current) {
+        setPhase("idle");
+        handlers.current.onError?.(micProblem(err));
+      }
+      return;
+    }
+    // She left while the browser was asking for the mic: let it go at once.
+    if (!alive.current) {
+      stream.getTracks().forEach((t) => t.stop());
+      return;
+    }
+
+    const recorder = new MediaRecorder(stream);
+    const audio = new AudioContext();
+    const meter = audio.createAnalyser();
+    meter.fftSize = 512;
+    audio.createMediaStreamSource(stream).connect(meter);
+    const s: Session = { stream, recorder, parts: [], audio, meter, began: performance.now(), frame: 0, cap: 0, tick: 0 };
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) s.parts.push(e.data);
+    };
+    recorder.start(250);
+    session.current = s;
+
+    s.cap = window.setTimeout(() => end(true), MAX_DICTATION_MS);
+    s.tick = window.setInterval(() => setElapsed(performance.now() - s.began), 250);
+
+    // Level trace: every SAMPLE_MS take the loudness and shift the marks left.
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!still) {
+      const levels = new Array<number>(TRACE).fill(0);
+      const wave = new Uint8Array(meter.fftSize);
+      let last = 0;
+      const draw = (now: number) => {
+        if (now - last >= SAMPLE_MS) {
+          last = now;
+          meter.getByteTimeDomainData(wave);
+          let sum = 0;
+          for (const v of wave) sum += ((v - 128) / 128) ** 2;
+          const loud = Math.min(1, Math.sqrt(sum / wave.length) * 4.5);
+          levels.shift();
+          levels.push(loud);
+          levels.forEach((lv, i) => {
+            const el = marks.current[i];
+            if (el) el.style.transform = `scaleY(${0.18 + 0.82 * lv})`;
+          });
+        }
+        s.frame = requestAnimationFrame(draw);
+      };
+      s.frame = requestAnimationFrame(draw);
+    }
+
+    setElapsed(0);
+    setPhase("recording");
+    handlers.current.onRecordingChange?.(true);
+  };
+
+  // Escape throws the recording away.
+  useEffect(() => {
+    if (phase !== "recording") return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        end(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [phase, end]);
+
+  // Leaving the page mid-recording: release the mic and hand nothing over.
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+      const s = session.current;
+      session.current = null;
+      if (s) {
+        s.recorder.onstop = null;
+        if (s.recorder.state !== "inactive") s.recorder.stop();
+        release(s);
+      }
+    };
+  }, [release]);
+
+  if (phase !== "recording") {
+    return (
+      <button
+        type="button"
+        aria-label={startLabel}
+        aria-pressed={false}
+        disabled={disabled || phase === "opening"}
+        onClick={begin}
+        className={`grid size-touch shrink-0 place-items-center rounded-full text-[var(--fg-muted)] transition-colors duration-150 hover:bg-[var(--chip-off-bg)] hover:text-[var(--fg)] disabled:opacity-50 ${className}`}
+      >
+        <Mic size={18} aria-hidden />
+      </button>
+    );
+  }
+
   return (
-    <div className={cn("flex items-center", className)}>
-      {recording && (
-        <div className="mr-1 flex h-touch items-center gap-1 rounded-full bg-[var(--hairline)] pr-3 pl-1 text-[var(--accent-fg)] motion-safe:animate-[pill-open_200ms_var(--ease-soft-out)]">
-          <button
-            type="button"
-            onClick={() => stop(false)}
-            aria-label="Cancel recording"
-            className="inline-flex size-11 items-center justify-center rounded-full text-[var(--fg-muted)] hover:bg-[var(--hairline)] hover:text-[var(--fg)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--focus-ring)] focus-visible:outline-solid"
-          >
-            <X aria-hidden size={18} />
-          </button>
-          {reduce ? (
-            <span aria-hidden className="text-small font-medium">
-              Recording
-            </span>
-          ) : (
-            <canvas ref={canvasRef} aria-hidden className="h-6 w-[clamp(4.5rem,18vw,7rem)]" />
-          )}
-          <span aria-hidden className="w-10 text-right text-small font-medium tabular-nums">
-            {clock(elapsed)}
-          </span>
-        </div>
-      )}
-      <span role="status" className="sr-only">
-        {recording ? "Recording. Press the button again to stop, or Escape to cancel." : ""}
+    <div
+      className={`flex shrink-0 items-center gap-0.5 rounded-full border border-[var(--hairline)] bg-[var(--chip-off-bg)] p-px motion-safe:animate-[voice-grow_220ms_ease-out] ${className}`}
+    >
+      <button
+        type="button"
+        aria-label="Cancel recording"
+        onClick={() => end(false)}
+        className="grid size-touch shrink-0 place-items-center rounded-full text-[var(--fg-muted)] hover:bg-[var(--hairline)] hover:text-[var(--fg)]"
+      >
+        <X size={16} aria-hidden />
+      </button>
+      <span aria-hidden className="flex h-6 items-center gap-[2px] px-1">
+        {Array.from({ length: TRACE }, (_, i) => (
+          <span
+            key={i}
+            ref={(el) => {
+              marks.current[i] = el;
+            }}
+            className="h-full w-[2px] origin-center rounded-full bg-[var(--accent-fg)] transition-transform duration-75"
+            style={{ transform: "scaleY(0.3)" }}
+          />
+        ))}
+      </span>
+      <span className="min-w-[2.6rem] text-center text-small tabular-nums text-[var(--fg)]" aria-hidden>
+        {minutes(elapsed)}
+      </span>
+      <span className="sr-only" role="status">
+        Recording
       </span>
       <button
-        ref={micRef}
         type="button"
-        onClick={() => (recording ? stop(true) : void start())}
-        // Not disabled while the mic starts: a disabled button drops keyboard focus.
-        disabled={disabled}
-        aria-busy={starting || undefined}
-        aria-label={recording ? stopLabel : startLabel}
-        aria-pressed={recording}
-        className={cn(
-          "inline-flex size-11 shrink-0 items-center justify-center rounded-full transition-colors duration-150 disabled:opacity-50",
-          "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] focus-visible:outline-solid",
-          recording ? "bg-[var(--accent-fg)] text-[var(--primary-fg)]" : "text-[var(--fg-muted)] hover:bg-[var(--hairline)] hover:text-[var(--fg)]",
-        )}
+        aria-label={stopLabel}
+        aria-pressed
+        onClick={() => end(true)}
+        className="grid size-touch shrink-0 place-items-center rounded-full bg-[var(--primary-bg)] text-[var(--primary-fg)] hover:bg-[var(--primary-hover)]"
       >
-        {recording ? <span aria-hidden className="size-3.5 rounded-[3px] bg-current" /> : <Mic aria-hidden size={20} />}
+        <Square size={12} fill="currentColor" aria-hidden />
       </button>
     </div>
   );
