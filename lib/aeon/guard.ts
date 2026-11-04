@@ -161,7 +161,7 @@ export function judgePerson(name: string, text: string, allow: Allowlist): Perso
     // claim", "no-showed") or a next sentence leaning on it ("Plan lunch with Maria. Her son was arrested.").
     const partOnly = boardPart && !boardWhole;
     const after = at >= 0 && partOnly ? leaningNext(text, at) : null;
-    const personal = partOnly && (PERSONAL_MATTER.test(s) || (after !== null && !partnerSentenceClean(after, name)));
+    const personal = partOnly && (PERSONAL_MATTER.test(s) || !businessOnly(s) || (after !== null && !partnerSentenceClean(after, name)));
     if (clean && !personal && (boardWhole || boardPart) && (referralContext(s) || command || (boardPart && titled))) continue;
     if (at >= 0 && colleagueAt(text, at, name) && !condition) continue;
     // A partner's staff by first name ("Jen at the front desk handles it"), outside any client sentence.
@@ -249,17 +249,90 @@ const PERSONAL_MATTER = new RegExp(
     `\\b(?:is|was|turned|turns)\\s+\\d{1,3}\\b|,\\s*\\d{1,3}\\s*,|\\bmy\\s+(?:\\d{1,2}(?::\\d{2})?\\s*(?:am|pm)|new\\s+intake|intake)\\b`,
   "iu",
 );
-// A sentence that starts by leaning on the one before ("Her son was arrested.").
-const LEANS_BACK = /^\s*(?:she|he|they|her|his|their|hers|him|them)\b/i;
-
-/** The sentence after the one at `at`, when it leans back on it with a pronoun ("Her son was arrested."). */
+/** The sentence after the one at `at` ("Plan lunch with Maria. Her son was arrested."): judged with it. */
 function leaningNext(text: string, at: number): string | null {
   const spans = sentenceSpans(text);
   const span = spans.find(([s, e]) => at >= s && at < e);
   const next = span ? spans.find(([s]) => s >= span[1]) : undefined;
-  if (!next) return null;
-  const n = text.slice(next[0], next[1]);
-  return LEANS_BACK.test(n) ? n : null;
+  return next ? text.slice(next[0], next[1]) : null;
+}
+
+// ---- what may stand next to a partner named by first name or surname: business only ----
+//
+// A POSITIVE list. Once a name was resolved from a first name or surname alone, the rest
+// of its sentence (and the next one) may say only business things about that person:
+// her/his/their + a business noun, she/he/they + a business clause, about/re:/regarding
+// + a business noun, and no bare number. Anything else refuses (default refuse).
+
+const BUSINESS_NOUN =
+  "practice|practices|clinic|clinics|group|groups|office|offices|team|teams|staff|colleagues?|waitlist|wait\\s+list|caseload|referrals?|availability|" +
+  "openings?|fees?|rates?|schedule|calendar|e-?mail|emails|number|phone|website|site|specialty|specialties|specialization|focus|niche|card|letters?|flyer|" +
+  "brochures?|talk|lunch|coffee|meeting|meetings|call|intro|introduction|partnership|collaboration|workshop|event|events|program|programs|services|" +
+  "front\\s+desk|desk|address|fax|hours|location|offices|department|unit|coordinator|manager|receptionist|scheduler|process|forms?|network|panel|panels|" +
+  "insurance\\s+panels?|board|newsletter|presentation|training|book|podcast|blog|outreach|contact|info|information|details|new\\s+clients|openings";
+const BUSINESS_NOUN_RE = new RegExp(`^(?:${BUSINESS_NOUN})$`, "i");
+/** Words that may come before a business noun ("her new practice", "his clinic's waitlist", "their intake process"). */
+const MODIFIER = /^(?:new|own|main|other|current|private|group|intake|referral|front|clinic|practice|office|team|lunch|quick|short|palliative|oncology|hospice|genetic|counseling|care|cancer|support|weekly|monthly|next|last|first|upcoming|free)$/i;
+
+/** One to three words, read as a business noun phrase ("clinic's waitlist", "palliative care referrals"). */
+function businessPhrase(words: string[]): boolean {
+  const ws = words.map((w) => w.replace(/['’]s$/i, "").toLowerCase());
+  for (let i = 0; i < Math.min(ws.length, 3); i++) {
+    if (BUSINESS_NOUN_RE.test(ws[i]) || (i + 1 < ws.length && BUSINESS_NOUN_RE.test(`${ws[i]} ${ws[i + 1]}`))) return true;
+    if (!MODIFIER.test(ws[i])) return false;
+  }
+  return false;
+}
+
+const wordsAfter = (s: string, from: number, n = 4) =>
+  s
+    .slice(from)
+    .split(/[^\p{L}'’-]+/u)
+    .filter(Boolean)
+    .slice(0, n);
+
+const ARTICLE = /^(?:the|a|an|some|our|my|your|this|that|their|her|his)$/i;
+
+// What she/he/they may do in a sentence about a partner: send or take referrals, have openings, run a group...
+const BUSINESS_CLAUSE = new RegExp(
+  "^(?:\\s+(?:said|says|mentioned|told\\s+me|thinks|thought)(?:\\s+that)?(?:\\s+(?:she|he|they))?)?\\s*" +
+    "(?:['’](?:s|d|ll|re)\\s+|\\s+(?:is|are|was|were|will|would|can|could|might|may|should)\\s+(?:also\\s+|still\\s+|now\\s+)?)?(?:be\\s+)?" +
+    "(?:send(?:s|ing)?|refer(?:s|ring)?|tak(?:e|es|ing)\\s+(?:new\\s+)?(?:clients|referrals|patients|insurance|[A-Z]\\w+)|accept(?:s|ing)?\\s+(?:new\\s+)?(?:clients|referrals|patients|insurance|[A-Z]\\w+)|" +
+    "run(?:s|ning)?\\s+(?:a|an|the|her|his|their)\\s+|lead(?:s|ing)?\\s+(?:a|an|the)\\s+|host(?:s|ing)?\\s+(?:a|an|the)\\s+|" +
+    "see(?:s|ing)?\\s+(?:adults|kids|children|teens|adolescents|families|couples|clients|patients|older\\s+adults)|" +
+    "ha(?:s|ve)\\s+(?:a\\s+|an\\s+|some\\s+|no\\s+)?(?:openings?|availability|room|space|a\\s+waitlist|waitlist|slots?|time)|" +
+    "offer(?:s|ing)?\\s+(?:a|an|the|free|group|lunch)|available|free\\s+(?:to|on|next|this)|open\\s+to\\s+(?:a|an|meeting|coffee|lunch|referrals|partnering)|" +
+    "out\\s+of\\s+(?:the\\s+)?office|back\\s+(?:in|on|next)|in\\s+(?:the\\s+)?office|interested\\s+in\\s+(?:a|an|referrals|partnering|meeting|coffee|lunch)|" +
+    "happy\\s+to\\s+(?:meet|refer|send|partner|chat|talk)|want(?:s|ed)?\\s+to\\s+(?:meet|refer|partner|collaborate|chat|talk|grab)|" +
+    "work(?:s|ing)?\\s+(?:with|at)\\s+(?:the\\s+)?(?:[A-Z]\\w+|adults|kids|families|teens|couples|a\\s+(?:group|practice|clinic))|" +
+    "reply|replied|respond(?:ed|s)?|wrote\\s+back|called\\s+back|emailed|got\\s+back|booked|confirm(?:ed|s)?|prefer(?:s|red)?\\s+(?:mornings|afternoons|zoom|email|coffee|lunch|a\\s+call)|" +
+    "coordinat\\w*|manag(?:e|es|ing)\\s+(?:the|their|our)\\s+(?:referrals|intake|schedule|calendar)|handl(?:e|es|ing)\\s+(?:the|their)\\s+(?:referrals|intake|scheduling))\\b",
+  "u",
+);
+
+/** True when everything said about a person in this sentence is practice business. */
+export function businessOnly(s: string): boolean {
+  if (/,\s*\d{1,3}\b/.test(s)) return false;
+  for (const m of s.matchAll(/\b(?:her|his|their)\s+/giu)) {
+    if (!businessPhrase(wordsAfter(s, (m.index ?? 0) + m[0].length))) return false;
+  }
+  // "Maria's Blue Cross claim", "Pamela's patient": a person's thing must be business too ("Dr. Serrano Vidal's team").
+  for (const m of s.matchAll(/\b([\p{L}-]+)['’]s\s+/gu)) {
+    const owner = m[1].toLowerCase();
+    if (/^(?:she|he|it|that|what|there|here|who|let|where|how|today|tomorrow|week|month|year)$/.test(owner) || BUSINESS_NOUN_RE.test(owner)) continue;
+    if (!businessPhrase(wordsAfter(s, (m.index ?? 0) + m[0].length))) return false;
+  }
+  for (const m of s.matchAll(/\b(?:she|he|they)\b/giu)) {
+    if (!BUSINESS_CLAUSE.test(s.slice((m.index ?? 0) + m[0].length))) return false;
+  }
+  for (const m of s.matchAll(/\b(?:about|regarding|re:?|to\s+discuss|discuss(?:ing)?|on\s+the)\s+/giu)) {
+    const ws = wordsAfter(s, (m.index ?? 0) + m[0].length, 5);
+    while (ws.length && ARTICLE.test(ws[0]) && !/^(?:her|his|their)$/i.test(ws[0])) ws.shift();
+    // "about her/his ..." was judged above as a possessive.
+    if (ws.length && /^(?:her|his|their)$/i.test(ws[0])) continue;
+    if (!businessPhrase(ws)) return false;
+  }
+  return true;
 }
 
 function partnerSentenceClean(s: string, said: string): boolean {
@@ -272,6 +345,7 @@ function partnerSentenceClean(s: string, said: string): boolean {
     !mentionsMedical(s) &&
     !medicalAboutSomeone(s) &&
     !PERSONAL_MATTER.test(s) &&
+    businessOnly(s) &&
     !namedCondition(said, s) &&
     !new RegExp(`(?<![\\p{L}\\p{N}])${who}['’]s\\s+(?:[\\p{L}-]+\\s+)?(?:${RELATIVES})s?\\b`, "iu").test(s)
   );
@@ -645,7 +719,7 @@ async function checkOnce(text: string, at: GuardPoint, list: Allowlist, opts: Gu
     for (const t of tokensOf(plain)) {
       if (t.capital || !cards.some((c) => c.words.includes(t.base))) continue;
       const s = sentenceAt(plain, t.at);
-      if (MY_CLIENT.test(s) || clientLike(s) || PERSONAL_MATTER.test(s)) return { ok: false, kind: "client_name" };
+      if (MY_CLIENT.test(s) || clientLike(s) || PERSONAL_MATTER.test(s) || !businessOnly(s)) return { ok: false, kind: "client_name" };
     }
   }
   const strangers: string[] = [];
