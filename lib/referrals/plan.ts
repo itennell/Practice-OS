@@ -339,6 +339,9 @@ export function cardsNamed(query: string, cards: ReferralSource[]): ReferralSour
         // "Dr. Rivera" names the last name only; with a first name it has to fit too.
         const first = words.tokens.length > 1 ? jaroWinkler(words.first, person.first) : 1;
         if (last >= 0.94 && first >= 0.85) score = Math.max(score, 0.6 * last + 0.4 * first);
+        // One word that is exactly a word of the person's name: "Maria", "Pamela", or one part
+        // of a two-part surname ("Serrano" in Pamela Serrano Vidal). Two such cards ask which.
+        if (words.tokens.length === 1 && person.tokens.includes(words.tokens[0])) score = Math.max(score, 0.7);
       }
       return { c, score };
     })
