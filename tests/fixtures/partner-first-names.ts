@@ -187,3 +187,16 @@ export const ROUND3_MUST_REFUSE: string[] = [
   "follow up with Emily, she's out of the psych ward",
   "call John, he's been suicidal lately",
 ];
+
+/** Round 4: a fragment after a comma or semicolon is never read as part of a business clause. Must refuse. */
+export const ROUND4_MUST_REFUSE: string[] = [
+  "follow up with Emily, she's out until Monday, Mercy Hospital",
+  "follow up with Emily, she's out until Monday, Rush ICU",
+  "follow up with Emily, she's out until Monday; Northwestern psych",
+  "follow up with James, she has openings Thursdays, Mercy Hospital",
+  "follow up with James, he has openings Thursdays; Rush ICU",
+  "follow up with Emily, she's out on maternity leave until March",
+];
+
+/** Round 4: must pass. */
+export const ROUND4_MUST_PASS: string[] = ["call Michael, he said his front desk lost my fax"];

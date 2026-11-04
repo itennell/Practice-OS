@@ -336,13 +336,14 @@ const PRACTICE_NEWS_CLAUSE = [
   `(?:presenting|presents|present|speaking|speaks|speak)\\s+at\\s+(?:the\\s+|a\\s+|an\\s+)?(?:(?:[A-Z][\\w-]*|counseling|therapy|clinical|regional|state|annual|national|local|spring|fall)\\s+){0,4}(?:conference|workshop|training|summit|meeting|event|grand\\s+rounds|webinar|lunch-and-learn)`,
   `(?:(?:wants?|wanted|plans?|planning|hopes?|hoping)\\s+to\\s+)?(?:co-?lead|co-?leads|co-?leading|lead|leads|leading|host|hosts|hosting|run|runs|running)\\s+(?:a|an|the)\\s+(?:new\\s+)?(?:workshop|training|webinar|lunch-and-learn|consultation\\s+group)`,
   `mentioned\\s+(?:a|an|the|her|his|their)\\s+(?:new\\s+)?(?:group|IOP|PHP|program|workshop|office|location|practice|associate|opening|training)`,
+  `(?:said|says|mentioned)\\s+(?:that\\s+)?(?:her|his|their)\\s+(?:front\\s+desk|office|staff|team|scheduler|biller|receptionist|office\\s+manager)\\s+(?:lost|has|needs|got|never\\s+got|didn['’]t\\s+get|sent|missed|wants)\\s+my\\s+(?:fax|referral|letter|e-?mail|brochure|card|forms?|NPI|fee\\s+sheet)`,
   `(?:sees|gets|receives|see|get)\\s+(?:a\\s+lot\\s+of|lots\\s+of|many|mostly|plenty\\s+of)\\s+(?:(?:${FIELD})\\s+){1,3}referrals`,
 ].join("|");
 const PRACTICE_NEWS_TAIL =
   `(?:\\s+(?:next|this|last)\\s+(?:week|month|year|weekend|spring|summer|fall|winter)|\\s+(?:in|on|until|through|till|by|from|after|before|starting)\\s+(?:the\\s+)?(?:${MONTH}|${WEEKDAY}|spring|summer|fall|winter|the\\s+\\d{1,2}(?:st|nd|rd|th)?|\\d{1,2}\\/\\d{1,2})(?:\\s+\\d{1,2}(?:st|nd|rd|th)?)?|` +
   `\\s+(?:to|in)\\s+${NOT_A_PLACE}[A-Z][\\w-]+(?:\\s+${NOT_A_PLACE}[A-Z][\\w-]+){0,2}|\\s+on\\s+(?:${WEEKDAY}|Zoom)|\\s+(?:soon|again|too|now|already|this\\s+week))*`;
 const PRACTICE_NEWS = new RegExp(
-  `^(?:['’](?:s|d|ll|re|ve)\\b|\\s+(?:is|are|was|were|will|would|can|could|might|may|should))?(?:\\s+(?:just|also|recently|now|still|finally|really|soon))*\\s+(?:${PRACTICE_NEWS_CLAUSE})${PRACTICE_NEWS_TAIL}\\s*(?:[.,;!?]|$|\\s+and\\s+(?=(?:she|he|they)\\b))`,
+  `^(?:['’](?:s|d|ll|re|ve)\\b|\\s+(?:is|are|was|were|will|would|can|could|might|may|should))?(?:\\s+(?:just|also|recently|now|still|finally|really|soon))*\\s+(?:${PRACTICE_NEWS_CLAUSE})${PRACTICE_NEWS_TAIL}(?=[.!?]?\\s*$|,?\\s+and\\s+(?:she|he|they)\\b)`,
   "u",
 );
 // Field words name the referrals a partner sees, never a person's condition, only in this frame.
@@ -369,7 +370,13 @@ export function businessOnly(s: string): boolean {
   }
   for (const m of s.matchAll(/\b(?:she|he|they)\b/giu)) {
     const rest = s.slice((m.index ?? 0) + m[0].length);
-    if (!BUSINESS_CLAUSE.test(rest) && !PRACTICE_NEWS.test(rest)) return false;
+    if (PRACTICE_NEWS.test(rest)) continue;
+    const clause = BUSINESS_CLAUSE.exec(rest);
+    if (!clause) return false;
+    // A business clause ends the sentence, or hands over with ", and she/he/they" (judged on its
+    // own above). Any other fragment after a comma or semicolon ("..., Mercy Hospital") refuses.
+    const after = rest.slice(clause[0].length).split(/,?\s+and\s+(?=(?:she|he|they)\b)/i)[0];
+    if (/[,;:]/.test(after)) return false;
   }
   for (const m of s.matchAll(/\b(?:about|regarding|re:?|to\s+discuss|discuss(?:ing)?|on\s+the)\s+/giu)) {
     const ws = wordsAfter(s, (m.index ?? 0) + m[0].length, 5);
