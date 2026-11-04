@@ -143,3 +143,5 @@ The Front Desk helper is paused and hidden in the app for now. When on, it texts
 Copyright (C) 2026 Isaiah Tennell.
 
 Practice-OS is free software, licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0). You can use, change and share it. If you run a changed version for others over a network, you must share your changes under the same license.
+
+Practice-OS uses code, models, data and fonts made by others, under their own licenses. They are listed, with open license questions, in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
