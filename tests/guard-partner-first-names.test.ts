@@ -148,6 +148,37 @@ describe("board partners by first name or surname", () => {
     expect((await guard(withContext(m, "Partners", PICKED), "message", common, ASK)).ok, m).toBe(true);
   }, T);
 
+  // CI on PR #154: plan_referral_meeting's result was withheld now and then. When anything in a
+  // tool result is blanked (here a stranger), the redacted text is checked again, and that check
+  // ran the business-only rules (", 9:00 am" read as a bare number) on code-built JSON. Those
+  // rules are for her own words only.
+  it("a tool result naming a partner by first name, with times, is kept after another name is blanked", async () => {
+    const result = JSON.stringify(
+      { queued: true, proposed: { with: "Maria", kind: "Meeting", when: "Tue Aug 19, 9:00 am" }, also_open: ["Tue Aug 19, 9:30 am", "Tue Aug 19, 10:00 am"], note: "Kevin Ortiz" },
+      null,
+      2,
+    );
+    const r = await guard(result, "tool_result", allow);
+    expect(r.ok, JSON.stringify(r)).toBe(true);
+    if (r.ok) {
+      expect(r.text).not.toContain("Kevin Ortiz");
+    }
+    // Her own message with the same shape is still judged by the business-only rules.
+    expect((await guard("coffee with Maria, 9", "message", allow, ASK)).ok).toBe(false);
+  }, T);
+
+  // The CI flake's real cause: a random approval id whose hex digits read as a phone number.
+  it("an approval id is never read as a phone number in a full-rules tool result", async () => {
+    for (const id of ["66d21f71-d43f-48ad-af3c-e18592619355", "4269c074-2ed9-4818-a928-1727490bef4a", "193793dc-f688-40c7-9ecf-ac6564798793"]) {
+      const text = JSON.stringify({ queued: true, approval_id: id, proposed: { with: "Birinder Malhi, MD", kind: "Meeting", when: "Tue Apr 15, 1:00 pm" } }, null, 2);
+      const r = await guard(text, "tool_result", allow, { fullRules: true });
+      expect(r, id).toEqual({ ok: true, text });
+    }
+    // A real phone number in the same place still refuses.
+    const phone = JSON.stringify({ note: "her cell is 312-555-0199" });
+    expect((await guard(phone, "tool_result", allow, { fullRules: true })).ok).toBe(false);
+  }, T);
+
   it("every earlier adversarial must-refuse probe still refuses, with these partners on the board too", async () => {
     const board = { ...DEMO_ALLOWED, names: [...DEMO_ALLOWED.names, ...BOARD], directory: [...DEMO_ALLOWED.directory, ...BOARD] };
     const leaks: string[] = [];

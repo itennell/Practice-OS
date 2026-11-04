@@ -131,11 +131,17 @@ export type PersonVerdict = { verdict: "ok" } | { verdict: "blank" } | { verdict
  * Anyone else is a stranger: refused when the sentence looks like a client's
  * (a visit, a bill, a condition), otherwise blanked where blanking is allowed.
  */
-export function judgePerson(name: string, text: string, allow: Allowlist): PersonVerdict {
+/**
+ * `herWords`: the text is hers (her chat message, or a memory). Only there do the
+ * business-only rules apply around a partner named by first name or surname (businessOnly,
+ * PERSONAL_MATTER, the next sentence). Tool results and replies the code builds itself
+ * ("Tue Aug 19, 9:00 am", "Maria Halvorsen, MS") are judged without them.
+ */
+export function judgePerson(name: string, text: string, allow: Allowlist, herWords = true): PersonVerdict {
   // "Mark Brittany Keiser as contacted": the name-finder can take the command
   // word as a first name. When the rest is a whole name on her list, judge that.
   const command = COMMAND_BEFORE_NAME.exec(name);
-  if (command && wholeOf(wordsOf(command[1]), allow.names)) return judgePerson(command[1], text, allow);
+  if (command && wholeOf(wordsOf(command[1]), allow.names)) return judgePerson(command[1], text, allow, herWords);
   const words = wordsOf(name);
   // Only titles or a sample label ("Rev.", "[Sample]"): no one is named.
   if (words.length === 0) return { verdict: "ok" };
@@ -161,7 +167,7 @@ export function judgePerson(name: string, text: string, allow: Allowlist): Perso
     // claim", "no-showed") or a next sentence leaning on it ("Plan lunch with Maria. Her son was arrested.").
     const partOnly = boardPart && !boardWhole;
     const after = at >= 0 && partOnly ? leaningNext(text, at) : null;
-    const personal = partOnly && (PERSONAL_MATTER.test(s) || !businessOnly(s) || (after !== null && !partnerSentenceClean(after, name)));
+    const personal = herWords && partOnly && (PERSONAL_MATTER.test(s) || !businessOnly(s) || (after !== null && !partnerSentenceClean(after, name)));
     if (clean && !personal && (boardWhole || boardPart) && (referralContext(s) || command || (boardPart && titled))) continue;
     if (at >= 0 && colleagueAt(text, at, name) && !condition) continue;
     // A partner's staff by first name ("Jen at the front desk handles it"), outside any client sentence.
@@ -174,8 +180,8 @@ export function judgePerson(name: string, text: string, allow: Allowlist): Perso
 }
 
 /** A name that passes where it stands (see judgePerson). */
-export function isAllowedPerson(name: string, text: string, allow: Allowlist): boolean {
-  return judgePerson(name, text, allow).verdict === "ok";
+export function isAllowedPerson(name: string, text: string, allow: Allowlist, herWords = true): boolean {
+  return judgePerson(name, text, allow, herWords).verdict === "ok";
 }
 
 // ---- partners named by first name or surname ------------------------------------
@@ -388,7 +394,7 @@ export function businessOnly(s: string): boolean {
   return true;
 }
 
-function partnerSentenceClean(sentence: string, said: string): boolean {
+function partnerSentenceClean(sentence: string, said: string, herWords = true): boolean {
   const who = escape(said);
   const s = withoutReferralFields(sentence);
   return (
@@ -398,8 +404,7 @@ function partnerSentenceClean(sentence: string, said: string): boolean {
     !mentionsDiagnosis(s) &&
     !mentionsMedical(s) &&
     !medicalAboutSomeone(s) &&
-    !PERSONAL_MATTER.test(s) &&
-    businessOnly(s) &&
+    (!herWords || (!PERSONAL_MATTER.test(s) && businessOnly(s))) &&
     !namedCondition(said, s) &&
     !new RegExp(`(?<![\\p{L}\\p{N}])${who}['’]s\\s+(?:[\\p{L}-]+\\s+)?(?:${RELATIVES})s?\\b`, "iu").test(s)
   );
@@ -420,7 +425,7 @@ export type PartnerMatch =
  * are one person and must all be on one card ("Maria Smith" is not Maria Helgeson);
  * words split by a comma, "and" or a colon are separate people.
  */
-export function partnerMatch(name: string, text: string, allow: Allowlist): PartnerMatch {
+export function partnerMatch(name: string, text: string, allow: Allowlist, herWords = true): PartnerMatch {
   const cards = partnerCards(allow);
   if (!cards.length) return { kind: "none" };
   const said = name
@@ -463,9 +468,9 @@ export function partnerMatch(name: string, text: string, allow: Allowlist): Part
       if (joined.some((t) => !cards.some((c) => c.words.includes(t.base)) && !COMMON_AFTER_NAME.test(t.base))) return { kind: "none" };
       const spoken = text.slice(group[0].at, group.at(-1)!.end);
       const sent = sentenceAt(text, group[0].at);
-      if (!partnerSentenceClean(sent, spoken)) return { kind: "none" };
+      if (!partnerSentenceClean(sent, spoken, herWords)) return { kind: "none" };
       const after = leaningNext(text, group[0].at);
-      if (after && !partnerSentenceClean(after, spoken)) return { kind: "none" };
+      if (herWords && after && !partnerSentenceClean(after, spoken)) return { kind: "none" };
       // The positive gate stays: a referral sentence, a command to her, or "Dr." before the name.
       // A first name never clears a sentence just because it lacks client words.
       const titledHere = TITLE_BEFORE.test(text.slice(Math.max(0, group[0].at - 8), group[0].at));
@@ -550,7 +555,7 @@ function joinSpacedLetters(text: string): string {
  * name. Used for checking only; what is saved is unchanged.
  */
 export function normalizeForCheck(text: string): string {
-  return foldTypos(joinSpacedLetters(foldLookalikes(text.normalize("NFKD").replace(/[\p{M}\p{Cf}]/gu, "").normalize("NFKC"))));
+  return foldTypos(joinSpacedLetters(foldLookalikes(text.replace(UUID_ANYWHERE, "[id]").normalize("NFKD").replace(/[\p{M}\p{Cf}]/gu, "").normalize("NFKC"))));
 }
 
 // Digits and symbols written for letters ("cl1ent S4rah K1ein", "p@tient",
@@ -725,9 +730,16 @@ function joinBrokenLines(text: string): string {
   return text.replace(/([^.!?:;\s])[ \t]*\n+[ \t]*(?!(?:[-*•]|\d+[.)])\s)/g, "$1 ");
 }
 
+// A UUID (an approval or card id the code puts in a tool result) is never a phone or record
+// number, but its hex digits ("...-e18592619355") read as a phone about 1 time in 200: the
+// checks read "[id]" in its place (normalizeForCheck).
+const UUID_ANYWHERE = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
+
 async function checkOnce(text: string, at: GuardPoint, list: Allowlist, opts: GuardOptions): Promise<GuardResult> {
   const plain = normalizeForCheck(text);
   const light = at === "tool_result" && !opts.fullRules;
+  // Her own words (her message, a memory) get the business-only rules around a partner's first name.
+  const herWords = at === "message" || at === "memory";
   const rules = light ? checkIdentity(plain, list, TOOL_RESULT_RULES) : checkIdentity(plain, list);
   if (!rules.ok) return { ok: false, kind: rules.kind };
   const detail = light ? personalDetail(plain, list) : null;
@@ -768,7 +780,7 @@ async function checkOnce(text: string, at: GuardPoint, list: Allowlist, opts: Gu
   }
   // A partner's first name or surname written in lowercase, which the name-finder can miss
   // ("maria no-showed again"), in a sentence about someone's own life or visits: refused.
-  if (at === "message" || at === "memory") {
+  if (herWords) {
     const cards = partnerCards(list);
     for (const t of tokensOf(plain)) {
       if (t.capital || !cards.some((c) => c.words.includes(t.base))) continue;
@@ -781,7 +793,7 @@ async function checkOnce(text: string, at: GuardPoint, list: Allowlist, opts: Gu
   // a name on two or more cards is asked about at her message, judged as before elsewhere.
   let ambiguous: { said: string; choices: string[] } | null = null;
   const asPartner = (n: string): boolean => {
-    const p = partnerMatch(n, plain, list);
+    const p = partnerMatch(n, plain, list, herWords);
     if (p.kind === "partners") return true;
     if (p.kind === "ambiguous" && at === "message" && opts.askWhichPartner) {
       ambiguous ??= { said: p.said, choices: p.choices };
@@ -791,9 +803,9 @@ async function checkOnce(text: string, at: GuardPoint, list: Allowlist, opts: Gu
   };
   for (const n of names.filter(isNameLike)) {
     if (asPartner(n)) continue;
-    const v = judgePerson(n, plain, list);
+    const v = judgePerson(n, plain, list, herWords);
     if (v.verdict === "refuse") return { ok: false, kind: v.kind };
-    const w = joined === plain ? v : judgePerson(n, joined, list);
+    const w = joined === plain ? v : judgePerson(n, joined, list, herWords);
     if (w.verdict === "refuse") return { ok: false, kind: w.kind };
     if (v.verdict === "blank" || w.verdict === "blank") strangers.push(n);
   }
@@ -809,7 +821,7 @@ async function checkOnce(text: string, at: GuardPoint, list: Allowlist, opts: Gu
       const capital = asWritten.split(/\s+/).filter((w) => /^\p{Lu}/u.test(w));
       if (capital.length > 0 && capital.length < asWritten.split(/\s+/).length && partOf(wordsOf(capital.join(" ")), list.names)) continue;
       if (asPartner(asWritten)) continue;
-      const v = judgePerson(asWritten, plain, list);
+      const v = judgePerson(asWritten, plain, list, herWords);
       if (v.verdict === "refuse") return { ok: false, kind: v.kind };
       if (v.verdict === "blank" && /\s/.test(n.trim())) strangers.push(asWritten);
     }
@@ -828,7 +840,7 @@ async function checkOnce(text: string, at: GuardPoint, list: Allowlist, opts: Gu
   // if any stranger is still there, withhold the whole result.
   try {
     const again = normalizeForCheck(redacted);
-    if ((await findNames(again)).some((n) => isNameLike(n) && !isAllowedPerson(n, again, list))) return { ok: false, kind: "client_name" };
+    if ((await findNames(again)).some((n) => isNameLike(n) && !isAllowedPerson(n, again, list, herWords))) return { ok: false, kind: "client_name" };
   } catch {
     return { ok: false, kind: "unavailable" };
   }
