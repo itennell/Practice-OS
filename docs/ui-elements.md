@@ -53,14 +53,14 @@ Every UI piece Isaiah picked for Practice-OS, where it goes, and how to build it
 | UI-007 | Plugins page for connections | SET | Connections | nice | collected | Design board p.8 |  |
 | UI-008 | Agent profile page | Settings | Settings → Aeon | nice | built (Aeon only) | Design board p.8; Isaiah screenshot 2026-10-28 | `components/aeon-files.tsx` |
 | UI-009 | Primary button pinned to the bottom on phones | GLB | Buttons and chips | must | approved | Design board p.7 |  |
-| UI-010 | Status Mark (animated status icon) | GLB | Status pills | must | built | React Bits (app exception) | `components/shared/status-mark.tsx` (`StatusMark`, `StatusPill`) |
-| UI-011 | Prompt Bar ("Ask anything" with dictation) | CHT | Message input | must | built | React Bits (app exception) | `components/shared/prompt-bar.tsx` (`PromptBar`) |
+| UI-010 | Status Mark (animated status icon) | GLB | Status pills | must | built | Own code (rewritten 2026-11-04) | `components/shared/status-mark.tsx` (`StatusMark`, `StatusPill`) |
+| UI-011 | Prompt Bar ("Ask anything" with dictation) | CHT | Message input | must | built | Own code (rewritten 2026-11-04) | `components/shared/prompt-bar.tsx` (`PromptBar`) |
 | UI-012 | Slide to Commit | TBD | Anywhere it fits | nice | collected | React Bits (app exception) |  |
-| UI-013 | Spring Check (check off and cross out) | GLB | Checklists and check-offs | must | built | React Bits (app exception) | `components/shared/spring-check.tsx` (`SpringCheck`) |
-| UI-014 | Thought Line (Aeon is working) | CHT | Aeon thinking | must | built | React Bits (app exception) | `components/shared/thought-line.tsx` (`ThoughtLine`) |
-| UI-015 | Voice Pill (dictation capture) | CHT | Message input | must | built | React Bits (app exception) | `components/shared/voice-pill.tsx` (`VoicePill`), `app/api/transcribe` |
+| UI-013 | Spring Check (check off and cross out) | GLB | Checklists and check-offs | must | built | Own code (rewritten 2026-11-04) | `components/shared/spring-check.tsx` (`SpringCheck`) |
+| UI-014 | Thought Line (Aeon is working) | CHT | Aeon thinking | must | built | Own code (rewritten 2026-11-04) | `components/shared/thought-line.tsx` (`ThoughtLine`) |
+| UI-015 | Voice Pill (dictation capture) | CHT | Message input | must | built | Own code (rewritten 2026-11-04) | `components/shared/voice-pill.tsx` (`VoicePill`), `app/api/transcribe` |
 | UI-016 | Animated Content (fade and slide in) | TBD | Anywhere it fits | nice | parked | React Bits (reference; marketing fit) |  |
-| UI-017 | Liquid Aeon (liquid metal blob for Aeon and the agents) | SHL | Aeon orb | must | approved | React Bits (app exception, adapted) | `components/agent-blob/` (test page built) |
+| UI-017 | Liquid Aeon (liquid metal blob for Aeon and the agents) | SHL | Aeon orb | must | approved | Own code (rewritten 2026-11-04) | `components/agent-blob/` (test page built) |
 | UI-018 | Liquid Ether (living background) | GLB | App background | must | built | React Bits idea (MIT), own WebGL shader | `components/shared/liquid-ether.tsx` (`LiquidEther`); test page `/ui-lab/liquid-ether` |
 | UI-019 | Text Type (welcome greeting) | HOM | Greeting and practice chips | must | approved | React Bits (app exception) |  |
 | UI-020 | Card Nav (menu that opens into cards) | SHL | Phone top bar and menu | must | approved | React Bits (app exception) |  |
@@ -144,11 +144,15 @@ On phone screens (390 wide, 24px side padding), the main action button sits fixe
 
 ### UI-010 Status Mark (animated status icon)
 
+> **Rewritten 2026-11-04.** Our component is original Practice-OS code, written from scratch (clean room) to remove the React Bits Commons Clause conflict with the AGPL. The React Bits link and Install line below are design history only: never install or copy React Bits code for it.
+
 **GLB · Status pills** · must · approved · React Bits (app exception) · [link](https://reactbits.dev/c/micro/status-mark)
 
 A small icon that morphs from a ring to a spinning arc, then a check, X or strike. Use it everywhere something has a status: loading/running, waiting for sign-off (pending), done, failed, and cancelled or declined. Its states match ours: pending, running, done, failed, cancelled (our 'declined'). Sits next to or inside the status pills. Install: npx shadcn@latest add @react-bits/StatusMark-TS-TW. Needs the motion library. Respects reduced motion and has screen-reader labels.
 
 ### UI-011 Prompt Bar ("Ask anything" with dictation)
+
+> **Rewritten 2026-11-04.** Our component is original Practice-OS code, written from scratch (clean room) to remove the React Bits Commons Clause conflict with the AGPL. The React Bits link and Install line below are design history only: never install or copy React Bits code for it.
 
 **CHT · Message input** · must · approved · React Bits (app exception) · [link](https://reactbits.dev/c/micro/prompt-bar?menuBackground=9d9d9d)
 
@@ -162,17 +166,23 @@ A pill track you slide across (or press Enter / arrow keys) to confirm something
 
 ### UI-013 Spring Check (check off and cross out)
 
+> **Rewritten 2026-11-04.** Our component is original Practice-OS code, written from scratch (clean room) to remove the React Bits Commons Clause conflict with the AGPL. The React Bits link and Install line below are design history only: never install or copy React Bits code for it.
+
 **GLB · Checklists and check-offs** · must · approved · React Bits (app exception) · [link](https://reactbits.dev/c/micro/spring-check)
 
 The checkbox for every list where things get checked off: a springy check, then the label is crossed out and fades. Use it everywhere something is marked done: deadlines (license renewal, CE hours, CAQH, taxes), referral follow-ups, credentialing prep and how-do-I guide steps, setup and connection checklists in Settings, and onboarding checklists. Not for approvals (those keep Approve / Edit / Decline). Colors follow the Caseload palette: box border #D4CDF0, fill = primary #1E1A3A (or success #2F7A55 for completed), check = white, label = ink #17142B, crossed-out label = muted #5D5878; dark mode uses #8E7CF8 / #8FD8AE / #F1EEFF / #B3ADCF. Add a visible Caseload focus ring (the component has none) and keep the 44px touch target around the box. Install: npx shadcn@latest add @react-bits/SpringCheck-TS-TW. Needs motion; swap its Hugeicons check for lucide. A real button with checkbox role, so Space and Enter work; respects reduced motion.
 
 ### UI-014 Thought Line (Aeon is working)
 
+> **Rewritten 2026-11-04.** Our component is original Practice-OS code, written from scratch (clean room) to remove the React Bits Commons Clause conflict with the AGPL. The React Bits link and Install line below are design history only: never install or copy React Bits code for it.
+
 **CHT · Aeon thinking** · must · approved · React Bits (app exception) · [link](https://reactbits.dev/c/micro/thought-line)
 
 Shown whenever Aeon is thinking, working through ideas, or running steps the clinician should see. A breathing, shimmering "Thinking…" line with an expandable list of steps and an optional timer; it settles into a done label (e.g. "Drafted 3 posts") and collapses when finished. Use it in the Chat with Aeon panel (main spot), the onboarding "Aeon is putting your practice together" step, the morning brief, and while Aeon drafts letters, posts or searches referral sources. Glyph: a tiny Aeon orb instead of the default sparkle (glyph accepts any element). Steps must be plain-English summaries of real work Aeon is doing (from actual job progress), never raw model reasoning and never invented progress. Colors follow the Caseload palette: text = muted #5D5878 while working, ink #17142B when done, shimmer and glyph in accent #5B47C9 (dark: #B3ADCF / #F1EEFF / #8E7CF8). Install: npx shadcn@latest add @react-bits/ThoughtLine-TS-TW. Needs motion; swap Hugeicons for lucide. Announced to screen readers as a status; respects reduced motion. Use Status Mark (UI-010) for item status and Thought Line for Aeon's own work.
 
 ### UI-015 Voice Pill (dictation capture)
+
+> **Rewritten 2026-11-04.** Our component is original Practice-OS code, written from scratch (clean room) to remove the React Bits Commons Clause conflict with the AGPL. The React Bits link and Install line below are design history only: never install or copy React Bits code for it.
 
 **CHT · Message input** · must · approved · React Bits (app exception) · [link](https://reactbits.dev/c/micro/voice-pill)
 
@@ -185,6 +195,8 @@ The recording state for dictation in the Prompt Bar (UI-011): when the clinician
 Reference for later. Wraps any block so it fades and slides into place (optional blur, scale, stagger), usually as you scroll. Spot not decided. Best fit: the public Practice-OS landing page or the hackathon demo page, where scroll reveals suit a marketing page. Inside the app, use it sparingly or not at all: content starts invisible and arrives 100px away over 0.8s, which slows people doing tasks; if we want a reveal in the app (e.g. new items arriving in the approvals inbox, onboarding steps), copy the idea with a short 150-250ms fade-up using motion (already used by the other pieces) instead of adding GSAP. Colors: none of its own. Install: npx shadcn@latest add @react-bits/AnimatedContent-TS-TW. Needs GSAP with ScrollTrigger; DECIDED: no GSAP in the app, landing page only. Respects reduced motion.
 
 ### UI-017 Liquid Aeon (liquid metal blob for Aeon and the agents)
+
+> **Rewritten 2026-11-04.** Our component is original Practice-OS code, written from scratch (clean room) to remove the React Bits Commons Clause conflict with the AGPL. The React Bits link and Install line below are design history only: never install or copy React Bits code for it.
 
 **SHL · Aeon orb** · must · approved · React Bits (app exception, adapted) · DECIDED 2026-10-27: Isaiah saw the standalone test (/ui-lab/aeon) and picked Chrome surface with eyes on for Aeon (clinician-facing only; never on public Front Desk or web chat). Ready to go into the app in Stage 2. · [link](https://reactbits.dev/c/animations/blob-cursor)
 
