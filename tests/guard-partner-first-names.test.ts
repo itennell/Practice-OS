@@ -205,6 +205,30 @@ describe("board partners by first name or surname", () => {
     expect((await guard("April Nguyen wants Tuesdays after 5", "message", allow, ASK)).ok).toBe(false);
   }, T);
 
+  // The name-finder misses a bare month first name: refused by plain code, at message and memory.
+  it.each([
+    "June no-showed again",
+    "May cried in session",
+    "April's PTSD is worse",
+    "April wants Tuesdays after 5",
+    "August owes me for two sessions",
+    "my client June wants a meeting",
+    "January is struggling since her divorce",
+  ])("a bare month first name in a client sentence refuses: %s", async (m) => {
+    for (const at of ["message", "memory"] as const) {
+      const r = await guard(m, at, allow, ASK);
+      expect(r.ok, `${at}: ${m}`).toBe(false);
+    }
+  }, T);
+
+  it("a month that is a date, or a board partner named June, still passes", async () => {
+    const board = [...BOARD, "[Sample] June Park, LCSW"];
+    const withJune = { names: [...OWN, ...board], contacts: [], directory: board };
+    for (const m of ["coffee with June Park", "meet in May", "follow up May 5", "May I book a coffee with Maria?", "we start a grief group in June", "lunch talk with Pamela next April"]) {
+      expect((await guard(m, "message", withJune, ASK)).ok, m).toBe(true);
+    }
+  }, T);
+
   it("every earlier adversarial must-refuse probe still refuses, with these partners on the board too", async () => {
     const board = { ...DEMO_ALLOWED, names: [...DEMO_ALLOWED.names, ...BOARD], directory: [...DEMO_ALLOWED.directory, ...BOARD] };
     const leaks: string[] = [];

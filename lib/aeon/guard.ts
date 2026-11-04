@@ -829,6 +829,27 @@ async function checkOnce(text: string, at: GuardPoint, list: Allowlist, opts: Gu
       const s = sentenceAt(plain, t.at);
       if (MY_CLIENT.test(s) || clientLike(s) || PERSONAL_MATTER.test(s) || !businessOnly(s)) return { ok: false, kind: "client_name" };
     }
+    // A month that is also a first name ("June no-showed again", "May cried in session",
+    // "April's PTSD is worse"): the name-finder often misses it. Capitalized, not a date (no day
+    // number beside it, no weekday before it), in a client or personal sentence: refused like
+    // any unknown name. "meet in May", "follow up May 5" and "May I ask..." are not names.
+    for (const t of tokensOf(plain)) {
+      if (!t.capital || !MONTH_NAMES.has(t.base) || calendarWord(t.base, plain)) continue;
+      if (t.base === "may" && /^\s+(?:I|we|you|she|he|they)\b/i.test(plain.slice(t.end))) continue;
+      // "starting in June", "until April", "next May", "end of August": the month.
+      if (/\b(?:in|by|until|till|through|since|during|before|after|from|of|next|last|this|early|mid|late|starting|beginning|end\s+of)\s+$/i.test(plain.slice(Math.max(0, t.at - 16), t.at))) continue;
+      const s = sentenceAt(plain, t.at);
+      if (
+        MY_CLIENT.test(s) ||
+        clientLike(s) ||
+        PERSONAL_MATTER.test(s) ||
+        mentionsDiagnosis(s) ||
+        medicalAboutSomeone(s) ||
+        namedCondition(plain.slice(t.at, t.end), s)
+      ) {
+        return { ok: false, kind: mentionsDiagnosis(s) ? "diagnosis" : "client_name" };
+      }
+    }
   }
   const strangers: string[] = [];
   // Her partners named by first name or surname (partnerMatch): one card each passes;
