@@ -100,8 +100,17 @@ describe.skipIf(REFERRALS_ONLY_DEMO || !sql)("morning_brief", () => {
   });
 
   it("returns this week's items, urgent ones just after, and a plain-text summary", async () => {
+    // Whatever today is: a partner (Hollis Vance, at a hospice) and a grief center both have a
+    // follow-up this week, so the brief always lists a person beside care words in org names.
+    const PINNED = ["00000000-0000-4000-8000-000000000208", "00000000-0000-4000-8000-000000000209"];
+    const saved = await sql!<{ id: string; next_follow_up_on: string | null }[]>`
+      select id::text, next_follow_up_on::text from practice_os.referral_sources where id in ${sql!(PINNED)}`;
+    await sql!`update practice_os.referral_sources set next_follow_up_on = current_date + 1 where id in ${sql!(PINNED)}`;
     const before = await sql!`select count(*)::int as n, max(updated_at) as at from practice_os.obligations`;
-    const result = await client.callTool({ name: "morning_brief", arguments: {} });
+    const result = await client.callTool({ name: "morning_brief", arguments: {} }).finally(async () => {
+      for (const s of saved) await sql!`update practice_os.referral_sources set next_follow_up_on = ${s.next_follow_up_on} where id = ${s.id}`;
+    });
+    if (saved.length === PINNED.length) expect(String((result.structuredContent as { summary?: string } | undefined)?.summary)).toMatch(/Marrowpine Grief Center/);
     expect(result.isError).toBeFalsy();
     const brief = result.structuredContent as {
       today: string;
