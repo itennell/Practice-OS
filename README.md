@@ -4,7 +4,7 @@
 
 **An open-source AI co-owner for solo therapists: find referral partners, draft the outreach, plan the meetings — nothing goes out without your OK.**
 
-[![Built with Meta Muse](https://img.shields.io/badge/Built%20with-Meta%20Muse-5B47C9?style=flat-square)](lib/meta.ts)
+[![Built with Meta Muse](https://img.shields.io/badge/Built%20with-Meta%20Muse-5B47C9?style=flat-square)](lib/meta.ts) [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue?style=flat-square)](LICENSE)
 [![Next.js](https://img.shields.io/badge/Next.js-16-1F1E1D?style=flat-square&logo=nextdotjs)](package.json)
 [![Postgres](https://img.shields.io/badge/Postgres-built--in-336791?style=flat-square&logo=postgresql&logoColor=white)](lib/local-db.ts)
 [![Hackathon: Meta Global AI Developer Hackathon](https://img.shields.io/badge/Hackathon-Meta%20Global%20AI%20Developer%20Hackathon-2F7A55?style=flat-square)](#built-for-the-meta-global-ai-developer-hackathon)
@@ -140,4 +140,6 @@ The Front Desk helper is paused and hidden in the app for now. When on, it texts
 
 ## License
 
-License: to be added.
+Copyright (C) 2026 Isaiah Tennell.
+
+Practice-OS is free software, licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0). You can use, change and share it. If you run a changed version for others over a network, you must share your changes under the same license.
