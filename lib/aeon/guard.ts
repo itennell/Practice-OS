@@ -713,7 +713,7 @@ async function withoutRefusedParts(text: string, list: Allowlist, opts: GuardOpt
     const restPlain = normalizeForCheck(rest);
     for (const p of dropped) {
       const plain = normalizeForCheck(p);
-      const found = [...(await findNames(plain)), ...(await findNames(titleCase(plain), { secondReads: false }))];
+      const found = [...withoutCalendarWords(await findNames(plain), plain), ...withoutCalendarWords(await findNames(titleCase(plain), { secondReads: false }), titleCase(plain))];
       for (const n of found.filter(isNameLike)) {
         if (wordsOf(n).some((w) => w.length > 1 && wholeWord(w, "i").test(restPlain))) return null;
       }
@@ -728,6 +728,48 @@ async function withoutRefusedParts(text: string, list: Allowlist, opts: GuardOpt
 /** Joins a line break that splits a sentence: the line before doesn't end one, and the next isn't a list item. */
 function joinBrokenLines(text: string): string {
   return text.replace(/([^.!?:;\s])[ \t]*\n+[ \t]*(?!(?:[-*•]|\d+[.)])\s)/g, "$1 ");
+}
+
+// Weekdays and months are never a person's name ("Tue Apr 15, 1:00 pm" in a meeting result:
+// the name-finder can read "Tue" as one, more often on some machines). Weekday names and the
+// abbreviations are always calendar words. Month names that are also first names (Jan, May,
+// June, April, August...) count only next to a day number ("May 5", "5th of June") or a weekday.
+const ALWAYS_CALENDAR = new Set(
+  "monday tuesday wednesday thursday friday saturday sunday mon tue tues wed thu thur thurs fri sat sun feb mar apr jun jul aug sep sept oct nov dec".split(" "),
+);
+const MONTH_NAMES = new Set("jan january february march april may june july august september october november december".split(" "));
+const WEEKDAY_WORD = "(?:mon(?:day)?|tue(?:s(?:day)?)?|wed(?:nesday)?|thu(?:r(?:s(?:day)?)?)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)";
+
+function calendarWord(token: string, text: string): boolean {
+  const bare = token.replace(/^[^\p{L}]+|[^\p{L}]+$/gu, "").toLowerCase();
+  if (ALWAYS_CALENDAR.has(bare)) return true;
+  if (!MONTH_NAMES.has(bare)) return false;
+  const spots = [...text.matchAll(new RegExp(`(?<![\\p{L}\\p{N}])${escape(bare)}(?![\\p{L}\\p{N}])`, "giu"))];
+  return (
+    spots.length > 0 &&
+    spots.every((m) => {
+      const at = m.index ?? 0;
+      const after = text.slice(at + m[0].length, at + m[0].length + 8);
+      const before = text.slice(Math.max(0, at - 14), at);
+      return (
+        /^\.?,?\s*\d{1,2}(?:st|nd|rd|th)?(?!\d)/.test(after) ||
+        /\d{1,2}(?:st|nd|rd|th)?\s+(?:of\s+)?$/i.test(before) ||
+        new RegExp(`\\b${WEEKDAY_WORD}\\.?,?\\s+$`, "i").test(before)
+      );
+    })
+  );
+}
+
+/** Name-finder hits with weekday and month words taken off their ends; hits that were only those are dropped. */
+export function withoutCalendarWords(names: string[], text: string): string[] {
+  const out: string[] = [];
+  for (const n of names) {
+    const words = n.split(/\s+/).filter(Boolean);
+    while (words.length && calendarWord(words[0], text)) words.shift();
+    while (words.length && calendarWord(words.at(-1)!, text)) words.pop();
+    if (words.length) out.push(words.join(" "));
+  }
+  return out;
 }
 
 // A UUID (an approval or card id the code puts in a tool result) is never a phone or record
@@ -771,8 +813,8 @@ async function checkOnce(text: string, at: GuardPoint, list: Allowlist, opts: Gu
     // One name read across a sentence end ("coffee with Maria. Maria's PTSD is worse" gives
     // "Maria. Maria"): each side is judged on its own, at every place it appears.
     const split = (list: string[]) => list.flatMap((n) => n.split(/(?<!\b(?:Dr|Doctor|Mr|Mrs|Ms|Mx|Prof|Rev|Fr|St|\p{Lu}))[.!?]+\s+/u).map((p) => p.trim()).filter(Boolean));
-    names = split(names);
-    cased = split(cased);
+    names = withoutCalendarWords(split(names), plain);
+    cased = withoutCalendarWords(split(cased), titled);
   } catch (err) {
     if (err instanceof Error && err.name === "TooLongToCheck") return { ok: false, kind: "too_long" };
     console.error(`[guard] name-finder unavailable: ${err instanceof Error ? err.message : String(err)}`);
@@ -840,7 +882,7 @@ async function checkOnce(text: string, at: GuardPoint, list: Allowlist, opts: Gu
   // if any stranger is still there, withhold the whole result.
   try {
     const again = normalizeForCheck(redacted);
-    if ((await findNames(again)).some((n) => isNameLike(n) && !isAllowedPerson(n, again, list, herWords))) return { ok: false, kind: "client_name" };
+    if (withoutCalendarWords(await findNames(again), again).some((n) => isNameLike(n) && !isAllowedPerson(n, again, list, herWords))) return { ok: false, kind: "client_name" };
   } catch {
     return { ok: false, kind: "unavailable" };
   }

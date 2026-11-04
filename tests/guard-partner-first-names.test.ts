@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { loadEnv } from "../lib/env";
 
 loadEnv();
-const { guard, partnerMatch, whichPartner, looksLikePerson, spokenName } = await import("../lib/aeon/guard");
+const { guard, partnerMatch, whichPartner, looksLikePerson, spokenName, withoutCalendarWords } = await import("../lib/aeon/guard");
 const { withContext } = await import("../lib/referrals/ask-context");
 const { COMMON_BOARD, REVIEW_MUST_PASS, REVIEW_MUST_REFUSE, ROUND2_MUST_PASS, ROUND2_MUST_REFUSE, ROUND3_MUST_PASS, ROUND3_MUST_REFUSE, ROUND4_MUST_PASS, ROUND4_MUST_REFUSE } = await import("./fixtures/partner-first-names");
 const { DEMO_ALLOWED, MUST_REFUSE: ADVERSARIAL_REFUSE } = await import("./fixtures/guard-adversarial");
@@ -177,6 +177,32 @@ describe("board partners by first name or surname", () => {
     // A real phone number in the same place still refuses.
     const phone = JSON.stringify({ note: "her cell is 312-555-0199" });
     expect((await guard(phone, "tool_result", allow, { fullRules: true })).ok).toBe(false);
+  }, T);
+
+  // CI's name-finder read "Tue" in "Tue Apr 15, 1:00 pm" as a name and blanked it. Weekdays and
+  // months never count as names, whatever the model says.
+  const DAYS = ["Mon", "Tue", "Tues", "Wed", "Thu", "Thur", "Thurs", "Fri", "Sat", "Sun", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Sept", "Oct", "Nov", "Dec", "January", "April", "June", "August"];
+
+  it.each(DAYS.flatMap((d) => MONTHS.map((m) => [d, m])))("never a name: %s %s 15, 1:00 pm", (d, m) => {
+    const when = `${d} ${m} 15, 1:00 pm`;
+    const text = JSON.stringify({ proposed: { with: "Birinder Malhi, MD", when }, also_open: [`${d} ${m} 15, 1:30 pm`] });
+    expect(withoutCalendarWords([d, m, `${d} ${m}`, `${d} Kevin`], text)).toEqual(["Kevin"]);
+  });
+
+  it.each([...DAYS, ...MONTHS])("a meeting time with %s is kept whole in a tool result and a reply", async (w) => {
+    const when = DAYS.includes(w) ? `${w} Nov 17, 1:00 pm` : `Tue ${w} 17, 1:00 pm`;
+    const text = JSON.stringify({ queued: true, proposed: { with: "Birinder Malhi, MD", kind: "Meeting", when }, also_open: [when.replace("1:00", "1:30")] }, null, 2);
+    expect(await guard(text, "tool_result", allow, { fullRules: true })).toEqual({ ok: true, text });
+    const reply = `Your meeting with Birinder Malhi, MD is set for ${when}.`;
+    expect(await guard(reply, "reply", allow)).toEqual({ ok: true, text: reply });
+  }, T);
+
+  it("a month that is also a first name is still a name when it isn't a date", async () => {
+    expect(withoutCalendarWords(["May", "June", "April", "Jan"], "May and June and April and Jan all no-showed")).toEqual(["May", "June", "April", "Jan"]);
+    expect(withoutCalendarWords(["June"], "coffee on June 5")).toEqual([]);
+    expect((await guard("June Kowalski no-showed again", "message", allow, ASK)).ok).toBe(false);
+    expect((await guard("April Nguyen wants Tuesdays after 5", "message", allow, ASK)).ok).toBe(false);
   }, T);
 
   it("every earlier adversarial must-refuse probe still refuses, with these partners on the board too", async () => {
