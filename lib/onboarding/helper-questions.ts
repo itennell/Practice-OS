@@ -3,10 +3,7 @@
 // in its own block. The onboarding shell shows one question per screen with Back, Skip and
 // "Set up later", runs the crisis check and the client-detail guard on every "text" answer
 // before save(), and never stores these answers itself.
-import { instagramQuestions } from "../instagram/onboarding";
 import { referralsQuestions } from "../referrals/onboarding";
-import { frontDeskQuestions } from "../frontdesk/onboarding";
-import { FRONT_DESK_ENABLED } from "../features";
 
 /** What onboarding already knows, so a block can skip or prefill a question. */
 export type PracticeBasics = {
@@ -51,12 +48,10 @@ export type HelperQuestion =
       note?: { will: string; wont: string };
     })
   /** Numbered steps to follow, then a choice (done, or later). */
-  | (Base & { kind: "steps"; steps: string[]; options: Choice[] })
-  /** Three [Sample] captions to pick from, or a pasted post she likes: { pick, example }. */
-  | (Base & { kind: "style" });
+  | (Base & { kind: "steps"; steps: string[]; options: Choice[] });
 
 export type HelperBlock = {
-  helper: "referrals" | "instagram" | "front_desk" | "admin";
+  helper: "referrals" | "admin";
   questions: HelperQuestion[];
   /** Slot these screens in after this question id; defaults to "uses_texting". */
   after?: string;
@@ -69,6 +64,4 @@ export type HelperBlock = {
 export const HELPER_QUESTIONS: HelperBlock[] = [
   // One entry per helper session, e.g. referralsQuestions from lib/referrals/onboarding.ts.
   referralsQuestions,
-  instagramQuestions,
-  frontDeskQuestions,
-].filter((b) => FRONT_DESK_ENABLED || b.helper !== "front_desk"); // Front Desk is paused (lib/features.ts)
+];

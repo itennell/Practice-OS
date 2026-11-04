@@ -4,13 +4,6 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import OpenAI from "openai";
-import {
-  decodeMaskToRaster,
-  parseImageStream,
-  recordsOfKind,
-  type ImageSegmentationResult,
-  type ResponsesEvent,
-} from "@meta-sam/parser";
 import { requireEnv } from "./env";
 import { logModelCall } from "./model-calls";
 
@@ -19,7 +12,6 @@ export const META_BASE_URL = "https://api.meta.ai/v1";
 export const MODELS = {
   chat: "muse-spark-1.3",
   image: "muse-image-1.0",
-  segment: "sam-3.1",
   transcribe: "muse-voice-transcribe-1.0",
 } as const;
 
@@ -232,133 +224,6 @@ export async function generateImage(feature: string, prompt: string) {
     (r) => r.usage?.total_tokens ?? null,
   );
   return { response, image: extractImage(response) };
-}
-
-// ---- SAM 3.1: streaming Responses API ----------------------------------------
-// Cookbook: 07_sam/01_api_basics/typescript/sam-api.ts (segmentImage,
-// normalizedEvents, validateResult).
-
-// The API streams response.content_part.done but not response.output_text.done,
-// which the parser needs; synthesize it (copied from the cookbook). Also keeps
-// the usage from response.completed, which the parser does not expose.
-async function* normalizedEvents(
-  stream: AsyncIterable<unknown>,
-  sink: { usage: { total_tokens?: number } | null; events: unknown[] },
-): AsyncIterable<ResponsesEvent> {
-  const completed = new Set<string>();
-  for await (const raw of stream) {
-    sink.events.push(raw);
-    const event = raw as {
-      type?: string;
-      item_id?: unknown;
-      output_index?: unknown;
-      content_index?: unknown;
-      part?: { type?: unknown; text?: unknown } | null;
-      response?: { usage?: { total_tokens?: number } | null };
-    };
-    if (event.type === "response.completed") sink.usage = event.response?.usage ?? null;
-    const lane = `${String(event.item_id)}:${String(event.output_index)}:${String(event.content_index)}`;
-    if (event.type === "response.output_text.done") {
-      if (!completed.has(lane)) {
-        completed.add(lane);
-        yield event as unknown as ResponsesEvent;
-      }
-      continue;
-    }
-    yield event as unknown as ResponsesEvent;
-    if (
-      event.type === "response.content_part.done" &&
-      !completed.has(lane) &&
-      event.part &&
-      typeof event.part === "object" &&
-      event.part.type === "output_text" &&
-      typeof event.part.text === "string"
-    ) {
-      completed.add(lane);
-      yield {
-        type: "response.output_text.done",
-        item_id: event.item_id,
-        output_index: event.output_index,
-        content_index: event.content_index,
-        text: event.part.text,
-      } as unknown as ResponsesEvent;
-    }
-  }
-}
-
-export function validateSegmentation(result: ImageSegmentationResult): void {
-  if (result.outcome.status !== "completed") {
-    throw new MetaApiError(`Segmentation was incomplete: ${JSON.stringify(result.outcome)}`, null, result.outcome);
-  }
-  const errors = result.diagnostics.filter((d) => d.severity === "error");
-  if (errors.length > 0) {
-    throw new MetaApiError(
-      `The parser rejected records: ${errors.map((d) => `line ${d.line}: ${d.message}`).join("; ")}`,
-      null,
-      errors,
-    );
-  }
-}
-
-export async function segmentImage(feature: string, image: Buffer, mime: string, concept: string) {
-  const phrase = concept.trim();
-  if (!phrase) throw new MetaApiError("The concept must be a short noun phrase.", null, null);
-  const sink: { usage: { total_tokens?: number } | null; events: unknown[] } = { usage: null, events: [] };
-  const result = await tracked(
-    MODELS.segment,
-    feature,
-    async () => {
-      const stream = await metaClient().responses.create({
-        model: MODELS.segment,
-        stream: true,
-        input: [
-          {
-            type: "message",
-            role: "user",
-            content: [
-              { type: "input_text", text: phrase },
-              { type: "input_image", image_url: dataUrl(image, mime) },
-            ],
-          },
-        ] as unknown as OpenAI.Responses.ResponseInput,
-      });
-      const parsed = await parseImageStream(normalizedEvents(stream, sink)).finalResult;
-      validateSegmentation(parsed);
-      return parsed;
-    },
-    () => sink.usage?.total_tokens ?? null,
-  );
-  return { result, usage: sink.usage, events: sink.events };
-}
-
-/**
- * Builds a full-size 0/255 alpha channel from every mask record: each mask's
- * raster is scaled to its bounds and painted at its position.
- */
-export async function maskToAlpha(
-  result: ImageSegmentationResult,
-  width: number,
-  height: number,
-  resize: (raster: Uint8Array, w: number, h: number, toW: number, toH: number) => Promise<Uint8Array>,
-): Promise<Uint8Array> {
-  const alpha = new Uint8Array(width * height);
-  for (const record of recordsOfKind(result.records, "mask")) {
-    const { left, top, right, bottom } = record.bounds;
-    const boxW = Math.max(1, Math.round(right - left));
-    const boxH = Math.max(1, Math.round(bottom - top));
-    const raster = decodeMaskToRaster(record.mask);
-    const scaled = await resize(raster, record.mask.width, record.mask.height, boxW, boxH);
-    for (let y = 0; y < boxH; y++) {
-      const py = Math.round(top) + y;
-      if (py < 0 || py >= height) continue;
-      for (let x = 0; x < boxW; x++) {
-        const px = Math.round(left) + x;
-        if (px < 0 || px >= width) continue;
-        if (scaled[y * boxW + x]) alpha[py * width + px] = 255;
-      }
-    }
-  }
-  return alpha;
 }
 
 // ---- Muse Voice Transcribe: one-shot HTTP endpoint ----------------------------

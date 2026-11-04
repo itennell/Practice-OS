@@ -7,7 +7,7 @@
 import type postgres from "postgres";
 import { practiceToday } from "../compliance/store";
 import { db } from "../db";
-import { loadMediaFacts } from "../media/facts";
+import { loadPracticeFacts } from "./practice-facts";
 import { listPayerApplications, WAITING } from "../payers/store";
 import type { ScriptFacts } from "./call-script";
 import type { ApprovalBits, MoveBits } from "./crm-views";
@@ -73,7 +73,7 @@ export async function recentStageMoves(sql: postgres.Sql = db(), days = 62, limi
 /** Her practice for the call script: her own settings and profile, nothing guessed. */
 export async function scriptFacts(): Promise<ScriptFacts> {
   const [media, payers, practice] = await Promise.all([
-    loadMediaFacts().catch(() => null),
+    loadPracticeFacts().catch(() => null),
     listPayerApplications().catch(() => []),
     practiceFacts().catch(() => ({ focus: [] as Focus[], state: null, niche: null, selfPay: false })),
   ]);

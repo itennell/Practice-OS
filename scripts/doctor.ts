@@ -4,11 +4,9 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { loadEnv } from "../lib/env";
-import { FRONT_DESK_ENABLED, PHONE_ENABLED } from "../lib/features";
 import { builtInDatabaseUrl } from "../lib/local-db-url";
 import { modelCacheDir, NER_MODEL } from "../lib/aeon/phi-classifier";
 import {
-  calcomCheck,
   databaseCheck,
   dryRunCheck,
   envFileCheck,
@@ -16,7 +14,6 @@ import {
   formatReport,
   museCheck,
   nodeCheck,
-  phoneCheck,
   privacyModelCheck,
   type ConnectFacts,
   type DatabaseFacts,
@@ -51,8 +48,6 @@ async function gather(): Promise<SetupCheck[]> {
     databaseCheck({ kind, reachable }),
     privacyModelCheck(model),
     museCheck(museFromEnv, await status("muse")),
-    ...(FRONT_DESK_ENABLED ? [calcomCheck(await status("calcom"))] : []), // Cal.com is Front Desk only (paused: lib/features.ts)
-    ...(PHONE_ENABLED ? [phoneCheck(reachable ? await status("phone") : null, !FRONT_DESK_ENABLED)] : []),
     dryRunCheck(process.env.DRY_RUN !== "false"),
   ];
   if (reachable) await (await import("../lib/db")).closeDb();

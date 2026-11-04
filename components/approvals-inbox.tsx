@@ -18,7 +18,6 @@ const STATUS = {
 const KIND_LABEL: Record<string, string> = {
   test_note: "Test note",
   referral_letter: "Referral letter",
-  instagram_post: "Instagram post",
   sms_reply: "Text reply",
   consult_booking: "Consult booking",
   consult_reschedule: "Consult reschedule",
@@ -49,8 +48,6 @@ function ApprovalStatus({ status }: { status: ApprovalView["status"] }) {
 const FROM_LABEL: Record<string, string> = {
   aeon: "Aeon",
   "aeon:referrals": "Referrals",
-  "aeon:instagram": "Instagram",
-  "aeon:front_desk": "Front Desk",
   "aeon:admin": "Admin",
   "aeon:research": "Aeon research",
 };

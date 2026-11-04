@@ -3,7 +3,6 @@ import { daysBetween, type ISODate } from "../compliance/dates";
 import type { CredentialingProfile } from "../credentialing/profile";
 import type { EstimateRow } from "../gfe/store";
 import type { SuperbillRow } from "../superbill/store";
-import { PHONE_ENABLED } from "../features";
 
 // "What your practice needs next" at the top of Admin. Plain code, no model:
 // it reads what the app already knows (the morning brief, credentialing gaps,
@@ -82,23 +81,15 @@ const join = (...parts: (string | null | undefined)[]) => parts.filter(Boolean).
 export function needsNext({ today, brief, estimates, superbills, profile, alertFailures = [] }: NeedsInput): NeedItem[] {
   const out: NeedItem[] = [];
 
-  // Never silent: when the chat's crisis check could not text her, say so at the very top.
+  // Never silent: when the chat's crisis check fires, say so at the very top (Practice-OS texts no one).
   if (alertFailures.length) {
     const latest = alertFailures[0];
     out.push({
       id: `urgent_alert:${latest.id}`,
       kind: "urgent_alert",
-      ...(PHONE_ENABLED
-        ? {
-            title: "Aeon showed the 988 message in your chat, but couldn't text you",
-            why: "No alert phone line is connected, so nothing reached your cell. Check your chat now",
-            action: { label: "Set up alerts", href: "/settings/connections" },
-          }
-        : {
-            title: "Aeon showed the 988 message in your chat",
-            why: "A message mentioned danger or self-harm. Check your chat now",
-            action: { label: "Open chat", href: "/" },
-          }),
+      title: "Aeon showed the 988 message in your chat",
+      why: "A message mentioned danger or self-harm. Check your chat now",
+      action: { label: "Open chat", href: "/" },
       also: crisisSeen(`urgent_alert:${latest.id}`),
       due_on: null,
       days_left: null,

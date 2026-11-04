@@ -3,7 +3,7 @@
 // its filters, the map's pins, and the day-by-day timeline. Pure and small, so
 // the tabs (client) and the tests share it. "They referred someone" rows carry a
 // date only: nothing here ever reads or shows who a client was.
-import { zonedTime } from "../frontdesk/calendar/zone";
+import { zonedTime } from "../zone";
 import { COLUMN_LABEL, columnFor, STAGES, type Stage } from "./stages";
 import { CATEGORY_LABELS } from "./categories";
 import { CONTACT_LABEL, type ContactKind } from "./contact-kinds";

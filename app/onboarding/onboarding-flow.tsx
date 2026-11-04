@@ -40,7 +40,7 @@ const readDraft = () => {
 /** Screens whose control shows the error itself, under the box she typed in. */
 const OWN_ERROR = new Set(["name", "text", "phone", "npi", "ein", "number", "contact", "ce", "address", "malpractice", "office_days", "fees", "payers", "who", "followups", "url"]);
 const showsOwnError = (s: Screen) =>
-  OWN_ERROR.has(s.kind) || (s.kind === "helper" && ["text", "zip", "number", "style"].includes(s.helper?.question.kind ?? ""));
+  OWN_ERROR.has(s.kind) || (s.kind === "helper" && ["text", "zip", "number"].includes(s.helper?.question.kind ?? ""));
 
 type Status = { kind: "idle" } | { kind: "saving" } | { kind: "error"; text: string } | { kind: "crisis"; text: string };
 
@@ -204,7 +204,7 @@ function OnboardingFlow({ initial, connections, startAt }: Props & { startAt?: s
       });
     }
     setNote(data.notes?.join(" ") ?? "");
-    // An answer can add or remove the screens after it (Instagram "Not for me"), so the
+    // An answer can add or remove the screens after it (a helper question that branches), so the
     // next screen comes from the new list.
     const list = data.state ? withFollowups(data.state.screens) : screens;
     const at = list.findIndex((s) => s.id === screen.id);

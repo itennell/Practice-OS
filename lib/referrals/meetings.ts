@@ -16,7 +16,7 @@ import { audit, type AuditEntry } from "../audit";
 import { practiceTimeZone } from "../compliance/store";
 import { db } from "../db";
 import type { guard } from "../aeon/guard";
-import { localDate, zonedTime } from "../frontdesk/calendar/zone";
+import { localDate, zonedTime } from "../zone";
 import { checkNote, isSuppressed, suppressedList } from "./contacts";
 import { canMarkDone, NOT_YET } from "./meeting-rules";
 import type { ReferralSource } from "./store";

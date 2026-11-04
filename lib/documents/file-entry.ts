@@ -8,7 +8,7 @@ import { KIND_LABEL, type DocumentCard, type DocumentKind } from "./card";
 // No client details: a Good Faith Estimate is its reference number, as everywhere.
 // Pure (no database), so the page's list can use it in the browser; lib/documents/files.ts loads.
 
-export const FILE_GROUPS = ["uploaded", "forms", "money", "insurance", "referrals", "media"] as const;
+export const FILE_GROUPS = ["uploaded", "forms", "money", "insurance", "referrals"] as const;
 export type FileGroup = (typeof FILE_GROUPS)[number];
 
 export const GROUP_LABEL: Record<FileGroup, string> = {
@@ -17,7 +17,6 @@ export const GROUP_LABEL: Record<FileGroup, string> = {
   money: "Estimates & superbills",
   insurance: "Insurance",
   referrals: "Referrals",
-  media: "Media",
 };
 
 /** Which kinds are files, and where each one sits. Deadlines, guides and checklists aren't files. */
@@ -30,7 +29,6 @@ export const GROUP_OF: Partial<Record<DocumentKind, FileGroup>> = {
   payer_application: "insurance",
   cms855i: "insurance",
   referral_letter: "referrals",
-  instagram_post: "media",
 };
 
 /** The groups Files offers: in the referrals-only demo (lib/features.ts), only those its file kinds fill. */

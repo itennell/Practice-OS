@@ -10,11 +10,8 @@
 //   127.0.0.1 without a CORS preflight; the browser's Sec-Fetch-Site (or, in
 //   older browsers, Origin) tells us where it came from.
 //
-// The Vercel copy has its own guards (DEMO_PASSWORD, ADMIN_PASSWORD, Twilio
-// signatures), and its webhook routes are posted to by other sites, so none of
+// The Vercel copy has its own guards (DEMO_PASSWORD, ADMIN_PASSWORD), so none of
 // this applies there.
-
-import { FRONT_DESK_ENABLED } from "./features";
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
@@ -43,17 +40,6 @@ export function isSameOrigin(request: Incoming): boolean {
 
 /** A local request from the app's own page. */
 export const isLocalAppRequest = (request: Incoming) => isLocalRequest(request) && isSameOrigin(request);
-
-// Pages and routes that exist only on her own computer. On the Vercel copy they
-// are a plain 404: the public website chat has no visitor gate there (yet).
-// While Front Desk is paused (lib/features.ts) its pages and routes are hidden here too.
-const LOCAL_ONLY_PATHS = ["/website-chat", "/api/website-chat", ...(FRONT_DESK_ENABLED ? [] : ["/front-desk", "/api/front-desk"])];
-
-/** True when this path must 404 here (the Vercel copy) because it answers only on her computer. */
-export function hiddenOnThisCopy(pathname: string): boolean {
-  if (!process.env.VERCEL) return false;
-  return LOCAL_ONLY_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
-}
 
 /** Why the local app refuses this request, or null to let it through. Used by proxy.ts for every request. */
 export function refusal(request: Incoming): string | null {

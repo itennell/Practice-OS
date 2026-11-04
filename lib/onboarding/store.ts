@@ -1,6 +1,6 @@
 import type postgres from "postgres";
 import { z } from "zod";
-import { saveDefaultMode, saveFrontDeskRules } from "../approval-settings";
+import { saveDefaultMode } from "../approval-settings";
 import { isApprovalMode } from "../approval-policy";
 import { audit } from "../audit";
 import { remember } from "../aeon/memory";
@@ -93,11 +93,10 @@ export function ctxFrom(values: Record<string, unknown>, row: Pick<ProfileRow, "
     officeZip: office?.zip ?? null,
     findClients: Array.isArray(values.find_clients) ? (values.find_clients as string[]) : [],
     website: str(values.website) as Ctx["website"],
-    instagram: str(values["instagram:account"]) as Ctx["instagram"],
   };
 }
 
-/** Each helper's answers so far ("instagram:account" -> mine.instagram.account), so a block can branch. */
+/** Each helper's answers so far ("referrals:niche" -> mine.referrals.niche), so a block can branch. */
 function helperAnswers(values: Record<string, unknown>): Record<string, Record<string, unknown>> {
   const out: Record<string, Record<string, unknown>> = {};
   for (const [id, v] of Object.entries(values)) {
@@ -246,9 +245,7 @@ async function savedValues(row: ProfileRow, sql: postgres.Sql): Promise<Record<s
     });
   }
   if (settings) {
-    if (settings.alert_phone) out.alert_phone = settings.alert_phone;
     if (settings.approval_mode) out.mode = settings.approval_mode;
-    if (settings.front_desk_rules) out.text_missed_callers = settings.front_desk_rules.text_missed_callers;
     // The team screen starts from her stage's picks, not the table's all-on default.
   }
   for (const k of Object.keys(out)) if (out[k] === null || out[k] === undefined) delete out[k];
@@ -274,7 +271,7 @@ const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a date.");
 const optionalDay = isoDay.nullable().optional();
 const PROFILE_FIRST = new Set(["name", "practice_name", "state", "license"]);
 /** Answers that never go into onboarding_answers, only into the table that owns them. */
-const PRIVATE = new Set(["contact", "alert_phone", "npi", "ein", "malpractice"]);
+const PRIVATE = new Set(["contact", "npi", "ein", "malpractice"]);
 
 export class AnswerError extends Error {}
 
@@ -322,7 +319,7 @@ export async function saveAnswers(
 
 /**
  * Where she picks up. An answer can remove the screen the browser said was next
- * (Instagram "Not for me"); then it's the screen after the one she just answered,
+ * (a helper question that branches); then it's the screen after the one she just answered,
  * in the list as it is now.
  */
 export function resumeAt(p: Progress, row: ProfileRow, answered: string[]): string | null {
@@ -471,13 +468,6 @@ async function saveOne(id: string, value: unknown, all: Record<string, unknown>,
       );
       await sql`update practice_os.clinician_profile set city = ${o.city}, neighborhood = ${o.neighborhood || null}`;
       await facts({ city_code: o.state === "IL" && o.city.toLowerCase() === "chicago" ? "CHI" : null });
-      return null;
-    }
-    case "alert_phone": {
-      const phone = normalizeUsPhone(String(value ?? ""));
-      if (!phone) throw new AnswerError("Please type a 10-digit US cell number.");
-      await sql`update practice_os.settings set alert_phone = ${phone}`;
-      await audit({ actor: "clinician", action: "alert_phone_set", subjectType: "settings", details: { by: BY } }, sql);
       return null;
     }
     case "license_expires":
@@ -660,8 +650,6 @@ async function saveOne(id: string, value: unknown, all: Record<string, unknown>,
     case "stage":
       await sql`update practice_os.clinician_profile set practice_stage = ${z.enum(["beginning", "middle", "late"]).parse(value)}`;
       return null;
-    case "connect":
-      return null; // each Connect card saves its own sign-in
     case "uses_texting":
       await facts({ uses_texting: yesNo.parse(value) });
       return null;
@@ -670,15 +658,10 @@ async function saveOne(id: string, value: unknown, all: Record<string, unknown>,
       await saveDefaultMode(value, BY, sql);
       return null;
     }
-    case "text_missed_callers":
-      await saveFrontDeskRules({ text_missed_callers: yesNo.parse(value) }, BY, sql);
-      return null;
     case "team": {
-      const ids: HelperId[] = ["admin", "referrals", "instagram", "front_desk"]; // saved maps may still name a paused helper
+      const ids: HelperId[] = ["admin", "referrals"];
       const v = z.record(z.enum(ids as [HelperId, ...HelperId[]]), z.boolean()).parse(value);
-      // "Not for me" wins over a team map saved before it (going Back to this screen).
-      if (all["instagram:account"] === "no") v.instagram = false;
-      await sql`update practice_os.settings set helpers_enabled = ${sql.json({ admin: true, referrals: true, instagram: true, front_desk: true, ...v } as never)}`;
+      await sql`update practice_os.settings set helpers_enabled = ${sql.json({ admin: true, referrals: true, ...v } as never)}`;
       return null;
     }
     default:

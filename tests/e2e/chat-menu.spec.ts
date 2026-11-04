@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { FRONT_DESK_ENABLED, hiddenInDemo, REFERRALS_ONLY_DEMO } from "../../lib/features";
+import { hiddenInDemo, REFERRALS_ONLY_DEMO } from "../../lib/features";
 import { execSync } from "node:child_process";
 
 // The dark chat menu (UI-005): the same menu on desktop (left column) and phones (slides in).
@@ -40,13 +40,13 @@ test("Menu: Aeon, New chat, search, practice links with counts, recent chats and
   await expect(menu.getByRole("button", { name: "New chat" })).toBeVisible();
   await expect(menu.getByRole("searchbox", { name: "Search chats" })).toBeVisible();
   const main = menu.getByRole("navigation", { name: "Main" });
-  for (const name of [/^Admin/, /^Approvals/, "Referrals", "Media", "Files"]) {
-    // The referrals-only demo (lib/features.ts) hides Admin and Media.
-    const hidden = REFERRALS_ONLY_DEMO && (name === "Media" || String(name) === String(/^Admin/));
+  for (const name of [/^Admin/, /^Approvals/, "Referrals", "Files"]) {
+    // The referrals-only demo (lib/features.ts) hides Admin.
+    const hidden = REFERRALS_ONLY_DEMO && String(name) === String(/^Admin/);
     await expect(main.getByRole("link", { name })).toHaveCount(hidden ? 0 : 1);
   }
-  // Front Desk is in the menu only while it is on (lib/features.ts); paused it is three helpers.
-  await expect(main.getByRole("link", { name: "Front Desk" })).toHaveCount(FRONT_DESK_ENABLED ? 1 : 0);
+  // Media and Front Desk are gone from Practice-OS.
+  for (const name of ["Media", "Front Desk"]) await expect(main.getByRole("link", { name })).toHaveCount(0);
   // The seeded practice has approvals waiting; the count is part of the link's name.
   await expect(main.getByRole("link", { name: /^Approvals \d+ waiting$/ })).toHaveAttribute("aria-current", "page");
   await expect(menu.getByRole("link", { name: /Dana Reyes, LCPC/ })).toBeVisible();

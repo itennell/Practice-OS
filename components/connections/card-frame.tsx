@@ -3,7 +3,7 @@ import { GlassCard } from "@/components/ui";
 import { StatusPill } from "@/components/shared/status-mark";
 
 // The shared look of every card on Settings › Connections, so each helper's
-// card (Muse, Google, Instagram, phone, Cal.com) lines up the same way:
+// card lines up the same way:
 // icon and name, one plain sentence, connected status, then its actions.
 
 export function ConnectionCardFrame({
@@ -28,8 +28,7 @@ export function ConnectionCardFrame({
 }) {
   const headingId = `connection-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
   return (
-    // @container: the card lays itself out by its own width, not the window's. On Front Desk
-    // it sits in a two-column grid, so a wide window can still mean a narrow card.
+    // @container: the card lays itself out by its own width, not the window's.
     <GlassCard aria-labelledby={headingId} className="@container flex flex-col gap-4 p-6 md:p-7">
       <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-4 gap-y-3 @4xl:grid-cols-[auto_minmax(0,1fr)_auto]">
         <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-2xl border border-border bg-[var(--chip-off-bg)] text-[var(--fg)]">

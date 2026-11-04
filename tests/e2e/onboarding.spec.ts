@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { execSync } from "node:child_process";
-import { FRONT_DESK_ENABLED, PHONE_ALERTS_ENABLED, REFERRALS_ONLY_DEMO } from "../../lib/features";
+import { REFERRALS_ONLY_DEMO } from "../../lib/features";
 import { pick, typeDate } from "../helpers/controls";
 
 // Aeon's onboarding interview on a fresh install: every screen checked with axe, a full
@@ -9,8 +9,8 @@ import { pick, typeDate } from "../helpers/controls";
 // and the 200% / 320px reflow checks. No model call: without a Muse key the follow-up
 // questions are the three fixed ones.
 
-// Helper answers live here too (referral_settings; Instagram's in the profile, Front
-// Desk's on settings), so each project starts from a truly fresh install.
+// Helper answers live here too (referral_settings), so each project starts from a
+// truly fresh install.
 const FRESH = ["clinician_profile", "compliance_facts", "settings", "credentialing_profile", "payer_applications", "obligations", "memories", "referral_settings"];
 
 function freshInstall() {
@@ -66,7 +66,7 @@ test("A new clinician sets up the whole practice, and the home page lists what s
   freshInstall();
   await page.goto("/");
   await expect(page).toHaveURL(/\/onboarding$/);
-  await expect(page.getByText("You and your practice · question 1 of 9")).toBeVisible();
+  await expect(page.getByText("You and your practice · question 1 of 8")).toBeVisible();
 
   await step(page, /What's your name\?/, () => page.getByLabel("Your name").fill("Dana Reyes"));
   // No Muse key here, so desktop-app's Connect Aeon step shows; she puts it off.
@@ -84,7 +84,6 @@ test("A new clinician sets up the whole practice, and the home page lists what s
     await page.getByLabel("City").fill("Chicago");
     await page.getByLabel("ZIP code").fill("60614");
   });
-  if (PHONE_ALERTS_ENABLED) await step(page, /your own cell phone/, () => page.getByLabel("Phone number").fill("312 555 0199"));
 
   // 2 · License and rules
   await expect(page.getByText(/License and rules · question 1 of/)).toBeVisible();
@@ -128,19 +127,9 @@ test("A new clinician sets up the whole practice, and the home page lists what s
   await step(page, /new clients would you like each month/, () => page.getByLabel("Your answer").fill("About four"));
   await step(page, /never want consults booked/, () => page.getByLabel("Your answer").fill("Fridays"));
 
-  // 5 · Stage, 6 · Connect your tools, 7 · How Aeon asks
+  // 5 · Stage, 6 · Your tools, 7 · How Aeon asks
   await step(page, /Where is your practice right now\?/, () => radio(page, /Beginning/));
-  // The marketing interview (tests/e2e/marketing-interview.spec.ts has the other paths).
   await step(page, /How do new clients find you now\?/, () => page.getByRole("button", { name: "Word of mouth", exact: true }).click());
-  await step(page, /Do you have an Instagram for your practice\?/, () => radio(page, "Yes, I have one"));
-  await step(page, /What should your posts help with\?/, () => page.getByRole("button", { name: "Fill my open spots" }).click());
-  // All five topics start picked.
-  await step(page, /What should your posts be about\?/, () => page.getByRole("button", { name: "Office and telehealth", pressed: true }).click());
-  await step(page, /How often do you want to post\?/, () => radio(page, "3 times a week"));
-  await step(page, /What should posts never show\?/, none, "skip");
-  await step(page, /Which one sounds most like you\?/, () => radio(page, /Plain/));
-  await step(page, /Do you have a website for your practice\?/, () => radio(page, "No, a website isn't for me"));
-  await step(page, /Connect your tools/, none);
   await step(page, /text clients/, () => radio(page, "Yes"));
   // Referrals' own setup question (lib/referrals/onboarding.ts); the ZIP one is skipped because she has an office.
   await step(page, /Who would you like to hear from\?/, async () => {
@@ -150,11 +139,7 @@ test("A new clinician sets up the whole practice, and the home page lists what s
     if ((await oncology.getAttribute("aria-pressed")) !== "true") await oncology.click();
     await expect(oncology).toHaveAttribute("aria-pressed", "true");
   });
-  // Front Desk's setup questions (voicemail greeting, "miss a call") are asked only while it is on (lib/features.ts).
-  // Skipping the greeting keeps the suggested one, shown on the Front Desk page.
-  if (FRONT_DESK_ENABLED) await step(page, /voicemail greeting/, none, "skip");
   await step(page, /How should I ask/, () => radio(page, /Ask me first/));
-  if (FRONT_DESK_ENABLED) await step(page, /miss a call/, () => radio(page, "No"));
 
   // 8 · Your team, then home.
   await expect(heading(page)).toHaveText("Meet your team");

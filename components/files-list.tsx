@@ -5,7 +5,7 @@
 // only; each row opens the side panel (?open=<id>) or downloads the file. One list
 // card per group, hairline rows (UI-033), the shared empty state (UI-034).
 
-import { Download, FileText, FolderOpen, Image as ImageIcon, Mail, PanelRight, Receipt, SearchX, ShieldCheck, Upload, type LucideIcon } from "lucide-react";
+import { Download, FileText, FolderOpen, Mail, PanelRight, Receipt, SearchX, ShieldCheck, Upload, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -17,7 +17,7 @@ import { SHOWN_GROUPS, GROUP_LABEL, fileDetail, matchesSearch, type FileEntry, t
 
 type Filter = "all" | FileGroup;
 
-const ICON: Record<FileGroup, LucideIcon> = { uploaded: Upload, forms: FileText, money: Receipt, insurance: ShieldCheck, referrals: Mail, media: ImageIcon };
+const ICON: Record<FileGroup, LucideIcon> = { uploaded: Upload, forms: FileText, money: Receipt, insurance: ShieldCheck, referrals: Mail };
 
 const EMPTY_TITLE: Record<Filter, string> = {
   all: "No files yet",
@@ -26,7 +26,6 @@ const EMPTY_TITLE: Record<Filter, string> = {
   money: "No estimates or superbills yet",
   insurance: "No insurance forms yet",
   referrals: "No referral letters yet",
-  media: "No posts yet",
 };
 
 const EMPTY_LINE: Record<Filter, string> = {
@@ -36,7 +35,6 @@ const EMPTY_LINE: Record<Filter, string> = {
   money: "Ask Aeon in the chat to draft a Good Faith Estimate or a superbill; it shows up here.",
   insurance: "When Aeon prepares an insurance form, like Medicare's CMS-855I, it shows up here.",
   referrals: "Intro letters Aeon drafts for your referral sources show up here.",
-  media: "Instagram posts Aeon writes with you show up here, with their pictures.",
 };
 
 const ACTION = "h-touch! px-4! text-small!";

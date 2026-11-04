@@ -86,8 +86,8 @@ describe.skipIf(!hasDb)("referral letters", () => {
     expect(row.payload).toMatchObject({ referral_source_id: sourceId });
     // Muse's letter, with her real phone and email added to the signature when Muse left them out.
     expect(row.payload.letter.startsWith(LETTER)).toBe(true);
-    const { loadMediaFacts } = await import("../lib/media/facts");
-    const facts = await loadMediaFacts();
+    const { loadPracticeFacts } = await import("../lib/referrals/practice-facts");
+    const facts = await loadPracticeFacts();
     for (const v of [facts.phone, facts.email].filter(Boolean)) expect(row.payload.letter).toContain(v);
     expect(row.preview.body).toBe(row.payload.letter);
     expect((await getSource(sourceId))!.stage).toBe("found");

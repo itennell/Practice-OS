@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  calcomCheck,
   databaseCheck,
+  dryRunCheck,
   envFileCheck,
   exitCode,
   formatReport,
@@ -31,13 +31,9 @@ describe("npm run doctor checks", () => {
     expect(museCheck(false, { connected: false }).state).toBe("todo");
   });
 
-  it("marks optional helpers as later, not as problems", () => {
-    expect(calcomCheck(null).state).toBe("later");
-  });
-
   it("is ready only when every required check is ok", () => {
     const required = [nodeCheck("v20.0.0"), envFileCheck(true), databaseCheck({ kind: "built-in", reachable: true }), privacyModelCheck(true), museCheck(true, null)];
-    expect(exitCode([...required, calcomCheck(null)])).toBe(0);
+    expect(exitCode([...required, dryRunCheck(true)])).toBe(0);
     expect(verdict(required)).toMatch(/^Ready/);
     const missing = [...required, envFileCheck(false)];
     expect(exitCode(missing)).toBe(1);
@@ -47,15 +43,5 @@ describe("npm run doctor checks", () => {
   it("never prints a value, only labels", () => {
     const out = formatReport([museCheck(false, { connected: true, accountLabel: "Key ending 4f2a" })]);
     expect(out).not.toMatch(/sk-|cal_|AC[0-9a-f]{8}/);
-  });
-});
-
-describe("phoneCheck with Front Desk paused", () => {
-  it("is optional and only about urgent alerts", async () => {
-    const { phoneCheck } = await import("../lib/setup/doctor");
-    const none = phoneCheck(null, true);
-    expect(none).toMatchObject({ id: "phone", required: false, state: "later" });
-    expect(none.say).toMatch(/urgent alerts/i);
-    expect(phoneCheck({ connected: true }, true).state).toBe("ok");
   });
 });

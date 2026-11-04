@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FRONT_DESK_ENABLED, REFERRALS_ONLY_DEMO } from "../lib/features";
+import { REFERRALS_ONLY_DEMO } from "../lib/features";
 import {
   CHAPTERS,
   firstFor,
@@ -27,7 +27,6 @@ const base: Ctx = {
   officeZip: "60614",
   findClients: [],
   website: null,
-  instagram: null,
 };
 const ids = (c: Ctx) => flatten(c).map((s) => s.id);
 
@@ -63,8 +62,7 @@ describe("onboarding chapters", () => {
     expect(flatten({ ...base, insurance: "some" }).find((s) => s.id === "medicaid")?.dateAsk).toMatch(/IMPACT/);
   });
 
-  // Chapter 6 opens on how clients find her and her website (the marketing interview);
-  // Instagram's own screens are a helper block and aren't counted here.
+  // Chapter 6 opens on how clients find her; the helpers' own screens aren't counted here.
   it.skipIf(REFERRALS_ONLY_DEMO)("stays at 25 to 37 questions for typical practices", () => {
     for (const c of [base, { ...base, insurance: "some" as const, medicare: "enrolled" as const, medicaid: true }, { ...base, state: "TX", credential: "LMFT" as const }])  {
       const n = flatten(c).length;
@@ -108,7 +106,7 @@ describe("onboarding chapters", () => {
     const screens = flatten(base, {
       helpers: [
         {
-          helper: "front_desk",
+          helper: "admin",
           questions: [{ id: "minutes", kind: "number", ask: "How long is a consult?", appliesWhen: (b) => b.state === "IL" }],
         },
       ],
@@ -121,7 +119,7 @@ describe("onboarding chapters", () => {
     };
     walk(screens, "screens");
     expect(functions).toEqual([]); // React refuses to send a function to a client component
-    expect(screens.find((s) => s.id === "front_desk:minutes")?.helper?.question.ask).toBe("How long is a consult?");
+    expect(screens.find((s) => s.id === "admin:minutes")?.helper?.question.ask).toBe("How long is a consult?");
     expect(() => structuredClone(screens)).not.toThrow();
   });
 
@@ -134,14 +132,8 @@ describe("onboarding chapters", () => {
 
   it("starts the right helpers for each stage", () => {
     expect(firstFor("beginning").helpers).toEqual(["admin", "referrals"]);
-    if (FRONT_DESK_ENABLED) {
-      expect(firstFor("middle").helpers).toEqual(["referrals", "instagram", "front_desk"]);
-      expect(firstFor("late").helpers).toEqual(["front_desk", "admin"]);
-    } else {
-      // Front Desk is paused (lib/features.ts), so no stage starts it.
-      expect(firstFor("middle").helpers).toEqual(["referrals", "instagram"]);
-      expect(firstFor("late").helpers).toEqual(["admin"]);
-    }
+    expect(firstFor("middle").helpers).toEqual(["referrals"]);
+    expect(firstFor("late").helpers).toEqual(["admin"]);
   });
 
   it("reads phone numbers and tax IDs the way people type them", () => {
@@ -196,7 +188,7 @@ describe("helper answers when she comes back", () => {
   it("prefills each helper screen from that helper's own load()", async () => {
     const seen: unknown[] = [];
     const block: HelperBlock = {
-      helper: "front_desk",
+      helper: "admin",
       questions: [
         { id: "minutes", kind: "number", ask: "How long is a consult?" },
         { id: "calendar", kind: "choices", multi: false, ask: "Which calendar?", options: [{ value: "calcom", label: "Cal.com" }] },
@@ -208,13 +200,13 @@ describe("helper answers when she comes back", () => {
       },
       save: async () => {},
     };
-    expect(await helperPrefill([block], basics)).toEqual({ "front_desk:minutes": 15, "front_desk:calendar": "calcom" });
+    expect(await helperPrefill([block], basics)).toEqual({ "admin:minutes": 15, "admin:calendar": "calcom" });
     expect(seen).toEqual([basics]); // it gets what onboarding already knows
   });
 
   it("a helper that fails to load leaves its screens empty instead of breaking onboarding", async () => {
     const broken: HelperBlock = {
-      helper: "instagram",
+      helper: "admin",
       questions: [{ id: "topics", kind: "choices", multi: true, ask: "Topics?", options: [] }],
       load: async () => {
         throw new Error("table missing");

@@ -5,7 +5,7 @@ export type MenuData = {
   /** urgent: missed crisis alerts, counted on the chat row while Admin is hidden (referrals-only demo). */
   counts: { approvals: number; admin: number; urgent: number };
   chats: { id: string; title: string }[];
-  /** Practice links she turned off (Instagram after "Not for me" in onboarding). */
+  /** Practice links hidden from her (the referrals-only demo's pages). */
   hidden: string[];
 };
 

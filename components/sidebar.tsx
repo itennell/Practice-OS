@@ -7,12 +7,12 @@
 // left; phones open the same menu as a panel that slides in from the left.
 
 import { Dialog } from "@base-ui/react/dialog";
-import { Brain, Camera, ClipboardList, FolderOpen, Inbox, Menu, Phone, Plus, Search, Settings, Users, X, type LucideIcon } from "lucide-react";
+import { Brain, ClipboardList, FolderOpen, Inbox, Menu, Plus, Search, Settings, Users, X, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Avatar } from "@/components/shared/avatar";
-import { FRONT_DESK_ENABLED, REFERRALS_ONLY_DEMO } from "@/lib/features";
+import { REFERRALS_ONLY_DEMO } from "@/lib/features";
 import { EMPTY_MENU, type MenuData } from "@/lib/ui/menu-types";
 import { cn } from "@/lib/utils";
 import { Orb } from "./ui";
@@ -29,7 +29,7 @@ type PracticeLink = { href: string; label: string; icon: LucideIcon; count?: key
 
 export const PRACTICE: PracticeLink[] = REFERRALS_ONLY_DEMO
   ? [
-      // Referrals-only demo (lib/features.ts): Admin and Media are hidden.
+      // Referrals-only demo (lib/features.ts): Admin is hidden.
       { href: "/referrals", label: "Referrals", icon: Users },
       { href: "/approvals", label: "Approvals", icon: Inbox, count: "approvals", countWord: "waiting" },
       { href: "/files", label: "Files", icon: FolderOpen },
@@ -39,8 +39,6 @@ export const PRACTICE: PracticeLink[] = REFERRALS_ONLY_DEMO
       { href: "/files", label: "Files", icon: FolderOpen },
       { href: "/approvals", label: "Approvals", icon: Inbox, count: "approvals", countWord: "waiting" },
       { href: "/referrals", label: "Referrals", icon: Users },
-      { href: "/media", label: "Media", icon: Camera },
-      ...(FRONT_DESK_ENABLED ? [{ href: "/front-desk", label: "Front Desk", icon: Phone }] : []), // paused: lib/features.ts
     ];
 
 const isAt = (pathname: string, href: string) => pathname === href || pathname.startsWith(`${href}/`);

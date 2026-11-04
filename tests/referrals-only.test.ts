@@ -7,7 +7,6 @@ import {
   demoApprovalKind,
   demoApprovalShown,
   fileKindEnabled,
-  FRONT_DESK_TOOLS,
   hiddenInDemo,
   REFERRAL_DEMO_FILE_KINDS,
   REFERRAL_DEMO_HIDDEN_API,
@@ -50,7 +49,6 @@ const ctx = {
   officeZip: "60614",
   findClients: [],
   website: null,
-  instagram: null,
 } as const;
 const basics = { state: "IL", credential: "LCPC" as const, practiceStage: "beginning" as const, officeZip: "60614", telehealth: false };
 const screens = () => flatten({ ...ctx, findClients: [] }, { helpers: HELPER_QUESTIONS, basics, extra: [{ after: "name", screen: { id: "muse-key", chapter: "you", kind: "slot", ask: "x", aeonSays: "x" } }] });
@@ -78,8 +76,8 @@ describe.skipIf(!REFERRALS_ONLY_DEMO)("referrals-only demo is on", () => {
     expect(src).toContain('href="/settings"');
   });
 
-  it("sends Admin, Media, Instagram and Grow pages Home, and leaves the rest and every API route alone", () => {
-    for (const p of ["/admin", "/admin/deadlines", "/admin/how-do-i", "/media", "/media/instagram", "/media/grow", "/media/website", "/instagram"]) {
+  it("sends Admin pages Home, and leaves the rest and every API route alone", () => {
+    for (const p of ["/admin", "/admin/deadlines", "/admin/how-do-i"]) {
       const res = page(p);
       expect(res.status, p).toBe(307);
       expect(new URL(res.headers.get("location")!).pathname).toBe("/");
@@ -92,7 +90,7 @@ describe.skipIf(!REFERRALS_ONLY_DEMO)("referrals-only demo is on", () => {
   it("answers 404 on the hidden helpers' API routes, GET and POST, and keeps the rest", () => {
     const api = (method: string, p: string) =>
       proxy(new NextRequest(`http://${HOST}${p}`, { method, headers: { host: HOST, origin: `http://${HOST}`, "sec-fetch-site": "same-origin", "content-type": "application/json" } }));
-    for (const p of ["/api/gfe/x", "/api/superbills", "/api/instagram/posts/x/image", "/api/growth/x", "/api/client-forms/x", "/api/studio/x", "/api/payers/x", "/api/credentialing", "/api/media/x", "/api/release-forms/pdf", "/api/obligations/x"]) {
+    for (const p of ["/api/gfe/x", "/api/superbills", "/api/client-forms/x", "/api/payers/x", "/api/credentialing", "/api/release-forms/pdf", "/api/obligations/x"]) {
       expect(api("GET", p).status, p).toBe(404);
       expect(api("POST", p).status, p).toBe(404);
     }
@@ -104,8 +102,8 @@ describe.skipIf(!REFERRALS_ONLY_DEMO)("referrals-only demo is on", () => {
   it("gives Aeon's chat and MCP only the referral and core tools", () => {
     const names = TOOLS.map((t) => t.name).sort();
     const built = (n: string) => !COMING.includes(n) || names.includes(n);
-    expect(names).toEqual(REFERRAL_DEMO_TOOLS.filter((n) => !FRONT_DESK_TOOLS.includes(n) && built(n)).slice().sort());
-    for (const hidden of ["morning_brief", "draft_gfe", "caqh_prep", "draft_instagram_post", "set_fees", "build_website"]) expect(toolEnabled(hidden)).toBe(false);
+    expect(names).toEqual(REFERRAL_DEMO_TOOLS.filter((n) => built(n)).slice().sort());
+    for (const hidden of ["morning_brief", "draft_gfe", "caqh_prep", "set_fees"]) expect(toolEnabled(hidden)).toBe(false);
     const chat = chatTools().map((t) => t.function.name);
     expect(chat).toContain("find_referral_sources");
     expect(chat).toContain("remember");
@@ -125,7 +123,7 @@ describe.skipIf(!REFERRALS_ONLY_DEMO)("referrals-only demo is on", () => {
   it("shows only referral approvals: letters, and Aeon actions that wrap a referral tool", () => {
     expect(demoApprovalKind("referral_letter")).toBe(true);
     expect(demoApprovalKind("file_document")).toBe(true); // her uploads are hers
-    for (const k of ["gfe_issue", "instagram_post", "state_rules", "test_note", "website"]) expect(demoApprovalKind(k), k).toBe(false);
+    for (const k of ["gfe_issue", "state_rules", "test_note"]) expect(demoApprovalKind(k), k).toBe(false);
     expect(demoApprovalShown("aeon_action", "log_referral_contact")).toBe(true);
     expect(demoApprovalShown("aeon_action", "set_fees")).toBe(false);
     expect(demoApprovalShown("aeon_action", undefined)).toBe(false);
@@ -134,10 +132,10 @@ describe.skipIf(!REFERRALS_ONLY_DEMO)("referrals-only demo is on", () => {
   it("keeps only her uploads and referral letters on Files", () => {
     expect(fileKindEnabled("uploaded")).toBe(true);
     expect(fileKindEnabled("referral_letter")).toBe(true);
-    for (const k of ["gfe", "superbill", "client_form", "release_form", "instagram_post", "cms855i"]) expect(fileKindEnabled(k), k).toBe(false);
+    for (const k of ["gfe", "superbill", "client_form", "release_form", "cms855i"]) expect(fileKindEnabled(k), k).toBe(false);
     const letter = toFileEntry({ id: "referral_letter:x", kind: "referral_letter", title: "Letter", status: "Waiting", topics: [] } as never, null);
     expect(letter && fileKindEnabled(letter.card.kind)).toBe(true);
-    // Only the chips those kinds fill: no empty Forms, Estimates, Insurance or Media.
+    // Only the chips those kinds fill: no empty Forms, Estimates or Insurance.
     expect(SHOWN_GROUPS).toEqual(["uploaded", "referrals"]);
   });
 
@@ -161,19 +159,15 @@ describe.skipIf(!REFERRALS_ONLY_DEMO)("referrals-only demo is on", () => {
     expect(SUGGESTIONS).toEqual(REFERRAL_DEMO_SUGGESTIONS);
     expect(SUGGESTIONS).toEqual(["Who should I reach out to this week?", "Find oncology and palliative care near me", "Debrief my coffee meeting", "Draft a letter to my top 3"]);
     expect(SPECIALTIES.map((s) => s.id)).toContain("oncology"); // the second tile finds a real kind of provider
-    const ids = CONNECTION_CARDS.map((c) => c.id);
-    expect(ids).toContain("muse");
-    expect(ids).not.toContain("google");
-    expect(ids).not.toContain("instagram");
+    expect(CONNECTION_CARDS.map((c) => c.id)).toEqual(["muse"]);
   });
 });
 
 describe.skipIf(REFERRALS_ONLY_DEMO)("referrals-only demo is off", () => {
   it("restores the full menu, tools, cards, tiles and onboarding", () => {
     expect(PRACTICE.map((l) => l.label)).toContain("Admin");
-    expect(PRACTICE.map((l) => l.label)).toContain("Media");
     expect(TOOLS.map((t) => t.name)).toContain("morning_brief");
-    expect(CONNECTION_CARDS.map((c) => c.id)).toContain("google");
+    expect(CONNECTION_CARDS.map((c) => c.id)).toEqual(["muse"]);
     expect(SUGGESTIONS).not.toEqual(REFERRAL_DEMO_SUGGESTIONS);
     expect(soul()).not.toContain(REFERRALS_DEMO_SOUL);
     const ids = screens().map((s) => s.id);
@@ -205,12 +199,12 @@ describe("the other state of the switch", () => {
     if (flipped) {
       expect(menu.map((l) => l.href)).toEqual(["/referrals", "/approvals", "/files"]);
       expect(tiles).toEqual(REFERRAL_DEMO_SUGGESTIONS);
-      expect(cards.map((c) => c.id)).not.toContain("google");
+      expect(cards.map((c) => c.id)).toEqual(["muse"]);
       expect(ids.at(-1)).toBe("employer_policy");
     } else {
-      expect(menu.map((l) => l.label)).toEqual(["Admin", "Files", "Approvals", "Referrals", "Media"]);
+      expect(menu.map((l) => l.label)).toEqual(["Admin", "Files", "Approvals", "Referrals"]);
       expect(tiles).not.toEqual(REFERRAL_DEMO_SUGGESTIONS);
-      expect(cards.map((c) => c.id)).toContain("google");
+      expect(cards.map((c) => c.id)).toEqual(["muse"]);
       expect(ids).not.toContain("employer_policy");
       expect(ids).toContain("office");
     }

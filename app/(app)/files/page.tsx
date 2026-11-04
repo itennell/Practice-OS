@@ -12,8 +12,8 @@ import { fileDetail, getFile, listFiles } from "@/lib/documents/files";
 export const metadata: Metadata = { title: "Files · Practice-OS" };
 
 // Everything in one place: the files she added in the chat and every file Aeon made
-// (client forms, estimates and superbills, insurance forms, referral letters, Instagram
-// posts), from the document index (lib/documents). Open shows the file in a side panel
+// (client forms, estimates and superbills, insurance forms, referral letters),
+// from the document index (lib/documents). Open shows the file in a side panel
 // (?open=<card id>), the same panel Admin uses; closing it comes back here.
 
 export default function FilesPage({ searchParams }: PageProps<"/files">) {

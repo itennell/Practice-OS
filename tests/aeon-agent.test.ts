@@ -13,8 +13,6 @@ import { NER_MODEL, modelCacheDir } from "../lib/aeon/phi-classifier";
 import { SCENARIOS } from "./fixtures/aeon-scenarios";
 
 loadEnv();
-// Instagram drafts get a plain stand-in picture: no image models in a replay.
-process.env.PLAYWRIGHT_IMAGE_STANDIN = "1";
 const ready = Boolean(process.env.DATABASE_URL) && existsSync(path.join(modelCacheDir(), NER_MODEL));
 
 const { sendMessage } = await import("../lib/aeon/chat");
@@ -112,7 +110,7 @@ describe.skipIf(!ready)("golden conversations (replayed)", () => {
     expect(last).toMatch(scenario.expectReply);
 
     // Every chat call offers the whole shared tool list (less the MCP-only ones) and starts with SOUL.md.
-    // Calls made inside a tool (Instagram ideas and drafts) carry no tools and are replayed too.
+    // Calls made inside a tool (referral letters) carry no tools and are replayed too.
     for (const r of requests.filter((x) => x.tools)) {
       expect((r.tools ?? []).map((t) => (t as { function: { name: string } }).function.name)).toEqual(TOOLS.filter((t) => !t.mcpOnly).map((t) => t.name));
       expect(r.messages[0]).toMatchObject({ role: "system" });

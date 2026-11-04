@@ -1,24 +1,14 @@
-// Every approval kind the database accepts (practice_os.approvals CHECK, latest
-// migration). tests/db.test.ts fails if this list and the CHECK ever differ.
+// Every approval kind the app queues. The database CHECK (practice_os.approvals,
+// latest migration) still allows the removed Media and Front Desk kinds; no code
+// queues them. tests/db.test.ts fails if a kind here is missing from the CHECK.
 export const APPROVAL_KINDS = [
   "referral_letter",
-  "instagram_post",
-  "sms_reply",
-  "consult_booking",
-  "consult_reschedule",
-  "consult_cancel",
-  "web_chat_reply",
   "test_note",
   "state_rules",
   "gfe_issue",
   "aeon_action",
-  // Front Desk (migration 016)
-  "text_consult_options",
   // Chat documents (migration 018)
   "file_document",
-  // Grow: ad and website drafts (migration 042)
-  "ads_campaign",
-  "website",
   // Referrals calendar: a meeting Aeon planned (migration 047)
   "referral_meeting",
 ] as const;

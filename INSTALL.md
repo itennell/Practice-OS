@@ -44,23 +44,22 @@ Leave `DATABASE_URL` and `CONNECTIONS_ENCRYPTION_KEY` empty. Practice-OS then ru
 
 From here she works in the app. The interview asks for everything else, one question per screen, and she can skip anything and finish it later from the home page.
 
-## 5. Accounts (one at a time, only when she wants that helper)
+## 5. The Muse key (one account)
 
-Only the Muse key is needed to start. Instagram needs no connection: Aeon writes posts with her, and she posts them herself. Everything else is optional and can be set up later from **Settings › Connections**, which walks her through each one step by step with a check after every step. Offer them in this order, and say the cost and time first:
+Only the Muse key is needed. It is the one connection in **Settings › Connections**, which walks her through it step by step with a check after the last step. Say the cost and time first:
 
 | What | Needed for | Cost | Time | Guide |
 |---|---|---|---|---|
 | Muse key (Meta) | Aeon answering at all | Per use, on her own Meta account | 5 minutes | [muse.md](docs/self-hosting/muse.md) |
-| Google (Gmail drafts) | Referral letters as Gmail drafts | Free | Later: not ready for self-hosting yet | [google.md](docs/self-hosting/google.md) |
 
-How to help her with each one:
+How to help her:
 
-1. Open the matching guide above and Settings › Connections in her browser.
+1. Open the guide above and Settings › Connections in her browser.
 2. Read her the next step from the card, in the card's own words. Don't skip ahead.
-3. When she has copied a key, tell her to paste it into the box on the card, not here. The card checks it straight away and shows a green check.
-4. Run `npm run doctor -- --json` to confirm, then move to the next one only if she wants to.
+3. When she has copied the key, tell her to paste it into the box on the card, not here. The card checks it straight away and shows a green check.
+4. Run `npm run doctor -- --json` to confirm.
 
-Leave `DRY_RUN=true` in `.env` until she has tried everything. While it's on, nothing is really sent, posted or booked.
+Leave `DRY_RUN=true` in `.env` until she has tried everything. While it's on, nothing is really done on her behalf.
 
 ## 6. Connect Aeon's tools to her coding agent (optional)
 
@@ -85,7 +84,7 @@ The MCP server reads `.env` itself, so the agent config holds no secrets. Use he
 claude mcp add practice-os -s user -- npx --no-install --prefix /path/to/Practice-OS tsx /path/to/Practice-OS/mcp/server.ts
 ```
 
-Check it: ask the agent "What needs me this week?" It should call `morning_brief`. Nothing is sent, posted or booked without her approval in the app.
+Check it: ask the agent "What needs me this week?" It should call `morning_brief`. Nothing is done on her behalf without her approval in the app.
 
 Skills in this repo for her agent: `skills/admin/SKILL.md` (everyday practice admin) and `skills/admin/state-research/SKILL.md` (her state's rules if she practices **outside Illinois**; the rules wait in her approvals until she confirms them).
 
