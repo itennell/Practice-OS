@@ -339,7 +339,7 @@ export function ownContext(sentence: string): boolean {
 // A sentence where a provider on her board belongs: their card, a letter,
 // outreach, their office, specialty or NPI. Only here is a board name directory data.
 const REFERRAL_CONTEXT =
-  /\b(cards?|board|letters?|referr\w*|refers?|NPI|NPPES|outreach|practice|office|address|speciali[sz]\w*|specialt\w*|accepting|e-?mail|phone|fax|follow[- ]?ups?|call log|contact\w*|providers?|directory|status|colleagues?|network|introduc\w*|reach(?:ed)?\s+out|coffee|meet|meeting|confirm\w*|chat|stage|column|pipeline|do not contact|LCSW|LICSW|LCPC|LPC|LMFT|MD|PhD|PsyD|chaplains?|reverend|navigators?|genetic\s+counsel\w*|social\s+workers?|oncolog\w*|hospice|palliative|miles?\s+away|\d+(?:\.\d+)?\s*mi)\b/i;
+  /\b(cards?|board|letters?|referr\w*|refers?|NPI|NPPES|outreach|practice|office|address|speciali[sz]\w*|specialt\w*|accepting|e-?mail|phone|fax|follow[- ]?ups?|call log|contact\w*|providers?|directory|status|colleagues?|network|introduc\w*|reach(?:ed)?\s+out|coffees?|lunch(?:es)?|lunch\s+talks?|meet|meetings?|intros?|(?:a|the|phone|zoom|quick|intro|video)\s+calls?|calls?\s+with|(?:plan|set|book|schedule)\s+(?:up\s+)?(?:a\s+|an\s+|some\s+)?(?:coffees?|lunch(?:es)?|meetings?|calls?|chats?|intros?|e-?mails?|letters?)|follow\s+up|confirm\w*|chat|stage|column|pipeline|do not contact|LCSW|LICSW|LCPC|LPC|LMFT|MD|PhD|PsyD|chaplains?|reverend|navigators?|genetic\s+counsel\w*|social\s+workers?|oncolog\w*|hospice|palliative|miles?\s+away|\d+(?:\.\d+)?\s*mi)\b/i;
 // A professional's credential after a name ("Brittany Keiser, MS, CGC", "Renata
 // Ostrowski, RN", "Rev. Tobias Wren"). Case-sensitive, so "do" and "ms" as words don't count.
 export const PROFESSIONAL_CREDENTIAL =

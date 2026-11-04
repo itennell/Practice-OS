@@ -11,6 +11,7 @@ import {
   clinicalForMemory,
   colleagueAt,
   foldTypos,
+  medicalAboutSomeone,
   mentionsMedical,
   mentionsDiagnosis,
   namedCondition,
@@ -156,7 +157,12 @@ export function judgePerson(name: string, text: string, allow: Allowlist): Perso
     const titled = at >= 0 && TITLE_BEFORE.test(text.slice(Math.max(0, at - 8), at));
     // A command to her about a board name ("Text Brittany Keiser to confirm coffee") is referral work.
     const command = COMMAND_AT_START.test(s) && !clientLike(s);
-    if (clean && (boardWhole || boardPart) && (referralContext(s) || command || (boardPart && titled))) continue;
+    // A part of a board name ("Maria") never clears her own life details ("about her insurance
+    // claim", "no-showed") or a next sentence leaning on it ("Plan lunch with Maria. Her son was arrested.").
+    const partOnly = boardPart && !boardWhole;
+    const after = at >= 0 && partOnly ? leaningNext(text, at) : null;
+    const personal = partOnly && (PERSONAL_MATTER.test(s) || (after !== null && !partnerSentenceClean(after, name)));
+    if (clean && !personal && (boardWhole || boardPart) && (referralContext(s) || command || (boardPart && titled))) continue;
     if (at >= 0 && colleagueAt(text, at, name) && !condition) continue;
     // A partner's staff by first name ("Jen at the front desk handles it"), outside any client sentence.
     // Never with a health word or diagnosis in the sentence ("Jen at the front desk is pregnant").
@@ -236,6 +242,26 @@ function tokensOf(text: string): Token[] {
 }
 
 /** A sentence where a partner's name can't be resolved by a first name or surname: anything about a client or a health detail. */
+// Her own life words about a person: what a client's sentence holds and a partner meeting never needs.
+const PERSONAL_MATTER = new RegExp(
+  `\\b(?:her|his|their)\\s+(?:[\\p{L}-]+\\s+)?(?:${RELATIVES}|claims?|insurance|leave|employer|boss|job|divorce|marriage|apartment|landlord|rent|court|case|lawyer|grief|loss|drinking|meds|medications?|prescriptions?|therapy|treatment|sessions?|appointments?|diagnosis|symptoms?|history)s?\\b|` +
+    `\\b(?:claims?|denied|copays?|deductibles?|no-?show\\w*|intakes?|divorc\\w*|grie(?:f|ving|ves)|abus\\w*|arrest\\w*|drinks?|drinking|drunk|sober|relaps\\w*|foster|custody|evict\\w*|homeless|fired|laid\\s+off|lost\\s+(?:her|his|their)|cried|crying|tearful|died|passed\\s+away|funeral|zoloft|lexapro|prozac|xanax|adderall|wellbutrin|ssris?|meds|medications?|prescri\\w*|works?\\s+(?:at|for)|lives?\\s+(?:in|at|on|near)|retired)\\b|` +
+    `\\b(?:is|was|turned|turns)\\s+\\d{1,3}\\b|,\\s*\\d{1,3}\\s*,|\\bmy\\s+(?:\\d{1,2}(?::\\d{2})?\\s*(?:am|pm)|new\\s+intake|intake)\\b`,
+  "iu",
+);
+// A sentence that starts by leaning on the one before ("Her son was arrested.").
+const LEANS_BACK = /^\s*(?:she|he|they|her|his|their|hers|him|them)\b/i;
+
+/** The sentence after the one at `at`, when it leans back on it with a pronoun ("Her son was arrested."). */
+function leaningNext(text: string, at: number): string | null {
+  const spans = sentenceSpans(text);
+  const span = spans.find(([s, e]) => at >= s && at < e);
+  const next = span ? spans.find(([s]) => s >= span[1]) : undefined;
+  if (!next) return null;
+  const n = text.slice(next[0], next[1]);
+  return LEANS_BACK.test(n) ? n : null;
+}
+
 function partnerSentenceClean(s: string, said: string): boolean {
   const who = escape(said);
   return (
@@ -244,6 +270,8 @@ function partnerSentenceClean(s: string, said: string): boolean {
     !clientLike(s) &&
     !mentionsDiagnosis(s) &&
     !mentionsMedical(s) &&
+    !medicalAboutSomeone(s) &&
+    !PERSONAL_MATTER.test(s) &&
     !namedCondition(said, s) &&
     !new RegExp(`(?<![\\p{L}\\p{N}])${who}['’]s\\s+(?:[\\p{L}-]+\\s+)?(?:${RELATIVES})s?\\b`, "iu").test(s)
   );
@@ -306,7 +334,14 @@ export function partnerMatch(name: string, text: string, allow: Allowlist): Part
       const all = [...words, ...joined.filter((t) => cards.some((c) => c.words.includes(t.base))).map((t) => t.base)];
       if (joined.some((t) => !cards.some((c) => c.words.includes(t.base)) && !COMMON_AFTER_NAME.test(t.base))) return { kind: "none" };
       const spoken = text.slice(group[0].at, group.at(-1)!.end);
-      if (!partnerSentenceClean(sentenceAt(text, group[0].at), spoken)) return { kind: "none" };
+      const sent = sentenceAt(text, group[0].at);
+      if (!partnerSentenceClean(sent, spoken)) return { kind: "none" };
+      const after = leaningNext(text, group[0].at);
+      if (after && !partnerSentenceClean(after, spoken)) return { kind: "none" };
+      // The positive gate stays: a referral sentence, a command to her, or "Dr." before the name.
+      // A first name never clears a sentence just because it lacks client words.
+      const titledHere = TITLE_BEFORE.test(text.slice(Math.max(0, group[0].at - 8), group[0].at));
+      if (!(referralContext(sent) || (COMMAND_AT_START.test(sent) && !clientLike(sent)) || titledHere)) return { kind: "none" };
       const match = cardsWith(all, cards);
       if (match.length === 0) return { kind: "none" };
       if (match.length === 1) found.push(match[0].name);
@@ -593,10 +628,25 @@ async function checkOnce(text: string, at: GuardPoint, list: Allowlist, opts: Gu
     // A second, cheaper read with every word capitalized: names written in
     // capitals or lowercase ("KEVIN ORTIZ", "carin gordon") are found too.
     cased = titled === plain || titled.length !== plain.length ? [] : await findNames(titled, { secondReads: false });
+    // One name read across a sentence end ("coffee with Maria. Maria's PTSD is worse" gives
+    // "Maria. Maria"): each side is judged on its own, at every place it appears.
+    const split = (list: string[]) => list.flatMap((n) => n.split(/(?<!\b(?:Dr|Doctor|Mr|Mrs|Ms|Mx|Prof|Rev|Fr|St|\p{Lu}))[.!?]+\s+/u).map((p) => p.trim()).filter(Boolean));
+    names = split(names);
+    cased = split(cased);
   } catch (err) {
     if (err instanceof Error && err.name === "TooLongToCheck") return { ok: false, kind: "too_long" };
     console.error(`[guard] name-finder unavailable: ${err instanceof Error ? err.message : String(err)}`);
     return { ok: false, kind: "unavailable" };
+  }
+  // A partner's first name or surname written in lowercase, which the name-finder can miss
+  // ("maria no-showed again"), in a sentence about someone's own life or visits: refused.
+  if (at === "message" || at === "memory") {
+    const cards = partnerCards(list);
+    for (const t of tokensOf(plain)) {
+      if (t.capital || !cards.some((c) => c.words.includes(t.base))) continue;
+      const s = sentenceAt(plain, t.at);
+      if (MY_CLIENT.test(s) || clientLike(s) || PERSONAL_MATTER.test(s)) return { ok: false, kind: "client_name" };
+    }
   }
   const strangers: string[] = [];
   // Her partners named by first name or surname (partnerMatch): one card each passes;

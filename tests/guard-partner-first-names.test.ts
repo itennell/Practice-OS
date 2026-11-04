@@ -9,6 +9,7 @@ import { loadEnv } from "../lib/env";
 loadEnv();
 const { guard, partnerMatch, whichPartner, looksLikePerson, spokenName } = await import("../lib/aeon/guard");
 const { withContext } = await import("../lib/referrals/ask-context");
+const { COMMON_BOARD, REVIEW_MUST_PASS, REVIEW_MUST_REFUSE } = await import("./fixtures/partner-first-names");
 const { DEMO_ALLOWED, MUST_REFUSE: ADVERSARIAL_REFUSE } = await import("./fixtures/guard-adversarial");
 
 const BOARD = ["[Sample] Maria Halvorsen, MS", "[Sample] Pamela Serrano Vidal, MD", "[Sample] Birinder Malhi, MD", "[Sample] Juniper Row Family Medicine"];
@@ -129,6 +130,22 @@ describe("board partners by first name or surname", () => {
   it("asks only at her chat message: other callers judge the name as before", async () => {
     const r = await guard("coffee with Maria", "message", twoMarias);
     if (!r.ok) expect(r.kind).not.toBe("ambiguous_partner");
+  }, T);
+
+  // The PR #153 review: one partner named John must never clear "John is grieving his father".
+  const common = { names: [...OWN, ...COMMON_BOARD], contacts: [], directory: COMMON_BOARD };
+
+  it.each(REVIEW_MUST_REFUSE)("review leak, still refused with common first names on the board: %s", async (m) => {
+    for (const text of [m, withContext(m, "Partners", PICKED)]) {
+      const r = await guard(text, "message", common, ASK);
+      expect(r.ok, text).toBe(false);
+      if (!r.ok) expect(r.kind, text).not.toBe("ambiguous_partner");
+    }
+  }, T);
+
+  it.each(REVIEW_MUST_PASS)("review must-pass with common first names on the board: %s", async (m) => {
+    expect(await guard(m, "message", common, ASK), m).toEqual({ ok: true, text: m });
+    expect((await guard(withContext(m, "Partners", PICKED), "message", common, ASK)).ok, m).toBe(true);
   }, T);
 
   it("every earlier adversarial must-refuse probe still refuses, with these partners on the board too", async () => {
