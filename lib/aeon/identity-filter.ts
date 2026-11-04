@@ -22,6 +22,13 @@ export type Allowlist = {
   directory?: string[];
   /** Her practice's city and neighbourhood (profile): not a detail that narrows down a client. */
   places?: string[];
+  /**
+   * The people on her board, one entry per card (a person's name, never an
+   * organization's): a first name or surname that matches exactly one of them is
+   * that partner (lib/aeon/guard.ts partnersIn). Left out, the person-looking
+   * names in `directory` are used.
+   */
+  partners?: string[];
 };
 
 // ---- sentences ---------------------------------------------------------------
@@ -332,7 +339,7 @@ export function ownContext(sentence: string): boolean {
 // A sentence where a provider on her board belongs: their card, a letter,
 // outreach, their office, specialty or NPI. Only here is a board name directory data.
 const REFERRAL_CONTEXT =
-  /\b(cards?|board|letters?|referr\w*|refers?|NPI|NPPES|outreach|practice|office|address|speciali[sz]\w*|specialt\w*|accepting|e-?mail|phone|fax|follow[- ]?ups?|call log|contact\w*|providers?|directory|status|colleagues?|network|introduc\w*|reach(?:ed)?\s+out|coffee|meet|meeting|confirm\w*|chat|stage|column|pipeline|do not contact|LCSW|LICSW|LCPC|LPC|LMFT|MD|PhD|PsyD|chaplains?|reverend|navigators?|genetic\s+counsel\w*|social\s+workers?|oncolog\w*|hospice|palliative|miles?\s+away|\d+(?:\.\d+)?\s*mi)\b/i;
+  /\b(cards?|board|letters?|referr\w*|refers?|NPI|NPPES|outreach|practice|office|address|speciali[sz]\w*|specialt\w*|accepting|e-?mail|phone|fax|follow[- ]?ups?|call log|contact\w*|providers?|directory|status|colleagues?|network|introduc\w*|reach(?:ed)?\s+out|coffees?|lunch(?:es)?|lunch\s+talks?|meet|meetings?|intros?|(?:a|the|phone|zoom|quick|intro|video)\s+calls?|calls?\s+with|(?:plan|set|book|schedule)\s+(?:up\s+)?(?:a\s+|an\s+|some\s+)?(?:coffees?|lunch(?:es)?|meetings?|calls?|chats?|intros?|e-?mails?|letters?)|follow\s+up|confirm\w*|chat|stage|column|pipeline|do not contact|LCSW|LICSW|LCPC|LPC|LMFT|MD|PhD|PsyD|chaplains?|reverend|navigators?|genetic\s+counsel\w*|social\s+workers?|oncolog\w*|hospice|palliative|miles?\s+away|\d+(?:\.\d+)?\s*mi)\b/i;
 // A professional's credential after a name ("Brittany Keiser, MS, CGC", "Renata
 // Ostrowski, RN", "Rev. Tobias Wren"). Case-sensitive, so "do" and "ms" as words don't count.
 export const PROFESSIONAL_CREDENTIAL =
@@ -410,7 +417,7 @@ const WORD_CA = /\p{L}{3,}\s+(?:ca|Ca)(?![\p{L}\p{N}])/u;
 // center", "patient navigator", "radiation oncology", "a hospice social worker".
 const MEDICAL_PLACES =
   /\b(?:cancer|oncology|hospice|palliative|dialysis|transplant|diabetes|stroke|radiation|chemo(?:therapy)?|infusion|breast|maternity|pregnancy|fertility|HIV|surgery|surgical)\s+(?:cent(?:er|re)s?|care(?:\s+(?:cent(?:er|re)s?|teams?|programs?))?|institutes?|society|support|groups?|programs?|clinics?|hospitals?|units?|teams?|services|networks?|alliances?|foundations?|wellness|navigators?|nurses?|social\s+workers?|counselors?|specialists?|survivorship|resources?|research|ward|floor|practices?|offices?|departments?|partners?|providers?|doctors?|physicians?|surgeons?|oncologists?|experts?|advocates?|coaches?|educators?|doulas?|researchers?|patients|survivors|clients|families)\b|\bpatient\s+(?:navigators?|advocates?|care|services|portal|education|experience|relations|intake|coordinators?|liaisons?|family|families|support)\b|\b(?:radiation|surgical|medical|gynecologic|pediatric|hematology)[- ]+oncolog\w*/gi;
-const RELATIVES =
+export const RELATIVES =
   "mom|mother|dad|father|son|daughter|husband|wife|spouse|sister|brother|grandma|grandpa|grandmother|grandfather|aunt|uncle|niece|nephew|cousin|" +
   "child|kid|baby|infant|toddler|teen|teenager|stepson|stepdaughter|stepmom|stepdad|fianc[eé]e?|girlfriend|boyfriend|grandson|granddaughter|parent";
 const AGE_WORDS = "\\d{1,3}\\s*(?:yo|y/o|y\\.o\\.?|yrs?\\s*old|years?[- ]old|year-old)(?![\\p{L}\\p{N}])";

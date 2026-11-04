@@ -341,7 +341,13 @@ export async function respond(typed: string, opts: RespondOptions): Promise<Repl
     return { kind: "crisis", text: CRISIS_REPLY };
   }
   const message = opts.context ? joinContext(typed, opts.context) : typed;
-  const check = await guard(message, "message");
+  const check = await guard(message, "message", undefined, { askWhichPartner: true });
+  if (!check.ok && check.kind === "ambiguous_partner") {
+    // Not a privacy refusal: a first name on two or more board cards. Aeon asks which and
+    // keeps her words in the box to edit; nothing is saved (the cards' names only, no guess).
+    await audit({ actor: "safety", action: "partner_ambiguous", subjectType: "chat", details: { by: opts.by } });
+    return { kind: "refused", text: check.question ?? REFUSAL.ambiguous_partner, reason: check.kind };
+  }
   if (!check.ok) {
     await audit({ actor: "safety", action: "phi_refused", subjectType: "chat", details: { kind: check.kind, by: opts.by } });
     return { kind: "refused", text: REFUSAL[check.kind], reason: check.kind };

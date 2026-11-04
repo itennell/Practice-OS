@@ -11,11 +11,13 @@ import {
   clinicalForMemory,
   colleagueAt,
   foldTypos,
+  medicalAboutSomeone,
   mentionsMedical,
   mentionsDiagnosis,
   namedCondition,
   ownContext,
   personalDetail,
+  RELATIVES,
   referralContext,
   sentenceAt,
   sentenceSpans,
@@ -25,8 +27,9 @@ import {
 import { findNames, isNameLike } from "./phi-classifier";
 
 export type GuardPoint = "message" | "tool_result" | "memory" | "reply";
-export type GuardKind = PhiKind | "unavailable" | "too_long";
-export type GuardResult = { ok: true; text: string } | { ok: false; kind: GuardKind };
+export type GuardKind = PhiKind | "unavailable" | "too_long" | "ambiguous_partner";
+/** `question`: with ambiguous_partner, Aeon's question naming the cards ("Which Maria do you mean: ..."). */
+export type GuardResult = { ok: true; text: string } | { ok: false; kind: GuardKind; question?: string };
 
 /** The fixed line she sees when her message is refused. Never repeats what she typed. */
 export const REFUSAL: Record<GuardKind, string> = {
@@ -40,6 +43,7 @@ export const REFUSAL: Record<GuardKind, string> = {
   identifying:
     "That describes one client closely enough to pick them out (an age, a job, a place or a health detail). I can't keep client details yet. Ask again without those details.",
   unavailable: "My privacy check isn't working right now, so I can't read messages. Try again in a minute.",
+  ambiguous_partner: "More than one card on your Referrals board has that name. Ask again with their full name, or pick the card on Referrals.",
   too_long: "That's too long for my privacy check to read in full, so I left its text out. Ask about a shorter part, or open it on the Files page.",
 };
 
@@ -153,7 +157,12 @@ export function judgePerson(name: string, text: string, allow: Allowlist): Perso
     const titled = at >= 0 && TITLE_BEFORE.test(text.slice(Math.max(0, at - 8), at));
     // A command to her about a board name ("Text Brittany Keiser to confirm coffee") is referral work.
     const command = COMMAND_AT_START.test(s) && !clientLike(s);
-    if (clean && (boardWhole || boardPart) && (referralContext(s) || command || (boardPart && titled))) continue;
+    // A part of a board name ("Maria") never clears her own life details ("about her insurance
+    // claim", "no-showed") or a next sentence leaning on it ("Plan lunch with Maria. Her son was arrested.").
+    const partOnly = boardPart && !boardWhole;
+    const after = at >= 0 && partOnly ? leaningNext(text, at) : null;
+    const personal = partOnly && (PERSONAL_MATTER.test(s) || !businessOnly(s) || (after !== null && !partnerSentenceClean(after, name)));
+    if (clean && !personal && (boardWhole || boardPart) && (referralContext(s) || command || (boardPart && titled))) continue;
     if (at >= 0 && colleagueAt(text, at, name) && !condition) continue;
     // A partner's staff by first name ("Jen at the front desk handles it"), outside any client sentence.
     // Never with a health word or diagnosis in the sentence ("Jen at the front desk is pregnant").
@@ -167,6 +176,265 @@ export function judgePerson(name: string, text: string, allow: Allowlist): Perso
 /** A name that passes where it stands (see judgePerson). */
 export function isAllowedPerson(name: string, text: string, allow: Allowlist): boolean {
   return judgePerson(name, text, allow).verdict === "ok";
+}
+
+// ---- partners named by first name or surname ------------------------------------
+//
+// "Set a meeting with Maria, Pamela and Birinder": she names her board partners the
+// way she talks about them. Before the name-finder's names are judged, each one is
+// resolved against the people on her board: a first name or surname (any case,
+// titles and credentials out) that matches exactly ONE card is that partner. Two or
+// more cards: Aeon asks which (at her message), never guesses. No card: judged as
+// before (default refuse). A sentence that treats the name like a client's ("my
+// client Maria", "Maria has stage 3 cancer", "Pamela's husband is in hospice",
+// "Pamela's patient Kevin") is never resolved this way.
+
+const ORG_WORD =
+  /\b(?:cent(?:er|re)s?|clinics?|hospitals?|health|healthcare|medicine|medical|group|associates|services?|counseling|therapy|care|institute|foundation|practice|llc|pllc|inc|corp|network|society|church|university|college|school|family|families|partners|program|hospice|oncology|pharmacy|wellness|behavioral|psychology|psychiatry|department|office|cancer|support|community|alliance|house|home|ministries|clinic|system|systems|physicians|specialists|consulting|collective|studio|psychotherapy|rehabilitation|rehab)\b/i;
+
+/** A board entry that reads as one person's name ("Maria Helgeson, MS"), not an organization's. */
+export function looksLikePerson(name: string): boolean {
+  const words = wordsOf(name);
+  return words.length >= 2 && words.length <= 5 && !ORG_WORD.test(name.replace(/\[[^\]]*\]/g, " "));
+}
+
+/** The name as she'd say it: no sample label, title or credentials ("Dr. Maria Helgeson, MS" is "Maria Helgeson"). */
+export function spokenName(name: string): string {
+  const words = name
+    .replace(/\[[^\]]*\]/g, " ")
+    .split(",")[0]
+    .split(/\s+/)
+    .filter(Boolean);
+  const bare = (w: string) => w.replace(/\./g, "").toLowerCase();
+  while (words.length > 1 && TITLE_WORDS.has(bare(words[0]))) words.shift();
+  while (words.length > 1 && TITLE_WORDS.has(bare(words.at(-1)!))) words.pop();
+  const out = words.join(" ");
+  // Stored in capitals ("PAMELA SERRANO VIDAL MD"): said the usual way.
+  return /\p{Ll}/u.test(out) ? out : titleCase(out);
+}
+
+type Card = { name: string; words: string[] };
+
+function partnerCards(allow: Allowlist): Card[] {
+  const list = allow.partners ?? (allow.directory ?? []).filter(looksLikePerson);
+  const seen = new Map<string, Card>();
+  for (const name of list) {
+    const words = wordsOf(name).filter((w) => w.length >= 2);
+    const key = words.join(" ");
+    if (words.length && !seen.has(key)) seen.set(key, { name, words });
+  }
+  return [...seen.values()];
+}
+
+/** The cards that have every one of these words. */
+function cardsWith(words: string[], cards: Card[]): Card[] {
+  return words.length ? cards.filter((c) => words.every((w) => c.words.includes(w))) : [];
+}
+
+type Token = { at: number; end: number; base: string; capital: boolean };
+
+/** Words as written, a possessive "'s" left off ("Maria's" is "maria"). */
+function tokensOf(text: string): Token[] {
+  return [...text.matchAll(/\p{L}+(?:[-'’]\p{L}+)*/gu)].map((m) => {
+    const raw = m[0].replace(/['’]s$/iu, "");
+    return { at: m.index ?? 0, end: (m.index ?? 0) + raw.length, base: raw.toLowerCase(), capital: /^\p{Lu}/u.test(raw) };
+  });
+}
+
+/** A sentence where a partner's name can't be resolved by a first name or surname: anything about a client or a health detail. */
+// Her own life words about a person: what a client's sentence holds and a partner meeting never needs.
+const PERSONAL_MATTER = new RegExp(
+  `\\b(?:her|his|their)\\s+(?:[\\p{L}-]+\\s+)?(?:${RELATIVES}|claims?|insurance|leave|employer|boss|job|divorce|marriage|apartment|landlord|rent|court|case|lawyer|grief|loss|drinking|meds|medications?|prescriptions?|therapy|treatment|sessions?|appointments?|diagnosis|symptoms?|history)s?\\b|` +
+    `\\b(?:claims?|denied|copays?|deductibles?|no-?show\\w*|intakes?|divorc\\w*|grie(?:f|ving|ves)|abus\\w*|arrest\\w*|drinks?|drinking|drunk|sober|relaps\\w*|foster|custody|evict\\w*|homeless|fired|laid\\s+off|lost\\s+(?:her|his|their)|cried|crying|tearful|died|passed\\s+away|funeral|zoloft|lexapro|prozac|xanax|adderall|wellbutrin|ssris?|meds|medications?|prescri\\w*|works?\\s+(?:at|for)|lives?\\s+(?:in|at|on|near)|retired)\\b|` +
+    `\\b(?:is|was|turned|turns)\\s+\\d{1,3}\\b|,\\s*\\d{1,3}\\s*,|\\bmy\\s+(?:\\d{1,2}(?::\\d{2})?\\s*(?:am|pm)|new\\s+intake|intake)\\b`,
+  "iu",
+);
+/** The sentence after the one at `at` ("Plan lunch with Maria. Her son was arrested."): judged with it. */
+function leaningNext(text: string, at: number): string | null {
+  const spans = sentenceSpans(text);
+  const span = spans.find(([s, e]) => at >= s && at < e);
+  const next = span ? spans.find(([s]) => s >= span[1]) : undefined;
+  return next ? text.slice(next[0], next[1]) : null;
+}
+
+// ---- what may stand next to a partner named by first name or surname: business only ----
+//
+// A POSITIVE list. Once a name was resolved from a first name or surname alone, the rest
+// of its sentence (and the next one) may say only business things about that person:
+// her/his/their + a business noun, she/he/they + a business clause, about/re:/regarding
+// + a business noun, and no bare number. Anything else refuses (default refuse).
+
+const BUSINESS_NOUN =
+  "practice|practices|clinic|clinics|group|groups|office|offices|team|teams|staff|colleagues?|waitlist|wait\\s+list|caseload|referrals?|availability|" +
+  "openings?|fees?|rates?|schedule|calendar|e-?mail|emails|number|phone|website|site|specialty|specialties|specialization|focus|niche|card|letters?|flyer|" +
+  "brochures?|talk|lunch|coffee|meeting|meetings|call|intro|introduction|partnership|collaboration|workshop|event|events|program|programs|services|" +
+  "front\\s+desk|desk|address|fax|hours|location|offices|department|unit|coordinator|manager|receptionist|scheduler|process|forms?|network|panel|panels|" +
+  "insurance\\s+panels?|board|newsletter|presentation|training|book|podcast|blog|outreach|contact|info|information|details|new\\s+clients|openings";
+const BUSINESS_NOUN_RE = new RegExp(`^(?:${BUSINESS_NOUN})$`, "i");
+/** Words that may come before a business noun ("her new practice", "his clinic's waitlist", "their intake process"). */
+const MODIFIER = /^(?:new|own|main|other|current|private|group|intake|referral|front|clinic|practice|office|team|lunch|quick|short|palliative|oncology|hospice|genetic|counseling|care|cancer|support|weekly|monthly|next|last|first|upcoming|free)$/i;
+
+/** One to three words, read as a business noun phrase ("clinic's waitlist", "palliative care referrals"). */
+function businessPhrase(words: string[]): boolean {
+  const ws = words.map((w) => w.replace(/['’]s$/i, "").toLowerCase());
+  for (let i = 0; i < Math.min(ws.length, 3); i++) {
+    if (BUSINESS_NOUN_RE.test(ws[i]) || (i + 1 < ws.length && BUSINESS_NOUN_RE.test(`${ws[i]} ${ws[i + 1]}`))) return true;
+    if (!MODIFIER.test(ws[i])) return false;
+  }
+  return false;
+}
+
+const wordsAfter = (s: string, from: number, n = 4) =>
+  s
+    .slice(from)
+    .split(/[^\p{L}'’-]+/u)
+    .filter(Boolean)
+    .slice(0, n);
+
+const ARTICLE = /^(?:the|a|an|some|our|my|your|this|that|their|her|his)$/i;
+
+// What she/he/they may do in a sentence about a partner: send or take referrals, have openings, run a group...
+const BUSINESS_CLAUSE = new RegExp(
+  "^(?:\\s+(?:said|says|mentioned|told\\s+me|thinks|thought)(?:\\s+that)?(?:\\s+(?:she|he|they))?)?\\s*" +
+    "(?:['’](?:s|d|ll|re)\\s+|\\s+(?:is|are|was|were|will|would|can|could|might|may|should)\\s+(?:also\\s+|still\\s+|now\\s+)?)?(?:be\\s+)?" +
+    "(?:send(?:s|ing)?|refer(?:s|ring)?|tak(?:e|es|ing)\\s+(?:new\\s+)?(?:clients|referrals|patients|insurance|[A-Z]\\w+)|accept(?:s|ing)?\\s+(?:new\\s+)?(?:clients|referrals|patients|insurance|[A-Z]\\w+)|" +
+    "run(?:s|ning)?\\s+(?:a|an|the|her|his|their)\\s+|lead(?:s|ing)?\\s+(?:a|an|the)\\s+|host(?:s|ing)?\\s+(?:a|an|the)\\s+|" +
+    "see(?:s|ing)?\\s+(?:adults|kids|children|teens|adolescents|families|couples|clients|patients|older\\s+adults)|" +
+    "ha(?:s|ve)\\s+(?:a\\s+|an\\s+|some\\s+|no\\s+)?(?:openings?|availability|room|space|a\\s+waitlist|waitlist|slots?|time)|" +
+    "offer(?:s|ing)?\\s+(?:a|an|the|free|group|lunch)|available|free\\s+(?:to|on|next|this)|open\\s+to\\s+(?:a|an|meeting|coffee|lunch|referrals|partnering)|" +
+    "out\\s+of\\s+(?:the\\s+)?office|back\\s+(?:in|on|next)|in\\s+(?:the\\s+)?office|interested\\s+in\\s+(?:a|an|referrals|partnering|meeting|coffee|lunch)|" +
+    "happy\\s+to\\s+(?:meet|refer|send|partner|chat|talk)|want(?:s|ed)?\\s+to\\s+(?:meet|refer|partner|collaborate|chat|talk|grab)|" +
+    "work(?:s|ing)?\\s+(?:with|at)\\s+(?:the\\s+)?(?:[A-Z]\\w+|adults|kids|families|teens|couples|a\\s+(?:group|practice|clinic))|" +
+    "reply|replied|respond(?:ed|s)?|wrote\\s+back|called\\s+back|emailed|got\\s+back|booked|confirm(?:ed|s)?|prefer(?:s|red)?\\s+(?:mornings|afternoons|zoom|email|coffee|lunch|a\\s+call)|" +
+    "coordinat\\w*|manag(?:e|es|ing)\\s+(?:the|their|our)\\s+(?:referrals|intake|schedule|calendar)|handl(?:e|es|ing)\\s+(?:the|their)\\s+(?:referrals|intake|scheduling))\\b",
+  "u",
+);
+
+/** True when everything said about a person in this sentence is practice business. */
+export function businessOnly(s: string): boolean {
+  if (/,\s*\d{1,3}\b/.test(s)) return false;
+  for (const m of s.matchAll(/\b(?:her|his|their)\s+/giu)) {
+    if (!businessPhrase(wordsAfter(s, (m.index ?? 0) + m[0].length))) return false;
+  }
+  // "Maria's Blue Cross claim", "Pamela's patient": a person's thing must be business too ("Dr. Serrano Vidal's team").
+  for (const m of s.matchAll(/\b([\p{L}-]+)['’]s\s+/gu)) {
+    const owner = m[1].toLowerCase();
+    if (/^(?:she|he|it|that|what|there|here|who|let|where|how|today|tomorrow|week|month|year)$/.test(owner) || BUSINESS_NOUN_RE.test(owner)) continue;
+    if (!businessPhrase(wordsAfter(s, (m.index ?? 0) + m[0].length))) return false;
+  }
+  for (const m of s.matchAll(/\b(?:she|he|they)\b/giu)) {
+    if (!BUSINESS_CLAUSE.test(s.slice((m.index ?? 0) + m[0].length))) return false;
+  }
+  for (const m of s.matchAll(/\b(?:about|regarding|re:?|to\s+discuss|discuss(?:ing)?|on\s+the)\s+/giu)) {
+    const ws = wordsAfter(s, (m.index ?? 0) + m[0].length, 5);
+    while (ws.length && ARTICLE.test(ws[0]) && !/^(?:her|his|their)$/i.test(ws[0])) ws.shift();
+    // "about her/his ..." was judged above as a possessive.
+    if (ws.length && /^(?:her|his|their)$/i.test(ws[0])) continue;
+    if (!businessPhrase(ws)) return false;
+  }
+  return true;
+}
+
+function partnerSentenceClean(s: string, said: string): boolean {
+  const who = escape(said);
+  return (
+    !MY_CLIENT.test(s) &&
+    !/\b(?:client|patient)\b/i.test(s) &&
+    !clientLike(s) &&
+    !mentionsDiagnosis(s) &&
+    !mentionsMedical(s) &&
+    !medicalAboutSomeone(s) &&
+    !PERSONAL_MATTER.test(s) &&
+    businessOnly(s) &&
+    !namedCondition(said, s) &&
+    !new RegExp(`(?<![\\p{L}\\p{N}])${who}['’]s\\s+(?:[\\p{L}-]+\\s+)?(?:${RELATIVES})s?\\b`, "iu").test(s)
+  );
+}
+
+export type PartnerMatch =
+  /** Every part of the name is one partner each ("Maria, Pamela" read as one name: two partners). */
+  | { kind: "partners"; cards: string[] }
+  /** A part of it matches two or more cards: ask which. */
+  | { kind: "ambiguous"; said: string; choices: string[] }
+  /** Not (only) her partners, or a sentence that treats it like a client's: judge it the usual way. */
+  | { kind: "none" };
+
+/**
+ * One name the name-finder found, resolved against the people on her board. The
+ * name is found again in the text word by word (the name-finder can merge a list,
+ * "Maria, Pamela", or cut a word short, "Biri"). Words written next to each other
+ * are one person and must all be on one card ("Maria Smith" is not Maria Helgeson);
+ * words split by a comma, "and" or a colon are separate people.
+ */
+export function partnerMatch(name: string, text: string, allow: Allowlist): PartnerMatch {
+  const cards = partnerCards(allow);
+  if (!cards.length) return { kind: "none" };
+  const said = name
+    .split(/[\s,]+/)
+    .map((w) => w.replace(/['’]s$/iu, "").toLowerCase())
+    .filter((w) => w && !TITLE_WORDS.has(w.replace(/\./g, "")));
+  if (!said.length) return { kind: "none" };
+  const tokens = tokensOf(text);
+  const hits: Token[][] = [];
+  for (let i = 0; i + said.length <= tokens.length; i++) {
+    const run = tokens.slice(i, i + said.length);
+    // Each word as found, or (the last one) cut short by the name-finder.
+    const fits = run.every((t, k) => t.base === said[k] || (k === said.length - 1 && said[k].length >= 3 && t.base.startsWith(said[k])));
+    if (fits) hits.push(run);
+  }
+  if (!hits.length) return { kind: "none" };
+  const found: string[] = [];
+  let ambiguous: { said: string; choices: string[] } | null = null;
+  for (const run of hits) {
+    // A title or credential written just before ("Dr. Marwah") stays part of the person, not of the name.
+    const groups: Token[][] = [];
+    for (const t of run) {
+      const last = groups.at(-1);
+      if (last && /^[ \t]+$/.test(text.slice(last.at(-1)!.end, t.at))) last.push(t);
+      else groups.push([t]);
+    }
+    for (const group of groups) {
+      // A command or day word the name-finder took into the name ("Email Halvorsen" in a capitalized copy) is not part of it.
+      const onCard = (w: string) => cards.some((c) => c.words.includes(w));
+      const words = group.map((t) => t.base).filter((w) => !TITLE_WORDS.has(w) && (onCard(w) || !COMMON_AFTER_NAME.test(w)));
+      if (!words.length) continue;
+      // The word right after, written as part of the same name ("Maria Smith"), must be on the card too.
+      const next = tokens.find((t) => t.at >= group.at(-1)!.end);
+      const before = [...tokens].reverse().find((t) => t.end <= group[0].at);
+      const joined = [before, next].filter(
+        (t): t is Token =>
+          Boolean(t) && t!.capital && !TITLE_WORDS.has(t!.base) && /^[ \t]+$/.test(text.slice(Math.min(t!.end, group.at(-1)!.end), Math.max(t!.at, group[0].at))),
+      );
+      const all = [...words, ...joined.filter((t) => cards.some((c) => c.words.includes(t.base))).map((t) => t.base)];
+      if (joined.some((t) => !cards.some((c) => c.words.includes(t.base)) && !COMMON_AFTER_NAME.test(t.base))) return { kind: "none" };
+      const spoken = text.slice(group[0].at, group.at(-1)!.end);
+      const sent = sentenceAt(text, group[0].at);
+      if (!partnerSentenceClean(sent, spoken)) return { kind: "none" };
+      const after = leaningNext(text, group[0].at);
+      if (after && !partnerSentenceClean(after, spoken)) return { kind: "none" };
+      // The positive gate stays: a referral sentence, a command to her, or "Dr." before the name.
+      // A first name never clears a sentence just because it lacks client words.
+      const titledHere = TITLE_BEFORE.test(text.slice(Math.max(0, group[0].at - 8), group[0].at));
+      if (!(referralContext(sent) || (COMMAND_AT_START.test(sent) && !clientLike(sent)) || titledHere)) return { kind: "none" };
+      const match = cardsWith(all, cards);
+      if (match.length === 0) return { kind: "none" };
+      if (match.length === 1) found.push(match[0].name);
+      else ambiguous ??= { said: spoken, choices: match.map((c) => spokenName(c.name)) };
+    }
+  }
+  if (ambiguous) return { kind: "ambiguous", ...ambiguous };
+  return found.length ? { kind: "partners", cards: [...new Set(found)] } : { kind: "none" };
+}
+
+// Capitalized words that may follow or lead a name without being part of it ("Call Birinder Thursday").
+const COMMON_AFTER_NAME =
+  /^(?:mark|move|log|draft|email|e-mail|call|text|add|find|show|remove|archive|message|remind|schedule|send|write|open|update|edit|invite|ask|tell|contact|check|follow|set|plan|book|please|hi|hey|thanks|meet|coffee|lunch|today|tomorrow|tonight|next|this|monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec|morning|afternoon|evening|week|i|and|or|with|at|on|to|for)$/i;
+
+/** Her question when a first name or surname is on two or more cards. */
+export function whichPartner(said: string, choices: string[]): string {
+  const list = choices.slice(0, 4);
+  const names = list.length > 1 ? `${list.slice(0, -1).join(", ")} or ${list.at(-1)}` : list[0];
+  return `Which ${titleCase(said)} do you mean: ${names}? Ask again with their full name, or pick the card on Referrals.`;
 }
 
 /**
@@ -279,6 +547,12 @@ export type GuardOptions = {
    * uploads and free-text tool results.
    */
   failClosedWhenLong?: boolean;
+  /**
+   * Her chat message (lib/aeon/agent.ts): a first name or surname on two or more board
+   * cards comes back as ambiguous_partner with a question naming them. Elsewhere such a
+   * name is judged the usual way.
+   */
+  askWhichPartner?: boolean;
 };
 
 export async function guard(text: string, at: GuardPoint, allow?: Allowlist, opts: GuardOptions = {}): Promise<GuardResult> {
@@ -289,6 +563,7 @@ export async function guard(text: string, at: GuardPoint, allow?: Allowlist, opt
     contacts: raw.contacts.map(normalizeForCheck),
     ...(raw.directory ? { directory: raw.directory.map(normalizeForCheck) } : {}),
     ...(raw.places ? { places: raw.places.map(normalizeForCheck) } : {}),
+    ...(raw.partners ? { partners: raw.partners.map(normalizeForCheck) } : {}),
   };
   const whole = await checkWithVariants(text, at, list, opts);
   if (whole.ok || at !== "reply" || whole.kind === "unavailable" || whole.kind === "too_long") return whole;
@@ -427,13 +702,41 @@ async function checkOnce(text: string, at: GuardPoint, list: Allowlist, opts: Gu
     // A second, cheaper read with every word capitalized: names written in
     // capitals or lowercase ("KEVIN ORTIZ", "carin gordon") are found too.
     cased = titled === plain || titled.length !== plain.length ? [] : await findNames(titled, { secondReads: false });
+    // One name read across a sentence end ("coffee with Maria. Maria's PTSD is worse" gives
+    // "Maria. Maria"): each side is judged on its own, at every place it appears.
+    const split = (list: string[]) => list.flatMap((n) => n.split(/(?<!\b(?:Dr|Doctor|Mr|Mrs|Ms|Mx|Prof|Rev|Fr|St|\p{Lu}))[.!?]+\s+/u).map((p) => p.trim()).filter(Boolean));
+    names = split(names);
+    cased = split(cased);
   } catch (err) {
     if (err instanceof Error && err.name === "TooLongToCheck") return { ok: false, kind: "too_long" };
     console.error(`[guard] name-finder unavailable: ${err instanceof Error ? err.message : String(err)}`);
     return { ok: false, kind: "unavailable" };
   }
+  // A partner's first name or surname written in lowercase, which the name-finder can miss
+  // ("maria no-showed again"), in a sentence about someone's own life or visits: refused.
+  if (at === "message" || at === "memory") {
+    const cards = partnerCards(list);
+    for (const t of tokensOf(plain)) {
+      if (t.capital || !cards.some((c) => c.words.includes(t.base))) continue;
+      const s = sentenceAt(plain, t.at);
+      if (MY_CLIENT.test(s) || clientLike(s) || PERSONAL_MATTER.test(s) || !businessOnly(s)) return { ok: false, kind: "client_name" };
+    }
+  }
   const strangers: string[] = [];
+  // Her partners named by first name or surname (partnerMatch): one card each passes;
+  // a name on two or more cards is asked about at her message, judged as before elsewhere.
+  let ambiguous: { said: string; choices: string[] } | null = null;
+  const asPartner = (n: string): boolean => {
+    const p = partnerMatch(n, plain, list);
+    if (p.kind === "partners") return true;
+    if (p.kind === "ambiguous" && at === "message" && opts.askWhichPartner) {
+      ambiguous ??= { said: p.said, choices: p.choices };
+      return true;
+    }
+    return false;
+  };
   for (const n of names.filter(isNameLike)) {
+    if (asPartner(n)) continue;
     const v = judgePerson(n, plain, list);
     if (v.verdict === "refuse") return { ok: false, kind: v.kind };
     const w = joined === plain ? v : judgePerson(n, joined, list);
@@ -451,12 +754,16 @@ async function checkOnce(text: string, at: GuardPoint, list: Allowlist, opts: Gu
       // capitalized words are her own or a board name, that name was judged above.
       const capital = asWritten.split(/\s+/).filter((w) => /^\p{Lu}/u.test(w));
       if (capital.length > 0 && capital.length < asWritten.split(/\s+/).length && partOf(wordsOf(capital.join(" ")), list.names)) continue;
+      if (asPartner(asWritten)) continue;
       const v = judgePerson(asWritten, plain, list);
       if (v.verdict === "refuse") return { ok: false, kind: v.kind };
       if (v.verdict === "blank" && /\s/.test(n.trim())) strangers.push(asWritten);
     }
   }
-  if (strangers.length === 0) return { ok: true, text };
+  if (strangers.length === 0) {
+    const which = ambiguous as { said: string; choices: string[] } | null;
+    return which ? { ok: false, kind: "ambiguous_partner", question: whichPartner(which.said, which.choices) } : { ok: true, text };
+  }
   // A tool result or Aeon's own reply keeps its content with the names blanked
   // out, so one word misread as a name doesn't throw away a whole answer.
   // Anything she typed or Aeon would save is refused outright.
@@ -493,8 +800,9 @@ export async function practiceAllowlist(): Promise<Allowlist> {
     select full_name, practice_name, city, neighborhood from practice_os.clinician_profile limit 1`;
   const [cred] = await sql<{ identity: Record<string, string>; practice_location: Record<string, unknown> }[]>`
     select identity, practice_location from practice_os.credentialing_profile limit 1`.catch(() => []);
-  const sources = await sql<{ name: string; organization: string | null; email: string | null; phone: string | null; address: string | null }[]>`
-    select name, organization, email, phone, address from practice_os.referral_sources`;
+  const sources = await sql<
+    { name: string; organization: string | null; npi_type: string | null; email: string | null; phone: string | null; address: string | null }[]
+  >`select name, organization, npi_type, email, phone, address from practice_os.referral_sources`;
 
   const location = (cred?.practice_location ?? {}) as { name?: string; phone?: string; address?: { street?: string } };
   const names: (string | null | undefined)[] = [
@@ -508,6 +816,12 @@ export async function practiceAllowlist(): Promise<Allowlist> {
   const present = (v: string | null | undefined): v is string => Boolean(v);
   const directory = sources.flatMap((s) => [s.name, s.organization]).filter(present);
   const places = [profile?.city, profile?.neighborhood].filter(present);
-  cached = { at: Date.now(), list: { names: names.filter(present), contacts: contacts.filter(present), directory, places } };
+  // The people on her board (NPPES individuals, or a card that reads as a person's name), so
+  // "Maria" alone can be resolved to the one Maria on it. Every card counts, do-not-contact,
+  // Not a fit and sensitive ones too: their tools refuse them in plain words, not the privacy check.
+  const partners = sources
+    .filter((s) => s.npi_type === "individual" || (s.npi_type !== "organization" && looksLikePerson(s.name)))
+    .map((s) => s.name);
+  cached = { at: Date.now(), list: { names: names.filter(present), contacts: contacts.filter(present), directory, places, partners } };
   return cached.list;
 }
